@@ -1,5 +1,9 @@
+//! Database schema definitions matching beads_rust (br) for interoperability.
+
+use rusqlite::Connection;
+
 /// The complete SQL schema for the beads database.
-/// Schema matches classic bd (Go) for interoperability.
+/// Schema matches beads_rust (br) for interoperability.
 pub const SCHEMA_SQL: &str = r"
     -- Issues table
     -- Note: TEXT fields use DEFAULT '' for bd (Go) compatibility.
@@ -199,17 +203,6 @@ pub const SCHEMA_SQL: &str = r"
         FOREIGN KEY (parent_id) REFERENCES issues(id) ON DELETE CASCADE
     );
 
-    -- Critical Path Cache (for float-based ordering in claim operations)
-    -- Stores the critical path float value for each bead.
-    -- Lower float = more critical (closer to root of critical path).
-    CREATE TABLE IF NOT EXISTS critical_path_cache (
-        bead_id TEXT PRIMARY KEY,
-        float REAL NOT NULL DEFAULT 999999,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_critical_path_float ON critical_path_cache(float);
-
     -- Recovery Sessions (for anomaly/recovery audit trail)
     CREATE TABLE IF NOT EXISTS recovery_sessions (
         correlation_id TEXT PRIMARY KEY,
@@ -364,17 +357,17 @@ fn split_sql_statements(sql: &str) -> Vec<&str> {
 }
 
 /// Execute multiple SQL statements separated by semicolons.
-fn execute_batch(conn: &rusqlite::Connection, sql: &str) -> anyhow::Result<()> {
+fn execute_batch(conn: &Connection, sql: &str) -> anyhow::Result<()> {
     conn.execute_batch(sql)?;
     Ok(())
 }
 
-pub fn apply_schema(conn: &rusqlite::Connection) -> anyhow::Result<()> {
+pub fn apply_schema(conn: &Connection) -> anyhow::Result<()> {
     execute_batch(conn, SCHEMA_SQL)?;
     Ok(())
 }
 
-pub fn ensure_wal_mode(conn: &rusqlite::Connection) -> anyhow::Result<()> {
+pub fn ensure_wal_mode(conn: &Connection) -> anyhow::Result<()> {
     // Use execute_batch so PRAGMAs that return rows don't cause errors
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
