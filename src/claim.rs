@@ -89,13 +89,19 @@ pub fn claim(
     if let Some(row) = rows.next()? {
         let bead_id: String = row.get(0)?;
 
-        // Step 3: Update the winner to in_progress
-        tx.execute(
+        // Step 3: Update the winner to in_progress with a race condition check
+        // The WHERE status = 'open' condition ensures we only claim if still open
+        let rows_affected = tx.execute(
             "UPDATE issues
              SET status = 'in_progress', assignee = ?, updated_at = ?
-             WHERE id = ?",
+             WHERE id = ? AND status = 'open'",
             params![worker, now.to_rfc3339(), &bead_id],
         )?;
+
+        // If no rows were affected, another worker claimed this bead first
+        if rows_affected == 0 {
+            return Ok(None);
+        }
 
         // Step 4: Insert event
         tx.execute(
