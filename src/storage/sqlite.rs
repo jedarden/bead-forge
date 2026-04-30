@@ -269,41 +269,87 @@ impl Storage {
     pub fn update_issue(&self, id: &str, changes: &IssueChanges) -> Result<()> {
         self.with_immediate_transaction(|tx| {
             let mut updates = Vec::new();
-            let mut params: Vec<String> = Vec::new();
+            let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
             if let Some(ref title) = changes.title {
                 updates.push("title = ?");
-                params.push(title.clone());
+                params.push(Box::new(title.clone()));
             }
             if let Some(ref description) = changes.description {
                 updates.push("description = ?");
-                params.push(description.clone());
+                params.push(Box::new(description.clone()));
+            }
+            if let Some(ref design) = changes.design {
+                updates.push("design = ?");
+                params.push(Box::new(design.clone()));
+            }
+            if let Some(ref acceptance_criteria) = changes.acceptance_criteria {
+                updates.push("acceptance_criteria = ?");
+                params.push(Box::new(acceptance_criteria.clone()));
+            }
+            if let Some(ref notes) = changes.notes {
+                updates.push("notes = ?");
+                params.push(Box::new(notes.clone()));
             }
             if let Some(ref status) = changes.status {
                 updates.push("status = ?");
-                params.push(status.to_string());
+                params.push(Box::new(status.to_string()));
             }
             if let Some(priority) = changes.priority {
                 updates.push("priority = ?");
-                params.push(priority.to_string());
+                params.push(Box::new(priority));
             }
             if let Some(ref issue_type) = changes.issue_type {
                 updates.push("issue_type = ?");
-                params.push(issue_type.to_string());
+                params.push(Box::new(issue_type.to_string()));
             }
             if let Some(ref assignee) = changes.assignee {
                 updates.push("assignee = ?");
-                params.push(assignee.clone());
+                params.push(Box::new(assignee.clone()));
             }
+            if let Some(ref owner) = changes.owner {
+                updates.push("owner = ?");
+                params.push(Box::new(owner.clone()));
+            }
+            if let Some(estimated_minutes) = changes.estimated_minutes {
+                updates.push("estimated_minutes = ?");
+                params.push(Box::new(estimated_minutes));
+            }
+            if let Some(ref due_at) = changes.due_at {
+                updates.push("due_at = ?");
+                params.push(Box::new(due_at.to_rfc3339()));
+            }
+            if let Some(ref defer_until) = changes.defer_until {
+                updates.push("defer_until = ?");
+                params.push(Box::new(defer_until.to_rfc3339()));
+            }
+            if let Some(ref external_ref) = changes.external_ref {
+                updates.push("external_ref = ?");
+                params.push(Box::new(external_ref.clone()));
+            }
+            let now = Utc::now();
             if !updates.is_empty() {
                 updates.push("updated_at = ?");
-                let now = Utc::now().to_rfc3339();
-                params.push(now);
+                params.push(Box::new(now.to_rfc3339()));
                 let query = format!("UPDATE issues SET {} WHERE id = ?", updates.join(", "));
-                let mut all_params = params.clone();
-                all_params.push(id.to_string());
+                let mut all_params: Vec<Box<dyn rusqlite::ToSql>> = params.into_iter().collect();
+                all_params.push(Box::new(id.to_string()));
                 let param_refs: Vec<&dyn rusqlite::ToSql> =
-                    all_params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+                    all_params.iter().map(|p| p.as_ref()).collect();
                 tx.execute(&query, param_refs.as_slice())?;
+            }
+            // Handle label updates separately
+            if let Some(ref labels) = changes.labels {
+                tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![id])?;
+                for label in labels {
+                    tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![id, label])?;
+                }
+            }
+            // Mark as dirty for export (if any changes were made)
+            if !updates.is_empty() || changes.labels.is_some() {
+                tx.execute(
+                    "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                    params![id, now.to_rfc3339()],
+                )?;
             }
             Ok(())
         })
@@ -319,6 +365,38 @@ impl Storage {
             tx.execute(
                 "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'closed', ?2, NULL, ?3, ?4)",
                 params![id, actor, reason, now.to_rfc3339()],
+            )?;
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                params![id, now.to_rfc3339()],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn mark_dirty(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+            params![id, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn rebuild_blocked_cache(&self) -> Result<()> {
+        self.with_immediate_transaction(|tx| {
+            tx.execute("DELETE FROM blocked_issues_cache", [])?;
+
+            tx.execute(
+                "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                 SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                 FROM dependencies d
+                 INNER JOIN issues i ON i.id = d.depends_on_id
+                 WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 AND i.status NOT IN ('closed', 'tombstone')
+                 GROUP BY d.issue_id",
+                params![Utc::now().to_rfc3339()],
             )?;
             Ok(())
         })
