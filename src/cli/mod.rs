@@ -68,13 +68,17 @@ pub enum Commands {
         #[arg(long)]
         priority: Option<i32>,
 
-        /// Limit results
+        /// Limit results (0 = unlimited)
         #[arg(long)]
         limit: Option<usize>,
 
         /// Output format (text, json)
         #[arg(long, default_value = "text")]
         format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 
     /// Show bead details
@@ -85,6 +89,10 @@ pub enum Commands {
         /// Output format (text, json)
         #[arg(long, default_value = "text")]
         format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 
     /// Update a bead
@@ -133,13 +141,17 @@ pub enum Commands {
 
     /// Show ready (unblocked) beads
     Ready {
-        /// Limit results
+        /// Limit results (0 = unlimited)
         #[arg(long, default_value = "10")]
         limit: usize,
 
         /// Output format (text, json)
         #[arg(long, default_value = "text")]
         format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 
     /// Claim a bead (atomic)
@@ -167,6 +179,10 @@ pub enum Commands {
         /// Output format (text, json)
         #[arg(long, default_value = "text")]
         format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 
     /// Initialize a new workspace
@@ -465,18 +481,26 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::Create { title, type_, priority, description, assignee, label } => {
             cmd_create(&beads_dir, title, type_, priority, description, assignee, label)
         }
-        Commands::List { status, type_, assignee, priority, limit, format } => {
+        Commands::List { status, type_, assignee, priority, limit, format, json } => {
+            let format = if json { "json".to_string() } else { format };
             cmd_list(&beads_dir, status, type_, assignee, priority, limit, &format)
         }
-        Commands::Show { id, format } => cmd_show(&beads_dir, &id, &format),
+        Commands::Show { id, format, json } => {
+            let format = if json { "json".to_string() } else { format };
+            cmd_show(&beads_dir, &id, &format)
+        }
         Commands::Update { id, title, status, priority, assignee } => {
             cmd_update(&beads_dir, &id, title, status, priority, assignee)
         }
         Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason),
         Commands::Reopen { id } => cmd_reopen(&beads_dir, &id),
         Commands::Delete { id } => cmd_delete(&beads_dir, &id),
-        Commands::Ready { limit, format } => cmd_ready(&beads_dir, limit, &format),
-        Commands::Claim { assignee, model, harness, harness_version, dry_run, format } => {
+        Commands::Ready { limit, format, json } => {
+            let format = if json { "json".to_string() } else { format };
+            cmd_ready(&beads_dir, limit, &format)
+        }
+        Commands::Claim { assignee, model, harness, harness_version, dry_run, format, json } => {
+            let format = if json { "json".to_string() } else { format };
             cmd_claim(&beads_dir, &assignee, model, harness, harness_version, dry_run, &format)
         }
         Commands::Sync { flush_only, import_only } => cmd_sync(&beads_dir, flush_only, import_only),
@@ -587,15 +611,14 @@ fn cmd_list(
     }
     filter.assignee = assignee;
     filter.priority = priority;
-    filter.limit = limit;
+    // --limit 0 means unlimited
+    filter.limit = limit.and_then(|l| if l == 0 { None } else { Some(l) });
 
     let issues = storage.list_issues(&filter)?;
 
     match format {
         "json" => {
-            for issue in issues {
-                println!("{}", serde_json::to_string(&issue)?);
-            }
+            println!("{}", serde_json::to_string(&issues)?);
         }
         _ => {
             for issue in issues {
@@ -616,7 +639,15 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
 
     match format {
         "json" => {
-            println!("{}", serde_json::to_string_pretty(&issue)?);
+            // Strip dependencies/comments before serializing: NEEDLE's BrDependency
+            // format ({id, title, status, priority, dependency_type}) differs from
+            // bead-forge's Dependency format ({issue_id, depends_on_id, type, ...}).
+            // NEEDLE has #[serde(default)] on the deps field so empty is fine.
+            let mut out = issue;
+            out.dependencies = vec![];
+            out.comments = vec![];
+            // Wrap in array so NEEDLE's parse_single_bead (Vec<Bead> → first) works.
+            println!("{}", serde_json::to_string(&vec![out])?);
         }
         _ => {
             println!("ID: {}", issue.id);
@@ -768,6 +799,8 @@ fn cmd_claim(
                     println!("{} (priority={}, impact={})", candidate.id, candidate.priority, candidate.downstream_impact);
                 }
             }
+        } else if format == "json" {
+            println!("{{}}");
         } else {
             println!("No beads available to claim");
         }
@@ -794,7 +827,11 @@ fn cmd_claim(
                 }
             }
             None => {
-                println!("No beads available to claim");
+                if format == "json" {
+                    println!("{{}}");
+                } else {
+                    println!("No beads available to claim");
+                }
             }
         }
     }

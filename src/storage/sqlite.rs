@@ -22,7 +22,16 @@ impl Storage {
     pub fn open(db_path: &Path) -> Result<Self> {
         let conn = Connection::open(db_path)?;
         ensure_wal_mode(&conn)?;
-        apply_schema(&conn)?;
+        // Only apply schema if the issues table doesn't exist yet (avoids DDL lock contention
+        // when NEEDLE workers hold a continuous read lock on the database)
+        let needs_schema: bool = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='issues'",
+            [],
+            |row| row.get::<_, i64>(0),
+        ).map(|n| n == 0).unwrap_or(true);
+        if needs_schema {
+            apply_schema(&conn)?;
+        }
         Ok(Storage { conn: Mutex::new(conn) })
     }
 
@@ -89,7 +98,7 @@ impl Storage {
         )?;
         let mut rows = stmt.query(params![id])?;
         if let Some(row) = rows.next()? {
-            Ok(Some(self.row_to_issue(row)?))
+            Ok(Some(Self::row_to_issue_conn(&conn, row)?))
         } else {
             Ok(None)
         }
@@ -141,7 +150,7 @@ impl Storage {
         let mut rows = stmt.query(param_refs.as_slice())?;
         let mut issues = Vec::new();
         while let Some(row) = rows.next()? {
-            issues.push(self.row_to_issue(row)?);
+            issues.push(Self::row_to_issue_conn(&conn, row)?);
         }
         Ok(issues)
     }
@@ -161,7 +170,7 @@ impl Storage {
         let mut rows = stmt.query([])?;
         let mut issues = Vec::new();
         while let Some(row) = rows.next()? {
-            issues.push(self.row_to_issue(row)?);
+            issues.push(Self::row_to_issue_conn(&conn, row)?);
         }
         Ok(issues)
     }
@@ -183,7 +192,7 @@ impl Storage {
         let mut rows = stmt.query([])?;
         let mut issues = Vec::new();
         while let Some(row) = rows.next()? {
-            issues.push(self.row_to_issue(row)?);
+            issues.push(Self::row_to_issue_conn(&conn, row)?);
         }
         Ok(issues)
     }
@@ -344,7 +353,7 @@ impl Storage {
         }
     }
 
-    fn row_to_issue(&self, row: &rusqlite::Row) -> Result<Issue> {
+    fn row_to_issue_conn(conn: &Connection, row: &rusqlite::Row) -> Result<Issue> {
         let status_str: String = row.get(7)?;
         let type_str: String = row.get(9)?;
         let parse_opt_dt = |idx: usize| -> Result<Option<DateTime<Utc>>> {
@@ -355,8 +364,8 @@ impl Storage {
                 Some(val) => Ok(Some(parse_datetime(val)?)),
             }
         };
+        let id: String = row.get(0)?;
         Ok(Issue {
-            id: row.get(0)?,
             content_hash: row.get(1)?,
             title: row.get(2)?,
             description: row.get(3)?,
@@ -392,14 +401,14 @@ impl Storage {
             ephemeral: row.get::<_, i32>(33)? != 0,
             pinned: row.get::<_, i32>(34)? != 0,
             is_template: row.get::<_, i32>(35)? != 0,
-            labels: self.load_labels(&row.get::<_, String>(0)?)?,
-            dependencies: self.load_dependencies(&row.get::<_, String>(0)?)?,
-            comments: self.load_comments(&row.get::<_, String>(0)?)?,
+            labels: Self::load_labels_conn(conn, &id)?,
+            dependencies: Self::load_dependencies_conn(conn, &id)?,
+            comments: Self::load_comments_conn(conn, &id)?,
+            id,
         })
     }
 
-    fn load_labels(&self, issue_id: &str) -> Result<Vec<String>> {
-        let conn = self.conn.lock().unwrap();
+    fn load_labels_conn(conn: &Connection, issue_id: &str) -> Result<Vec<String>> {
         let mut stmt = conn.prepare("SELECT label FROM labels WHERE issue_id = ?1")?;
         let mut rows = stmt.query(params![issue_id])?;
         let mut labels = Vec::new();
@@ -409,8 +418,7 @@ impl Storage {
         Ok(labels)
     }
 
-    fn load_dependencies(&self, issue_id: &str) -> Result<Vec<Dependency>> {
-        let conn = self.conn.lock().unwrap();
+    fn load_dependencies_conn(conn: &Connection, issue_id: &str) -> Result<Vec<Dependency>> {
         let mut stmt = conn.prepare(
             "SELECT issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by FROM dependencies WHERE issue_id = ?1",
         )?;
@@ -431,8 +439,7 @@ impl Storage {
         Ok(deps)
     }
 
-    fn load_comments(&self, issue_id: &str) -> Result<Vec<Comment>> {
-        let conn = self.conn.lock().unwrap();
+    fn load_comments_conn(conn: &Connection, issue_id: &str) -> Result<Vec<Comment>> {
         let mut stmt = conn.prepare(
             "SELECT id, issue_id, author, text, created_at FROM comments WHERE issue_id = ?1",
         )?;
@@ -448,6 +455,21 @@ impl Storage {
             });
         }
         Ok(comments)
+    }
+
+    fn load_labels(&self, issue_id: &str) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        Self::load_labels_conn(&conn, issue_id)
+    }
+
+    fn load_dependencies(&self, issue_id: &str) -> Result<Vec<Dependency>> {
+        let conn = self.conn.lock().unwrap();
+        Self::load_dependencies_conn(&conn, issue_id)
+    }
+
+    fn load_comments(&self, issue_id: &str) -> Result<Vec<Comment>> {
+        let conn = self.conn.lock().unwrap();
+        Self::load_comments_conn(&conn, issue_id)
     }
 
     pub fn add_dependency(&self, issue_id: &str, depends_on_id: &str, dep_type: &DependencyType, created_by: &str) -> Result<()> {
@@ -602,7 +624,7 @@ impl Storage {
         let mut rows = stmt.query(param_refs.as_slice())?;
         let mut issues = Vec::new();
         while let Some(row) = rows.next()? {
-            issues.push(self.row_to_issue(row)?);
+            issues.push(Self::row_to_issue_conn(&conn, row)?);
         }
         Ok(issues)
     }

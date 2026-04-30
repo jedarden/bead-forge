@@ -365,9 +365,7 @@ fn split_sql_statements(sql: &str) -> Vec<&str> {
 
 /// Execute multiple SQL statements separated by semicolons.
 fn execute_batch(conn: &rusqlite::Connection, sql: &str) -> anyhow::Result<()> {
-    for stmt in split_sql_statements(sql) {
-        conn.execute(stmt, [])?;
-    }
+    conn.execute_batch(sql)?;
     Ok(())
 }
 
