@@ -585,6 +585,161 @@ impl Issue {
         let hash = Sha256::digest(serialized.as_bytes());
         format!("{:x}", hash)
     }
+
+    /// Compare two issues using sync semantics instead of raw struct equality.
+    ///
+    /// This ignores derived or volatile audit fields that would otherwise make
+    /// semantically identical issues look different across import/export
+    /// boundaries, while still comparing the full synced payload including
+    /// labels, dependencies, comments, and user-visible timestamps like `due_at`.
+    #[must_use]
+    pub fn sync_equals(&self, other: &Self) -> bool {
+        if self.id != other.id
+            || self.title != other.title
+            || self.description != other.description
+            || self.design != other.design
+            || self.acceptance_criteria != other.acceptance_criteria
+            || self.notes != other.notes
+            || self.status != other.status
+            || self.priority != other.priority
+            || self.issue_type != other.issue_type
+            || self.assignee != other.assignee
+            || self.owner != other.owner
+            || self.estimated_minutes != other.estimated_minutes
+            || self.created_by != other.created_by
+            || self.closed_at != other.closed_at
+            || self.close_reason != other.close_reason
+            || self.closed_by_session != other.closed_by_session
+            || self.due_at != other.due_at
+            || self.defer_until != other.defer_until
+            || self.external_ref != other.external_ref
+            || self.source_system != other.source_system
+            || self.source_repo != other.source_repo
+            || self.deleted_at != other.deleted_at
+            || self.deleted_by != other.deleted_by
+            || self.delete_reason != other.delete_reason
+            || self.original_type != other.original_type
+            || self.compacted_at != other.compacted_at
+            || self.compacted_at_commit != other.compacted_at_commit
+            || self.original_size != other.original_size
+            || self.sender != other.sender
+            || self.ephemeral != other.ephemeral
+            || self.pinned != other.pinned
+            || self.is_template != other.is_template
+        {
+            return false;
+        }
+
+        // Handle compaction_level serialization quirk where None == 0
+        if self.compaction_level.unwrap_or(0) != other.compaction_level.unwrap_or(0) {
+            return false;
+        }
+
+        // Fast path for relations: if lengths differ, they can't be equal
+        if self.dependencies.len() != other.dependencies.len()
+            || self.comments.len() != other.comments.len()
+        {
+            return false;
+        }
+
+        // Compare labels (order independent)
+        let mut self_labels = self.labels.clone();
+        self_labels.sort_unstable();
+        self_labels.dedup();
+        let mut other_labels = other.labels.clone();
+        other_labels.sort_unstable();
+        other_labels.dedup();
+        if self_labels != other_labels {
+            return false;
+        }
+
+        // Compare dependencies (order independent)
+        let mut self_deps = self.dependencies.clone();
+        self_deps.sort_by(|left, right| {
+            left.issue_id
+                .cmp(&right.issue_id)
+                .then_with(|| left.depends_on_id.cmp(&right.depends_on_id))
+                .then_with(|| left.dep_type.as_str().cmp(right.dep_type.as_str()))
+                .then_with(|| left.created_at.cmp(&right.created_at))
+                .then_with(|| left.created_by.cmp(&right.created_by))
+                .then_with(|| left.metadata.cmp(&right.metadata))
+                .then_with(|| left.thread_id.cmp(&right.thread_id))
+        });
+        let mut other_deps = other.dependencies.clone();
+        other_deps.sort_by(|left, right| {
+            left.issue_id
+                .cmp(&right.issue_id)
+                .then_with(|| left.depends_on_id.cmp(&right.depends_on_id))
+                .then_with(|| left.dep_type.as_str().cmp(right.dep_type.as_str()))
+                .then_with(|| left.created_at.cmp(&right.created_at))
+                .then_with(|| left.created_by.cmp(&right.created_by))
+                .then_with(|| left.metadata.cmp(&right.metadata))
+                .then_with(|| left.thread_id.cmp(&right.thread_id))
+        });
+        if self_deps != other_deps {
+            return false;
+        }
+
+        // Compare comments (order independent)
+        let mut self_comments = self.comments.clone();
+        self_comments.sort_by(|left, right| {
+            left.issue_id
+                .cmp(&right.issue_id)
+                .then_with(|| left.created_at.cmp(&right.created_at))
+                .then_with(|| left.author.cmp(&right.author))
+                .then_with(|| left.body.cmp(&right.body))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        let mut other_comments = other.comments.clone();
+        other_comments.sort_by(|left, right| {
+            left.issue_id
+                .cmp(&right.issue_id)
+                .then_with(|| left.created_at.cmp(&right.created_at))
+                .then_with(|| left.author.cmp(&right.author))
+                .then_with(|| left.body.cmp(&right.body))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        if self_comments != other_comments {
+            return false;
+        }
+
+        true
+    }
+
+    /// Check if this issue is a tombstone that has exceeded its TTL.
+    #[must_use]
+    pub fn is_expired_tombstone(&self, retention_days: Option<u64>) -> bool {
+        if self.status != Status::Tombstone {
+            return false;
+        }
+
+        let Some(days) = retention_days else {
+            return false;
+        };
+
+        if days == 0 {
+            return false;
+        }
+
+        let Some(deleted_at) = self.deleted_at else {
+            return false;
+        };
+
+        // Clamp days to a safe maximum to avoid panic in Duration::days().
+        let max_safe_days = 365_u64 * 1000;
+        let days_i64 = i64::try_from(days.min(max_safe_days)).unwrap_or(365_000);
+        let expiration_time = deleted_at + chrono::Duration::days(days_i64);
+        Utc::now() > expiration_time
+    }
+}
+
+/// Epic completion status with child counts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EpicStatus {
+    pub epic: Issue,
+    pub total_children: usize,
+    pub closed_children: usize,
+    pub eligible_for_close: bool,
 }
 
 /// Relationship between two issues.
@@ -949,5 +1104,204 @@ mod tests {
         let serialized = serde_json::to_string(&issue).unwrap();
         let roundtrip: Issue = serde_json::from_str(&serialized).unwrap();
         assert_eq!(issue, roundtrip);
+    }
+
+    #[test]
+    fn test_epic_status_serialization() {
+        let epic_status = EpicStatus {
+            epic: Issue {
+                id: "bd-epic".to_string(),
+                title: "Epic".to_string(),
+                created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+                updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+                ..Default::default()
+            },
+            total_children: 10,
+            closed_children: 7,
+            eligible_for_close: false,
+        };
+
+        let json = serde_json::to_string(&epic_status).unwrap();
+        assert!(json.contains("\"total_children\":10"));
+        assert!(json.contains("\"closed_children\":7"));
+        assert!(json.contains("\"eligible_for_close\":false"));
+    }
+
+    #[test]
+    fn test_sync_equals_ignores_audit_timestamps_and_relation_order() {
+        let mut issue1 = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec!["backend".to_string(), "bug".to_string()],
+            dependencies: vec![
+                Dependency {
+                    issue_id: "bd-test".to_string(),
+                    depends_on_id: "bd-parent".to_string(),
+                    dep_type: DependencyType::Blocks,
+                    created_at: Utc.timestamp_opt(1_700_000_100, 0).unwrap(),
+                    created_by: Some("alice".to_string()),
+                    metadata: Some("{\"source\":\"cli\"}".to_string()),
+                    thread_id: Some("br-1".to_string()),
+                },
+                Dependency {
+                    issue_id: "bd-test".to_string(),
+                    depends_on_id: "bd-epic".to_string(),
+                    dep_type: DependencyType::ParentChild,
+                    created_at: Utc.timestamp_opt(1_700_000_200, 0).unwrap(),
+                    created_by: Some("alice".to_string()),
+                    metadata: None,
+                    thread_id: None,
+                },
+            ],
+            comments: vec![
+                Comment {
+                    id: 2,
+                    issue_id: "bd-test".to_string(),
+                    author: "alice".to_string(),
+                    body: "second".to_string(),
+                    created_at: Utc.timestamp_opt(1_700_000_200, 0).unwrap(),
+                },
+                Comment {
+                    id: 1,
+                    issue_id: "bd-test".to_string(),
+                    author: "alice".to_string(),
+                    body: "first".to_string(),
+                    created_at: Utc.timestamp_opt(1_700_000_100, 0).unwrap(),
+                },
+            ],
+            ..Default::default()
+        };
+
+        let mut issue2 = issue1.clone();
+        issue2.created_at = Utc.timestamp_opt(1_800_000_000, 0).unwrap();
+        issue2.updated_at = Utc.timestamp_opt(1_800_000_500, 0).unwrap();
+        issue2.labels.reverse();
+        issue2.dependencies.reverse();
+        issue2.comments.reverse();
+        issue2.content_hash = Some("stale-hash".to_string());
+
+        assert!(issue1.sync_equals(&issue2));
+        assert!(issue2.sync_equals(&issue1));
+    }
+
+    #[test]
+    fn test_sync_equals_detects_semantic_changes() {
+        let issue1 = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        let mut issue2 = issue1.clone();
+        issue2.due_at = Some(Utc.timestamp_opt(1_800_000_000, 0).unwrap());
+
+        assert!(!issue1.sync_equals(&issue2));
+    }
+
+    #[test]
+    fn test_sync_equals_treats_duplicate_labels_as_equivalent() {
+        let mut issue1 = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        issue1.labels = vec![
+            "backend".to_string(),
+            "backend".to_string(),
+            "urgent".to_string(),
+        ];
+
+        let mut issue2 = issue1.clone();
+        issue2.labels = vec!["urgent".to_string(), "backend".to_string()];
+
+        assert!(issue1.sync_equals(&issue2));
+        assert!(issue2.sync_equals(&issue1));
+    }
+
+    #[test]
+    fn test_is_expired_tombstone_not_tombstone() {
+        let issue = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Open,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        assert!(!issue.is_expired_tombstone(Some(30)));
+    }
+
+    #[test]
+    fn test_is_expired_tombstone_no_retention() {
+        let mut issue = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Tombstone,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        issue.deleted_at = Some(Utc::now() - chrono::Duration::days(100));
+        assert!(!issue.is_expired_tombstone(None));
+    }
+
+    #[test]
+    fn test_is_expired_tombstone_zero_retention() {
+        let mut issue = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Tombstone,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        issue.deleted_at = Some(Utc::now() - chrono::Duration::days(100));
+        assert!(!issue.is_expired_tombstone(Some(0)));
+    }
+
+    #[test]
+    fn test_is_expired_tombstone_no_deleted_at() {
+        let issue = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Tombstone,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        assert!(!issue.is_expired_tombstone(Some(30)));
+    }
+
+    #[test]
+    fn test_is_expired_tombstone_not_expired() {
+        let mut issue = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Tombstone,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        issue.deleted_at = Some(Utc::now() - chrono::Duration::days(10));
+        assert!(!issue.is_expired_tombstone(Some(30)));
+    }
+
+    #[test]
+    fn test_is_expired_tombstone_expired() {
+        let mut issue = Issue {
+            id: "bd-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Tombstone,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+        issue.deleted_at = Some(Utc::now() - chrono::Duration::days(40));
+        assert!(issue.is_expired_tombstone(Some(30)));
     }
 }
