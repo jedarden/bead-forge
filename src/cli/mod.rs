@@ -1572,7 +1572,7 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
     Ok(())
 }
 
-fn cmd_log(beads_dir: &PathBuf, id: &str, limit: Option<usize>, format: &str) -> Result<()> {
+fn cmd_log(beads_dir: &PathBuf, id: &str, _limit: Option<usize>, format: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let _storage = Storage::open(&db_path)?;
@@ -1589,7 +1589,7 @@ fn cmd_log(beads_dir: &PathBuf, id: &str, limit: Option<usize>, format: &str) ->
     Ok(())
 }
 
-fn cmd_critical_path(beads_dir: &PathBuf, id: &str, max_depth: usize, format: &str) -> Result<()> {
+fn cmd_critical_path(beads_dir: &PathBuf, id: &str, _max_depth: usize, format: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let _storage = Storage::open(&db_path)?;
