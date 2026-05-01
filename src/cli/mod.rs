@@ -469,22 +469,22 @@ pub enum DepCommands {
 pub enum LabelCommands {
     /// Add label(s) to an issue
     Add {
-        /// Issue ID
-        id: String,
-
         /// Label(s) to add (multiple labels supported)
         #[arg(short, long, required = true, num_args = 1..)]
         label: Vec<String>,
+
+        /// Issue ID
+        id: String,
     },
 
     /// Remove label(s) from an issue
     Remove {
-        /// Issue ID
-        id: String,
-
         /// Label(s) to remove (multiple labels supported)
         #[arg(short, long, required = true, num_args = 1..)]
         label: Vec<String>,
+
+        /// Issue ID
+        id: String,
     },
 
     /// List labels for an issue or all unique labels

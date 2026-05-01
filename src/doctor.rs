@@ -54,7 +54,7 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
 
     // Check consistency
     if db_ok && jsonl_ok {
-        if let Some(count_mismatch) = check_consistency(&db_path, &jsonl_path)? {
+        if check_consistency(&db_path, &jsonl_path)?.is_some() {
             issues.push(format!(
                 "Count mismatch: database has {} issues, JSONL has {}",
                 db_issue_count, jsonl_line_count
