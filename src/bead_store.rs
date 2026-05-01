@@ -7,7 +7,7 @@
 //! # Migration from br's ready+claim
 //!
 //! **OLD (racy - TOCTOU race condition):**
-//! ```rust
+//! ```text
 //! // Step 1: Get candidate list (snapshot)
 //! let candidates = br_ready().await?;
 //! // ← Race window: another worker can claim the top candidate here
@@ -18,7 +18,7 @@
 //! ```
 //!
 //! **NEW (atomic - no race condition):**
-//! ```rust
+//! ```text
 //! // Single atomic operation: scoring and claiming in one transaction
 //! let result = bead_store::claim_bead(&workspace, worker_id, metadata).await?;
 //! ```
