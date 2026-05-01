@@ -4,6 +4,7 @@ pub mod cli;
 pub mod claim;
 pub mod config;
 pub mod doctor;
+pub mod format;
 pub mod id;
 pub mod jsonl;
 pub mod model;

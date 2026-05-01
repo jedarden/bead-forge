@@ -5,7 +5,6 @@
 
 use crate::config::{find_beads_dir, load_metadata};
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl};
-use crate::model::Issue;
 use crate::storage::Storage;
 use anyhow::Result;
 use std::path::{Path, PathBuf};
