@@ -13,15 +13,15 @@ const BASE36_CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 /// Solving for L given target collision probability p:
 ///   L ≈ log_B(N² / (2 * -ln(1-p)))
 ///
-/// We use p = 0.05 (5% collision probability) to balance br compatibility
+/// We use p = 0.01 (1% collision probability) to balance br compatibility
 /// with mathematical soundness, and clamp L to [3, 8].
 pub fn optimal_hash_length(existing_count: usize) -> usize {
     if existing_count == 0 {
         return 3;
     }
 
-    // Target: 5% collision probability (balance between br compatibility and safety)
-    const TARGET_COLLISION_PROB: f64 = 0.05;
+    // Target: 1% collision probability (balance between br compatibility and safety)
+    const TARGET_COLLISION_PROB: f64 = 0.01;
     let neg_ln_one_minus_p = -((1.0 - TARGET_COLLISION_PROB).ln());
 
     // B = 36 (base36), solve for L
@@ -86,14 +86,14 @@ mod tests {
 
     #[test]
     fn test_optimal_hash_length() {
-        // Values based on birthday problem formula with 5% collision target
+        // Values based on birthday problem formula with 1% collision target
         assert_eq!(optimal_hash_length(0), 3);
         assert_eq!(optimal_hash_length(100), 4);
         assert_eq!(optimal_hash_length(500), 5);
         assert_eq!(optimal_hash_length(1000), 5);
         assert_eq!(optimal_hash_length(5000), 6);
-        assert_eq!(optimal_hash_length(10000), 6);
-        assert_eq!(optimal_hash_length(50000), 7);
+        assert_eq!(optimal_hash_length(10000), 7);
+        assert_eq!(optimal_hash_length(50000), 8);
         assert_eq!(optimal_hash_length(100000), 8);
     }
 
