@@ -293,6 +293,12 @@ impl Storage {
             if let Some(ref status) = changes.status {
                 updates.push("status = ?");
                 params.push(Box::new(status.to_string()));
+                // Clear closed fields when transitioning from closed/tombstone to open
+                if !matches!(status, Status::Closed | Status::Tombstone) {
+                    updates.push("closed_at = NULL");
+                    updates.push("close_reason = NULL");
+                    updates.push("closed_by_session = NULL");
+                }
             }
             if let Some(priority) = changes.priority {
                 updates.push("priority = ?");
