@@ -1,6 +1,7 @@
 use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild};
 use crate::claim::{claim, claim_any, ClaimResult, get_ready_candidates, WorkerMetadata, find_workspaces};
 use crate::config::{find_beads_dir, load_config, load_metadata, get_default_prefix};
+use crate::format::{OutputFormat, get_formatter};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
@@ -72,7 +73,7 @@ pub enum Commands {
         #[arg(long)]
         limit: Option<usize>,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
 
@@ -86,7 +87,7 @@ pub enum Commands {
         /// Bead ID
         id: String,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
 
@@ -145,7 +146,7 @@ pub enum Commands {
         #[arg(long, default_value = "10")]
         limit: usize,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
 
@@ -188,7 +189,7 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
 
@@ -257,7 +258,7 @@ pub enum Commands {
         #[arg(long, default_value = "Split into children")]
         reason: String,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
     },
@@ -317,7 +318,7 @@ pub enum Commands {
         #[arg(long, default_value = "50")]
         limit: usize,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
     },
@@ -340,7 +341,7 @@ pub enum Commands {
         #[arg(long)]
         by_label: bool,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
     },
@@ -370,7 +371,7 @@ pub enum Commands {
         #[arg(long)]
         harness: Option<String>,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
     },
@@ -388,7 +389,7 @@ pub enum Commands {
         #[arg(long)]
         limit: Option<usize>,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
     },
@@ -402,7 +403,7 @@ pub enum Commands {
         #[arg(long, default_value = "20")]
         max_depth: usize,
 
-        /// Output format (text, json)
+        /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
     },
@@ -738,16 +739,9 @@ fn cmd_list(
 
     let issues = storage.list_issues(&filter)?;
 
-    match format {
-        "json" => {
-            println!("{}", serde_json::to_string(&issues)?);
-        }
-        _ => {
-            for issue in issues {
-                println!("[{}] {} - {} ({})", issue.id, issue.title, issue.status, issue.priority);
-            }
-        }
-    }
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    print!("{}", formatter.format_issues(&issues));
 
     Ok(())
 }
@@ -770,6 +764,22 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             out.comments = vec![];
             // Wrap in array so NEEDLE's parse_single_bead (Vec<Bead> → first) works.
             println!("{}", serde_json::to_string(&vec![out])?);
+        }
+        "toon" => {
+            println!("ID: {}", issue.id);
+            println!("Title: {}", issue.title);
+            println!("Status: {}", issue.status);
+            println!("Priority: {}", issue.priority);
+            println!("Type: {}", issue.issue_type);
+            if let Some(desc) = &issue.description {
+                println!("Description: {}", desc);
+            }
+            if let Some(assignee) = &issue.assignee {
+                println!("Assignee: {}", assignee);
+            }
+            if !issue.labels.is_empty() {
+                println!("Labels: {}", issue.labels.join(", "));
+            }
         }
         _ => {
             println!("ID: {}", issue.id);
@@ -871,11 +881,22 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
                 println!("{}", serde_json::to_string(&candidate)?);
             }
         }
+        "toon" => {
+            for candidate in candidates {
+                println!("{}", crate::format::toon::format_ready_bead(
+                    &candidate.id,
+                    &candidate.title,
+                    candidate.priority,
+                    candidate.downstream_impact,
+                    candidate.critical_float,
+                ));
+            }
+        }
         _ => {
             for candidate in candidates {
-                println!("[{}] {} (priority={}, impact={})",
+                println!("[{}] {} (priority={}, impact={}, float={})",
                     candidate.id, candidate.title, candidate.priority,
-                    candidate.downstream_impact);
+                    candidate.downstream_impact, candidate.critical_float);
             }
         }
     }
@@ -1407,18 +1428,9 @@ fn cmd_search(
         limit,
     )?;
 
-    match format {
-        "json" => {
-            for issue in issues {
-                println!("{}", serde_json::to_string(&issue)?);
-            }
-        }
-        _ => {
-            for issue in issues {
-                println!("[{}] {} - {} ({})", issue.id, issue.title, issue.status, issue.priority);
-            }
-        }
-    }
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    print!("{}", formatter.format_issues(&issues));
 
     Ok(())
 }
