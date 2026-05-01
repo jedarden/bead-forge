@@ -1,8 +1,8 @@
-use crate::batch::{execute_batch, parse_stdin, BatchOp};
+use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild};
 use crate::claim::{claim, ClaimResult, get_ready_candidates};
 use crate::config::{find_beads_dir, load_config, load_metadata, get_default_prefix};
-use crate::model::{DependencyType, Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
-use crate::storage::{Storage, Stats};
+use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
+use crate::storage::Storage;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
@@ -230,6 +230,24 @@ pub enum Commands {
         /// Read from stdin
         #[arg(long, default_value = "false")]
         stdin: bool,
+    },
+
+    /// Mitosis: split a bead into children atomically
+    Mitosis {
+        /// Parent bead ID to split
+        id: String,
+
+        /// Child bead definitions (JSON array of {title, type, priority})
+        #[arg(long)]
+        children: String,
+
+        /// Close reason for parent bead
+        #[arg(long, default_value = "Split into children")]
+        reason: String,
+
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        format: String,
     },
 
     /// Manage dependencies
@@ -507,6 +525,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::Doctor { repair } => cmd_doctor(&beads_dir, repair),
         Commands::Count { status } => cmd_count(&beads_dir, status),
         Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
+        Commands::Mitosis { id, children, reason, format } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format),
         Commands::Dep(dep) => cmd_dep(&beads_dir, dep),
         Commands::Label(label) => cmd_label(&beads_dir, label),
         Commands::Comments(comments) => cmd_comments(&beads_dir, comments),
@@ -575,7 +594,6 @@ fn cmd_create(
     let prefix = get_default_prefix(&config);
     let id = crate::id::generate_id(prefix, count);
 
-    let now = Utc::now();
     let mut issue = Issue::new(id.clone(), title, ".".to_string());
     issue.issue_type = IssueType::from_str(type_.as_str()).map_err(|e| anyhow::anyhow!(e))?;
     issue.priority = Priority(priority);
@@ -751,9 +769,9 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
         }
         _ => {
             for candidate in candidates {
-                println!("[{}] {} (priority={}, impact={}, float={})",
+                println!("[{}] {} (priority={}, impact={})",
                     candidate.id, candidate.title, candidate.priority,
-                    candidate.downstream_impact, candidate.critical_float);
+                    candidate.downstream_impact);
             }
         }
     }
@@ -789,7 +807,6 @@ fn cmd_claim(
                         "title": candidate.title,
                         "priority": candidate.priority,
                         "downstream_impact": candidate.downstream_impact,
-                        "critical_float": candidate.critical_float,
                         "assignee": assignee,
                         "dry_run": true
                     });
@@ -925,6 +942,38 @@ fn cmd_batch(beads_dir: &PathBuf, file: Option<PathBuf>, json: Option<String>, s
             }
         } else {
             eprintln!("[op {}] error: {}", result.op, result.error.unwrap_or_default());
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_mitosis(beads_dir: &PathBuf, id: &str, children: &str, reason: &str, format: &str) -> Result<()> {
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let storage = Storage::open(&db_path)?;
+
+    // Parse children as JSON array of {title, type, priority} or {title, type, priority, description, assignee, labels}
+    let children_defs: Vec<MitosisChild> = serde_json::from_str(children)?;
+
+    // Build the batch operations
+    let ops = mitosis_ex(id, children_defs, Some(reason.to_string()))?;
+
+    // Execute atomically
+    let results = execute_batch(&storage, ops, beads_dir)?;
+
+    match format {
+        "json" => {
+            println!("{}", serde_json::to_string_pretty(&results)?);
+        }
+        _ => {
+            // Print child IDs that were created
+            for result in &results {
+                if let Some(child_id) = &result.id {
+                    println!("Created child: {}", child_id);
+                }
+            }
+            println!("Parent bead {} closed with {} children", id, results.len() - 2); // -2 for close + last dep
         }
     }
 

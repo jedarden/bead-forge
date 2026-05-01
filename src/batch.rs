@@ -173,7 +173,7 @@ fn execute_create(
     issue.issue_type = IssueType::from_str(type_)
         .map_err(|e| anyhow!("Invalid type: {}", e))?;
     issue.priority = Priority(priority);
-    issue.description = description.clone();
+    issue.description = description.clone().or_else(|| Some(String::new()));
     issue.assignee = assignee.clone();
     issue.labels = labels.to_vec();
 
@@ -194,10 +194,10 @@ fn execute_create(
             &issue.id,
             &issue.content_hash,
             &issue.title,
-            &issue.description,
-            &issue.design,
-            &issue.acceptance_criteria,
-            &issue.notes,
+            issue.description.as_deref().unwrap_or(""),
+            issue.design.as_deref().unwrap_or(""),
+            issue.acceptance_criteria.as_deref().unwrap_or(""),
+            issue.notes.as_deref().unwrap_or(""),
             issue.status.to_string(),
             &issue.priority,
             issue.issue_type.to_string(),
@@ -208,22 +208,22 @@ fn execute_create(
             &issue.created_by,
             issue.updated_at.to_rfc3339(),
             issue.closed_at.map(|d| d.to_rfc3339()),
-            &issue.close_reason,
-            &issue.closed_by_session,
+            issue.close_reason.as_deref().unwrap_or(""),
+            issue.closed_by_session.as_deref().unwrap_or(""),
             issue.due_at.map(|d| d.to_rfc3339()),
             issue.defer_until.map(|d| d.to_rfc3339()),
-            &issue.external_ref,
-            &issue.source_system,
+            issue.external_ref.as_deref(),
+            issue.source_system.as_deref().unwrap_or(""),
             &issue.source_repo,
             issue.deleted_at.map(|d| d.to_rfc3339()),
-            &issue.deleted_by,
-            &issue.delete_reason,
-            &issue.original_type,
+            issue.deleted_by.as_deref().unwrap_or(""),
+            issue.delete_reason.as_deref().unwrap_or(""),
+            issue.original_type.as_deref().unwrap_or(""),
             &issue.compaction_level,
             issue.compacted_at.map(|d| d.to_rfc3339()),
-            &issue.compacted_at_commit,
+            issue.compacted_at_commit.as_deref().unwrap_or(""),
             &issue.original_size,
-            &issue.sender,
+            issue.sender.as_deref().unwrap_or(""),
             if issue.ephemeral { 1 } else { 0 },
             if issue.pinned { 1 } else { 0 },
             if issue.is_template { 1 } else { 0 },
@@ -301,11 +301,126 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
 
     tx.execute(
         "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at)
-         VALUES (?1, 'closed', NULL, NULL, ?2, ?3)",
+         VALUES (?1, 'closed', '', '', ?2, ?3)",
         rusqlite::params![id, reason, now.to_rfc3339()],
     )?;
 
     Ok(())
+}
+
+/// Mitosis: split a parent bead into multiple child beads atomically.
+///
+/// This function constructs a batch of operations that:
+/// 1. Creates N child beads
+/// 2. Adds dependencies (child blocks parent) for each child
+/// 3. Closes the parent bead
+///
+/// All operations run in a single BEGIN IMMEDIATE transaction, so there's no
+/// risk of orphaned children if the process crashes midway.
+///
+/// # Arguments
+/// * `parent_id` - The ID of the parent bead to split
+/// * `children` - Vector of (title, type_, priority) tuples for each child
+/// * `close_reason` - Reason for closing the parent (default: "Split into children")
+///
+/// # Returns
+/// * `Ok(Vec<BatchOp>)` - Batch operations ready for execute_batch()
+///
+/// # Example
+/// ```ignore
+/// let ops = mitosis("bf-123", vec![
+///     ("Child 1".to_string(), "task".to_string(), 2),
+///     ("Child 2".to_string(), "bug".to_string(), 0),
+/// ], None)?;
+/// let results = execute_batch(&storage, ops, &workspace_dir)?;
+/// ```
+pub fn mitosis(
+    parent_id: &str,
+    children: Vec<(String, String, i32)>,
+    close_reason: Option<String>,
+) -> Result<Vec<BatchOp>> {
+    let mut ops = Vec::new();
+
+    // Create child beads
+    for (title, type_, priority) in &children {
+        ops.push(BatchOp::Create {
+            title: title.clone(),
+            type_: type_.clone(),
+            priority: *priority,
+            description: None,
+            assignee: None,
+            labels: Vec::new(),
+        });
+    }
+
+    // Add dependencies: each child blocks the parent
+    // Reference children by placeholder (@0, @1, etc.)
+    for (idx, _) in children.iter().enumerate() {
+        ops.push(BatchOp::DepAddBlocker {
+            parent: format!("@{}", idx),
+            child: parent_id.to_string(),
+        });
+    }
+
+    // Close the parent
+    ops.push(BatchOp::Close {
+        id: parent_id.to_string(),
+        reason: close_reason.unwrap_or_else(|| "Split into children".to_string()),
+    });
+
+    Ok(ops)
+}
+
+/// Mitosis with extended options (description, assignee, labels).
+///
+/// Same as mitosis() but allows full control over child bead properties.
+pub fn mitosis_ex(
+    parent_id: &str,
+    children: Vec<MitosisChild>,
+    close_reason: Option<String>,
+) -> Result<Vec<BatchOp>> {
+    let mut ops = Vec::new();
+
+    for child in &children {
+        ops.push(BatchOp::Create {
+            title: child.title.clone(),
+            type_: child.type_.clone(),
+            priority: child.priority,
+            description: child.description.clone(),
+            assignee: child.assignee.clone(),
+            labels: child.labels.clone(),
+        });
+    }
+
+    for (idx, _) in children.iter().enumerate() {
+        ops.push(BatchOp::DepAddBlocker {
+            parent: format!("@{}", idx),
+            child: parent_id.to_string(),
+        });
+    }
+
+    ops.push(BatchOp::Close {
+        id: parent_id.to_string(),
+        reason: close_reason.unwrap_or_else(|| "Split into children".to_string()),
+    });
+
+    Ok(ops)
+}
+
+/// Extended child bead definition for mitosis_ex.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MitosisChild {
+    pub title: String,
+    #[serde(default = "default_type")]
+    pub type_: String,
+    #[serde(default = "default_priority")]
+    pub priority: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    #[serde(default)]
+    pub labels: Vec<String>,
 }
 
 pub fn parse_stdin() -> Result<Vec<BatchOp>> {
