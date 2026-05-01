@@ -28,7 +28,7 @@ pub struct ClaimResult {
 /// 2. negative critical_float (lower float = more critical)
 /// 3. negative priority (lower number = higher priority)
 /// 4. negative created timestamp (older = higher priority/FIFO)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Score {
     pub downstream_impact: i64,
     pub critical_float: i64,
@@ -40,6 +40,34 @@ impl Score {
     /// Create a new score from candidate fields.
     pub fn new(downstream_impact: i64, critical_float: i64, priority: i32, created_at_ts: i64) -> Self {
         Self { downstream_impact, critical_float, priority, created_at_ts }
+    }
+}
+
+impl PartialOrd for Score {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Score {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // downstream_impact: DESC (higher is better)
+        match other.downstream_impact.cmp(&self.downstream_impact) {
+            std::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        // critical_float: ASC (lower is better)
+        match self.critical_float.cmp(&other.critical_float) {
+            std::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        // priority: ASC (lower number is better)
+        match self.priority.cmp(&other.priority) {
+            std::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        // created_at_ts: ASC (older is better/FIFO)
+        self.created_at_ts.cmp(&other.created_at_ts)
     }
 }
 

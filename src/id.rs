@@ -77,7 +77,8 @@ pub fn is_valid_bead_id(id: &str) -> bool {
         return false;
     }
     let hash_part = parts[1..].join("");
-    hash_part.chars().all(|c| c.is_ascii_alphanumeric())
+    // Check that hash part is not empty and contains only alphanumeric chars
+    !hash_part.is_empty() && hash_part.chars().all(|c| c.is_ascii_alphanumeric())
 }
 
 #[cfg(test)]
