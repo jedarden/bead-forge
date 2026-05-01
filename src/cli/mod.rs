@@ -693,7 +693,7 @@ fn cmd_create(
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let mut storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
@@ -812,9 +812,9 @@ fn cmd_update(
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let mut storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
-    let mut changes = IssueChanges {
+    let changes = IssueChanges {
         title,
         status: status.map(|s| Status::from_str(&s).ok()).flatten(),
         priority,
@@ -830,7 +830,7 @@ fn cmd_update(
 fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let mut storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
     storage.close_issue(id, reason, "cli")?;
     println!("Closed bead {}", id);
@@ -840,7 +840,7 @@ fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str) -> Result<()> {
 fn cmd_reopen(beads_dir: &PathBuf, id: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let mut storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
     let changes = IssueChanges {
         status: Some(Status::Open),
@@ -855,7 +855,7 @@ fn cmd_reopen(beads_dir: &PathBuf, id: &str) -> Result<()> {
 fn cmd_delete(beads_dir: &PathBuf, id: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let mut storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
     storage.with_immediate_transaction(|tx| {
         tx.execute("DELETE FROM issues WHERE id = ?", [&id])?;
@@ -1151,7 +1151,7 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let jsonl_path = beads_dir.join(&metadata.jsonl_export);
-    let mut storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
     if import_only {
         let result = storage.sync_from_jsonl(&jsonl_path)?;
@@ -1174,7 +1174,7 @@ fn cmd_doctor(beads_dir: &PathBuf, repair: bool) -> Result<()> {
     if repair {
         std::fs::remove_file(&db_path)?;
         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
-        let mut storage = Storage::open(&db_path)?;
+        let storage = Storage::open(&db_path)?;
         let result = storage.sync_from_jsonl(&jsonl_path)?;
         println!("Repaired database: imported {} beads from JSONL", result.imported);
     } else {
@@ -1480,7 +1480,7 @@ fn cmd_stats(
     Ok(())
 }
 
-fn cmd_schema(target: &str, format: &str) -> Result<()> {
+fn cmd_schema(target: &str, _format: &str) -> Result<()> {
     match target {
         "all" => {
             println!("Schema for all: (use 'json' format for actual schema)");
@@ -1522,19 +1522,12 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
 }
 
 fn cmd_velocity(
-    beads_dir: &PathBuf,
+    _beads_dir: &PathBuf,
     _model: Option<String>,
     _harness: Option<String>,
-    format: &str,
+    _format: &str,
 ) -> Result<()> {
-    match format {
-        "json" => {
-            println!("{}", serde_json::json!({"velocity": "not yet implemented"}));
-        }
-        _ => {
-            println!("Velocity stats: (not yet implemented)");
-        }
-    }
+    println!("Velocity stats: (not yet implemented)");
     Ok(())
 }
 

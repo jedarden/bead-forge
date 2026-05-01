@@ -5,7 +5,7 @@ use crate::model::{
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, Transaction};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::str::FromStr;
@@ -23,16 +23,9 @@ impl Storage {
     pub fn open(db_path: &Path) -> Result<Self> {
         let conn = Connection::open(db_path)?;
         ensure_wal_mode(&conn)?;
-        // Only apply schema if the issues table doesn't exist yet (avoids DDL lock contention
-        // when NEEDLE workers hold a continuous read lock on the database)
-        let needs_schema: bool = conn.query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='issues'",
-            [],
-            |row| row.get::<_, i64>(0),
-        ).map(|n| n == 0).unwrap_or(true);
-        if needs_schema {
-            apply_schema(&conn)?;
-        }
+        // Apply schema on every open - all tables use CREATE TABLE IF NOT EXISTS
+        // which is a no-op for existing tables and avoids DDL lock contention
+        apply_schema(&conn)?;
         Ok(Storage { conn: Mutex::new(conn) })
     }
 

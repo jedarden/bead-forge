@@ -168,7 +168,6 @@ fn execute_create(
     let prefix = get_default_prefix(config);
     let id = crate::id::generate_id(prefix, count as usize);
 
-    let now = Utc::now();
     let mut issue = Issue::new(id.clone(), title.to_string(), ".".to_string());
     issue.issue_type = IssueType::from_str(type_)
         .map_err(|e| anyhow!("Invalid type: {}", e))?;

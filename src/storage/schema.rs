@@ -249,8 +249,6 @@ pub const SCHEMA_SQL: &str = r"
         updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
     );
-    CREATE INDEX IF NOT EXISTS idx_critical_path_cache_epic ON critical_path_cache(epic_id);
-    CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float ON critical_path_cache(float);
 
     -- Bead Annotations (bf-only table, never touched by br)
     -- Stores arbitrary key-value metadata per bead.
@@ -409,6 +407,49 @@ fn execute_batch(conn: &Connection, sql: &str) -> anyhow::Result<()> {
 
 pub fn apply_schema(conn: &Connection) -> anyhow::Result<()> {
     execute_batch(conn, SCHEMA_SQL)?;
+    apply_migrations(conn)?;
+    Ok(())
+}
+
+/// Apply database migrations for schema changes.
+/// This handles adding new columns to existing tables.
+fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
+    // Migration 1: Update critical_path_cache schema if it has the old format
+    // Old format: bead_id, float (REAL), updated_at
+    // New format: bead_id, epic_id, es (INTEGER), ls (INTEGER), float (INTEGER), updated_at
+    let has_es: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('critical_path_cache') WHERE name='es'",
+        [],
+        |row| row.get::<_, i64>(0).map(|n| n > 0),
+    ).unwrap_or(false);
+
+    if !has_es {
+        // Table has old schema - recreate with new schema
+        conn.execute_batch(
+            "BEGIN;
+             CREATE TABLE IF NOT EXISTS critical_path_cache_new (
+                 bead_id     TEXT PRIMARY KEY,
+                 epic_id     TEXT,
+                 es          INTEGER NOT NULL DEFAULT 0,
+                 ls          INTEGER NOT NULL DEFAULT 0,
+                 float       INTEGER NOT NULL DEFAULT 0,
+                 updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                 FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
+             );
+             INSERT INTO critical_path_cache_new (bead_id, float, updated_at)
+                 SELECT bead_id, CAST(float AS INTEGER), updated_at FROM critical_path_cache;
+             DROP TABLE critical_path_cache;
+             ALTER TABLE critical_path_cache_new RENAME TO critical_path_cache;
+             COMMIT;"
+        )?;
+    }
+
+    // Create indexes for critical_path_cache (idempotent)
+    let _ = conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_critical_path_cache_epic ON critical_path_cache(epic_id);
+         CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float ON critical_path_cache(float);"
+    );
+
     Ok(())
 }
 
