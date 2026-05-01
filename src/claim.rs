@@ -452,4 +452,57 @@ mod tests {
         // After reclaim, the stale bead is open again, so it could be claimed too
         // But the open bead has priority by created_at order
     }
+
+    #[test]
+    fn test_concurrent_claim_no_double_claim() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        let (_temp, storage) = setup_test_db();
+        let storage = Arc::new(storage);
+
+        // Create 20 open beads
+        for i in 0..20 {
+            let issue = Issue::new(format!("bf-{:0>4}", i), format!("Test bead {}", i), ".".to_string());
+            storage.create_issue(&issue).unwrap();
+        }
+
+        // Spawn 20 workers trying to claim concurrently
+        let claimed_beads: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let mut handles = vec![];
+
+        for worker_id in 0..20 {
+            let storage_clone = Arc::clone(&storage);
+            let claimed_clone = Arc::clone(&claimed_beads);
+
+            let handle = thread::spawn(move || {
+                let result = storage_clone.with_immediate_transaction(|tx| {
+                    claim(tx, &format!("worker-{}", worker_id), 30, Utc::now(), None)
+                }).unwrap();
+
+                if let Some(claim_result) = result {
+                    let mut claimed = claimed_clone.lock().unwrap();
+                    claimed.push(claim_result.bead_id);
+                }
+            });
+
+            handles.push(handle);
+        }
+
+        // Wait for all workers to complete
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let claimed = claimed_beads.lock().unwrap();
+
+        // All 20 beads should be claimed exactly once
+        assert_eq!(claimed.len(), 20, "Expected 20 unique claims, got {}", claimed.len());
+
+        // No duplicates allowed
+        let mut unique_beads = claimed.clone();
+        unique_beads.sort();
+        unique_beads.dedup();
+        assert_eq!(unique_beads.len(), 20, "Found duplicate claims: {:?}", claimed);
+    }
 }

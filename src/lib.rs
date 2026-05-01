@@ -1,4 +1,5 @@
 pub mod batch;
+pub mod bead_store;
 pub mod cli;
 pub mod claim;
 pub mod config;
@@ -10,6 +11,7 @@ pub mod storage;
 pub mod sync;
 
 pub use batch::{execute_batch, BatchOp, BatchResult, mitosis, mitosis_ex, MitosisChild};
+pub use bead_store::{claim_bead, get_ready, is_bead_ready, ClaimConfig, ClaimedBead};
 pub use claim::{claim, ClaimResult, ScoredBead, get_ready_candidates};
 pub use config::{find_beads_dir, load_config, load_metadata, Config, Metadata};
 pub use doctor::{check, reclaim_stale, rebuild_cache, repair, verify_schema, DoctorResult};
