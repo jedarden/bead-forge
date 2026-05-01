@@ -75,6 +75,16 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
 fn check_database(db_path: &Path) -> Result<(usize, bool)> {
     let conn = Connection::open(db_path)?;
 
+    // Apply schema if database is new (no tables yet)
+    let needs_schema: bool = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='issues'",
+        [],
+        |row| row.get::<_, i64>(0),
+    ).map(|n| n == 0).unwrap_or(true);
+    if needs_schema {
+        crate::storage::schema::apply_schema(&conn)?;
+    }
+
     // Run PRAGMA integrity_check
     let integrity_result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
 
@@ -383,6 +393,11 @@ mod tests {
         let beads_dir = workspace.join(".beads");
 
         init_workspace(&beads_dir, "bf").unwrap();
+
+        // Open storage to create database and apply schema
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+        let _storage = Storage::open(&db_path).unwrap();
 
         let result = verify_schema(workspace).unwrap();
         assert!(result);
