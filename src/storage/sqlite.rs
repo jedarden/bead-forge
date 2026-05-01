@@ -855,6 +855,76 @@ impl Storage {
         let closed: i64 = conn.query_row("SELECT COUNT(*) FROM issues WHERE status = 'closed' AND deleted_at IS NULL", [], |row| row.get(0))?;
         Ok(Stats { total: total as usize, open: open as usize, in_progress: in_progress as usize, closed: closed as usize })
     }
+
+    /// Get the score of the top candidate bead for claiming.
+    ///
+    /// Returns None if no candidates are available.
+    /// Used by claim_any() for cross-workspace scoring comparison.
+    pub fn top_candidate_score(&self) -> Result<Option<crate::claim::Score>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                    COALESCE(c.float, 999999) as critical_float,
+                    i.priority,
+                    strftime('%s', i.created_at) as created_ts
+             FROM issues i
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+             WHERE i.status = 'open'
+               AND i.ephemeral = 0
+               AND i.pinned = 0
+               AND i.is_template = 0
+               AND i.deleted_at IS NULL
+             GROUP BY i.id
+             ORDER BY
+                 downstream_impact DESC,
+                 critical_float ASC,
+                 i.priority ASC,
+                 i.created_at ASC
+             LIMIT 1",
+        )?;
+
+        let mut rows = stmt.query([])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(crate::claim::Score {
+                downstream_impact: row.get(0)?,
+                critical_float: row.get(1)?,
+                priority: row.get(2)?,
+                created_at_ts: row.get(3)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Record a worker session for tracking metadata.
+    ///
+    /// Stores worker metadata (model, harness, version) for each claim operation.
+    /// Used by velocity-aware scoring and audit trails.
+    pub fn record_worker_session(
+        &self,
+        worker_id: &str,
+        model: Option<&str>,
+        harness: Option<&str>,
+        harness_version: Option<&str>,
+        bead_id: &str,
+        workspace_path: &str,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                worker_id,
+                model,
+                harness,
+                harness_version,
+                bead_id,
+                workspace_path,
+            ],
+        )?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
