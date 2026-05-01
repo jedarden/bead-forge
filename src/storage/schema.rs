@@ -265,6 +265,23 @@ pub const SCHEMA_SQL: &str = r"
     );
     CREATE INDEX IF NOT EXISTS idx_bead_annotations_key_value
         ON bead_annotations (key, value);
+
+    -- Worker Sessions (bf-only table for multi-workspace claiming)
+    -- Tracks worker metadata (model, harness, version) for each claim operation.
+    -- Used by velocity-aware scoring and audit trails.
+    CREATE TABLE IF NOT EXISTS worker_sessions (
+        worker_id        TEXT NOT NULL,
+        model            TEXT,
+        harness          TEXT,
+        harness_version  TEXT,
+        claimed_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        bead_id          TEXT REFERENCES issues(id) ON DELETE SET NULL,
+        workspace_path   TEXT NOT NULL,
+        PRIMARY KEY (worker_id, claimed_at)
+    );
+    CREATE INDEX IF NOT EXISTS idx_worker_sessions_worker ON worker_sessions(worker_id);
+    CREATE INDEX IF NOT EXISTS idx_worker_sessions_model ON worker_sessions(model);
+    CREATE INDEX IF NOT EXISTS idx_worker_sessions_harness ON worker_sessions(harness);
 ";
 
 /// Split a SQL script into individual statements, respecting string literals,

@@ -50,7 +50,7 @@ pub fn base36_encode(data: &[u8]) -> String {
     let mut n = num;
     while n > BigUint::zero() {
         let remainder = &n % &base;
-        let digit = remainder.to_u32_digits()[0] as usize;
+        let digit = remainder.to_u32_digits().first().copied().unwrap_or(0) as usize;
         result.insert(0, BASE36_CHARS[digit] as char);
         n /= &base;
     }

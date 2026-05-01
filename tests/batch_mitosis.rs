@@ -6,8 +6,9 @@
 
 use bead_forge::batch::{execute_batch, BatchOp};
 use bead_forge::config::{init_workspace, load_metadata};
-use bead_forge::model::IssueFilter;
+use bead_forge::model::{Issue, IssueFilter, IssueType, Priority};
 use bead_forge::storage::Storage;
+use chrono::Utc;
 use tempfile::TempDir;
 
 #[test]
@@ -24,7 +25,8 @@ fn test_mitosis_atomic_batch() {
 
     // Create parent bead
     let parent_id = "bf-parent".to_string();
-    storage.create_issue_with_id(&parent_id, "Parent task", "task", 2, &None, &[]).unwrap();
+    let parent = Issue::new(parent_id.clone(), "Parent task".to_string(), ".".to_string());
+    storage.create_issue(&parent).unwrap();
 
     // Verify parent exists and is open
     let parent = storage.get_issue(&parent_id).unwrap().unwrap();
@@ -113,7 +115,8 @@ fn test_batch_rollback_on_error() {
 
     // Create parent bead
     let parent_id = "bf-parent".to_string();
-    storage.create_issue_with_id(&parent_id, "Parent task", "task", 2, &None, &[]).unwrap();
+    let parent = Issue::new(parent_id.clone(), "Parent task".to_string(), ".".to_string());
+    storage.create_issue(&parent).unwrap();
 
     // Count beads before
     let before_count = storage.list_issues(&IssueFilter::default()).unwrap().len();

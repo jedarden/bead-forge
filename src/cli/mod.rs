@@ -1,5 +1,5 @@
 use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild};
-use crate::claim::{claim, ClaimResult, get_ready_candidates};
+use crate::claim::{claim, claim_any, ClaimResult, get_ready_candidates, WorkerMetadata, find_workspaces};
 use crate::config::{find_beads_dir, load_config, load_metadata, get_default_prefix};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::storage::Storage;
@@ -171,6 +171,18 @@ pub enum Commands {
         /// Harness version
         #[arg(long)]
         harness_version: Option<String>,
+
+        /// Claim from any workspace (searches all .beads/ directories)
+        #[arg(long)]
+        any: bool,
+
+        /// Fallback mode: try current workspace first, fall back to any if no beads available
+        #[arg(long)]
+        fallback: bool,
+
+        /// Workspace paths to search (only used with --any)
+        #[arg(long)]
+        workspace_paths: Vec<PathBuf>,
 
         /// Dry run (show what would be claimed without claiming)
         #[arg(long)]
@@ -517,9 +529,9 @@ pub fn run(cli: Cli) -> Result<()> {
             let format = if json { "json".to_string() } else { format };
             cmd_ready(&beads_dir, limit, &format)
         }
-        Commands::Claim { assignee, model, harness, harness_version, dry_run, format, json } => {
+        Commands::Claim { assignee, model, harness, harness_version, any, fallback, workspace_paths, dry_run, format, json } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_claim(&beads_dir, &assignee, model, harness, harness_version, dry_run, &format)
+            cmd_claim(&beads_dir, &assignee, model, harness, harness_version, any, fallback, &workspace_paths, dry_run, &format)
         }
         Commands::Sync { flush_only, import_only } => cmd_sync(&beads_dir, flush_only, import_only),
         Commands::Doctor { repair } => cmd_doctor(&beads_dir, repair),
@@ -782,24 +794,77 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
 fn cmd_claim(
     beads_dir: &PathBuf,
     assignee: &str,
-    _model: Option<String>,
-    _harness: Option<String>,
-    _harness_version: Option<String>,
+    model: Option<String>,
+    harness: Option<String>,
+    harness_version: Option<String>,
+    any: bool,
+    fallback: bool,
+    workspace_paths: &[PathBuf],
     dry_run: bool,
     format: &str,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
-    let metadata = load_metadata(beads_dir)?;
-    let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
+    let claim_ttl = config.claim_ttl_minutes;
+
+    // Build worker metadata
+    let worker_metadata = WorkerMetadata {
+        worker_id: assignee.to_string(),
+        model: model.clone(),
+        harness: harness.clone(),
+        harness_version: harness_version.clone(),
+    };
 
     if dry_run {
-        // Show what would be claimed without actually claiming
-        let candidates = storage.with_immediate_transaction(|tx| {
-            get_ready_candidates(tx, 1)
-        })?;
+        // Dry run mode - show what would be claimed
+        let candidates: Vec<(PathBuf, crate::claim::ScoredBead)> = if any || fallback {
+            // Multi-workspace dry run
+            let paths = if workspace_paths.is_empty() {
+                // Auto-discover workspaces from current directory
+                find_workspaces(&std::env::current_dir()?)?
+            } else {
+                workspace_paths.to_vec()
+            };
 
-        if let Some(candidate) = candidates.first() {
+            let mut all_candidates = Vec::new();
+            for path in &paths {
+                let local_beads_dir = path.join(".beads");
+                if local_beads_dir.exists() {
+                    let local_metadata = match load_metadata(&local_beads_dir) {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+                    let local_db_path = local_beads_dir.join(&local_metadata.database);
+                    if let Ok(local_storage) = Storage::open(&local_db_path) {
+                        if let Ok(local_candidates) = local_storage.with_immediate_transaction(|tx| {
+                            get_ready_candidates(tx, 1)
+                        }) {
+                            for c in local_candidates {
+                                all_candidates.push((path.clone(), c));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sort by score and take top 1
+            all_candidates.sort_by(|a, b| {
+                let score_a = (b.1.downstream_impact, b.1.priority, b.1.created_at.clone());
+                let score_b = (a.1.downstream_impact, a.1.priority, a.1.created_at.clone());
+                score_a.cmp(&score_b)
+            });
+            all_candidates.into_iter().take(1).collect()
+        } else {
+            // Single workspace dry run
+            let metadata = load_metadata(beads_dir)?;
+            let db_path = beads_dir.join(&metadata.database);
+            let storage = Storage::open(&db_path)?;
+            let candidates = storage.with_immediate_transaction(|tx| {
+                get_ready_candidates(tx, 1)
+            })?;
+            candidates.into_iter().map(|c| (beads_dir.parent().unwrap_or(beads_dir).to_path_buf(), c)).collect()
+        };
+
+        if let Some((path, candidate)) = candidates.first() {
             match format {
                 "json" => {
                     let output = serde_json::json!({
@@ -808,12 +873,14 @@ fn cmd_claim(
                         "priority": candidate.priority,
                         "downstream_impact": candidate.downstream_impact,
                         "assignee": assignee,
+                        "workspace": path.display().to_string(),
                         "dry_run": true
                     });
                     println!("{}", output);
                 }
                 _ => {
-                    println!("{} (priority={}, impact={})", candidate.id, candidate.priority, candidate.downstream_impact);
+                    println!("{} (priority={}, impact={}, workspace={})",
+                        candidate.id, candidate.priority, candidate.downstream_impact, path.display());
                 }
             }
         } else if format == "json" {
@@ -821,14 +888,125 @@ fn cmd_claim(
         } else {
             println!("No beads available to claim");
         }
-    } else {
-        let claim_ttl = config.claim_ttl_minutes;
+    } else if any {
+        // Claim from any workspace
+        let paths = if workspace_paths.is_empty() {
+            // Auto-discover workspaces from current directory
+            find_workspaces(&std::env::current_dir()?)?
+        } else {
+            workspace_paths.to_vec()
+        };
+
+        let result = claim_any(&paths, assignee, claim_ttl, Some(&worker_metadata))?;
+
+        match result {
+            Some(ClaimResult { bead_id, reclaimed, workspace_path }) => {
+                match format {
+                    "json" => {
+                        let output = serde_json::json!({
+                            "bead_id": bead_id,
+                            "reclaimed": reclaimed,
+                            "assignee": assignee,
+                            "workspace": workspace_path.map(|p| p.display().to_string())
+                        });
+                        println!("{}", output);
+                    }
+                    _ => {
+                        if let Some(path) = workspace_path {
+                            println!("{} (workspace: {})", bead_id, path.display());
+                        } else {
+                            println!("{}", bead_id);
+                        }
+                    }
+                }
+            }
+            None => {
+                if format == "json" {
+                    println!("{{}}");
+                } else {
+                    println!("No beads available to claim");
+                }
+            }
+        }
+    } else if fallback {
+        // Fallback mode: try current workspace first, then any
+        let metadata = load_metadata(beads_dir)?;
+        let db_path = beads_dir.join(&metadata.database);
+        let storage = Storage::open(&db_path)?;
+
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, assignee, claim_ttl, Utc::now())
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
         })?;
 
         match result {
-            Some(ClaimResult { bead_id, reclaimed }) => {
+            Some(ClaimResult { bead_id, reclaimed, .. }) => {
+                match format {
+                    "json" => {
+                        let output = serde_json::json!({
+                            "bead_id": bead_id,
+                            "reclaimed": reclaimed,
+                            "assignee": assignee
+                        });
+                        println!("{}", output);
+                    }
+                    _ => {
+                        println!("{}", bead_id);
+                    }
+                }
+            }
+            None => {
+                // Fallback to any workspace
+                let paths = if workspace_paths.is_empty() {
+                    find_workspaces(&std::env::current_dir()?)?
+                } else {
+                    workspace_paths.to_vec()
+                };
+
+                let result = claim_any(&paths, assignee, claim_ttl, Some(&worker_metadata))?;
+
+                match result {
+                    Some(ClaimResult { bead_id, reclaimed, workspace_path }) => {
+                        match format {
+                            "json" => {
+                                let output = serde_json::json!({
+                                    "bead_id": bead_id,
+                                    "reclaimed": reclaimed,
+                                    "assignee": assignee,
+                                    "workspace": workspace_path.map(|p| p.display().to_string())
+                                });
+                                println!("{}", output);
+                            }
+                            _ => {
+                                if let Some(path) = workspace_path {
+                                    println!("{} (workspace: {})", bead_id, path.display());
+                                } else {
+                                    println!("{}", bead_id);
+                                }
+                            }
+                        }
+                    }
+                    None => {
+                        if format == "json" {
+                            println!("{{}}");
+                        } else {
+                            println!("No beads available to claim");
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // Normal single-workspace claim
+        let metadata = load_metadata(beads_dir)?;
+        let db_path = beads_dir.join(&metadata.database);
+        let storage = Storage::open(&db_path)?;
+
+        let result = storage.with_immediate_transaction(|tx| {
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
+        })?;
+
+        match result {
+            Some(ClaimResult { bead_id, reclaimed, .. }) => {
                 match format {
                     "json" => {
                         let output = serde_json::json!({
