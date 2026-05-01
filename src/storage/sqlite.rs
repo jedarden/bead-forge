@@ -6,6 +6,7 @@ use crate::storage::schema::{apply_schema, ensure_wal_mode};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Transaction, TransactionBehavior};
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Mutex;
@@ -262,6 +263,12 @@ impl Storage {
                     ],
                 )?;
             }
+            for (key, value) in &issue.annotations {
+                tx.execute(
+                    "INSERT INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)",
+                    params![&issue.id, key, value],
+                )?;
+            }
             Ok(())
         })
     }
@@ -344,13 +351,97 @@ impl Storage {
                     tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![id, label])?;
                 }
             }
+            // Handle annotation updates separately
+            if let Some(ref annotations) = changes.annotations {
+                tx.execute("DELETE FROM bead_annotations WHERE bead_id = ?1", params![id])?;
+                for (key, value) in annotations {
+                    tx.execute("INSERT INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)", params![id, key, value])?;
+                }
+            }
             // Mark as dirty for export (if any changes were made)
-            if !updates.is_empty() || changes.labels.is_some() {
+            if !updates.is_empty() || changes.labels.is_some() || changes.annotations.is_some() {
                 tx.execute(
                     "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
                     params![id, now.to_rfc3339()],
                 )?;
             }
+            Ok(())
+        })
+    }
+
+    /// Update an issue from JSONL import data.
+    ///
+    /// This replaces all fields of the existing issue with the imported data,
+    /// used during JSONL import when the content_hash differs.
+    pub fn update_issue_from_json(&self, issue: &Issue) -> Result<()> {
+        self.with_immediate_transaction(|tx| {
+            // Delete existing related data
+            tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
+            tx.execute("DELETE FROM dependencies WHERE issue_id = ?1", params![&issue.id])?;
+            tx.execute("DELETE FROM comments WHERE issue_id = ?1", params![&issue.id])?;
+
+            // Update the issue row with all fields
+            tx.execute(
+                "UPDATE issues SET
+                    content_hash = ?1, title = ?2, description = ?3, design = ?4,
+                    acceptance_criteria = ?5, notes = ?6, status = ?7, priority = ?8,
+                    issue_type = ?9, assignee = ?10, owner = ?11, estimated_minutes = ?12,
+                    created_at = ?13, created_by = ?14, updated_at = ?15, closed_at = ?16,
+                    close_reason = ?17, closed_by_session = ?18, due_at = ?19, defer_until = ?20,
+                    external_ref = ?21, source_system = ?22, source_repo = ?23,
+                    deleted_at = ?24, deleted_by = ?25, delete_reason = ?26, original_type = ?27,
+                    compaction_level = ?28, compacted_at = ?29, compacted_at_commit = ?30,
+                    original_size = ?31, sender = ?32, ephemeral = ?33, pinned = ?34, is_template = ?35
+                 WHERE id = ?36",
+                params![
+                    &issue.content_hash, &issue.title,
+                    issue.description.as_deref().unwrap_or(""),
+                    issue.design.as_deref().unwrap_or(""),
+                    issue.acceptance_criteria.as_deref().unwrap_or(""),
+                    issue.notes.as_deref().unwrap_or(""),
+                    &issue.status.to_string(),
+                    &issue.priority, &issue.issue_type.to_string(), &issue.assignee, &issue.owner,
+                    &issue.estimated_minutes, &issue.created_at.to_rfc3339(), &issue.created_by,
+                    &issue.updated_at.to_rfc3339(), issue.closed_at.map(|d| d.to_rfc3339()),
+                    &issue.close_reason, &issue.closed_by_session, issue.due_at.map(|d| d.to_rfc3339()),
+                    issue.defer_until.map(|d| d.to_rfc3339()), &issue.external_ref, &issue.source_system,
+                    issue.source_repo.as_deref().unwrap_or("."),
+                    issue.deleted_at.map(|d| d.to_rfc3339()), &issue.deleted_by,
+                    &issue.delete_reason, &issue.original_type, &issue.compaction_level,
+                    issue.compacted_at.map(|d| d.to_rfc3339()), &issue.compacted_at_commit,
+                    &issue.original_size, &issue.sender,
+                    if issue.ephemeral { 1 } else { 0 },
+                    if issue.pinned { 1 } else { 0 },
+                    if issue.is_template { 1 } else { 0 },
+                    &issue.id,
+                ],
+            )?;
+
+            // Re-insert labels, dependencies, and comments
+            for label in &issue.labels {
+                tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+            }
+            for dep in &issue.dependencies {
+                tx.execute(
+                    "INSERT INTO dependencies (issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        &dep.issue_id, &dep.depends_on_id, &dep.dep_type.to_string(),
+                        dep.metadata.as_ref().map(|m| serde_json::to_string(m).ok()).flatten(),
+                        &dep.thread_id, &dep.created_at.to_rfc3339(), &dep.created_by,
+                    ],
+                )?;
+            }
+            for comment in &issue.comments {
+                tx.execute(
+                    "INSERT INTO comments (id, issue_id, author, text, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![
+                        &comment.id, &comment.issue_id, &comment.author, &comment.body,
+                        &comment.created_at.to_rfc3339(),
+                    ],
+                )?;
+            }
+
             Ok(())
         })
     }
@@ -482,6 +573,7 @@ impl Storage {
             labels: Self::load_labels_conn(conn, &id)?,
             dependencies: Self::load_dependencies_conn(conn, &id)?,
             comments: Self::load_comments_conn(conn, &id)?,
+            annotations: Self::load_annotations_conn(conn, &id)?,
             id,
         })
     }
@@ -535,6 +627,18 @@ impl Storage {
         Ok(comments)
     }
 
+    fn load_annotations_conn(conn: &Connection, issue_id: &str) -> Result<BTreeMap<String, String>> {
+        let mut stmt = conn.prepare("SELECT key, value FROM bead_annotations WHERE bead_id = ?1")?;
+        let mut rows = stmt.query(params![issue_id])?;
+        let mut annotations = BTreeMap::new();
+        while let Some(row) = rows.next()? {
+            let key: String = row.get(0)?;
+            let value: String = row.get(1)?;
+            annotations.insert(key, value);
+        }
+        Ok(annotations)
+    }
+
     fn load_labels(&self, issue_id: &str) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         Self::load_labels_conn(&conn, issue_id)
@@ -548,6 +652,11 @@ impl Storage {
     fn load_comments(&self, issue_id: &str) -> Result<Vec<Comment>> {
         let conn = self.conn.lock().unwrap();
         Self::load_comments_conn(&conn, issue_id)
+    }
+
+    fn load_annotations(&self, issue_id: &str) -> Result<BTreeMap<String, String>> {
+        let conn = self.conn.lock().unwrap();
+        Self::load_annotations_conn(&conn, issue_id)
     }
 
     pub fn add_dependency(&self, issue_id: &str, depends_on_id: &str, dep_type: &DependencyType, created_by: &str) -> Result<()> {
@@ -636,6 +745,37 @@ impl Storage {
 
     pub fn list_comments(&self, issue_id: &str) -> Result<Vec<Comment>> {
         self.load_comments(issue_id)
+    }
+
+    // Annotation methods
+    pub fn get_annotations(&self, issue_id: &str) -> Result<BTreeMap<String, String>> {
+        self.load_annotations(issue_id)
+    }
+
+    pub fn set_annotation(&self, issue_id: &str, key: &str, value: &str) -> Result<()> {
+        self.with_immediate_transaction(|tx| {
+            tx.execute(
+                "INSERT OR REPLACE INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)",
+                params![issue_id, key, value],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn remove_annotation(&self, issue_id: &str, key: &str) -> Result<()> {
+        self.with_immediate_transaction(|tx| {
+            tx.execute(
+                "DELETE FROM bead_annotations WHERE bead_id = ?1 AND key = ?2",
+                params![issue_id, key],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn clear_annotations(&self, issue_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM bead_annotations WHERE bead_id = ?1", params![issue_id])?;
+        Ok(())
     }
 
     pub fn search_issues(&self, query: Option<&str>, status: &[Status], issue_type: &[IssueType], assignee: Option<&str>, labels: &[String], priority_min: Option<i32>, priority_max: Option<i32>, limit: usize) -> Result<Vec<Issue>> {

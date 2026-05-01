@@ -237,6 +237,34 @@ pub const SCHEMA_SQL: &str = r"
     CREATE INDEX IF NOT EXISTS idx_anomaly_audit_event_type ON anomaly_audit(event_type);
     CREATE INDEX IF NOT EXISTS idx_anomaly_audit_anomaly_type ON anomaly_audit(anomaly_type);
     CREATE INDEX IF NOT EXISTS idx_anomaly_audit_outcome ON anomaly_audit(outcome);
+
+    -- Critical Path Cache (for impact-weighted claim scoring)
+    -- Computed from dependency graph; lower float = more critical (0 = on critical path)
+    CREATE TABLE IF NOT EXISTS critical_path_cache (
+        bead_id     TEXT PRIMARY KEY,
+        epic_id     TEXT REFERENCES issues(id),
+        es          INTEGER NOT NULL,   -- earliest start (hops from root)
+        ls          INTEGER NOT NULL,   -- latest start
+        float       INTEGER NOT NULL,   -- ls - es; 0 = critical path
+        updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_critical_path_cache_epic ON critical_path_cache(epic_id);
+    CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float ON critical_path_cache(float);
+
+    -- Bead Annotations (bf-only table, never touched by br)
+    -- Stores arbitrary key-value metadata per bead.
+    -- IMPORTANT: This is a SEPARATE table (not a column on issues) because br's
+    -- issues_column_order_matches() check triggers rebuild_issues_table() when
+    -- the column count differs, which would silently destroy any extra column.
+    CREATE TABLE IF NOT EXISTS bead_annotations (
+        bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+        key     TEXT NOT NULL,
+        value   TEXT NOT NULL,
+        PRIMARY KEY (bead_id, key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_bead_annotations_key_value
+        ON bead_annotations (key, value);
 ";
 
 /// Split a SQL script into individual statements, respecting string literals,

@@ -146,3 +146,26 @@ pub fn load_metadata(beads_dir: &Path) -> Result<Metadata> {
 pub fn get_default_prefix(config: &Config) -> &str {
     config.issue_prefixes.first().map(|s| s.as_str()).unwrap_or("bf")
 }
+
+/// Initialize a new workspace directory with default config and metadata.
+///
+/// Creates the .beads directory with default configuration files.
+/// Used primarily for testing.
+pub fn init_workspace(beads_dir: &Path, prefix: &str) -> Result<()> {
+    std::fs::create_dir_all(beads_dir)?;
+
+    // Write default config.yaml
+    let config = Config {
+        issue_prefixes: vec![prefix.to_string()],
+        ..Default::default()
+    };
+    let config_yaml = serde_yaml::to_string(&config)?;
+    std::fs::write(beads_dir.join("config.yaml"), config_yaml)?;
+
+    // Write default metadata.json
+    let metadata = Metadata::default();
+    let metadata_json = serde_json::to_string_pretty(&metadata)?;
+    std::fs::write(beads_dir.join("metadata.json"), metadata_json)?;
+
+    Ok(())
+}

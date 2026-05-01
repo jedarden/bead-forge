@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 
@@ -503,6 +504,10 @@ pub struct Issue {
     pub dependencies: Vec<Dependency>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub comments: Vec<Comment>,
+
+    // Annotations (bf-only: arbitrary key-value metadata stored in bead_annotations table)
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub annotations: BTreeMap<String, String>,
 }
 
 impl Default for Issue {
@@ -547,6 +552,7 @@ impl Default for Issue {
             labels: Vec::new(),
             dependencies: Vec::new(),
             comments: Vec::new(),
+            annotations: BTreeMap::new(),
         }
     }
 }
@@ -817,6 +823,7 @@ pub struct IssueChanges {
     pub defer_until: Option<DateTime<Utc>>,
     pub external_ref: Option<String>,
     pub labels: Option<Vec<String>>,
+    pub annotations: Option<BTreeMap<String, String>>,
 }
 
 /// Filter for listing issues (non-Serde, for queries).
