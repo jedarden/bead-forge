@@ -374,6 +374,49 @@ pub enum Commands {
         #[arg(long, default_value = "text")]
         format: String,
     },
+
+    /// Manage annotations
+    #[command(subcommand)]
+    Annotate(AnnotateCommands),
+
+    /// Show event log for a bead
+    Log {
+        /// Bead ID
+        id: String,
+
+        /// Limit number of entries
+        #[arg(long)]
+        limit: Option<usize>,
+
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
+
+    /// Show critical path (longest chain of blocking dependencies)
+    CriticalPath {
+        /// Root bead ID
+        id: String,
+
+        /// Maximum depth
+        #[arg(long, default_value = "20")]
+        max_depth: usize,
+
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
+
+    /// Rotate (archive) closed beads older than threshold
+    Rotate {
+        /// Days threshold (archive beads closed this many days ago)
+        #[arg(long, default_value = "30")]
+        days: u64,
+
+        /// Dry run (show what would be rotated)
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -484,6 +527,51 @@ pub enum ConfigCommands {
     Path,
 }
 
+#[derive(Subcommand)]
+pub enum AnnotateCommands {
+    /// Set an annotation
+    Set {
+        /// Issue ID
+        id: String,
+
+        /// Annotation key
+        key: String,
+
+        /// Annotation value
+        value: String,
+    },
+
+    /// Get an annotation
+    Get {
+        /// Issue ID
+        id: String,
+
+        /// Annotation key
+        key: String,
+    },
+
+    /// Remove an annotation
+    Remove {
+        /// Issue ID
+        id: String,
+
+        /// Annotation key
+        key: String,
+    },
+
+    /// List all annotations for an issue
+    List {
+        /// Issue ID
+        id: String,
+    },
+
+    /// Clear all annotations for an issue
+    Clear {
+        /// Issue ID
+        id: String,
+    },
+}
+
 pub fn run_cli() -> Result<Cli> {
     Ok(Cli::try_parse()?)
 }
@@ -551,6 +639,10 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::Config(config) => cmd_config(&beads_dir, config),
         Commands::Velocity { model, harness, format } => cmd_velocity(&beads_dir, model, harness, &format),
         Commands::Labels { id, format } => cmd_labels(&beads_dir, &id, &format),
+        Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate),
+        Commands::Log { id, limit, format } => cmd_log(&beads_dir, &id, limit, &format),
+        Commands::CriticalPath { id, max_depth, format } => cmd_critical_path(&beads_dir, &id, max_depth, &format),
+        Commands::Rotate { days, dry_run } => cmd_rotate(&beads_dir, days, dry_run),
     }
 }
 
@@ -935,7 +1027,7 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata), None)
         })?;
 
         match result {
@@ -1002,7 +1094,7 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata), None)
         })?;
 
         match result {
@@ -1430,6 +1522,94 @@ fn cmd_velocity(
         _ => {
             println!("Velocity stats: (not yet implemented)");
         }
+    }
+    Ok(())
+}
+
+fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let storage = Storage::open(&db_path)?;
+
+    match annotate {
+        AnnotateCommands::Set { id, key, value } => {
+            storage.set_annotation(&id, &key, &value)?;
+            println!("Set annotation '{}' on {}", key, id);
+        }
+        AnnotateCommands::Get { id, key } => {
+            let annotations = storage.get_annotations(&id)?;
+            if let Some(value) = annotations.get(&key) {
+                println!("{}", value);
+            } else {
+                println!("Annotation '{}' not found on {}", key, id);
+            }
+        }
+        AnnotateCommands::Remove { id, key } => {
+            storage.remove_annotation(&id, &key)?;
+            println!("Removed annotation '{}' from {}", key, id);
+        }
+        AnnotateCommands::List { id } => {
+            let annotations = storage.get_annotations(&id)?;
+            if annotations.is_empty() {
+                println!("No annotations for {}", id);
+            } else {
+                println!("Annotations for {}:", id);
+                for (key, value) in annotations {
+                    println!("  {}: {}", key, value);
+                }
+            }
+        }
+        AnnotateCommands::Clear { id } => {
+            storage.clear_annotations(&id)?;
+            println!("Cleared all annotations from {}", id);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_log(beads_dir: &PathBuf, id: &str, limit: Option<usize>, format: &str) -> Result<()> {
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let _storage = Storage::open(&db_path)?;
+
+    // For now, we'll just return a placeholder
+    match format {
+        "json" => {
+            println!("{}", serde_json::json!({"events": []}));
+        }
+        _ => {
+            println!("Event log for {} (not yet implemented)", id);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_critical_path(beads_dir: &PathBuf, id: &str, max_depth: usize, format: &str) -> Result<()> {
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let _storage = Storage::open(&db_path)?;
+
+    // For now, we'll just return a placeholder
+    match format {
+        "json" => {
+            println!("{}", serde_json::json!({"critical_path": []}));
+        }
+        _ => {
+            println!("Critical path for {} (not yet implemented)", id);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_rotate(beads_dir: &PathBuf, days: u64, dry_run: bool) -> Result<()> {
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let _storage = Storage::open(&db_path)?;
+
+    if dry_run {
+        println!("Dry run: would rotate closed beads older than {} days", days);
+    } else {
+        println!("Rotate: closed beads older than {} days (not yet implemented)", days);
     }
     Ok(())
 }
