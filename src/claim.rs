@@ -138,6 +138,13 @@ pub fn claim(
            AND i.pinned = 0
            AND i.is_template = 0
            AND i.deleted_at IS NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM dependencies blocker_dep
+               INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+               WHERE blocker_dep.issue_id = i.id
+               AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+               AND blocker.status != 'closed'
+           )
          GROUP BY i.id
          ORDER BY
              downstream_impact DESC,
@@ -236,6 +243,13 @@ pub fn get_ready_candidates(tx: &Connection, limit: usize) -> Result<Vec<ScoredB
            AND i.pinned = 0
            AND i.is_template = 0
            AND i.deleted_at IS NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM dependencies blocker_dep
+               INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+               WHERE blocker_dep.issue_id = i.id
+               AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+               AND blocker.status != 'closed'
+           )
          GROUP BY i.id
          ORDER BY
              downstream_impact DESC,
