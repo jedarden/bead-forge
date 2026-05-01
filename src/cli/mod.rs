@@ -1027,7 +1027,7 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata), None)
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
         })?;
 
         match result {
@@ -1094,7 +1094,7 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata), None)
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
         })?;
 
         match result {
