@@ -4,7 +4,7 @@
 //! try to claim beads simultaneously. The acceptance criterion is that
 //! under 20-worker load, no bead is claimed twice.
 
-use bead_forge::bead_store::{claim_bead, ClaimConfig};
+use bead_forge::claim::claim;
 use bead_forge::config::{init_workspace, load_metadata};
 use bead_forge::model::{Issue, Priority};
 use bead_forge::storage::Storage;
@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
+use chrono::Utc;
 
 /// Helper to set up a test workspace with N beads.
 fn setup_workspace_with_beads(num_beads: usize) -> (TempDir, Arc<Storage>) {
@@ -39,18 +40,23 @@ fn setup_workspace_with_beads(num_beads: usize) -> (TempDir, Arc<Storage>) {
     (temp_dir, storage)
 }
 
+/// Claim a bead using the storage layer directly.
+fn claim_bead(storage: &Arc<Storage>, worker: &str) -> Option<bead_forge::claim::ClaimResult> {
+    storage.with_immediate_transaction(|tx| {
+        claim(tx, worker, 30, Utc::now(), None)
+    }).unwrap()
+}
+
 #[test]
 fn test_concurrent_claim_no_duplicates() {
     let num_beads = 20;
     let num_workers = 20;
 
     let (_temp, storage) = setup_workspace_with_beads(num_beads);
-    let workspace = std::env::current_dir().unwrap(); // Will be overridden by find_beads_dir
-    let beads_dir = _temp.path().join(".beads");
 
     // Track claimed bead IDs across all workers
     let claimed_ids = Arc::new(Mutex::new(Vec::new()));
-    let worker_errors = Arc::new(Mutex::new(Vec::new()));
+    let worker_errors: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 
     let mut handles = vec![];
 
@@ -58,27 +64,22 @@ fn test_concurrent_claim_no_duplicates() {
     for worker_id in 0..num_workers {
         let claimed_ids_clone = Arc::clone(&claimed_ids);
         let errors_clone = Arc::clone(&worker_errors);
-        let workspace_path = beads_dir.clone();
+        let storage_clone = Arc::clone(&storage);
 
         let handle = thread::spawn(move || {
             // Add a tiny random delay to increase race likelihood
             let delay = rand::random::<u64>() % 10;
             thread::sleep(Duration::from_micros(delay));
 
-            let config = ClaimConfig::new(format!("worker-{:02}", worker_id));
-            let result = claim_bead(&workspace_path, config);
+            let result = claim_bead(&storage_clone, &format!("worker-{:02}", worker_id));
 
             match result {
-                Ok(Some(claimed)) => {
+                Some(claimed) => {
                     let mut ids = claimed_ids_clone.lock().unwrap();
                     ids.push(claimed.bead_id);
                 }
-                Ok(None) => {
+                None => {
                     // No beads available - acceptable
-                }
-                Err(e) => {
-                    let mut errors = errors_clone.lock().unwrap();
-                    errors.push(format!("Worker {}: {}", worker_id, e));
                 }
             }
         });
@@ -89,12 +90,6 @@ fn test_concurrent_claim_no_duplicates() {
     // Wait for all workers to complete
     for handle in handles {
         handle.join().unwrap();
-    }
-
-    // Check for errors
-    let errors = worker_errors.lock().unwrap();
-    if !errors.is_empty() {
-        panic!("Worker errors occurred: {:?}", *errors);
     }
 
     let claimed_ids = claimed_ids.lock().unwrap();
@@ -132,12 +127,11 @@ fn test_concurrent_claim_no_duplicates() {
 fn test_concurrent_claim_priority_ordering() {
     // Create beads with unique priorities (valid range is 0-4)
     let (_temp, storage) = setup_workspace_with_beads(0);
-    let beads_dir = _temp.path().join(".beads");
 
     // Create 5 beads with unique priorities 0-4 (0 is highest)
     for i in 0..5 {
         let mut issue = Issue::new(
-            format!("bf-{:0>4}", i),
+            format!("bf-priority-{}", i),
             format!("Priority {} bead", i),
             ".".to_string(),
         );
@@ -150,16 +144,14 @@ fn test_concurrent_claim_priority_ordering() {
 
     for worker_id in 0..5 {
         let priorities_clone = Arc::clone(&claimed_priorities);
-        let workspace_path = beads_dir.clone();
+        let storage_clone = Arc::clone(&storage);
 
         let handle = thread::spawn(move || {
             thread::sleep(Duration::from_micros(rand::random::<u64>() % 100));
 
-            let config = ClaimConfig::new(format!("worker-{:02}", worker_id));
-            if let Ok(Some(claimed)) = claim_bead(&workspace_path, config) {
+            if let Some(claimed) = claim_bead(&storage_clone, &format!("worker-{:02}", worker_id)) {
                 // Get the priority of the claimed bead
-                let bead_storage = Storage::open(&workspace_path.join("beads.db")).unwrap();
-                if let Ok(Some(issue)) = bead_storage.get_issue(&claimed.bead_id) {
+                if let Ok(Some(issue)) = storage_clone.get_issue(&claimed.bead_id) {
                     let mut priorities = priorities_clone.lock().unwrap();
                     priorities.push(issue.priority.0);
                 }
@@ -179,7 +171,7 @@ fn test_concurrent_claim_priority_ordering() {
 
     // All 5 beads should be claimed with unique priorities
     assert_eq!(priorities.len(), 5);
-    let mut unique_priorities: std::collections::HashSet<_> = priorities.iter().cloned().collect();
+    let unique_priorities: std::collections::HashSet<_> = priorities.iter().cloned().collect();
     assert_eq!(unique_priorities.len(), 5, "All priorities should be unique");
 
     // The first claimed should have priority 0 (highest)
@@ -188,8 +180,7 @@ fn test_concurrent_claim_priority_ordering() {
 
 #[test]
 fn test_concurrent_claim_empty_workspace() {
-    let (_temp, _storage) = setup_workspace_with_beads(0);
-    let beads_dir = _temp.path().join(".beads");
+    let (_temp, storage) = setup_workspace_with_beads(0);
 
     let claim_count = Arc::new(Mutex::new(0));
     let mut handles = vec![];
@@ -197,11 +188,10 @@ fn test_concurrent_claim_empty_workspace() {
     // 5 workers try to claim from empty workspace
     for worker_id in 0..5 {
         let count_clone = Arc::clone(&claim_count);
-        let workspace_path = beads_dir.clone();
+        let storage_clone = Arc::clone(&storage);
 
         let handle = thread::spawn(move || {
-            let config = ClaimConfig::new(format!("worker-{}", worker_id));
-            if let Ok(Some(_)) = claim_bead(&workspace_path, config) {
+            if claim_bead(&storage_clone, &format!("worker-{}", worker_id)).is_some() {
                 let mut count = count_clone.lock().unwrap();
                 *count += 1;
             }
@@ -222,10 +212,9 @@ fn test_concurrent_claim_empty_workspace() {
 fn test_concurrent_claim_stale_reclamation() {
     let num_beads = 5;
     let (_temp, storage) = setup_workspace_with_beads(num_beads);
-    let beads_dir = _temp.path().join(".beads");
 
     // Manually set some beads to in_progress with old timestamp
-    use chrono::{Duration, Utc};
+    use chrono::Duration;
 
     let stale_time = Utc::now() - Duration::minutes(60);
     let stale_time_str = stale_time.to_rfc3339();
@@ -240,8 +229,7 @@ fn test_concurrent_claim_stale_reclamation() {
     }).unwrap();
 
     // Now a new worker should be able to claim after stale reclamation
-    let config = ClaimConfig::new("fresh-worker".to_string());
-    let result = claim_bead(&beads_dir, config).unwrap();
+    let result = claim_bead(&storage, "fresh-worker");
 
     assert!(result.is_some(), "Should reclaim stale beads and claim one");
 
