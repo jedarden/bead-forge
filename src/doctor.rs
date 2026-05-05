@@ -4,7 +4,7 @@
 //! including corruption detection and JSONL-based repair.
 
 use crate::config::{find_beads_dir, load_metadata};
-use crate::jsonl::{import_jsonl, stream_issues};
+use crate::jsonl::{import_jsonl, stream_issues, UpsertResult};
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
 use rusqlite::Connection;
@@ -191,7 +191,7 @@ pub fn repair(workspace_dir: &Path) -> Result<usize> {
 
     let result = import_jsonl(&jsonl_path, |issue| {
         storage.create_issue(issue)?;
-        Ok(true)
+        Ok(UpsertResult::New)
     })?;
 
     // Rebuild blocked cache
@@ -280,7 +280,7 @@ pub fn init_from_jsonl(workspace_dir: &Path, jsonl_path: &Path) -> Result<usize>
 
     let result = import_jsonl(jsonl_path, |issue| {
         storage.create_issue(issue)?;
-        Ok(true)
+        Ok(UpsertResult::New)
     })?;
 
     // Rebuild blocked cache

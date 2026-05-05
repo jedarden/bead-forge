@@ -4,6 +4,17 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
+/// Result of upserting an issue during import.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpsertResult {
+    /// Issue was newly created
+    New,
+    /// Issue was updated (content changed)
+    Updated,
+    /// Issue was skipped (content unchanged)
+    Unchanged,
+}
+
 pub struct ImportResult {
     pub imported: usize,
     pub updated: usize,
@@ -25,7 +36,7 @@ pub fn stream_issues(path: &Path) -> Result<impl Iterator<Item = Result<Issue>>>
 
 pub fn import_jsonl<F>(path: &Path, mut upsert: F) -> Result<ImportResult>
 where
-    F: FnMut(&Issue) -> Result<bool>,
+    F: FnMut(&Issue) -> Result<UpsertResult>,
 {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -39,8 +50,9 @@ where
         let line = line?;
         let issue: Issue = serde_json::from_str(&line)?;
         match upsert(&issue)? {
-            true => result.imported += 1,
-            false => result.updated += 1,
+            UpsertResult::New => result.imported += 1,
+            UpsertResult::Updated => result.updated += 1,
+            UpsertResult::Unchanged => result.skipped += 1,
         }
     }
 

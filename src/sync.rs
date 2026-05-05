@@ -4,7 +4,7 @@
 //! for git-backed bead synchronization.
 
 use crate::config::{find_beads_dir, load_metadata};
-use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl};
+use crate::jsonl::{export_jsonl, export_jsonl_dirty, ImportResult};
 use crate::storage::Storage;
 use anyhow::Result;
 use std::path::{Path, PathBuf};
@@ -88,25 +88,8 @@ pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
 
     let storage = Storage::open(&db_path)?;
 
-    let result = import_jsonl(&jsonl_path, |issue| {
-        let existing = storage.get_issue(&issue.id)?;
-        match existing {
-            None => {
-                // New bead - insert it
-                storage.create_issue(issue)?;
-                Ok(true)
-            }
-            Some(existing_issue) => {
-                // Existing bead - check if changed
-                if existing_issue.content_hash != issue.content_hash {
-                    storage.update_issue_from_json(issue)?;
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            }
-        }
-    })?;
+    // Use sync_from_jsonl for efficient single-transaction import
+    let result = storage.sync_from_jsonl(&jsonl_path)?;
 
     // Rebuild blocked cache after import
     storage.rebuild_blocked_cache()?;
@@ -114,7 +97,7 @@ pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
     Ok(SyncResult {
         imported: result.imported,
         exported: 0,
-        skipped: result.updated, // updated = skipped (unchanged)
+        skipped: result.skipped,
     })
 }
 
