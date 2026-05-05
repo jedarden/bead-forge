@@ -1148,20 +1148,29 @@ fn cmd_claim(
 }
 
 fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<()> {
-    let metadata = load_metadata(beads_dir)?;
-    let db_path = beads_dir.join(&metadata.database);
-    let jsonl_path = beads_dir.join(&metadata.jsonl_export);
-    let storage = Storage::open(&db_path)?;
+    let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
 
     if import_only {
-        let result = storage.sync_from_jsonl(&jsonl_path)?;
+        let result = crate::sync::import(workspace_dir)?;
         println!("Imported {} beads", result.imported);
+        if result.updated > 0 {
+            println!("Updated {} beads", result.updated);
+        }
+        if result.skipped > 0 {
+            println!("Skipped {} unchanged beads", result.skipped);
+        }
     } else if flush_only {
-        let count = storage.sync_to_jsonl(&jsonl_path, false)?;
+        let count = crate::sync::flush(workspace_dir)?;
         println!("Flushed {} beads to JSONL", count);
     } else {
-        let count = storage.sync_to_jsonl(&jsonl_path, false)?;
-        println!("Synced {} beads to JSONL", count);
+        let result = crate::sync::sync(workspace_dir)?;
+        println!("Synced {} beads from JSONL and flushed {} to JSONL", result.imported + result.updated, result.exported);
+        if result.updated > 0 {
+            println!("Updated {} beads", result.updated);
+        }
+        if result.skipped > 0 {
+            println!("Skipped {} unchanged beads", result.skipped);
+        }
     }
 
     Ok(())
