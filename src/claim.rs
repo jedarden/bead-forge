@@ -111,6 +111,17 @@ pub fn claim(
     worker_metadata: Option<&WorkerMetadata>,
 ) -> Result<Option<ClaimResult>> {
 
+    // Step 0: Check migration_lock - return NONE if migration is in progress
+    let lock_count: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM migration_lock WHERE expires_at > ?1",
+        params![now.to_rfc3339()],
+        |row| row.get(0),
+    ).unwrap_or(0);
+    if lock_count > 0 {
+        // Migration in progress - return None gracefully
+        return Ok(None);
+    }
+
     // Step 1: Reclaim stale in_progress beads
     let stale_cutoff = now - Duration::minutes(claim_ttl_minutes);
     let reclaimed = tx.execute(
