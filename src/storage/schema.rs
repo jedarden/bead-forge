@@ -280,6 +280,32 @@ pub const SCHEMA_SQL: &str = r"
     CREATE INDEX IF NOT EXISTS idx_worker_sessions_worker ON worker_sessions(worker_id);
     CREATE INDEX IF NOT EXISTS idx_worker_sessions_model ON worker_sessions(model);
     CREATE INDEX IF NOT EXISTS idx_worker_sessions_harness ON worker_sessions(harness);
+
+    -- Velocity Stats (bf-only table for performance-aware claim scoring)
+    -- Aggregated statistics per (model, harness, issue_type) tuple.
+    -- Updated on bead close to inform velocity-aware scoring.
+    CREATE TABLE IF NOT EXISTS velocity_stats (
+        model           TEXT NOT NULL,
+        harness         TEXT NOT NULL,
+        issue_type      TEXT NOT NULL,
+        sample_count    INTEGER DEFAULT 0,
+        p50_seconds     INTEGER,
+        p90_seconds     INTEGER,
+        avg_seconds     REAL,
+        last_updated    DATETIME,
+        PRIMARY KEY (model, harness, issue_type)
+    );
+    CREATE INDEX IF NOT EXISTS idx_velocity_stats_last_updated ON velocity_stats(last_updated);
+
+    -- Migration Lock (bf-only table for coordinating workspace migrations)
+    -- Singleton table that prevents new claims during migration operations.
+    -- Checked by bf claim at the start of each BEGIN IMMEDIATE transaction.
+    CREATE TABLE IF NOT EXISTS migration_lock (
+        id          INTEGER PRIMARY KEY CHECK (id = 1),
+        locked_by   TEXT NOT NULL,
+        locked_at   DATETIME NOT NULL,
+        expires_at  DATETIME NOT NULL
+    );
 ";
 
 /// Split a SQL script into individual statements, respecting string literals,
