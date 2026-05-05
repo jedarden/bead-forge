@@ -1,4 +1,4 @@
-use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult};
+use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
     Comment, Dependency, DependencyType, Issue, IssueChanges, IssueFilter, IssueType, Status,
 };
@@ -499,16 +499,185 @@ impl Storage {
     }
 
     pub fn sync_from_jsonl(&self, jsonl_path: &Path) -> Result<ImportResult> {
-        import_jsonl(jsonl_path, |issue| {
-            let existing = self.get_issue(&issue.id)?;
-            match existing {
-                None => {
-                    self.create_issue(issue)?;
-                    Ok(true)
+        self.with_immediate_transaction(|tx| {
+            import_jsonl(jsonl_path, |issue| {
+                let existing = Self::get_issue_tx(tx, &issue.id)?;
+                match existing {
+                    None => {
+                        Self::create_issue_tx(tx, issue)?;
+                        Ok(UpsertResult::New)
+                    }
+                    Some(existing_issue) => {
+                        if existing_issue.content_hash != issue.content_hash {
+                            Self::update_issue_from_json_tx(tx, issue)?;
+                            Ok(UpsertResult::Updated)
+                        } else {
+                            Ok(UpsertResult::Unchanged)
+                        }
+                    }
                 }
-                Some(_) => Ok(false),
-            }
+            })
         })
+    }
+
+    fn get_issue_tx(tx: &Connection, id: &str) -> Result<Option<Issue>> {
+        let mut stmt = tx.prepare(
+            "SELECT id, content_hash, title, description, design, acceptance_criteria, notes,
+                    status, priority, issue_type, assignee, owner, estimated_minutes,
+                    created_at, created_by, updated_at, closed_at, close_reason,
+                    closed_by_session, due_at, defer_until, external_ref, source_system,
+                    source_repo, deleted_at, deleted_by, delete_reason, original_type,
+                    compaction_level, compacted_at, compacted_at_commit, original_size,
+                    sender, ephemeral, pinned, is_template
+             FROM issues WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query(params![id])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(Self::row_to_issue_conn(tx, row)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn create_issue_tx(tx: &Connection, issue: &Issue) -> Result<()> {
+        tx.execute(
+            "INSERT INTO issues (
+                id, content_hash, title, description, design, acceptance_criteria, notes,
+                status, priority, issue_type, assignee, owner, estimated_minutes,
+                created_at, created_by, updated_at, closed_at, close_reason,
+                closed_by_session, due_at, defer_until, external_ref, source_system,
+                source_repo, deleted_at, deleted_by, delete_reason, original_type,
+                compaction_level, compacted_at, compacted_at_commit, original_size,
+                sender, ephemeral, pinned, is_template
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
+                      ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
+                      ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36)",
+            params![
+                &issue.id, &issue.content_hash, &issue.title,
+                issue.description.as_deref().unwrap_or(""),
+                issue.design.as_deref().unwrap_or(""),
+                issue.acceptance_criteria.as_deref().unwrap_or(""),
+                issue.notes.as_deref().unwrap_or(""),
+                &issue.status.to_string(),
+                &issue.priority, &issue.issue_type.to_string(), &issue.assignee, &issue.owner,
+                &issue.estimated_minutes, &issue.created_at.to_rfc3339(), &issue.created_by,
+                &issue.updated_at.to_rfc3339(), issue.closed_at.map(|d| d.to_rfc3339()),
+                &issue.close_reason, &issue.closed_by_session, issue.due_at.map(|d| d.to_rfc3339()),
+                issue.defer_until.map(|d| d.to_rfc3339()), &issue.external_ref, &issue.source_system,
+                issue.source_repo.as_deref().unwrap_or("."),
+                issue.deleted_at.map(|d| d.to_rfc3339()), &issue.deleted_by,
+                &issue.delete_reason, &issue.original_type, &issue.compaction_level,
+                issue.compacted_at.map(|d| d.to_rfc3339()), &issue.compacted_at_commit,
+                &issue.original_size, &issue.sender,
+                if issue.ephemeral { 1 } else { 0 },
+                if issue.pinned { 1 } else { 0 },
+                if issue.is_template { 1 } else { 0 },
+            ],
+        )?;
+        for label in &issue.labels {
+            tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+        }
+        for dep in &issue.dependencies {
+            tx.execute(
+                "INSERT INTO dependencies (issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    &dep.issue_id, &dep.depends_on_id, &dep.dep_type.to_string(),
+                    dep.metadata.as_ref().map(|m| serde_json::to_string(m).ok()).flatten(),
+                    &dep.thread_id, &dep.created_at.to_rfc3339(), &dep.created_by,
+                ],
+            )?;
+        }
+        for comment in &issue.comments {
+            tx.execute(
+                "INSERT INTO comments (id, issue_id, author, text, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    &comment.id, &comment.issue_id, &comment.author, &comment.body,
+                    &comment.created_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        for (key, value) in &issue.annotations {
+            tx.execute(
+                "INSERT INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)",
+                params![&issue.id, key, value],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn update_issue_from_json_tx(tx: &Connection, issue: &Issue) -> Result<()> {
+        tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
+        tx.execute("DELETE FROM dependencies WHERE issue_id = ?1", params![&issue.id])?;
+        tx.execute("DELETE FROM comments WHERE issue_id = ?1", params![&issue.id])?;
+        tx.execute("DELETE FROM bead_annotations WHERE bead_id = ?1", params![&issue.id])?;
+
+        tx.execute(
+            "UPDATE issues SET
+                content_hash = ?1, title = ?2, description = ?3, design = ?4,
+                acceptance_criteria = ?5, notes = ?6, status = ?7, priority = ?8,
+                issue_type = ?9, assignee = ?10, owner = ?11, estimated_minutes = ?12,
+                created_at = ?13, created_by = ?14, updated_at = ?15, closed_at = ?16,
+                close_reason = ?17, closed_by_session = ?18, due_at = ?19, defer_until = ?20,
+                external_ref = ?21, source_system = ?22, source_repo = ?23,
+                deleted_at = ?24, deleted_by = ?25, delete_reason = ?26, original_type = ?27,
+                compaction_level = ?28, compacted_at = ?29, compacted_at_commit = ?30,
+                original_size = ?31, sender = ?32, ephemeral = ?33, pinned = ?34, is_template = ?35
+             WHERE id = ?36",
+            params![
+                &issue.content_hash, &issue.title,
+                issue.description.as_deref().unwrap_or(""),
+                issue.design.as_deref().unwrap_or(""),
+                issue.acceptance_criteria.as_deref().unwrap_or(""),
+                issue.notes.as_deref().unwrap_or(""),
+                &issue.status.to_string(),
+                &issue.priority, &issue.issue_type.to_string(), &issue.assignee, &issue.owner,
+                &issue.estimated_minutes, &issue.created_at.to_rfc3339(), &issue.created_by,
+                &issue.updated_at.to_rfc3339(), issue.closed_at.map(|d| d.to_rfc3339()),
+                &issue.close_reason, &issue.closed_by_session, issue.due_at.map(|d| d.to_rfc3339()),
+                issue.defer_until.map(|d| d.to_rfc3339()), &issue.external_ref, &issue.source_system,
+                issue.source_repo.as_deref().unwrap_or("."),
+                issue.deleted_at.map(|d| d.to_rfc3339()), &issue.deleted_by,
+                &issue.delete_reason, &issue.original_type, &issue.compaction_level,
+                issue.compacted_at.map(|d| d.to_rfc3339()), &issue.compacted_at_commit,
+                &issue.original_size, &issue.sender,
+                if issue.ephemeral { 1 } else { 0 },
+                if issue.pinned { 1 } else { 0 },
+                if issue.is_template { 1 } else { 0 },
+                &issue.id,
+            ],
+        )?;
+
+        for label in &issue.labels {
+            tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+        }
+        for dep in &issue.dependencies {
+            tx.execute(
+                "INSERT INTO dependencies (issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    &dep.issue_id, &dep.depends_on_id, &dep.dep_type.to_string(),
+                    dep.metadata.as_ref().map(|m| serde_json::to_string(m).ok()).flatten(),
+                    &dep.thread_id, &dep.created_at.to_rfc3339(), &dep.created_by,
+                ],
+            )?;
+        }
+        for comment in &issue.comments {
+            tx.execute(
+                "INSERT INTO comments (id, issue_id, author, text, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    &comment.id, &comment.issue_id, &comment.author, &comment.body,
+                    &comment.created_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        for (key, value) in &issue.annotations {
+            tx.execute(
+                "INSERT INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)",
+                params![&issue.id, key, value],
+            )?;
+        }
+        Ok(())
     }
 
     pub fn sync_to_jsonl(&self, jsonl_path: &Path, dirty_only: bool) -> Result<usize> {
