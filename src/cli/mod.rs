@@ -1,5 +1,6 @@
 use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild};
 use crate::claim::{claim, claim_any, ClaimResult, get_ready_candidates, WorkerMetadata, find_workspaces};
+use crate::commit_check::{scan_staged_beads, format_scan_results};
 use crate::config::{find_beads_dir, load_config, load_metadata, get_default_prefix};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{OutputFormat, get_formatter};
@@ -228,6 +229,9 @@ pub enum Commands {
         #[arg(long)]
         repair: bool,
     },
+
+    /// Commit check - scan staged .beads/ changes for secrets (git pre-commit hook)
+    CommitCheck,
 
     /// Count beads
     Count {
@@ -673,6 +677,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         Commands::Sync { flush_only, import_only } => cmd_sync(&beads_dir, flush_only, import_only),
         Commands::Doctor { repair } => cmd_doctor(&beads_dir, repair),
+        Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
         Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
         Commands::Mitosis { id, children, reason, format } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format),
@@ -1286,6 +1291,19 @@ fn cmd_doctor(beads_dir: &PathBuf, repair: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn cmd_commit_check(beads_dir: &PathBuf) -> Result<()> {
+    let result = scan_staged_beads(beads_dir)?;
+
+    if result.secrets_found.is_empty() {
+        // Clean - no output on success (standard for pre-commit hooks)
+        std::process::exit(0);
+    }
+
+    // Secrets found - print details and exit 1
+    eprintln!("{}", format_scan_results(&result));
+    std::process::exit(1);
 }
 
 fn cmd_count(beads_dir: &PathBuf, status: Option<String>) -> Result<()> {

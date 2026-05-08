@@ -1,6 +1,7 @@
 pub mod batch;
 pub mod cli;
 pub mod claim;
+pub mod commit_check;
 pub mod config;
 pub mod critical_path;
 pub mod doctor;
