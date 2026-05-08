@@ -748,7 +748,7 @@ fn cmd_create(
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
+    let storage = Storage::open_with_config(&db_path, &config)?;
 
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
@@ -902,9 +902,10 @@ fn cmd_update(
     priority: Option<i32>,
     assignee: Option<String>,
 ) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
+    let storage = Storage::open_with_config(&db_path, &config)?;
 
     let changes = IssueChanges {
         title,
@@ -1307,9 +1308,10 @@ fn cmd_count(beads_dir: &PathBuf, status: Option<String>) -> Result<()> {
 }
 
 fn cmd_batch(beads_dir: &PathBuf, file: Option<PathBuf>, json: Option<String>, stdin: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
+    let storage = Storage::open_with_config(&db_path, &config)?;
 
     let ops: Vec<BatchOp> = if let Some(json_str) = json {
         serde_json::from_str(&json_str)?
@@ -1341,9 +1343,10 @@ fn cmd_batch(beads_dir: &PathBuf, file: Option<PathBuf>, json: Option<String>, s
 }
 
 fn cmd_mitosis(beads_dir: &PathBuf, id: &str, children: &str, reason: &str, format: &str) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
+    let storage = Storage::open_with_config(&db_path, &config)?;
 
     // Parse children as JSON array of {title, type, priority} or {title, type, priority, description, assignee, labels}
     let children_defs: Vec<MitosisChild> = serde_json::from_str(children)?;

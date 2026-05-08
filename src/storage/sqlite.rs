@@ -3,8 +3,9 @@ use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult,
 use crate::model::{
     Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter, IssueType, Status,
 };
+use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::BTreeMap;
@@ -16,8 +17,14 @@ use std::time::Duration;
 const MAX_RETRIES: u32 = 5;
 const RETRY_BASE_MS: u64 = 50;
 
+/// Error type for secret detection failures.
+#[derive(Debug, thiserror::Error)]
+#[error("secret detected: {0}")]
+pub struct SecretError(String);
+
 pub struct Storage {
     conn: Mutex<Connection>,
+    secret_scanner: Mutex<Option<SecretScanner>>,
 }
 
 impl Storage {
@@ -27,7 +34,38 @@ impl Storage {
         // Apply schema on every open - all tables use CREATE TABLE IF NOT EXISTS
         // which is a no-op for existing tables and avoids DDL lock contention
         apply_schema(&conn)?;
-        Ok(Storage { conn: Mutex::new(conn) })
+        Ok(Storage {
+            conn: Mutex::new(conn),
+            secret_scanner: Mutex::new(None),
+        })
+    }
+
+    /// Open storage with secret scanning configured from the provided config.
+    ///
+    /// This is a convenience method that opens the database and configures
+    /// secret protection in one step. Use this instead of `open()` followed
+    /// by `set_secret_scanner()` when you have access to the Config.
+    pub fn open_with_config(db_path: &Path, config: &crate::config::Config) -> Result<Self> {
+        let storage = Self::open(db_path)?;
+        if config.secret_protection.enabled {
+            if let Ok(scanner) = SecretScanner::from_config(&config.secret_protection) {
+                storage.set_secret_scanner(scanner);
+            }
+        }
+        Ok(storage)
+    }
+
+    /// Configure secret scanning for this storage instance.
+    ///
+    /// When enabled, `create_issue` and `update_issue` will scan all string fields
+    /// for secrets and return an error if any are detected.
+    pub fn set_secret_scanner(&self, scanner: SecretScanner) {
+        *self.secret_scanner.lock().unwrap() = Some(scanner);
+    }
+
+    /// Check if secret scanning is enabled.
+    pub fn has_secret_scanner(&self) -> bool {
+        self.secret_scanner.lock().unwrap().is_some()
     }
 
     pub fn with_write_transaction<T, F>(&self, f: F) -> Result<T>
@@ -199,6 +237,14 @@ impl Storage {
     }
 
     pub fn create_issue(&self, issue: &Issue) -> Result<()> {
+        // Scan for secrets before creating
+        if let Some(scanner) = &*self.secret_scanner.lock().unwrap() {
+            let matches = scanner.scan_issue(issue);
+            if !matches.is_empty() {
+                return Err(SecretError(format_secret_matches(&matches)).into());
+            }
+        }
+
         // Compute content_hash if not already set, and wrap in Some for storage
         let content_hash: Option<String> = issue.content_hash.as_ref().cloned().or_else(|| Some(issue.content_hash()));
 
@@ -273,6 +319,39 @@ impl Storage {
     }
 
     pub fn update_issue(&self, id: &str, changes: &IssueChanges) -> Result<()> {
+        // Scan for secrets before updating (only for string fields in changes)
+        if let Some(scanner) = &*self.secret_scanner.lock().unwrap() {
+            let mut all_matches = Vec::new();
+            for field in [
+                changes.title.as_deref(),
+                changes.description.as_deref(),
+                changes.design.as_deref(),
+                changes.acceptance_criteria.as_deref(),
+                changes.notes.as_deref(),
+                changes.assignee.as_deref(),
+                changes.owner.as_deref(),
+                changes.external_ref.as_deref(),
+            ] {
+                if let Some(value) = field {
+                    all_matches.extend(scanner.scan_string(value));
+                }
+            }
+            if let Some(labels) = &changes.labels {
+                for label in labels {
+                    all_matches.extend(scanner.scan_string(label));
+                }
+            }
+            if let Some(annotations) = &changes.annotations {
+                for (key, value) in annotations {
+                    all_matches.extend(scanner.scan_string(key));
+                    all_matches.extend(scanner.scan_string(value));
+                }
+            }
+            if !all_matches.is_empty() {
+                return Err(SecretError(format_secret_matches(&all_matches)).into());
+            }
+        }
+
         self.with_immediate_transaction(|tx| {
             let mut updates = Vec::new();
             let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -1237,4 +1316,36 @@ fn is_busy_error(e: &rusqlite::Error) -> bool {
 
 fn parse_datetime(s: String) -> Result<DateTime<Utc>> {
     Ok(DateTime::parse_from_rfc3339(&s)?.with_timezone(&Utc))
+}
+
+/// Format secret matches into a user-friendly error message.
+fn format_secret_matches(matches: &[SecretMatch]) -> String {
+    let mut msg = String::from("secret detected in bead content. Refusing write.\n\n");
+    msg.push_str("The following patterns matched:\n");
+
+    // Group by pattern name
+    let mut by_pattern: std::collections::HashMap<&str, Vec<&SecretMatch>> = std::collections::HashMap::new();
+    for m in matches {
+        by_pattern.entry(&m.pattern_name).or_default().push(m);
+    }
+
+    for (pattern, match_list) in by_pattern {
+        msg.push_str(&format!("\n  [{}]\n", pattern));
+        for m in match_list {
+            // Truncate very long matches for readability
+            let display = if m.matched_text.len() > 60 {
+                format!("{}...", &m.matched_text[..57])
+            } else {
+                m.matched_text.clone()
+            };
+            msg.push_str(&format!("    - {}\n", display));
+        }
+    }
+
+    msg.push_str("\nIf this is a false positive, add an allowlist pattern to .beads/config.yaml:\n");
+    msg.push_str("  secret_protection:\n");
+    msg.push_str("    allowlist:\n");
+    msg.push_str("      - \"<regex pattern to exclude>\"\n");
+
+    msg
 }
