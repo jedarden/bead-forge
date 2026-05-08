@@ -133,13 +133,14 @@ pub fn claim(
     )?;
 
     // Step 2: Find candidate beads with impact scoring
-    // Score = downstream_impact + (critical_float / 1000.0)
+    // Score = downstream_impact + critical_path_bonus
     // downstream_impact = count of beads blocked by this one
-    // critical_float = from critical_path_cache (lower is more critical)
+    // critical_path_bonus = 1000.0 / (float + 1) where float is from critical_path_cache
+    // Zero-float beads get bonus = 1000, float-5 beads get ~167, non-critical beads get ~1
     let mut stmt = tx.prepare(
         "SELECT i.id,
                 COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                COALESCE(c.float, 999999) as critical_float,
+                1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
                 i.priority
          FROM issues i
          LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
@@ -159,7 +160,7 @@ pub fn claim(
          GROUP BY i.id
          ORDER BY
              downstream_impact DESC,
-             critical_float ASC,
+             critical_path_bonus DESC,
              i.priority ASC,
              i.created_at ASC
          LIMIT 1",
@@ -230,7 +231,7 @@ pub fn claim(
 /// This returns a list of beads that would be considered for claiming,
 /// ordered by the same scoring formula:
 /// - downstream_impact DESC (more blocking = higher priority)
-/// - critical_float ASC (lower float = more critical)
+/// - critical_path_bonus DESC (1000.0/(float+1), higher bonus = more critical)
 /// - priority ASC (0=Critical, 4=Backlog)
 /// - created_at ASC (FIFO tiebreaker)
 ///
@@ -244,7 +245,7 @@ pub fn get_ready_candidates(tx: &Connection, limit: usize) -> Result<Vec<ScoredB
     let mut stmt = tx.prepare(
         "SELECT i.id, i.title, i.status, i.priority,
                 COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                COALESCE(c.float, 999999) as critical_float,
+                1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
                 i.created_at
          FROM issues i
          LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
@@ -264,7 +265,7 @@ pub fn get_ready_candidates(tx: &Connection, limit: usize) -> Result<Vec<ScoredB
          GROUP BY i.id
          ORDER BY
              downstream_impact DESC,
-             critical_float ASC,
+             critical_path_bonus DESC,
              i.priority ASC,
              i.created_at ASC
          LIMIT ?1",

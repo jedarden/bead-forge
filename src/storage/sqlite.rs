@@ -1,3 +1,4 @@
+use crate::critical_path::invalidate_cache;
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
     Comment, Dependency, DependencyType, Issue, IssueChanges, IssueFilter, IssueType, Status,
@@ -262,6 +263,8 @@ impl Storage {
                     params![&issue.id, key, value],
                 )?;
             }
+            // Invalidate critical path cache: new beads may add dependencies
+            invalidate_cache(tx)?;
             Ok(())
         })
     }
@@ -364,6 +367,10 @@ impl Storage {
                     params![id, now.to_rfc3339()],
                 )?;
             }
+            // Invalidate critical path cache if status changed (affects dependency graph)
+            if changes.status.is_some() {
+                invalidate_cache(tx)?;
+            }
             Ok(())
         })
     }
@@ -441,6 +448,9 @@ impl Storage {
                 )?;
             }
 
+            // Invalidate critical path cache after updating from JSON (may change deps/status)
+            invalidate_cache(tx)?;
+
             Ok(())
         })
     }
@@ -460,6 +470,8 @@ impl Storage {
                 "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
                 params![id, now.to_rfc3339()],
             )?;
+            // Invalidate critical path cache: closing a bead can unblock dependents
+            invalidate_cache(tx)?;
             Ok(())
         })
     }
@@ -675,6 +687,8 @@ impl Storage {
                 "INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![issue_id, depends_on_id, dep_type.to_string(), now.to_rfc3339(), created_by],
             )?;
+            // Invalidate critical path cache after adding a dependency
+            invalidate_cache(tx)?;
             Ok(())
         })
     }
@@ -682,6 +696,8 @@ impl Storage {
     pub fn remove_dependency(&self, issue_id: &str, depends_on_id: &str) -> Result<()> {
         self.with_immediate_transaction(|tx| {
             tx.execute("DELETE FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2", params![issue_id, depends_on_id])?;
+            // Invalidate critical path cache after removing a dependency
+            invalidate_cache(tx)?;
             Ok(())
         })
     }
@@ -869,11 +885,16 @@ impl Storage {
     ///
     /// Returns None if no candidates are available.
     /// Used by claim_any() for cross-workspace scoring comparison.
+    ///
+    /// Note: critical_float is the raw float value (lower = more critical).
+    /// The claim scoring uses 1000.0 / (float + 1) as a bonus, which is
+    /// monotonically decreasing with float. Therefore, ordering by float ASC
+    /// is equivalent to ordering by bonus DESC.
     pub fn top_candidate_score(&self) -> Result<Option<crate::claim::Score>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                    COALESCE(c.float, 999999) as critical_float,
+                    COALESCE(c.float, 999) as critical_float,
                     i.priority,
                     strftime('%s', i.created_at) as created_ts
              FROM issues i
