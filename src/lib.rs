@@ -8,6 +8,7 @@ pub mod format;
 pub mod id;
 pub mod jsonl;
 pub mod log;
+pub mod migrate;
 pub mod model;
 pub mod rotate;
 pub mod storage;
@@ -20,6 +21,7 @@ pub use config::{find_beads_dir, load_config, load_metadata, Config, Metadata, R
 pub use doctor::{check, reclaim_stale, rebuild_cache, repair, verify_schema, DoctorResult};
 pub use id::{generate_id, is_valid_bead_id};
 pub use log::{query_events, EventFilter, format_event_text, format_events_json, format_event_toon};
+pub use migrate::{migrate, migrate_from_jsonl, MigrateOptions, MigrateResult, VerificationResult};
 pub use model::{Issue, IssueChanges, IssueFilter, IssueType, Status};
 pub use rotate::{find_bead_in_archives, list_all_with_archives, list_archives, rotate, RotateOptions, RotateResult};
 pub use storage::Storage;

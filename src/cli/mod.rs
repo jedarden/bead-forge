@@ -444,6 +444,29 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Migrate workspace from br to bf
+    Migrate {
+        /// Workspace path to migrate (defaults to current directory)
+        #[arg(short, long)]
+        workspace: Option<PathBuf>,
+
+        /// Reimport from JSONL (for corrupted/missing databases)
+        #[arg(long)]
+        from_jsonl: bool,
+
+        /// Seed velocity stats from reconstructed events
+        #[arg(long)]
+        seed_velocity: bool,
+
+        /// Dry run (show what would be done without making changes)
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip verification steps
+        #[arg(long)]
+        skip_verify: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -673,6 +696,9 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         Commands::CriticalPath { id, max_depth, format } => cmd_critical_path(&beads_dir, &id, max_depth, &format),
         Commands::Rotate { days, dry_run } => cmd_rotate(&beads_dir, days, dry_run),
+        Commands::Migrate { workspace, from_jsonl, seed_velocity, dry_run, skip_verify } => {
+            cmd_migrate(&beads_dir, workspace, from_jsonl, seed_velocity, dry_run, skip_verify)
+        }
     }
 }
 
@@ -1844,6 +1870,48 @@ fn cmd_rotate(beads_dir: &PathBuf, days: u64, dry_run: bool) -> Result<()> {
             println!("Deleted {} old archive(s):", result.deleted_archives.len());
             for path in &result.deleted_archives {
                 println!("  {}", path.display());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_migrate(
+    beads_dir: &PathBuf,
+    workspace: Option<PathBuf>,
+    from_jsonl: bool,
+    seed_velocity: bool,
+    dry_run: bool,
+    skip_verify: bool,
+) -> Result<()> {
+    // Determine workspace path
+    let workspace_path = workspace.unwrap_or_else(|| {
+        beads_dir.parent().unwrap_or(beads_dir).to_path_buf()
+    });
+
+    if from_jsonl {
+        // Migration Path C: Reimport from JSONL
+        let result = crate::migrate::migrate_from_jsonl(&workspace_path, seed_velocity)?;
+
+        if !result.verification.errors.is_empty() {
+            eprintln!("Verification warnings:");
+            for error in &result.verification.errors {
+                eprintln!("  {}", error);
+            }
+        }
+    } else {
+        // Migration Path B: Explicit migration with backup
+        let opts = crate::migrate::MigrateOptions::new(workspace_path)
+            .with_dry_run(dry_run)
+            .skip_verify(skip_verify);
+
+        let result = crate::migrate::migrate(opts)?;
+
+        if !result.verification.errors.is_empty() {
+            eprintln!("Verification warnings:");
+            for error in &result.verification.errors {
+                eprintln!("  {}", error);
             }
         }
     }
