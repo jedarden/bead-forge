@@ -147,6 +147,55 @@ bf log bf-a3f8
 
 ---
 
+### Secret Scanning (Pre-Commit Hook)
+
+`bf` scans for secrets before writing to the database (see `.beads/config.yaml` → `secret_protection`). The `bf commit-check` command extends this to git — it runs as a pre-commit hook to block commits that would add secrets to `.beads/` files.
+
+```bash
+# Manual scan
+bf commit-check
+# Exits 0 (clean) or 1 (secrets found) with detailed error output
+```
+
+**Installation as git pre-commit hook:**
+
+```bash
+# In your workspace repo
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/sh
+bf commit-check
+EOF
+
+chmod +x .git/hooks/pre-commit
+```
+
+**What gets scanned:**
+- `.beads/config.yaml` — workspace configuration
+- `.beads/metadata.json` — database path settings
+- `.beads/issues.jsonl` — bead data (git artifact)
+
+**Patterns detected:**
+- AWS keys (`AKIA...`, secret access keys)
+- GitHub tokens (`ghp_`, `gho_`, `github_pat_`)
+- Private keys (`BEGIN RSA PRIVATE KEY`, `BEGIN PRIVATE KEY`)
+- JWT tokens
+- API keys in URLs
+- Database connection strings
+- And more (same scanner as write-time protection)
+
+**Allowlist exceptions:**
+
+If a pattern is legitimately non-secret, add to `.beads/config.yaml`:
+
+```yaml
+secret_protection:
+  allowlist:
+    - "^AKIAEXAMPLE$"  # exact string
+    - "password: test"  # substring
+```
+
+---
+
 ## Commands
 
 ```
@@ -171,6 +220,7 @@ bf doctor        [--repair] [--check] [--reclaim-stale [--ttl <duration>]]
 bf init          [--prefix <p>]
 bf stats
 bf search        <query>
+bf commit-check  # git pre-commit hook for secret scanning
 ```
 
 All `br` commands work identically. `bf` is a strict superset.
