@@ -185,8 +185,8 @@ pub enum Commands {
         any: bool,
 
         /// Fallback mode: try current workspace first, fall back to any if no beads available
-        #[arg(long)]
-        fallback: bool,
+        #[arg(long, value_name = "MODE")]
+        fallback: Option<String>,
 
         /// Workspace paths to search (only used with --any)
         #[arg(long)]
@@ -681,7 +681,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         Commands::Claim { assignee, model, harness, harness_version, any, fallback, workspace_paths, dry_run, format, json } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_claim(&beads_dir, &assignee, model, harness, harness_version, any, fallback, &workspace_paths, dry_run, &format)
+            cmd_claim(&beads_dir, &assignee, model, harness, harness_version, any, fallback.as_deref(), &workspace_paths, dry_run, &format)
         }
         Commands::Sync { flush_only, import_only } => cmd_sync(&beads_dir, flush_only, import_only),
         Commands::Doctor { repair, reclaim_stale, ttl } => cmd_doctor(&beads_dir, repair, reclaim_stale, ttl),
@@ -1017,7 +1017,7 @@ fn cmd_claim(
     harness: Option<String>,
     harness_version: Option<String>,
     any: bool,
-    fallback: bool,
+    fallback: Option<&str>,
     workspace_paths: &[PathBuf],
     dry_run: bool,
     format: &str,
@@ -1035,7 +1035,7 @@ fn cmd_claim(
 
     if dry_run {
         // Dry run mode - show what would be claimed
-        let candidates: Vec<(PathBuf, crate::claim::ScoredBead)> = if any || fallback {
+        let candidates: Vec<(PathBuf, crate::claim::ScoredBead)> = if any || fallback == Some("any") {
             // Multi-workspace dry run
             let paths = if workspace_paths.is_empty() {
                 // Auto-discover workspaces from current directory
@@ -1147,7 +1147,7 @@ fn cmd_claim(
                 }
             }
         }
-    } else if fallback {
+    } else if fallback == Some("any") {
         // Fallback mode: try current workspace first, then any
         let metadata = load_metadata(beads_dir)?;
         let db_path = beads_dir.join(&metadata.database);
