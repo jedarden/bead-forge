@@ -4,6 +4,7 @@ use crate::config::{find_beads_dir, load_config, load_metadata, get_default_pref
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{OutputFormat, get_formatter};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
+use crate::rotate::{rotate, RotateOptions, find_bead_in_archives, list_all_with_archives};
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
@@ -73,6 +74,10 @@ pub enum Commands {
         /// Limit results (0 = unlimited)
         #[arg(long)]
         limit: Option<usize>,
+
+        /// Include archived beads from archive files
+        #[arg(long)]
+        all: bool,
 
         /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
@@ -601,9 +606,9 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::Create { title, type_, priority, description, assignee, label } => {
             cmd_create(&beads_dir, title, type_, priority, description, assignee, label)
         }
-        Commands::List { status, type_, assignee, priority, limit, format, json } => {
+        Commands::List { status, type_, assignee, priority, limit, all, format, json } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_list(&beads_dir, status, type_, assignee, priority, limit, &format)
+            cmd_list(&beads_dir, status, type_, assignee, priority, limit, all, &format)
         }
         Commands::Show { id, format, json } => {
             let format = if json { "json".to_string() } else { format };
@@ -720,25 +725,55 @@ fn cmd_list(
     assignee: Option<String>,
     priority: Option<i32>,
     limit: Option<usize>,
+    all: bool,
     format: &str,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    let mut filter = IssueFilter::default();
-    if let Some(s) = status {
-        filter.status = Some(Status::from_str(s.as_str()).map_err(|e| anyhow::anyhow!(e))?);
-    }
-    if let Some(t) = type_ {
-        filter.issue_type = Some(IssueType::from_str(t.as_str()).map_err(|e| anyhow::anyhow!(e))?);
-    }
-    filter.assignee = assignee;
-    filter.priority = priority;
-    // --limit 0 means unlimited
-    filter.limit = limit.and_then(|l| if l == 0 { None } else { Some(l) });
+    let mut issues = if all {
+        // Include archived beads
+        list_all_with_archives(beads_dir)?
+    } else {
+        // Only from database
+        let mut filter = IssueFilter::default();
+        if let Some(ref s) = status {
+            filter.status = Some(Status::from_str(s.as_str()).map_err(|e| anyhow::anyhow!(e))?);
+        }
+        if let Some(ref t) = type_ {
+            filter.issue_type = Some(IssueType::from_str(t.as_str()).map_err(|e| anyhow::anyhow!(e))?);
+        }
+        filter.assignee = assignee.clone();
+        filter.priority = priority;
+        // --limit 0 means unlimited
+        filter.limit = limit.and_then(|l| if l == 0 { None } else { Some(l) });
+        storage.list_issues(&filter)?
+    };
 
-    let issues = storage.list_issues(&filter)?;
+    // Apply additional filters for --all mode (since we're not using DB filters)
+    if all {
+        if let Some(ref s) = status {
+            let status_filter = Status::from_str(s.as_str()).map_err(|e| anyhow::anyhow!(e))?;
+            issues.retain(|i| i.status == status_filter);
+        }
+        if let Some(ref t) = type_ {
+            let type_filter = IssueType::from_str(t.as_str()).map_err(|e| anyhow::anyhow!(e))?;
+            issues.retain(|i| i.issue_type == type_filter);
+        }
+        if let Some(ref assignee_val) = assignee {
+            issues.retain(|i| i.assignee.as_deref() == Some(assignee_val));
+        }
+        if let Some(p) = priority {
+            issues.retain(|i| i.priority.0 == p);
+        }
+        // Apply limit
+        if let Some(l) = limit {
+            if l != 0 {
+                issues.truncate(l);
+            }
+        }
+    }
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
@@ -752,7 +787,14 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    let issue = storage.get_issue(id)?.ok_or_else(|| anyhow!("Bead not found: {}", id))?;
+    let issue = match storage.get_issue(id)? {
+        Some(i) => i,
+        None => {
+            // Search archives
+            find_bead_in_archives(beads_dir, id)?
+                .ok_or_else(|| anyhow!("Bead not found: {}", id))?
+        }
+    };
 
     match format {
         "json" => {
@@ -1638,14 +1680,35 @@ fn cmd_critical_path(beads_dir: &PathBuf, id: &str, _max_depth: usize, format: &
 }
 
 fn cmd_rotate(beads_dir: &PathBuf, days: u64, dry_run: bool) -> Result<()> {
-    let metadata = load_metadata(beads_dir)?;
-    let db_path = beads_dir.join(&metadata.database);
-    let _storage = Storage::open(&db_path)?;
+    let config = load_config(beads_dir)?;
+
+    let mut options = RotateOptions::from_config(days, &config);
+    if dry_run {
+        options = options.dry_run();
+    }
+
+    let result = rotate(beads_dir, &options)?;
 
     if dry_run {
-        println!("Dry run: would rotate closed beads older than {} days", days);
+        println!("Dry run: would archive {} closed beads", result.archived);
+        if let Some(ref archive_path) = result.archive_path {
+            println!("Archive would be created at: {}", archive_path.display());
+        }
+        println!("{} beads would remain in active file", result.remaining);
     } else {
-        println!("Rotate: closed beads older than {} days (not yet implemented)", days);
+        println!("Archived {} closed beads", result.archived);
+        if let Some(ref archive_path) = result.archive_path {
+            println!("Created archive: {}", archive_path.display());
+        }
+        println!("{} beads remain in active file", result.remaining);
+
+        if !result.deleted_archives.is_empty() {
+            println!("Deleted {} old archive(s):", result.deleted_archives.len());
+            for path in &result.deleted_archives {
+                println!("  {}", path.display());
+            }
+        }
     }
+
     Ok(())
 }

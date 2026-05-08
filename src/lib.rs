@@ -8,14 +8,16 @@ pub mod format;
 pub mod id;
 pub mod jsonl;
 pub mod model;
+pub mod rotate;
 pub mod storage;
 pub mod sync;
 
 pub use batch::{execute_batch, BatchOp, BatchResult, mitosis, mitosis_ex, MitosisChild};
 pub use claim::{claim, ClaimResult, ScoredBead, get_ready_candidates};
-pub use config::{find_beads_dir, load_config, load_metadata, Config, Metadata};
+pub use config::{find_beads_dir, load_config, load_metadata, Config, Metadata, RotateConfig};
 pub use doctor::{check, reclaim_stale, rebuild_cache, repair, verify_schema, DoctorResult};
 pub use id::{generate_id, is_valid_bead_id};
 pub use model::{Issue, IssueChanges, IssueFilter, IssueType, Status};
+pub use rotate::{find_bead_in_archives, list_all_with_archives, list_archives, rotate, RotateOptions, RotateResult};
 pub use storage::Storage;
 pub use sync::{flush, flush_dirty, import, sync, SyncResult};

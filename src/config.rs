@@ -14,6 +14,31 @@ pub struct Config {
     pub scoring: ScoringConfig,
     #[serde(default)]
     pub claim_ttl_minutes: i64,
+    #[serde(default)]
+    pub rotate: RotateConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RotateConfig {
+    /// Days threshold for rotating closed beads (default 30)
+    #[serde(default = "default_rotate_age_days")]
+    pub rotate_age_days: u64,
+    /// Maximum size of active JSONL in MB before rotation is considered (default 100)
+    #[serde(default = "default_rotate_max_size_mb")]
+    pub rotate_max_size_mb: u64,
+    /// Maximum number of archive files to keep (default 10)
+    #[serde(default = "default_rotate_max_archives")]
+    pub rotate_max_archives: usize,
+}
+
+impl Default for RotateConfig {
+    fn default() -> Self {
+        RotateConfig {
+            rotate_age_days: default_rotate_age_days(),
+            rotate_max_size_mb: default_rotate_max_size_mb(),
+            rotate_max_archives: default_rotate_max_archives(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +106,18 @@ fn default_max_blockers() -> i32 {
     3
 }
 
+fn default_rotate_age_days() -> u64 {
+    30
+}
+
+fn default_rotate_max_size_mb() -> u64 {
+    100
+}
+
+fn default_rotate_max_archives() -> usize {
+    10
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -89,6 +126,7 @@ impl Default for Config {
             default_type: default_default_type(),
             scoring: ScoringConfig::default(),
             claim_ttl_minutes: 30,
+            rotate: RotateConfig::default(),
         }
     }
 }
