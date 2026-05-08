@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use anyhow::Result;
+use crate::secrets::SecretProtectionConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -16,6 +17,8 @@ pub struct Config {
     pub claim_ttl_minutes: i64,
     #[serde(default)]
     pub rotate: RotateConfig,
+    #[serde(default)]
+    pub secret_protection: SecretProtectionConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,6 +130,7 @@ impl Default for Config {
             scoring: ScoringConfig::default(),
             claim_ttl_minutes: 30,
             rotate: RotateConfig::default(),
+            secret_protection: SecretProtectionConfig::default(),
         }
     }
 }

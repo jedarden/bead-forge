@@ -11,6 +11,7 @@ pub mod log;
 pub mod migrate;
 pub mod model;
 pub mod rotate;
+pub mod secrets;
 pub mod storage;
 pub mod sync;
 pub mod velocity;
