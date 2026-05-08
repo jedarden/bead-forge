@@ -1,7 +1,7 @@
 use crate::critical_path::invalidate_cache;
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
-    Comment, Dependency, DependencyType, Issue, IssueChanges, IssueFilter, IssueType, Status,
+    Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter, IssueType, Status,
 };
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
 use anyhow::Result;
@@ -470,6 +470,8 @@ impl Storage {
                 "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
                 params![id, now.to_rfc3339()],
             )?;
+            // Update worker session with close time and duration for velocity tracking
+            crate::velocity::update_session_on_close(tx, id, now)?;
             // Invalidate critical path cache: closing a bead can unblock dependents
             invalidate_cache(tx)?;
             Ok(())
@@ -770,6 +772,87 @@ impl Storage {
 
     pub fn list_comments(&self, issue_id: &str) -> Result<Vec<Comment>> {
         self.load_comments(issue_id)
+    }
+
+    // Event methods
+    pub fn list_events(&self, issue_id: &str) -> Result<Vec<Event>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, issue_id, event_type, actor, old_value, new_value, comment, created_at
+             FROM events WHERE issue_id = ?1 ORDER BY created_at ASC",
+        )?;
+        let mut rows = stmt.query(params![issue_id])?;
+        let mut events = Vec::new();
+        while let Some(row) = rows.next()? {
+            events.push(Self::row_to_event(row)?);
+        }
+        Ok(events)
+    }
+
+    pub fn list_events_filtered(
+        &self,
+        issue_id: Option<&str>,
+        since: Option<&DateTime<Utc>>,
+        actor: Option<&str>,
+        event_type: Option<&EventType>,
+        limit: Option<usize>,
+    ) -> Result<Vec<Event>> {
+        let mut sql = String::from(
+            "SELECT id, issue_id, event_type, actor, old_value, new_value, comment, created_at
+             FROM events WHERE 1=1",
+        );
+        let mut params = Vec::new();
+        let mut param_idx = 1;
+
+        if let Some(id) = issue_id {
+            sql.push_str(&format!(" AND issue_id = ?{}", param_idx));
+            params.push(Box::new(id.to_string()) as Box<dyn rusqlite::ToSql>);
+            param_idx += 1;
+        }
+        if let Some(dt) = since {
+            sql.push_str(&format!(" AND created_at >= ?{}", param_idx));
+            params.push(Box::new(dt.to_rfc3339()) as Box<dyn rusqlite::ToSql>);
+            param_idx += 1;
+        }
+        if let Some(a) = actor {
+            sql.push_str(&format!(" AND actor = ?{}", param_idx));
+            params.push(Box::new(a.to_string()) as Box<dyn rusqlite::ToSql>);
+            param_idx += 1;
+        }
+        if let Some(et) = event_type {
+            sql.push_str(&format!(" AND event_type = ?{}", param_idx));
+            params.push(Box::new(et.as_str().to_string()) as Box<dyn rusqlite::ToSql>);
+            param_idx += 1;
+        }
+        sql.push_str(" ORDER BY created_at ASC");
+        if let Some(l) = limit {
+            sql.push_str(&format!(" LIMIT {}", l));
+        }
+
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&sql)?;
+        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut rows = stmt.query(param_refs.as_slice())?;
+        let mut events = Vec::new();
+        while let Some(row) = rows.next()? {
+            events.push(Self::row_to_event(row)?);
+        }
+        Ok(events)
+    }
+
+    fn row_to_event(row: &rusqlite::Row) -> Result<Event> {
+        let type_str: String = row.get(2)?;
+        Ok(Event {
+            id: row.get(0)?,
+            issue_id: row.get(1)?,
+            event_type: EventType::from_str(&type_str)
+                .unwrap_or(EventType::Custom(type_str)),
+            actor: row.get(3)?,
+            old_value: row.get(4)?,
+            new_value: row.get(5)?,
+            comment: row.get(6)?,
+            created_at: parse_datetime(row.get(7)?)?,
+        })
     }
 
     // Annotation methods

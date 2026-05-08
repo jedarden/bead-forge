@@ -337,6 +337,37 @@ impl EventType {
     }
 }
 
+impl FromStr for EventType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "created" => Ok(Self::Created),
+            "updated" => Ok(Self::Updated),
+            "status_changed" => Ok(Self::StatusChanged),
+            "priority_changed" => Ok(Self::PriorityChanged),
+            "assignee_changed" => Ok(Self::AssigneeChanged),
+            "commented" => Ok(Self::Commented),
+            "closed" => Ok(Self::Closed),
+            "reopened" => Ok(Self::Reopened),
+            "dependency_added" => Ok(Self::DependencyAdded),
+            "dependency_removed" => Ok(Self::DependencyRemoved),
+            "label_added" => Ok(Self::LabelAdded),
+            "label_removed" => Ok(Self::LabelRemoved),
+            "compacted" => Ok(Self::Compacted),
+            "deleted" => Ok(Self::Deleted),
+            "restored" => Ok(Self::Restored),
+            other => Ok(Self::Custom(other.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for EventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 impl Serialize for EventType {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())

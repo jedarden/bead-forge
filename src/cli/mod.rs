@@ -388,16 +388,36 @@ pub enum Commands {
 
     /// Show event log for a bead
     Log {
-        /// Bead ID
-        id: String,
+        /// Bead ID (omit to show all events)
+        id: Option<String>,
 
         /// Limit number of entries
         #[arg(long)]
         limit: Option<usize>,
 
+        /// Show events since this date (RFC3339 format, e.g., 2026-05-01T00:00:00Z)
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Filter by actor (worker name)
+        #[arg(long)]
+        actor: Option<String>,
+
+        /// Show only status change events
+        #[arg(long)]
+        status_changes: bool,
+
+        /// Show field-level diff between old and new values
+        #[arg(long)]
+        diff: bool,
+
         /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 
     /// Show critical path (longest chain of blocking dependencies)
@@ -647,7 +667,10 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::Velocity { model, harness, format } => cmd_velocity(&beads_dir, model, harness, &format),
         Commands::Labels { id, format } => cmd_labels(&beads_dir, &id, &format),
         Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate),
-        Commands::Log { id, limit, format } => cmd_log(&beads_dir, &id, limit, &format),
+        Commands::Log { id, limit, since, actor, status_changes, diff, format, json } => {
+            let format = if json { "json".to_string() } else { format };
+            cmd_log(&beads_dir, id, limit, since, actor, status_changes, diff, &format)
+        }
         Commands::CriticalPath { id, max_depth, format } => cmd_critical_path(&beads_dir, &id, max_depth, &format),
         Commands::Rotate { days, dry_run } => cmd_rotate(&beads_dir, days, dry_run),
     }
@@ -1574,12 +1597,69 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
 }
 
 fn cmd_velocity(
-    _beads_dir: &PathBuf,
-    _model: Option<String>,
-    _harness: Option<String>,
-    _format: &str,
+    beads_dir: &PathBuf,
+    model: Option<String>,
+    harness: Option<String>,
+    format: &str,
 ) -> Result<()> {
-    println!("Velocity stats: (not yet implemented)");
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let storage = Storage::open(&db_path)?;
+
+    let stats = storage.with_immediate_transaction(|tx| {
+        crate::velocity::get_velocity_stats(
+            tx,
+            model.as_deref(),
+            harness.as_deref(),
+        )
+    })?;
+
+    match format {
+        "json" => {
+            println!("{}", serde_json::to_string_pretty(&stats)?);
+        }
+        "toon" => {
+            for stat in stats {
+                println!("Model: {}", stat.model);
+                println!("Harness: {}", stat.harness);
+                println!("Type: {}", stat.issue_type);
+                println!("Samples: {}", stat.sample_count);
+                if let Some(p50) = stat.p50_seconds {
+                    println!("P50: {}s", p50);
+                }
+                if let Some(p90) = stat.p90_seconds {
+                    println!("P90: {}s", p90);
+                }
+                if let Some(avg) = stat.avg_seconds {
+                    println!("Avg: {:.1}s", avg);
+                }
+                println!();
+            }
+        }
+        _ => {
+            if stats.is_empty() {
+                println!("No velocity statistics available yet.");
+                println!("Velocity data accumulates as beads are claimed and closed.");
+            } else {
+                println!("Velocity Statistics:");
+                println!();
+                println!("{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8}", "Model", "Harness", "Type", "Samples", "P50(s)", "P90(s)", "Avg(s)");
+                println!("{}", "-".repeat(85));
+                for stat in stats {
+                    println!("{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8.1}",
+                        stat.model,
+                        stat.harness,
+                        stat.issue_type,
+                        stat.sample_count,
+                        stat.p50_seconds.map(|s| s.to_string()).unwrap_or_else(|| "-".to_string()),
+                        stat.p90_seconds.map(|s| s.to_string()).unwrap_or_else(|| "-".to_string()),
+                        stat.avg_seconds.unwrap_or(0.0),
+                    );
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -1624,20 +1704,78 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
     Ok(())
 }
 
-fn cmd_log(beads_dir: &PathBuf, id: &str, _limit: Option<usize>, format: &str) -> Result<()> {
+fn cmd_log(
+    beads_dir: &PathBuf,
+    id: Option<String>,
+    limit: Option<usize>,
+    since: Option<String>,
+    actor: Option<String>,
+    status_changes: bool,
+    diff: bool,
+    format: &str,
+) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let _storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
-    // For now, we'll just return a placeholder
-    match format {
-        "json" => {
-            println!("{}", serde_json::json!({"events": []}));
-        }
-        _ => {
-            println!("Event log for {} (not yet implemented)", id);
+    // Build filter
+    let mut filter = crate::log::EventFilter::new();
+
+    if let Some(issue_id) = id {
+        filter = filter.with_issue_id(issue_id);
+    }
+
+    if let Some(limit_val) = limit {
+        filter = filter.with_limit(limit_val);
+    }
+
+    if let Some(actor_val) = actor {
+        filter = filter.with_actor(actor_val);
+    }
+
+    if status_changes {
+        filter = filter.status_changes_only();
+    }
+
+    if diff {
+        filter = filter.with_diff();
+    }
+
+    // Parse since date if provided
+    if let Some(since_str) = since {
+        match chrono::DateTime::parse_from_rfc3339(&since_str) {
+            Ok(dt) => {
+                filter = filter.with_since(dt.with_timezone(&chrono::Utc));
+            }
+            Err(_) => {
+                return Err(anyhow::anyhow!("Invalid --since date format. Use RFC3339 format, e.g., 2026-05-01T00:00:00Z"));
+            }
         }
     }
+
+    // Query events
+    let events = crate::log::query_events(&storage, &filter)?;
+
+    match format {
+        "json" => {
+            println!("{}", crate::log::format_events_json(&events)?);
+        }
+        "toon" => {
+            for event in &events {
+                println!("{}", crate::log::format_event_toon(event));
+            }
+        }
+        _ => {
+            if events.is_empty() {
+                println!("No events found");
+            } else {
+                for event in &events {
+                    println!("{}", crate::log::format_event_text(event, diff));
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
