@@ -228,6 +228,14 @@ pub enum Commands {
         /// Repair database
         #[arg(long)]
         repair: bool,
+
+        /// Reclaim stale in_progress beads (reset to open without claiming)
+        #[arg(long)]
+        reclaim_stale: bool,
+
+        /// TTL in minutes for stale bead detection (overrides config claim_ttl_minutes)
+        #[arg(long)]
+        ttl: Option<i64>,
     },
 
     /// Commit check - scan staged .beads/ changes for secrets (git pre-commit hook)
@@ -676,7 +684,7 @@ pub fn run(cli: Cli) -> Result<()> {
             cmd_claim(&beads_dir, &assignee, model, harness, harness_version, any, fallback, &workspace_paths, dry_run, &format)
         }
         Commands::Sync { flush_only, import_only } => cmd_sync(&beads_dir, flush_only, import_only),
-        Commands::Doctor { repair } => cmd_doctor(&beads_dir, repair),
+        Commands::Doctor { repair, reclaim_stale, ttl } => cmd_doctor(&beads_dir, repair, reclaim_stale, ttl),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
         Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
@@ -1274,7 +1282,7 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
     Ok(())
 }
 
-fn cmd_doctor(beads_dir: &PathBuf, repair: bool) -> Result<()> {
+fn cmd_doctor(beads_dir: &PathBuf, repair: bool, reclaim_stale: bool, ttl: Option<i64>) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
@@ -1284,6 +1292,12 @@ fn cmd_doctor(beads_dir: &PathBuf, repair: bool) -> Result<()> {
         let storage = Storage::open(&db_path)?;
         let result = storage.sync_from_jsonl(&jsonl_path)?;
         println!("Repaired database: imported {} beads from JSONL", result.imported);
+    } else if reclaim_stale {
+        let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
+        let config = load_config(beads_dir)?;
+        let ttl_minutes = ttl.unwrap_or(config.claim_ttl_minutes);
+        let reclaimed = crate::doctor::reclaim_stale(workspace_dir, ttl_minutes)?;
+        println!("Reclaimed {} stale bead(s)", reclaimed);
     } else {
         let storage = Storage::open(&db_path)?;
         let count = storage.count_issues()?;
