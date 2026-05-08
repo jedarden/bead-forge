@@ -488,6 +488,18 @@ fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
         conn.execute("ALTER TABLE worker_sessions ADD COLUMN workspace_path TEXT", [])?;
     }
 
+    // Migration 3: Add closed_at and duration_seconds to worker_sessions for velocity tracking
+    let has_closed_at: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('worker_sessions') WHERE name='closed_at'",
+        [],
+        |row| row.get::<_, i64>(0).map(|n| n > 0),
+    ).unwrap_or(false);
+
+    if !has_closed_at {
+        conn.execute("ALTER TABLE worker_sessions ADD COLUMN closed_at DATETIME", [])?;
+        conn.execute("ALTER TABLE worker_sessions ADD COLUMN duration_seconds INTEGER", [])?;
+    }
+
     Ok(())
 }
 

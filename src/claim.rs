@@ -137,92 +137,216 @@ pub fn claim(
     // downstream_impact = count of beads blocked by this one
     // critical_path_bonus = 1000.0 / (float + 1) where float is from critical_path_cache
     // Zero-float beads get bonus = 1000, float-5 beads get ~167, non-critical beads get ~1
-    let mut stmt = tx.prepare(
-        "SELECT i.id,
-                COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
-                i.priority
-         FROM issues i
-         LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-         LEFT JOIN critical_path_cache c ON c.bead_id = i.id
-         WHERE i.status = 'open'
-           AND i.ephemeral = 0
-           AND i.pinned = 0
-           AND i.is_template = 0
-           AND i.deleted_at IS NULL
-           AND NOT EXISTS (
-               SELECT 1 FROM dependencies blocker_dep
-               INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-               WHERE blocker_dep.issue_id = i.id
-               AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-               AND blocker.status != 'closed'
-           )
-         GROUP BY i.id
-         ORDER BY
-             downstream_impact DESC,
-             critical_path_bonus DESC,
-             i.priority ASC,
-             i.created_at ASC
-         LIMIT 1",
-    )?;
-
-    let mut rows = stmt.query([])?;
-
-    if let Some(row) = rows.next()? {
-        let bead_id: String = row.get(0)?;
-
-        // Step 3: Update the winner to in_progress with a race condition check
-        // The WHERE status = 'open' condition ensures we only claim if still open
-        let rows_affected = tx.execute(
-            "UPDATE issues
-             SET status = 'in_progress', assignee = ?, updated_at = ?
-             WHERE id = ? AND status = 'open'",
-            params![worker, now.to_rfc3339(), &bead_id],
-        )?;
-
-        // If no rows were affected, another worker claimed this bead first
-        if rows_affected == 0 {
-            return Ok(None);
-        }
-
-        // Step 4: Record worker session if metadata provided
-        if let Some(meta) = worker_metadata {
-            tx.execute(
-                "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    &meta.worker_id,
-                    meta.model.as_deref(),
-                    meta.harness.as_deref(),
-                    meta.harness_version.as_deref(),
-                    &bead_id,
-                    "", // workspace_path not available in transaction context
-                ],
-            )?;
-        }
-
-        // Step 5: Insert event with worker metadata in comment field
-        let metadata_json = worker_metadata.and_then(|m| serde_json::to_string(m).ok());
-        tx.execute(
-            "INSERT INTO events (issue_id, event_type, actor, new_value, comment, created_at)
-             VALUES (?, 'claimed', ?, ?, ?, ?)",
-            params![&bead_id, worker, worker, metadata_json, now.to_rfc3339()],
-        )?;
-
-        // Step 6: Mark as dirty
-        tx.execute(
-            "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at)
-             VALUES (?, ?)",
-            params![&bead_id, now.to_rfc3339()],
-        )?;
-
-        Ok(Some(ClaimResult {
-            bead_id,
-            reclaimed,
-            workspace_path: None,
-        }))
+    // Velocity-aware scoring: prefer beads with lower expected duration
+    // score = impact / expected_seconds (with fallback to standard scoring)
+    let (model, harness) = if let Some(meta) = worker_metadata {
+        (meta.model.clone(), meta.harness.clone())
     } else {
+        (None, None)
+    };
+
+    // Velocity-aware claim: get all candidates and score in Rust
+    if model.is_some() && harness.is_some() {
+        let m = model.as_ref().map(|s| s.as_str()).unwrap_or("");
+        let h = harness.as_ref().map(|s| s.as_str()).unwrap_or("");
+
+        let mut stmt = tx.prepare(
+            "SELECT i.id, i.issue_type,
+                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                    i.priority, i.created_at
+             FROM issues i
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+             WHERE i.status = 'open'
+               AND i.ephemeral = 0
+               AND i.pinned = 0
+               AND i.is_template = 0
+               AND i.deleted_at IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM dependencies blocker_dep
+                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                   WHERE blocker_dep.issue_id = i.id
+                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                   AND blocker.status != 'closed'
+               )
+             GROUP BY i.id",
+        )?;
+
+        let mut rows = stmt.query([])?;
+
+        // Score all candidates and pick the best
+        let mut best_candidate: Option<(String, f64)> = None;
+
+        while let Some(row) = rows.next()? {
+            let bead_id: String = row.get(0)?;
+            let issue_type: String = row.get(1)?;
+            let downstream_impact: i64 = row.get(2)?;
+            let critical_path_bonus: f64 = row.get(3)?;
+            let _priority: i32 = row.get(4)?;
+            let _created_at: String = row.get(5)?;
+
+            // Get expected seconds from velocity stats
+            let expected_seconds = crate::velocity::get_expected_seconds(tx, m, h, &issue_type)?
+                .unwrap_or(60); // Default to 60 seconds if no data
+
+            // Velocity-aware score: impact per second
+            // Use expected_seconds as denominator to prefer faster completions
+            let velocity_score = (downstream_impact as f64) / (expected_seconds as f64);
+
+            // Combine with critical path bonus
+            let score = velocity_score + critical_path_bonus;
+
+            match &best_candidate {
+                None => best_candidate = Some((bead_id, score)),
+                Some((_, best_score)) if score > *best_score => {
+                    best_candidate = Some((bead_id, score));
+                }
+                _ => {}
+            }
+        }
+
+        if let Some((bead_id, _)) = best_candidate {
+            // Step 3: Update the winner to in_progress with a race condition check
+            let rows_affected = tx.execute(
+                "UPDATE issues
+                 SET status = 'in_progress', assignee = ?, updated_at = ?
+                 WHERE id = ? AND status = 'open'",
+                params![worker, now.to_rfc3339(), &bead_id],
+            )?;
+
+            if rows_affected == 0 {
+                return Ok(None);
+            }
+
+            // Step 4: Record worker session if metadata provided
+            if let Some(meta) = worker_metadata {
+                tx.execute(
+                    "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        &meta.worker_id,
+                        meta.model.as_deref(),
+                        meta.harness.as_deref(),
+                        meta.harness_version.as_deref(),
+                        &bead_id,
+                        "",
+                    ],
+                )?;
+            }
+
+            // Step 5: Insert event with worker metadata in comment field
+            let metadata_json = worker_metadata.and_then(|m| serde_json::to_string(m).ok());
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, new_value, comment, created_at)
+                 VALUES (?, 'claimed', ?, ?, ?, ?)",
+                params![&bead_id, worker, worker, metadata_json, now.to_rfc3339()],
+            )?;
+
+            // Step 6: Mark as dirty
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at)
+                 VALUES (?, ?)",
+                params![&bead_id, now.to_rfc3339()],
+            )?;
+
+            return Ok(Some(ClaimResult {
+                bead_id,
+                reclaimed,
+                workspace_path: None,
+            }));
+        }
+
         Ok(None)
+    } else {
+        // Standard scoring without velocity data (original SQL-based scoring)
+        let mut stmt = tx.prepare(
+            "SELECT i.id, i.issue_type,
+                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                    i.priority
+             FROM issues i
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+             WHERE i.status = 'open'
+               AND i.ephemeral = 0
+               AND i.pinned = 0
+               AND i.is_template = 0
+               AND i.deleted_at IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM dependencies blocker_dep
+                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                   WHERE blocker_dep.issue_id = i.id
+                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                   AND blocker.status != 'closed'
+               )
+             GROUP BY i.id
+             ORDER BY
+                 downstream_impact DESC,
+                 critical_path_bonus DESC,
+                 i.priority ASC,
+                 i.created_at ASC
+             LIMIT 1",
+        )?;
+
+        let mut rows = stmt.query([])?;
+
+        if let Some(row) = rows.next()? {
+            let bead_id: String = row.get(0)?;
+
+            // Step 3: Update the winner to in_progress with a race condition check
+            // The WHERE status = 'open' condition ensures we only claim if still open
+            let rows_affected = tx.execute(
+                "UPDATE issues
+                 SET status = 'in_progress', assignee = ?, updated_at = ?
+                 WHERE id = ? AND status = 'open'",
+                params![worker, now.to_rfc3339(), &bead_id],
+            )?;
+
+            // If no rows were affected, another worker claimed this bead first
+            if rows_affected == 0 {
+                return Ok(None);
+            }
+
+            // Step 4: Record worker session if metadata provided
+            if let Some(meta) = worker_metadata {
+                tx.execute(
+                    "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        &meta.worker_id,
+                        meta.model.as_deref(),
+                        meta.harness.as_deref(),
+                        meta.harness_version.as_deref(),
+                        &bead_id,
+                        "", // workspace_path not available in transaction context
+                    ],
+                )?;
+            }
+
+            // Step 5: Insert event with worker metadata in comment field
+            let metadata_json = worker_metadata.and_then(|m| serde_json::to_string(m).ok());
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, new_value, comment, created_at)
+                 VALUES (?, 'claimed', ?, ?, ?, ?)",
+                params![&bead_id, worker, worker, metadata_json, now.to_rfc3339()],
+            )?;
+
+            // Step 6: Mark as dirty
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at)
+                 VALUES (?, ?)",
+                params![&bead_id, now.to_rfc3339()],
+            )?;
+
+            Ok(Some(ClaimResult {
+                bead_id,
+                reclaimed,
+                workspace_path: None,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
 
