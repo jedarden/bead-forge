@@ -1,6 +1,7 @@
 use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild};
 use crate::claim::{claim, claim_any, ClaimResult, get_ready_candidates, WorkerMetadata, find_workspaces};
 use crate::config::{find_beads_dir, load_config, load_metadata, get_default_prefix};
+use crate::critical_path::compute_epic_critical_path;
 use crate::format::{OutputFormat, get_formatter};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::storage::Storage;
@@ -1601,17 +1602,38 @@ fn cmd_log(beads_dir: &PathBuf, id: &str, _limit: Option<usize>, format: &str) -
 fn cmd_critical_path(beads_dir: &PathBuf, id: &str, _max_depth: usize, format: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let _storage = Storage::open(&db_path)?;
+    let storage = Storage::open(&db_path)?;
 
-    // For now, we'll just return a placeholder
+    // Compute critical path for the epic
+    let result = storage.with_immediate_transaction(|tx| {
+        compute_epic_critical_path(tx, id)
+    })?;
+
     match format {
         "json" => {
-            println!("{}", serde_json::json!({"critical_path": []}));
+            println!("{}", serde_json::to_string_pretty(&result)?);
         }
         _ => {
-            println!("Critical path for {} (not yet implemented)", id);
+            println!("Critical path for {} ({} open beads, {} on critical path):",
+                id,
+                result.beads.len(),
+                result.beads.iter().filter(|b| b.float == 0).count()
+            );
+            println!();
+
+            for bead in &result.beads {
+                let float_marker = if bead.float == 0 { "★" } else { " " };
+                println!("  {} float={:<3} [{}]", float_marker, bead.float, bead.bead_id);
+            }
+
+            println!();
+            if !result.longest_chain.is_empty() {
+                println!("Longest chain: {}", result.longest_chain.join(" → "));
+                println!("Minimum remaining time: {} bead-completions on critical path", result.min_remaining);
+            }
         }
     }
+
     Ok(())
 }
 

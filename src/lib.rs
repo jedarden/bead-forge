@@ -2,6 +2,7 @@ pub mod batch;
 pub mod cli;
 pub mod claim;
 pub mod config;
+pub mod critical_path;
 pub mod doctor;
 pub mod format;
 pub mod id;
