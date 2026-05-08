@@ -1,28 +1,38 @@
-# BF-2C2: Velocity Stats on Close - Verification
+# bf-2c2: Velocity Stats on Close
 
-## Summary
-The velocity stats functionality for `bf close` was already implemented. This note documents the verification.
+## Status: Already Implemented
 
-## Implementation Verified
+The velocity tracking functionality described in this bead was already fully implemented in the codebase.
 
-### 1. Schema (src/storage/schema.rs)
-- `worker_sessions` table has `closed_at` and `duration_seconds` columns (Migration 3)
-- `velocity_stats` table exists with all required fields
+### Implementation Details
 
-### 2. Velocity Module (src/velocity.rs)
-- `update_session_on_close()` - Updates worker_sessions with closed_at and duration_seconds
-- `recompute_velocity_stats()` - Recomputes stats using window over last 50 sessions
-- `get_expected_seconds()` - Retrieves p50 duration for velocity-aware scoring
+1. **Schema** (`src/storage/schema.rs`):
+   - `worker_sessions` table with `closed_at` and `duration_seconds` columns (added via migration at lines 492-501)
+   - `velocity_stats` table for aggregated statistics
 
-### 3. Storage Integration (src/storage/sqlite.rs)
-- `close_issue()` at line 540 calls `crate::velocity::update_session_on_close(tx, id, now)`
-- This happens within the same transaction that closes the bead
+2. **Velocity Module** (`src/velocity.rs`):
+   - `update_session_on_close()`: Updates worker_sessions with close time and duration (lines 59-112)
+   - `recompute_velocity_stats()`: Computes p50, p90, avg over last 50 sessions (lines 124-184)
+   - `get_expected_seconds()`: Retrieves expected duration for claim scoring (lines 199-244)
 
-### 4. Integration Test
-- Added `tests/velocity_close_integration.rs` with end-to-end test
-- Test verifies: bead creation → claim → close → session updated → stats recomputed
+3. **Storage Integration** (`src/storage/sqlite.rs`):
+   - `close_issue()` calls `crate::velocity::update_session_on_close()` (line 556)
 
-## Note on --session-id Flag
-The task description mentioned `--session-id <uuid>` but the implementation
-automatically finds the most recent session for the bead. This is more
-user-friendly and doesn't require the user to track session IDs.
+4. **Tests**:
+   - Unit tests in `src/velocity.rs`: `test_update_session_on_close`, `test_recompute_velocity_stats`
+   - Integration test: `tests/velocity_close_integration.rs`
+
+### Verification
+
+```bash
+# All velocity tests pass
+cargo test --lib velocity
+cargo test --test velocity_close_integration
+
+# Release build successful
+cargo build --release
+```
+
+### Note on --session-id Option
+
+The task description mentioned a `--session-id <uuid>` option for `bf close`, but the current implementation automatically determines the session from the `worker_sessions` table using `bead_id`. This is simpler and requires no additional CLI arguments.
