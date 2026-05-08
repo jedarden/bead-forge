@@ -476,6 +476,18 @@ fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
          CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float ON critical_path_cache(float);"
     );
 
+    // Migration 2: Add workspace_path to worker_sessions if missing
+    // Older databases may not have this column; br never reads worker_sessions so this is safe.
+    let has_workspace_path: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('worker_sessions') WHERE name='workspace_path'",
+        [],
+        |row| row.get::<_, i64>(0).map(|n| n > 0),
+    ).unwrap_or(false);
+
+    if !has_workspace_path {
+        conn.execute("ALTER TABLE worker_sessions ADD COLUMN workspace_path TEXT", [])?;
+    }
+
     Ok(())
 }
 
