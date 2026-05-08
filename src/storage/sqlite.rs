@@ -199,6 +199,9 @@ impl Storage {
     }
 
     pub fn create_issue(&self, issue: &Issue) -> Result<()> {
+        // Compute content_hash if not already set, and wrap in Some for storage
+        let content_hash: Option<String> = issue.content_hash.as_ref().cloned().or_else(|| Some(issue.content_hash()));
+
         self.with_immediate_transaction(|tx| {
             tx.execute(
                 "INSERT INTO issues (
@@ -213,7 +216,7 @@ impl Storage {
                           ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
                           ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36)",
                 params![
-                    &issue.id, &issue.content_hash, &issue.title,
+                    &issue.id, &content_hash, &issue.title,
                     issue.description.as_deref().unwrap_or(""),
                     issue.design.as_deref().unwrap_or(""),
                     issue.acceptance_criteria.as_deref().unwrap_or(""),
@@ -522,7 +525,9 @@ impl Storage {
                         Ok(UpsertResult::New)
                     }
                     Some(existing_issue) => {
-                        if existing_issue.content_hash != issue.content_hash {
+                        // Compute hash from incoming issue (content_hash is None from JSONL due to #[serde(skip)])
+                        let incoming_hash = issue.content_hash();
+                        if existing_issue.content_hash.as_ref() != Some(&incoming_hash) {
                             Self::update_issue_from_json_tx(tx, issue)?;
                             Ok(UpsertResult::Updated)
                         } else {
@@ -1070,6 +1075,9 @@ impl Storage {
 
     /// Create an issue within a transaction context.
     pub fn create_issue_tx(tx: &Connection, issue: &Issue) -> Result<()> {
+        // Compute content_hash if not already set, and wrap in Some for storage
+        let content_hash: Option<String> = issue.content_hash.as_ref().cloned().or_else(|| Some(issue.content_hash()));
+
         tx.execute(
             "INSERT INTO issues (
                 id, content_hash, title, description, design, acceptance_criteria, notes,
@@ -1083,7 +1091,7 @@ impl Storage {
                   ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
                   ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36)",
             params![
-                &issue.id, &issue.content_hash, &issue.title,
+                &issue.id, &content_hash, &issue.title,
                 issue.description.as_deref().unwrap_or(""),
                 issue.design.as_deref().unwrap_or(""),
                 issue.acceptance_criteria.as_deref().unwrap_or(""),
@@ -1138,6 +1146,9 @@ impl Storage {
 
     /// Update an issue from JSON within a transaction context.
     pub fn update_issue_from_json_tx(tx: &Connection, issue: &Issue) -> Result<()> {
+        // Compute content_hash (it's None when importing from JSONL due to #[serde(skip)])
+        let content_hash = issue.content_hash.as_ref().cloned().unwrap_or_else(|| issue.content_hash());
+
         tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
         tx.execute("DELETE FROM dependencies WHERE issue_id = ?1", params![&issue.id])?;
         tx.execute("DELETE FROM comments WHERE issue_id = ?1", params![&issue.id])?;
@@ -1156,7 +1167,7 @@ impl Storage {
                 original_size = ?31, sender = ?32, ephemeral = ?33, pinned = ?34, is_template = ?35
              WHERE id = ?36",
             params![
-                &issue.content_hash, &issue.title,
+                &content_hash, &issue.title,
                 issue.description.as_deref().unwrap_or(""),
                 issue.design.as_deref().unwrap_or(""),
                 issue.acceptance_criteria.as_deref().unwrap_or(""),
