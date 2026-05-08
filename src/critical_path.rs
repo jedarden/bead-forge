@@ -318,9 +318,7 @@ pub fn get_bead_float(conn: &Connection, bead_id: &str) -> Result<Option<i64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Issue, Status};
     use crate::storage::schema::apply_schema;
-    use crate::storage::Storage;
 
     fn setup_test_db() -> (tempfile::NamedTempFile, Connection) {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
