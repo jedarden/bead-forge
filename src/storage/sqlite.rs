@@ -22,6 +22,18 @@ const RETRY_BASE_MS: u64 = 50;
 #[error("secret detected: {0}")]
 pub struct SecretError(String);
 
+/// Dependency tree node with hierarchy information.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DepTreeNode {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub priority: i32,
+    pub depth: i64,
+    pub dep_type: Option<String>,
+    pub path: String,  // Comma-separated path of IDs for cycle detection
+}
+
 pub struct Storage {
     conn: Mutex<Connection>,
     secret_scanner: Mutex<Option<SecretScanner>>,
@@ -790,6 +802,109 @@ impl Storage {
 
     pub fn get_dependencies(&self, issue_id: &str) -> Result<Vec<Dependency>> {
         self.load_dependencies(issue_id)
+    }
+
+    /// Get dependency tree rooted at an issue using recursive CTE.
+    ///
+    /// # Arguments
+    /// * `root_id` - The root issue ID
+    /// * `direction` - "down" for what this depends on, "up" for what depends on this
+    /// * `max_depth` - Maximum depth to traverse (0 = unlimited)
+    ///
+    /// # Returns
+    /// Vector of tree nodes ordered by depth, suitable for tree display.
+    pub fn get_dep_tree(&self, root_id: &str, direction: &str, max_depth: usize) -> Result<Vec<DepTreeNode>> {
+        let conn = self.conn.lock().unwrap();
+
+        // Build recursive CTE based on direction
+        let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+            "up" => {
+                // "up" means: find issues that depend on this one
+                // Anchor: issues that directly depend on root
+                // Recursive: issues that depend on those
+                (
+                    "d.depends_on_id = ?1",
+                    "d.depends_on_id = rec.id",
+                    "d.issue_id",
+                    "d.depends_on_id"
+                )
+            }
+            _ => {
+                // "down" (default): what this issue depends on
+                // Anchor: issues that root directly depends on
+                // Recursive: issues that those depend on
+                (
+                    "d.issue_id = ?1",
+                    "d.issue_id = rec.id",
+                    "d.depends_on_id",
+                    "d.issue_id"
+                )
+            }
+        };
+
+        let depth_limit = if max_depth == 0 {
+            String::new()
+        } else {
+            format!("AND rec.depth < {}", max_depth)
+        };
+
+        let sql = format!(
+            "WITH RECURSIVE dep_tree AS (
+                -- Anchor: direct dependencies/dependents of root
+                SELECT
+                    {id_col} as id,
+                    i.title,
+                    i.status,
+                    i.priority,
+                    0 as depth,
+                    d.type as dep_type,
+                    '{root_id}' || ',' || {id_col} as path
+                FROM dependencies d
+                INNER JOIN issues i ON i.id = {id_col}
+                WHERE {anchor_join}
+
+                UNION ALL
+
+                -- Recursive: dependencies of dependencies
+                SELECT
+                    {id_col} as id,
+                    i.title,
+                    i.status,
+                    i.priority,
+                    rec.depth + 1 as depth,
+                    d.type as dep_type,
+                    rec.path || ',' || {id_col} as path
+                FROM dependencies d
+                INNER JOIN issues i ON i.id = {id_col}
+                INNER JOIN dep_tree rec ON {recursive_join}
+                WHERE rec.path NOT LIKE '%' || {id_col} || '%'
+                {depth_limit}
+            )
+            SELECT id, title, status, priority, depth, dep_type, path
+            FROM dep_tree
+            ORDER BY depth, id"
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let mut rows = stmt.query(params![root_id])?;
+        let mut nodes = Vec::new();
+        while let Some(row) = rows.next()? {
+            let path: String = row.get(6)?;
+            // Detect cycles: if the ID appears more than once in path, it's a cycle
+            let id: String = row.get(0)?;
+            let is_cycle = path.matches(&id).count() > 1;
+
+            nodes.push(DepTreeNode {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                status: row.get(2)?,
+                priority: row.get(3)?,
+                depth: row.get(4)?,
+                dep_type: row.get::<_, Option<String>>(5)?,
+                path: if is_cycle { format!("{} [CYCLE]", path) } else { path },
+            });
+        }
+        Ok(nodes)
     }
 
     pub fn get_dependents(&self, depends_on_id: &str) -> Result<Vec<Dependency>> {
