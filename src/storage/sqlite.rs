@@ -67,6 +67,20 @@ impl Storage {
         Ok(storage)
     }
 
+    /// Explicitly apply database migrations.
+    ///
+    /// This is called during `bf migrate` to ensure all bf-only tables
+    /// are created. Normally `apply_schema()` is called on every `Storage::open()`,
+    /// but this method allows explicit migration control.
+    pub fn apply_migrations(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        // Re-apply schema - all tables use CREATE TABLE IF NOT EXISTS
+        // which is a no-op for existing tables
+        apply_schema(&conn)?;
+        drop(conn);
+        Ok(())
+    }
+
     /// Configure secret scanning for this storage instance.
     ///
     /// When enabled, `create_issue` and `update_issue` will scan all string fields
