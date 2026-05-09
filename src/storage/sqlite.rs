@@ -1163,6 +1163,39 @@ impl Storage {
         Ok(Stats { total: total as usize, open: open as usize, in_progress: in_progress as usize, closed: closed as usize })
     }
 
+    pub fn get_stats_by_type(&self) -> Result<Vec<(String, i64)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT issue_type, COUNT(*) as count FROM issues WHERE deleted_at IS NULL GROUP BY issue_type ORDER BY count DESC")?;
+        let mut rows = stmt.query([])?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next()? {
+            result.push((row.get(0)?, row.get(1)?));
+        }
+        Ok(result)
+    }
+
+    pub fn get_stats_by_priority(&self) -> Result<Vec<(i32, i64)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT priority, COUNT(*) as count FROM issues WHERE deleted_at IS NULL GROUP BY priority ORDER BY priority ASC")?;
+        let mut rows = stmt.query([])?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next()? {
+            result.push((row.get(0)?, row.get(1)?));
+        }
+        Ok(result)
+    }
+
+    pub fn get_stats_by_assignee(&self) -> Result<Vec<(Option<String>, i64)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT assignee, COUNT(*) as count FROM issues WHERE assignee IS NOT NULL AND deleted_at IS NULL GROUP BY assignee ORDER BY count DESC")?;
+        let mut rows = stmt.query([])?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next()? {
+            result.push((row.get(0)?, row.get(1)?));
+        }
+        Ok(result)
+    }
+
     /// Get the score of the top candidate bead for claiming.
     ///
     /// Returns None if no candidates are available.

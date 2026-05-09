@@ -1723,13 +1723,29 @@ fn cmd_stats(
     }
 
     if by_type {
-        println!("\nBy type: (not yet implemented)");
+        let by_type_stats = storage.get_stats_by_type()?;
+        println!("\nBy type:");
+        for (issue_type, count) in by_type_stats {
+            println!("  {} ({})", issue_type, count);
+        }
     }
     if by_priority {
-        println!("\nBy priority: (not yet implemented)");
+        let by_priority_stats = storage.get_stats_by_priority()?;
+        println!("\nBy priority:");
+        for (priority, count) in by_priority_stats {
+            println!("  P{} ({})", priority, count);
+        }
     }
     if by_assignee {
-        println!("\nBy assignee: (not yet implemented)");
+        let by_assignee_stats = storage.get_stats_by_assignee()?;
+        println!("\nBy assignee:");
+        if by_assignee_stats.is_empty() {
+            println!("  (no assigned beads)");
+        } else {
+            for (assignee, count) in by_assignee_stats {
+                println!("  {} ({})", assignee.as_deref().unwrap_or("None"), count);
+            }
+        }
     }
     if by_label {
         let labels = storage.list_all_labels()?;
