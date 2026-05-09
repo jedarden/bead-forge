@@ -411,23 +411,68 @@ fn parse_jsonl_issues(content: &str) -> Result<HashMap<String, Issue>> {
     Ok(issues)
 }
 
+/// Parse a worker ID to extract model and harness information.
+///
+/// Worker IDs follow patterns like:
+/// - "worker-claude-sonnet-4-6-01" → model="claude-sonnet-4-6", harness="unknown"
+/// - "worker-claude-opus-4-7-02" → model="claude-opus-4-7", harness="unknown"
+/// - "claude-code-glm-4.7" → model="claude-code-glm-4.7", harness="unknown"
+///
+/// Returns (model, harness) tuple.
+fn parse_worker_actor(actor: &str) -> (String, String) {
+    let actor_lower = actor.to_lowercase();
+
+    // Pattern: worker-{model}-{number}
+    // e.g., "worker-claude-sonnet-4-6-01" → "claude-sonnet-4-6"
+    if actor_lower.starts_with("worker-") {
+        let parts: Vec<&str> = actor_lower.split('-').collect();
+        if parts.len() >= 3 {
+            // Rejoin parts between "worker" and the final numeric suffix
+            // e.g., ["worker", "claude", "sonnet", "4", "6", "01"]
+            //      → model = "claude-sonnet-4-6", skip "01"
+            let mut model_parts = Vec::new();
+            for (i, part) in parts.iter().enumerate() {
+                if i == 0 {
+                    continue; // skip "worker"
+                }
+                // Check if this is a numeric suffix (like "01", "02")
+                if i == parts.len() - 1 && part.parse::<u32>().is_ok() {
+                    break; // Skip the trailing numeric suffix
+                }
+                model_parts.push(*part);
+            }
+            if !model_parts.is_empty() {
+                return (model_parts.join("-"), "unknown".to_string());
+            }
+        }
+    }
+
+    // Pattern: {model}-{number} (e.g., "claude-code-glm-4.7")
+    if actor_lower.contains("claude") {
+        // Extract the model name - everything up to a version-like pattern
+        // or use the whole actor if no clear pattern
+        return (actor_lower, "unknown".to_string());
+    }
+
+    // Fallback: couldn't parse
+    ("unknown".to_string(), "unknown".to_string())
+}
+
 /// Seed velocity stats from reconstructed events.
 ///
-/// Scans events table for closed events with assignee info and
-/// populates velocity_stats table with duration data.
-fn seed_velocity_from_events(storage: &Storage) -> Result<()> {
+/// Scans events table for closed events and populates velocity_stats table
+/// with duration data. Uses the actor field from events to infer model/harness.
+pub fn seed_velocity_from_events(storage: &Storage) -> Result<()> {
     storage.with_immediate_transaction(|tx| {
-        // Get all closed events with duration info
+        // Get all closed events with duration info, prioritizing event actor
         let mut stmt = tx.prepare(
-            "SELECT e.issue_id, i.issue_type, i.assignee, i.closed_at, i.created_at,
-                    ws.model, ws.harness
+            "SELECT e.issue_id, i.issue_type, e.actor, i.closed_at, i.created_at
              FROM events e
              INNER JOIN issues i ON i.id = e.issue_id
-             LEFT JOIN worker_sessions ws ON ws.bead_id = e.issue_id
              WHERE e.event_type = 'closed'
              AND i.closed_at IS NOT NULL
-             AND i.assignee IS NOT NULL
-             AND i.assignee != ''
+             AND e.actor IS NOT NULL
+             AND e.actor != ''
              ORDER BY e.created_at ASC",
         )?;
 
@@ -437,19 +482,21 @@ fn seed_velocity_from_events(storage: &Storage) -> Result<()> {
         while let Some(row) = rows.next()? {
             let _issue_id: String = row.get(0)?;
             let issue_type: String = row.get(1)?;
-            let assignee: String = row.get(2)?;
+            let actor: String = row.get(2)?;
             let closed_at: String = row.get(3)?;
             let created_at: String = row.get(4)?;
-            let model: Option<String> = row.get(5)?;
-            let harness: Option<String> = row.get(6)?;
 
             let closed_dt = DateTime::parse_from_rfc3339(&closed_at)?.with_timezone(&Utc);
             let created_dt = DateTime::parse_from_rfc3339(&created_at)?.with_timezone(&Utc);
             let duration_secs = closed_dt.signed_duration_since(created_dt).num_seconds();
 
-            // Use assignee as model/harness if not available
-            let model = model.unwrap_or_else(|| assignee.clone());
-            let harness = harness.unwrap_or_else(|| "unknown".to_string());
+            // Skip negative durations (data issues)
+            if duration_secs < 0 {
+                continue;
+            }
+
+            // Parse actor to infer model and harness
+            let (model, harness) = parse_worker_actor(&actor);
 
             stats.entry((model, harness, issue_type))
                 .or_default()
@@ -465,7 +512,8 @@ fn seed_velocity_from_events(storage: &Storage) -> Result<()> {
             durations.sort_unstable();
             let count = durations.len();
             let p50_seconds = Some(durations[count / 2] as i32);
-            let p90_seconds = Some(durations[count * 9 / 10] as i32);
+            let p90_idx = (count * 9 / 10).min(count - 1);
+            let p90_seconds = Some(durations[p90_idx] as i32);
             let avg_seconds = Some(durations.iter().sum::<i64>() as f64 / count as f64);
 
             tx.execute(
