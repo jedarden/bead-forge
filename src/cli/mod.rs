@@ -523,6 +523,14 @@ pub enum DepCommands {
         /// Maximum depth
         #[arg(long, default_value = "10")]
         max_depth: usize,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1407,6 +1415,72 @@ fn cmd_mitosis(beads_dir: &PathBuf, id: &str, children: &str, reason: &str, form
     Ok(())
 }
 
+/// Format and print a dependency tree.
+fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> Result<()> {
+    if nodes.is_empty() {
+        println!("  (no dependencies)");
+        return Ok(());
+    }
+
+    // Status indicators: ●=open, ◐=in_progress, ○=closed/blocked/deferred, ⊘=tombstone
+    let status_symbol = |status: &str| -> char {
+        match status {
+            "open" => '●',
+            "in_progress" => '◐',
+            "closed" => '○',
+            "blocked" => '◌',
+            "deferred" => '○',
+            "tombstone" => '⊘',
+            _ => '○',
+        }
+    };
+
+    for (i, node) in nodes.iter().enumerate() {
+        let is_cycle = node.path.contains("[CYCLE]");
+
+        // Build tree prefix with proper branching
+        let mut prefix = String::new();
+        if node.depth > 0 {
+            for d in 0..node.depth as usize {
+                if d < node.depth as usize - 1 {
+                    prefix.push_str("│   ");
+                } else {
+                    // Check if this is the last node at this depth
+                    let is_last = nodes.iter().skip(i + 1)
+                        .all(|n| n.depth < node.depth || (n.depth == node.depth && n.id > node.id));
+                    if is_last {
+                        prefix.push_str("└── ");
+                    } else {
+                        prefix.push_str("├── ");
+                    }
+                }
+            }
+        }
+
+        // Truncate title if too long
+        let title = if node.title.len() > 60 {
+            format!("{}...", &node.title[..57])
+        } else {
+            node.title.clone()
+        };
+
+        let cycle_mark = if is_cycle { " [CYCLE]" } else { "" };
+        let dep_type_str = node.dep_type.as_deref().unwrap_or("blocks");
+
+        println!("{}[{}] {} {} (P{}, {}){}",
+            prefix,
+            node.id,
+            status_symbol(&node.status),
+            title,
+            node.priority,
+            dep_type_str,
+            cycle_mark
+        );
+    }
+
+    Ok(())
+}
+
 fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
     match dep {
         DepCommands::Add { issue, depends_on, type_ } => {
@@ -1438,9 +1512,61 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                 }
             }
         }
-        DepCommands::Tree { id, direction: _, max_depth: _ } => {
-            println!("Dependency tree for {}", id);
-            println!("(tree view not yet implemented)");
+        DepCommands::Tree { id, direction, max_depth, format, json } => {
+            let metadata = load_metadata(beads_dir)?;
+            let db_path = beads_dir.join(&metadata.database);
+            let storage = Storage::open(&db_path)?;
+            let format = if json { "json".to_string() } else { format };
+
+            // Validate direction
+            let direction = match direction.as_str() {
+                "down" | "up" | "both" => direction.as_str(),
+                _ => return Err(anyhow!("Invalid direction: {}. Use 'down', 'up', or 'both'", direction)),
+            };
+
+            if format == "json" {
+                // JSON output format
+                if direction == "both" {
+                    let down_nodes = storage.get_dep_tree(&id, "down", max_depth)?;
+                    let up_nodes = storage.get_dep_tree(&id, "up", max_depth)?;
+                    let output = serde_json::json!({
+                        "root_id": id,
+                        "direction": direction,
+                        "max_depth": max_depth,
+                        "downward": down_nodes,
+                        "upward": up_nodes
+                    });
+                    println!("{}", serde_json::to_string_pretty(&output)?);
+                } else {
+                    let nodes = storage.get_dep_tree(&id, direction, max_depth)?;
+                    let output = serde_json::json!({
+                        "root_id": id,
+                        "direction": direction,
+                        "max_depth": max_depth,
+                        "nodes": nodes
+                    });
+                    println!("{}", serde_json::to_string_pretty(&output)?);
+                }
+            } else {
+                // Text output format
+                if direction == "both" {
+                    // Show both directions separately
+                    println!("Dependency tree for {} (downward - what this depends on):\n", id);
+                    let down_nodes = storage.get_dep_tree(&id, "down", max_depth)?;
+                    print_dep_tree(&down_nodes, &storage)?;
+
+                    if !down_nodes.is_empty() {
+                        println!();
+                    }
+
+                    println!("Reverse dependency tree for {} (upward - what depends on this):\n", id);
+                    let up_nodes = storage.get_dep_tree(&id, "up", max_depth)?;
+                    print_dep_tree(&up_nodes, &storage)?;
+                } else {
+                    let nodes = storage.get_dep_tree(&id, direction, max_depth)?;
+                    print_dep_tree(&nodes, &storage)?;
+                }
+            }
         }
     }
     Ok(())
