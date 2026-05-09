@@ -1758,13 +1758,51 @@ fn cmd_stats(
     Ok(())
 }
 
-fn cmd_schema(target: &str, _format: &str) -> Result<()> {
+fn cmd_schema(target: &str, format: &str) -> Result<()> {
     match target {
         "all" => {
-            println!("Schema for all: (use 'json' format for actual schema)");
+            // Print SQLite schema DDL for all bf tables
+            match format {
+                "json" => {
+                    let output = serde_json::json!({
+                        "schema": crate::storage::schema::SCHEMA_SQL
+                    });
+                    println!("{}", serde_json::to_string_pretty(&output)?);
+                }
+                _ => {
+                    println!("{}", crate::storage::schema::SCHEMA_SQL);
+                }
+            }
         }
-        _ => {
-            println!("Schema for {}: (not yet implemented)", target);
+        bead_id => {
+            // Print that bead's full JSON representation including annotations
+            let current_dir = std::env::current_dir()?;
+            let beads_dir = crate::config::find_beads_dir(&current_dir)
+                .ok_or_else(|| anyhow!("No .beads directory found"))?;
+            let metadata = crate::config::load_metadata(&beads_dir)?;
+            let db_path = beads_dir.join(&metadata.database);
+            let storage = crate::storage::Storage::open(&db_path)?;
+
+            let mut issue = match storage.get_issue(bead_id)? {
+                Some(i) => i,
+                None => {
+                    // Search archives
+                    crate::rotate::find_bead_in_archives(&beads_dir, bead_id)?
+                        .ok_or_else(|| anyhow!("Bead not found: {}", bead_id))?
+                }
+            };
+
+            // Load annotations for this bead
+            issue.annotations = storage.get_annotations(bead_id)?;
+
+            match format {
+                "json" => {
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                }
+                _ => {
+                    println!("{}", serde_json::to_string_pretty(&issue)?);
+                }
+            }
         }
     }
     Ok(())
