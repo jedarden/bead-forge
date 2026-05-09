@@ -60,13 +60,264 @@ struct JsonlSnapshot {
     issues: HashMap<String, Issue>,
 }
 
-/// Migrate a br workspace to bf.
+/// Migrate a br workspace to bf (Path B: explicit migration with backup and verification).
 ///
-/// This is a placeholder - Phase 4C implementation needed.
-pub fn migrate(_opts: MigrateOptions) -> Result<MigrateResult> {
-    Err(anyhow::anyhow!(
-        "Migration is not yet implemented - see docs/plan/plan.md §4C"
-    ))
+/// Steps:
+/// 1. Pause fleet: write migration_lock row
+/// 2. Backup: copy beads.db to beads.db.br-backup-<timestamp>
+/// 3. Apply migrations: create bf-only tables via CREATE TABLE IF NOT EXISTS
+/// 4. Prime caches: populate critical_path_cache for all epics
+/// 5. Seed config: add bf-specific keys to config.yaml if missing
+/// 6. Verify forward compat: check that br would accept this database
+/// 7. Verify backward compat: run bf doctor check
+/// 8. Release fleet: remove migration_lock
+pub fn migrate(opts: MigrateOptions) -> Result<MigrateResult> {
+    let workspace = &opts.workspace_path;
+    let beads_dir = find_beads_dir(workspace).ok_or_else(|| {
+        anyhow!(
+            "No .beads directory found in {:?}",
+            workspace
+        )
+    })?;
+
+    let metadata = load_metadata(&beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let config_path = beads_dir.join("config.yaml");
+
+    // Dry-run mode: print what would be done
+    if opts.dry_run {
+        println!("Dry-run migration for {:?}", workspace);
+        println!("  Would back up: {} -> {}", db_path.display(), format!("{}.br-backup-{}", db_path.display(), Utc::now().format("%Y%m%d%H%M%S")));
+        println!("  Would apply schema migrations");
+        println!("  Would prime critical_path_cache");
+        println!("  Would seed config.yaml with bf defaults");
+        println!("  Would verify forward/backward compatibility");
+        return Ok(MigrateResult {
+            verification: VerificationResult { errors: vec![] },
+            imported: 0,
+            events_reconstructed: 0,
+        });
+    }
+
+    // Step 1: Pause fleet - acquire migration lock
+    println!("  Acquiring migration lock...");
+    let storage = Storage::open(&db_path)?;
+    let lock_id = acquire_migration_lock(&storage, "bf-migrate")?;
+    println!("  Migration lock acquired");
+
+    // Ensure lock is released even if migration fails
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let result = inner_migrate(&storage, &beads_dir, &db_path, &config_path, &opts.skip_verify);
+        // Release lock on completion (regardless of success/failure)
+        let _ = release_migration_lock(&storage, lock_id);
+        result
+    }));
+
+    match result {
+        Ok(inner_result) => inner_result,
+        Err(_) => {
+            release_migration_lock(&storage, lock_id)?;
+            Err(anyhow!("Migration panicked"))
+        }
+    }
+}
+
+/// Inner migration implementation (lock already held).
+fn inner_migrate(
+    storage: &Storage,
+    beads_dir: &std::path::Path,
+    db_path: &std::path::Path,
+    config_path: &std::path::Path,
+    skip_verify: &bool,
+) -> Result<MigrateResult> {
+    // Step 2: Backup database
+    let timestamp = Utc::now().format("%Y%m%d%H%M%S");
+    let backup_path = db_path.with_extension(&format!("db.br-backup-{}", timestamp));
+    println!("  Backing up {} -> {}", db_path.display(), backup_path.display());
+    std::fs::copy(db_path, &backup_path)?;
+
+    // Step 3: Apply migrations (CREATE TABLE IF NOT EXISTS is idempotent)
+    println!("  Applying schema migrations...");
+    storage.apply_migrations()?;
+
+    // Step 4: Prime critical_path_cache
+    println!("  Priming critical_path_cache...");
+    let cache_result = prime_critical_path_cache(storage)?;
+
+    // Step 5: Seed config with bf defaults
+    println!("  Seeding config.yaml with bf defaults...");
+    let config_updated = seed_config(config_path)?;
+
+    // Step 6 & 7: Verify forward/backward compatibility
+    let mut verification = VerificationResult { errors: vec![] };
+
+    if !*skip_verify {
+        println!("  Verifying migration...");
+
+        // Forward compat: check that issues table column count matches br's expectation
+        let forward_compat_ok = verify_forward_compat(storage)?;
+        if !forward_compat_ok {
+            verification.errors.push(
+                "Forward compatibility check failed: issues table column count mismatch".to_string()
+            );
+        }
+
+        // Backward compat: run doctor check
+        let workspace = beads_dir.parent().unwrap_or(beads_dir);
+        match crate::doctor::check(workspace) {
+            Ok(doctor_result) => {
+                if !doctor_result.db_ok {
+                    verification.errors.push(
+                        "Backward compatibility check failed: database integrity check failed".to_string()
+                    );
+                }
+                if !doctor_result.issues.is_empty() {
+                    for issue in &doctor_result.issues {
+                        verification.errors.push(format!("Doctor check: {}", issue));
+                    }
+                }
+            }
+            Err(e) => {
+                verification.errors.push(format!("Backward compatibility check failed: {}", e));
+            }
+        }
+    }
+
+    println!("  Migration complete");
+    if config_updated {
+        println!("  Note: config.yaml was updated with bf defaults");
+    }
+
+    Ok(MigrateResult {
+        verification,
+        imported: 0,
+        events_reconstructed: cache_result,
+    })
+}
+
+/// Acquire migration lock to prevent concurrent claims during migration.
+fn acquire_migration_lock(storage: &Storage, locked_by: &str) -> Result<i64> {
+    let now = Utc::now();
+    let expires_at = now + chrono::Duration::hours(1); // Lock expires after 1 hour
+
+    storage.with_immediate_transaction(|tx| {
+        tx.execute(
+            "INSERT OR REPLACE INTO migration_lock (id, locked_by, locked_at, expires_at)
+             VALUES (1, ?1, ?2, ?3)",
+            rusqlite::params![locked_by, now.to_rfc3339(), expires_at.to_rfc3339()],
+        )?;
+        Ok::<_, anyhow::Error>(1)
+    })
+}
+
+/// Release migration lock after migration completes.
+fn release_migration_lock(storage: &Storage, _lock_id: i64) -> Result<()> {
+    storage.with_immediate_transaction(|tx| {
+        tx.execute("DELETE FROM migration_lock WHERE id = 1", [])?;
+        Ok::<_, anyhow::Error>(())
+    })
+}
+
+/// Prime critical_path_cache for all beads.
+fn prime_critical_path_cache(storage: &Storage) -> Result<usize> {
+    storage.with_immediate_transaction(|tx| {
+        // Compute all critical paths - this populates the cache
+        crate::critical_path::compute_all_critical_paths(tx)?;
+
+        // Count how many beads were cached
+        let count: i64 = tx.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| row.get(0))?;
+        Ok(count as usize)
+    })
+}
+
+/// Seed config.yaml with bf-specific defaults if missing.
+fn seed_config(config_path: &std::path::Path) -> Result<bool> {
+    use std::io::Write;
+
+    // Read existing config
+    let existing_content = if config_path.exists() {
+        std::fs::read_to_string(config_path)?
+    } else {
+        String::new()
+    };
+
+    // Check if bf defaults are already present
+    let has_claim_ttl = existing_content.contains("claim_ttl_minutes:");
+    let has_rotate_age = existing_content.contains("rotate_age_days:");
+    let has_rotate_max_size = existing_content.contains("rotate_max_size_mb:");
+
+    if has_claim_ttl && has_rotate_age && has_rotate_max_size {
+        return Ok(false); // No update needed
+    }
+
+    // Parse existing config or create new one
+    let mut config: crate::config::Config = if existing_content.trim().is_empty() {
+        crate::config::Config::default()
+    } else {
+        serde_yaml::from_str(&existing_content)?
+    };
+
+    // Ensure bf defaults are set
+    if config.claim_ttl_minutes == 0 {
+        config.claim_ttl_minutes = 30;
+    }
+    if config.rotate.rotate_age_days == 0 {
+        config.rotate.rotate_age_days = 30;
+    }
+    if config.rotate.rotate_max_size_mb == 0 {
+        config.rotate.rotate_max_size_mb = 100;
+    }
+
+    // Write back
+    let yaml = serde_yaml::to_string(&config)?;
+    let mut file = std::fs::File::create(config_path)?;
+    writeln!(file, "# bead-forge configuration")?;
+    writeln!(file, "# br ignores bf-specific keys (claim_ttl_minutes, rotate_*)")?;
+    file.write_all(yaml.as_bytes())?;
+
+    Ok(true)
+}
+
+/// Verify forward compatibility: check that br can still open this database.
+///
+/// br checks that issues table column count matches exactly. We verify this
+/// by checking the column count against br's expected count.
+fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    // br expects exactly these columns in the issues table
+    // From beads_rust/src/storage/schema.rs
+    let expected_br_columns = vec![
+        "id", "title", "description", "status", "priority", "assignee",
+        "labels", "issue_type", "created_at", "updated_at", "closed_at",
+        "close_reason", "dependencies", "comments", "deleted_at",
+        "source_repo", "file_path", "line_number", "metadata",
+    ];
+
+    storage.with_immediate_transaction(|tx| {
+        // Get actual column names
+        let mut stmt = tx.prepare("PRAGMA table_info(issues)")?;
+        let mut actual_columns = Vec::new();
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let name: String = row.get(1)?;
+            actual_columns.push(name);
+        }
+
+        // Check that all expected br columns exist
+        let mut all_present = true;
+        for expected in &expected_br_columns {
+            if !actual_columns.iter().any(|c| c == expected) {
+                all_present = false;
+                break;
+            }
+        }
+
+        // Check that there are no extra columns (br's rebuild_issues_table check)
+        if actual_columns.len() != expected_br_columns.len() {
+            all_present = false;
+        }
+
+        Ok(all_present)
+    })
 }
 
 /// Migrate from br's JSONL export, reconstructing events from git log.
