@@ -59,10 +59,10 @@ impl RotateOptions {
 ///
 /// # Algorithm
 /// 1. Scan active JSONL and identify beads to archive (closed + age threshold)
-/// 2. Determine next archive number (issues.jsonl.1, .2, etc.)
-/// 3. Stream active file: keep active beads in memory, append archived beads to archive
-/// 4. Rewrite active file with only active beads
-/// 5. Delete oldest archives if exceeding rotate_max_archives
+/// 2. Check if issues.jsonl.1 exists and exceeds rotate_max_size_mb
+/// 3. If so, shift archives (.1 -> .2, .2 -> .3, etc.) and delete oldest if needed
+/// 4. Stream active file: keep active beads in memory, append archived beads to .1
+/// 5. Rewrite active file with only active beads
 ///
 /// # Arguments
 /// * `beads_dir` - Path to the .beads directory
@@ -114,9 +114,20 @@ pub fn rotate(beads_dir: &Path, options: &RotateOptions) -> Result<RotateResult>
         });
     }
 
-    // Phase 2: Find next archive number
-    let archive_num = find_next_archive_number(beads_dir, &metadata.jsonl_export)?;
-    let archive_path = beads_dir.join(format!("{}.{}", metadata.jsonl_export, archive_num));
+    // Phase 2: Shift archives if .1 exceeds size limit
+    let archive_path = beads_dir.join(format!("{}.1", metadata.jsonl_export));
+    let max_size_bytes = options.max_size_mb.unwrap_or(100) * 1024 * 1024;
+
+    let should_shift = archive_path.exists() && {
+        let metadata = std::fs::metadata(&archive_path)?;
+        metadata.len() > max_size_bytes as u64
+    };
+
+    let deleted_archives = if should_shift && !options.dry_run {
+        shift_archives(beads_dir, &metadata.jsonl_export, options.max_archives)?
+    } else {
+        Vec::new()
+    };
 
     if options.dry_run {
         return Ok(RotateResult {
@@ -127,9 +138,19 @@ pub fn rotate(beads_dir: &Path, options: &RotateOptions) -> Result<RotateResult>
         });
     }
 
-    // Phase 3: Write archive file
+    // Phase 3: Write archive file (streaming append to .1)
     {
-        let archive_file = File::create(&archive_path)?;
+        let archive_file = if archive_path.exists() {
+            // Append to existing .1
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&archive_path)?
+        } else {
+            // Create new .1
+            File::create(&archive_path)?
+        };
+
         let mut writer = BufWriter::new(archive_file);
 
         for bead in &archive_beads {
@@ -157,13 +178,6 @@ pub fn rotate(beads_dir: &Path, options: &RotateOptions) -> Result<RotateResult>
     // Atomic rename
     std::fs::rename(&temp_path, &jsonl_path)?;
 
-    // Phase 5: Delete old archives if exceeding max_archives
-    let deleted_archives = cleanup_old_archives(
-        beads_dir,
-        &metadata.jsonl_export,
-        options.max_archives,
-    )?;
-
     Ok(RotateResult {
         archived: archive_beads.len(),
         remaining: active_beads.len(),
@@ -189,29 +203,79 @@ fn should_archive(issue: &Issue, cutoff_time: &DateTime<Utc>) -> bool {
     }
 }
 
-/// Find the next available archive number.
+/// Shift archive files when .1 exceeds size limit.
 ///
-/// Scans for existing archive files (issues.jsonl.1, .2, etc.) and returns
-/// the next number in sequence.
-fn find_next_archive_number(beads_dir: &Path, base_name: &str) -> Result<usize> {
-    let mut max_num = 0;
+/// Performs the rotation: .1 -> .2, .2 -> .3, etc.
+/// Deletes the oldest archive if we would exceed max_archives.
+///
+/// # Algorithm
+/// 1. Find the highest numbered archive
+/// 2. Shift from highest to lowest: N -> N+1, ..., 2 -> 3, 1 -> 2
+/// 3. If max_archives would be exceeded, delete the oldest (highest number)
+/// 4. The .1 position is now free for new content
+///
+/// # Returns
+/// Paths of archives that were deleted
+fn shift_archives(beads_dir: &Path, base_name: &str, max_archives: usize) -> Result<Vec<PathBuf>> {
+    let mut archives: Vec<(usize, PathBuf)> = Vec::new();
+    let mut deleted = Vec::new();
 
+    // Find all existing archive files
     let entries = std::fs::read_dir(beads_dir)?;
     for entry in entries {
         let entry = entry?;
+        let path = entry.path();
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
 
         if let Some(suffix) = name_str.strip_prefix(base_name) {
             if let Some(num_str) = suffix.strip_prefix('.') {
                 if let Ok(num) = num_str.parse::<usize>() {
-                    max_num = max_num.max(num);
+                    archives.push((num, path));
                 }
             }
         }
     }
 
-    Ok(max_num + 1)
+    if archives.is_empty() {
+        return Ok(deleted);
+    }
+
+    // Sort by archive number (highest first for shifting)
+    archives.sort_by_key(|(num, _)| std::cmp::Reverse(*num));
+
+    // Check if shifting would exceed max_archives
+    let highest_num = archives[0].0;
+    if highest_num >= max_archives {
+        // Delete the oldest archive(s) that would be pushed beyond max_archives
+        for (num, path) in &archives {
+            if *num >= max_archives {
+                std::fs::remove_file(path)?;
+                deleted.push(path.clone());
+            }
+        }
+    }
+
+    // Shift archives from highest to lowest (so we don't overwrite)
+    // E.g., .5 -> .6, .4 -> .5, ..., .1 -> .2
+    for (num, path) in &archives {
+        // Skip if this file was deleted
+        if deleted.contains(path) {
+            continue;
+        }
+
+        let new_num = num + 1;
+        let new_path = beads_dir.join(format!("{}.{}", base_name, new_num));
+
+        // Skip if the target would be deleted anyway
+        if new_num >= max_archives {
+            continue;
+        }
+
+        std::fs::rename(&path, &new_path)?;
+    }
+
+    Ok(deleted)
 }
 
 /// Delete old archives if we exceed max_archives.
@@ -656,5 +720,75 @@ mod tests {
         // Verify only 10 archives remain
         let archives = list_archives(&beads_dir).unwrap();
         assert_eq!(archives.len(), 10);
+    }
+
+    #[test]
+    fn test_shift_archives() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+
+        // Create 3 archive files (.1, .2, .3)
+        for i in 1..=3 {
+            let archive_path = beads_dir.join(format!("issues.jsonl.{}", i));
+            let file = File::create(&archive_path).unwrap();
+            let mut writer = BufWriter::new(file);
+            writeln!(writer, r#"{{"id":"bf-{}","title":"Test","status":"closed","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"."}}"#, i).unwrap();
+            writer.flush().unwrap();
+        }
+
+        // Shift archives (max_archives = 10, so no deletion expected)
+        let deleted = shift_archives(&beads_dir, "issues.jsonl", 10).unwrap();
+
+        assert_eq!(deleted.len(), 0);
+
+        // Verify shift occurred: .1 should no longer exist, .2 and .3 shifted up
+        assert!(!beads_dir.join("issues.jsonl.1").exists());
+        assert!(beads_dir.join("issues.jsonl.2").exists());
+        assert!(beads_dir.join("issues.jsonl.3").exists());
+        assert!(beads_dir.join("issues.jsonl.4").exists());
+
+        // Verify content shifted correctly (old .1 is now .2, old .2 is now .3, etc.)
+        let content = std::fs::read_to_string(beads_dir.join("issues.jsonl.2")).unwrap();
+        assert!(content.contains(r#""id":"bf-1""#));
+
+        let content = std::fs::read_to_string(beads_dir.join("issues.jsonl.3")).unwrap();
+        assert!(content.contains(r#""id":"bf-2""#));
+    }
+
+    #[test]
+    fn test_shift_archives_with_deletion() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+
+        // Create 10 archive files (.1 through .10)
+        for i in 1..=10 {
+            let archive_path = beads_dir.join(format!("issues.jsonl.{}", i));
+            let file = File::create(&archive_path).unwrap();
+            let mut writer = BufWriter::new(file);
+            writeln!(writer, r#"{{"id":"bf-{}","title":"Test","status":"closed","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"."}}"#, i).unwrap();
+            writer.flush().unwrap();
+        }
+
+        // Shift archives with max_archives = 10
+        // .10 is deleted because 10 >= max_archives
+        // .9 is skipped (can't shift to .10)
+        // .8 shifts to .9 (overwrites existing .9)
+        // ... .1 shifts to .2
+        // Final: .2 through .9 (8 archives, from .1 through .8)
+        let deleted = shift_archives(&beads_dir, "issues.jsonl", 10).unwrap();
+
+        // .10 is deleted (10 >= 10)
+        assert_eq!(deleted.len(), 1);
+        assert_eq!(deleted[0], beads_dir.join("issues.jsonl.10"));
+
+        // After shift: .2 through .9 (8 archives from .1 through .8)
+        let archives = list_archives(&beads_dir).unwrap();
+        assert_eq!(archives.len(), 8);
     }
 }
