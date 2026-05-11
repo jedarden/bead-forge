@@ -145,19 +145,22 @@ pub fn claim(
         (None, None)
     };
 
-    // Velocity-aware claim: get all candidates and score in Rust
+    // Velocity-aware claim: JOIN velocity_stats for requesting worker.
+    // score = (impact * 3.0 + (4 - priority) * 2.0 + critical_path_bonus) / p50_seconds
+    // Fallback p50_seconds = 1800 when no velocity data exists for this (model, harness, issue_type).
     if model.is_some() && harness.is_some() {
-        let m = model.as_ref().map(|s| s.as_str()).unwrap_or("");
-        let h = harness.as_ref().map(|s| s.as_str()).unwrap_or("");
+        let m = model.as_deref().unwrap_or("");
+        let h = harness.as_deref().unwrap_or("");
 
         let mut stmt = tx.prepare(
-            "SELECT i.id, i.issue_type,
-                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
-                    i.priority, i.created_at
+            "SELECT i.id
              FROM issues i
-             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id
+                 AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
              LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+             LEFT JOIN velocity_stats vs ON vs.issue_type = i.issue_type
+                 AND vs.model = ?1
+                 AND vs.harness = ?2
              WHERE i.status = 'open'
                AND i.ephemeral = 0
                AND i.pinned = 0
@@ -170,43 +173,20 @@ pub fn claim(
                    AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
                    AND blocker.status != 'closed'
                )
-             GROUP BY i.id",
+             GROUP BY i.id
+             ORDER BY (
+                 COALESCE(COUNT(d.issue_id), 0) * 3.0
+                 + (4 - i.priority) * 2.0
+                 + 1000.0 / (COALESCE(c.float, 999) + 1)
+             ) / COALESCE(vs.p50_seconds, 1800) DESC
+             LIMIT 1",
         )?;
 
-        let mut rows = stmt.query([])?;
+        let mut rows = stmt.query(params![m, h])?;
 
-        // Score all candidates and pick the best
-        let mut best_candidate: Option<(String, f64)> = None;
-
-        while let Some(row) = rows.next()? {
+        if let Some(row) = rows.next()? {
             let bead_id: String = row.get(0)?;
-            let issue_type: String = row.get(1)?;
-            let downstream_impact: i64 = row.get(2)?;
-            let critical_path_bonus: f64 = row.get(3)?;
-            let _priority: i32 = row.get(4)?;
-            let _created_at: String = row.get(5)?;
 
-            // Get expected seconds from velocity stats
-            let expected_seconds = crate::velocity::get_expected_seconds(tx, m, h, &issue_type)?
-                .unwrap_or(60); // Default to 60 seconds if no data
-
-            // Velocity-aware score: impact per second
-            // Use expected_seconds as denominator to prefer faster completions
-            let velocity_score = (downstream_impact as f64) / (expected_seconds as f64);
-
-            // Combine with critical path bonus
-            let score = velocity_score + critical_path_bonus;
-
-            match &best_candidate {
-                None => best_candidate = Some((bead_id, score)),
-                Some((_, best_score)) if score > *best_score => {
-                    best_candidate = Some((bead_id, score));
-                }
-                _ => {}
-            }
-        }
-
-        if let Some((bead_id, _)) = best_candidate {
             // Step 3: Update the winner to in_progress with a race condition check
             let rows_affected = tx.execute(
                 "UPDATE issues
