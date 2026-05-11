@@ -466,3 +466,339 @@ fn test_case_insensitive_secret_detection() {
         assert!(!found.is_empty(), "Should detect secret with case variation: {}", text);
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Integration tests: SecretScanner wired into storage.create_issue()
+//
+// These tests call Storage::open_with_config() to enable actual secret scanning
+// and verify that create_issue() returns Err when a secret pattern matches any
+// bead field, and that the error message names the offending pattern.
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn storage_with_scanning(ws: &common::TempWorkspace) -> bead_forge::Storage {
+    // Config::default() has secret_protection.enabled = true
+    let config = bead_forge::Config::default();
+    bead_forge::Storage::open_with_config(&ws.db_path, &config).unwrap()
+}
+
+fn storage_with_allowlist(ws: &common::TempWorkspace, patterns: Vec<String>) -> bead_forge::Storage {
+    let config = bead_forge::Config {
+        secret_protection: bead_forge::secrets::SecretProtectionConfig {
+            enabled: true,
+            custom_patterns: vec![],
+            allowlist: patterns,
+        },
+        ..bead_forge::Config::default()
+    };
+    bead_forge::Storage::open_with_config(&ws.db_path, &config).unwrap()
+}
+
+fn storage_with_custom_patterns(
+    ws: &common::TempWorkspace,
+    patterns: Vec<String>,
+) -> bead_forge::Storage {
+    let config = bead_forge::Config {
+        secret_protection: bead_forge::secrets::SecretProtectionConfig {
+            enabled: true,
+            custom_patterns: patterns,
+            allowlist: vec![],
+        },
+        ..bead_forge::Config::default()
+    };
+    bead_forge::Storage::open_with_config(&ws.db_path, &config).unwrap()
+}
+
+fn storage_disabled(ws: &common::TempWorkspace) -> bead_forge::Storage {
+    let config = bead_forge::Config {
+        secret_protection: bead_forge::secrets::SecretProtectionConfig {
+            enabled: false,
+            ..Default::default()
+        },
+        ..bead_forge::Config::default()
+    };
+    bead_forge::Storage::open_with_config(&ws.db_path, &config).unwrap()
+}
+
+fn issue_with_description(id: &str, desc: &str) -> bead_forge::Issue {
+    let mut issue = bead_forge::Issue::new(id.to_string(), "Test bead".to_string(), ".".to_string());
+    issue.description = Some(desc.to_string());
+    issue
+}
+
+// AWS AKIA key in description ─────────────────────────────────────────────────
+
+#[test]
+fn integration_refuses_aws_akia_key_in_description() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description("bf-akia-1", "Credentials: AKIAIOSFODNN7EXAMPLE");
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject AWS AKIA key");
+
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("secret detected"), "error must say 'secret detected': {err}");
+    assert!(err.contains("AKIA"), "error must name the AKIA pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_aws_akia_key_in_title() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = bead_forge::Issue::new(
+        "bf-akia-title".to_string(),
+        "Deploy with AKIAIOSFODNN7EXAMPLE".to_string(),
+        ".".to_string(),
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject AWS AKIA key in title");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("AKIA"), "error must name AKIA pattern: {err}");
+}
+
+// Private key PEM headers ─────────────────────────────────────────────────────
+
+#[test]
+fn integration_refuses_rsa_private_key_header() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-rsa-1",
+        "Key: -----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject RSA private key");
+
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("secret detected"), "error must say 'secret detected': {err}");
+    assert!(err.contains("RSA"), "error must name the RSA pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_ec_private_key_header() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-ec-1",
+        "EC key material:\n-----BEGIN EC PRIVATE KEY-----\nMHQCAQEEIA==",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject EC private key");
+
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("EC"), "error must name the EC pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_openssh_private_key_header() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-ssh-1",
+        "SSH key:\n-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza==",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject OpenSSH private key");
+}
+
+#[test]
+fn integration_refuses_generic_private_key_header() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-pk-1",
+        "PKCS8:\n-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG==",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject generic PRIVATE KEY header");
+}
+
+// OpenAI / Anthropic sk- keys ─────────────────────────────────────────────────
+
+#[test]
+fn integration_refuses_openai_sk_key() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    // sk- followed by 20+ alphanum — matches the built-in "API Token (sk-)" pattern
+    let issue = issue_with_description(
+        "bf-sk-openai",
+        "OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz01234567890ABCDEF",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject OpenAI sk- key");
+
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("sk-"), "error must name the sk- pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_anthropic_sk_key() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    // Anthropic tokens start with sk- followed by alphanum — matches same built-in pattern
+    let issue = issue_with_description(
+        "bf-sk-ant",
+        "ANTHROPIC_API_KEY=sk-antabcdefghijklmnopqrstuvwxyz0123456789XYZ",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject Anthropic sk- key");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("sk-"), "error must name the sk- pattern: {err}");
+}
+
+// Error message format ────────────────────────────────────────────────────────
+
+#[test]
+fn integration_error_message_names_matching_pattern() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description("bf-err-msg", "AKIAIOSFODNN7EXAMPLE");
+
+    let err = storage.create_issue(&issue).unwrap_err().to_string();
+    // Error must include both the refusal notice and the pattern name so users
+    // know exactly what triggered the block.
+    assert!(err.contains("secret detected"), "must say 'secret detected': {err}");
+    assert!(err.contains("AWS Access Key"), "must name the matched pattern: {err}");
+}
+
+// Allowlist bypasses scanning for matching field values ───────────────────────
+
+#[test]
+fn integration_allowlist_pattern_bypasses_scan() {
+    let ws = common::TempWorkspace::new().unwrap();
+    // Allowlist the exact AKIA value — this field must be permitted
+    let storage = storage_with_allowlist(&ws, vec![r"AKIAIOSFODNN7EXAMPLE".to_string()]);
+
+    let issue = issue_with_description("bf-allow-1", "Credentials: AKIAIOSFODNN7EXAMPLE");
+
+    storage.create_issue(&issue).expect("allowlisted content must be accepted");
+}
+
+#[test]
+fn integration_allowlist_does_not_bypass_other_secrets() {
+    let ws = common::TempWorkspace::new().unwrap();
+    // Allowlist only covers the specific AKIA value; RSA header is NOT allowlisted
+    let storage = storage_with_allowlist(&ws, vec![r"AKIAIOSFODNN7EXAMPLE".to_string()]);
+
+    let issue = issue_with_description(
+        "bf-allow-2",
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "non-allowlisted RSA key must still be rejected");
+}
+
+// Custom patterns from config ─────────────────────────────────────────────────
+
+#[test]
+fn integration_custom_pattern_blocks_matching_content() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_custom_patterns(
+        &ws,
+        vec![r"MY_INTERNAL_TOKEN=[A-Za-z0-9]+".to_string()],
+    );
+
+    let issue = issue_with_description(
+        "bf-custom-1",
+        "Token: MY_INTERNAL_TOKEN=abc123XYZsecret",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "custom pattern must block matching content");
+}
+
+#[test]
+fn integration_custom_pattern_does_not_block_non_matching_content() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_custom_patterns(
+        &ws,
+        vec![r"MY_INTERNAL_TOKEN=[A-Za-z0-9]+".to_string()],
+    );
+
+    let issue = issue_with_description("bf-custom-2", "Safe description with no secrets");
+
+    storage.create_issue(&issue).expect("non-matching content must be accepted");
+}
+
+// Scanning disabled ──────────────────────────────────────────────────────────
+
+#[test]
+fn integration_scanning_disabled_allows_secrets_through() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_disabled(&ws);
+
+    let issue = issue_with_description("bf-disabled-1", "AKIAIOSFODNN7EXAMPLE");
+
+    storage.create_issue(&issue).expect("scanning disabled — secrets must pass through");
+}
+
+// Safe content always passes ──────────────────────────────────────────────────
+
+#[test]
+fn integration_safe_content_is_always_allowed() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-safe-1",
+        "Implement a new API endpoint for fetching user preferences",
+    );
+
+    storage.create_issue(&issue).expect("safe content must always be accepted");
+}
+
+// Secrets in other fields ────────────────────────────────────────────────────
+
+#[test]
+fn integration_secret_in_notes_is_blocked() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let mut issue = bead_forge::Issue::new(
+        "bf-notes-secret".to_string(),
+        "Database migration".to_string(),
+        ".".to_string(),
+    );
+    issue.notes =
+        Some("Conn: postgresql://admin:P@ssword@db.example.com/prod".to_string());
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "secret in notes must be blocked");
+}
+
+#[test]
+fn integration_secret_in_acceptance_criteria_is_blocked() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let mut issue = bead_forge::Issue::new(
+        "bf-ac-secret".to_string(),
+        "Auth setup".to_string(),
+        ".".to_string(),
+    );
+    // Full 3-part JWT
+    issue.acceptance_criteria = Some(
+        "Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+            .to_string(),
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "JWT in acceptance_criteria must be blocked");
+}
