@@ -13,7 +13,7 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 /// Velocity statistics for a (model, harness, issue_type) tuple.
@@ -62,8 +62,7 @@ pub fn update_session_on_close(
     closed_at: DateTime<Utc>,
 ) -> Result<bool> {
     // Find the most recent session for this bead
-    let (claimed_at_str, model, harness, issue_type): (String, Option<String>, Option<String>, Option<String>) =
-        tx.query_row(
+    let session = tx.query_row(
             "SELECT ws.claimed_at, ws.model, ws.harness, i.issue_type
              FROM worker_sessions ws
              INNER JOIN issues i ON i.id = ws.bead_id
@@ -78,7 +77,13 @@ pub fn update_session_on_close(
                 let issue_type: Option<String> = row.get(3)?;
                 Ok((claimed_at, model, harness, issue_type))
             },
-        )?;
+        )
+        .optional()?;
+
+    let (claimed_at_str, model, harness, issue_type): (String, Option<String>, Option<String>, Option<String>) = match session {
+        None => return Ok(false), // No worker session exists for this bead
+        Some(s) => s,
+    };
 
     // Parse claimed_at and calculate duration
     let claimed_at = DateTime::parse_from_rfc3339(&claimed_at_str)

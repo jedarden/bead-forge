@@ -533,3 +533,36 @@ fn parse_close(input: &str) -> Result<BatchOp> {
         reason,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_reference_placeholder() {
+        let created_ids = vec!["bf-001".to_string(), "bf-002".to_string(), "bf-003".to_string()];
+        assert_eq!(resolve_reference("@0", &created_ids), "bf-001");
+        assert_eq!(resolve_reference("@1", &created_ids), "bf-002");
+        assert_eq!(resolve_reference("@2", &created_ids), "bf-003");
+    }
+
+    #[test]
+    fn test_resolve_reference_passthrough() {
+        let created_ids = vec!["bf-001".to_string()];
+        assert_eq!(resolve_reference("bf-parent", &created_ids), "bf-parent");
+        assert_eq!(resolve_reference("literal-id", &created_ids), "literal-id");
+    }
+
+    #[test]
+    fn test_resolve_reference_out_of_bounds() {
+        let created_ids = vec!["bf-001".to_string()];
+        // Out-of-bounds @-ref returns the reference as-is
+        assert_eq!(resolve_reference("@5", &created_ids), "@5");
+    }
+
+    #[test]
+    fn test_resolve_reference_empty_created_ids() {
+        let created_ids: Vec<String> = vec![];
+        assert_eq!(resolve_reference("@0", &created_ids), "@0");
+    }
+}

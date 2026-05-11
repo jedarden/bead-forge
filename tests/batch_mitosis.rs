@@ -4,11 +4,11 @@
 //! All operations must be atomic - if the process crashes mid-batch, no
 //! partial state is committed.
 
-use bead_forge::batch::{execute_batch, BatchOp};
+use bead_forge::batch::{execute_batch, mitosis, BatchOp};
 use bead_forge::config::{init_workspace, load_metadata};
-use bead_forge::model::{Issue, IssueFilter, IssueType, Priority};
+use bead_forge::model::{Issue, IssueFilter};
 use bead_forge::storage::Storage;
-use chrono::Utc;
+use std::process::Command;
 use tempfile::TempDir;
 
 #[test]
@@ -145,4 +145,150 @@ fn test_batch_rollback_on_error() {
     // Verify no partial state: bead count should be unchanged
     let after_count = storage.list_issues(&IssueFilter::default()).unwrap().len();
     assert_eq!(before_count, after_count, "Batch should have rolled back completely");
+}
+
+/// Test that mitosis() produces BatchOps with correct @-reference placeholders.
+#[test]
+fn test_mitosis_helper_produces_at_references() {
+    let ops = mitosis(
+        "bf-parent",
+        vec![
+            ("Child A".to_string(), "task".to_string(), 2),
+            ("Child B".to_string(), "bug".to_string(), 0),
+        ],
+        Some("Splitting parent".to_string()),
+    )
+    .unwrap();
+
+    // 2 creates + 2 dep_add_blocker + 1 close = 5 ops
+    assert_eq!(ops.len(), 5);
+
+    // First two ops are creates
+    assert!(matches!(&ops[0], BatchOp::Create { title, .. } if title == "Child A"));
+    assert!(matches!(&ops[1], BatchOp::Create { title, .. } if title == "Child B"));
+
+    // Dep ops use @0 and @1 as blockers (children block the parent)
+    match &ops[2] {
+        BatchOp::DepAddBlocker { parent, child } => {
+            assert_eq!(parent, "@0", "first child should be referenced by @0");
+            assert_eq!(child, "bf-parent");
+        }
+        _ => panic!("expected DepAddBlocker at op[2]"),
+    }
+    match &ops[3] {
+        BatchOp::DepAddBlocker { parent, child } => {
+            assert_eq!(parent, "@1", "second child should be referenced by @1");
+            assert_eq!(child, "bf-parent");
+        }
+        _ => panic!("expected DepAddBlocker at op[3]"),
+    }
+
+    // Last op closes the parent
+    match &ops[4] {
+        BatchOp::Close { id, reason } => {
+            assert_eq!(id, "bf-parent");
+            assert_eq!(reason, "Splitting parent");
+        }
+        _ => panic!("expected Close at op[4]"),
+    }
+}
+
+/// End-to-end CLI test: bf batch --json with @-references exercises the mitosis pattern
+/// through the actual binary, verifying that the JSON serialization path resolves
+/// placeholders correctly.
+#[test]
+fn test_cli_batch_json_at_references() {
+    let temp_dir = TempDir::new().unwrap();
+    let beads_dir = temp_dir.path().join(".beads");
+    std::fs::create_dir(&beads_dir).unwrap();
+    init_workspace(&beads_dir, "bf").unwrap();
+
+    let metadata = load_metadata(&beads_dir).unwrap();
+    let db_path = beads_dir.join(&metadata.database);
+    let storage = Storage::open(&db_path).unwrap();
+
+    // Create the parent bead via the storage API
+    let parent_id = "bf-parent";
+    let parent = Issue::new(parent_id.to_string(), "Parent task".to_string(), ".".to_string());
+    storage.create_issue(&parent).unwrap();
+    drop(storage); // release the connection before the subprocess opens it
+
+    // Build the JSON payload with @-references (NEEDLE mitosis pattern)
+    let json_payload = serde_json::json!([
+        {"op": "create", "title": "Child Alpha", "type_": "task", "priority": 2},
+        {"op": "create", "title": "Child Beta",  "type_": "bug",  "priority": 1},
+        {"op": "dep_add_blocker", "parent": "@0", "child": "bf-parent"},
+        {"op": "dep_add_blocker", "parent": "@1", "child": "bf-parent"},
+        {"op": "close", "id": "bf-parent", "reason": "Split via CLI batch"}
+    ])
+    .to_string();
+
+    let bf_bin = env!("CARGO_BIN_EXE_bf");
+    let output = Command::new(bf_bin)
+        .arg("--workspace")
+        .arg(temp_dir.path())
+        .arg("batch")
+        .arg("--json")
+        .arg(&json_payload)
+        .output()
+        .expect("failed to run bf binary");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "bf batch --json failed.\nstdout: {stdout}\nstderr: {stderr}"
+    );
+
+    // Re-open storage to verify results
+    let storage = Storage::open(&db_path).unwrap();
+
+    // Parent should be closed
+    let parent = storage.get_issue(parent_id).unwrap().unwrap();
+    assert_eq!(parent.status.to_string(), "closed", "parent should be closed after mitosis");
+    assert_eq!(parent.close_reason.as_deref(), Some("Split via CLI batch"));
+
+    // Two children should have been created and are open
+    let all_issues = storage.list_all_issues().unwrap();
+    let children: Vec<_> = all_issues
+        .iter()
+        .filter(|i| i.id != parent_id)
+        .collect();
+    assert_eq!(children.len(), 2, "expected exactly 2 child beads");
+
+    let titles: Vec<&str> = children.iter().map(|i| i.title.as_str()).collect();
+    assert!(titles.contains(&"Child Alpha"), "Child Alpha not found");
+    assert!(titles.contains(&"Child Beta"), "Child Beta not found");
+
+    for child in &children {
+        assert_eq!(
+            child.status.to_string(),
+            "open",
+            "child {} should be open",
+            child.id
+        );
+    }
+
+    // Both children should appear as blockers in the parent's dependencies
+    let parent_deps = storage.get_dependencies(parent_id).unwrap();
+    assert_eq!(parent_deps.len(), 2, "parent should have 2 blocking dependencies");
+
+    let child_ids: Vec<&str> = children.iter().map(|i| i.id.as_str()).collect();
+    for dep in &parent_deps {
+        assert!(
+            child_ids.contains(&dep.depends_on_id.as_str()),
+            "dependency {} not in child IDs {:?}",
+            dep.depends_on_id,
+            child_ids
+        );
+    }
+
+    // CLI output should mention all 5 ops as ok
+    for i in 0..5 {
+        assert!(
+            stdout.contains(&format!("[op {i}] ok")),
+            "expected '[op {i}] ok' in stdout:\n{stdout}"
+        );
+    }
 }
