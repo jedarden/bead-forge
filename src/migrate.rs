@@ -282,14 +282,22 @@ fn seed_config(config_path: &std::path::Path) -> Result<bool> {
 ///
 /// br checks that issues table column count matches exactly. We verify this
 /// by checking the column count against br's expected count.
+///
+/// NOTE: The bf schema includes `content_hash` column which br does not have.
+/// This is a known incompatibility - br will rebuild the issues table if it
+/// sees this extra column. For full forward compatibility, `content_hash`
+/// should be removed from the issues table schema and stored in a separate table.
 fn verify_forward_compat(storage: &Storage) -> Result<bool> {
-    // br expects exactly these columns in the issues table
-    // From beads_rust/src/storage/schema.rs
+    // These are the actual columns in br's issues table (from beads_rust schema)
+    // Note: labels, dependencies, comments are in separate tables, NOT columns
     let expected_br_columns = vec![
-        "id", "title", "description", "status", "priority", "assignee",
-        "labels", "issue_type", "created_at", "updated_at", "closed_at",
-        "close_reason", "dependencies", "comments", "deleted_at",
-        "source_repo", "file_path", "line_number", "metadata",
+        "id", "title", "description", "design", "acceptance_criteria", "notes",
+        "status", "priority", "issue_type", "assignee", "owner", "estimated_minutes",
+        "created_at", "created_by", "updated_at", "closed_at", "close_reason",
+        "closed_by_session", "due_at", "defer_until", "external_ref", "source_system",
+        "source_repo", "deleted_at", "deleted_by", "delete_reason", "original_type",
+        "compaction_level", "compacted_at", "compacted_at_commit", "original_size",
+        "sender", "ephemeral", "pinned", "is_template",
     ];
 
     storage.with_immediate_transaction(|tx| {
@@ -312,6 +320,7 @@ fn verify_forward_compat(storage: &Storage) -> Result<bool> {
         }
 
         // Check that there are no extra columns (br's rebuild_issues_table check)
+        // bf adds `content_hash` which br doesn't have - this breaks forward compat
         if actual_columns.len() != expected_br_columns.len() {
             all_present = false;
         }
@@ -526,6 +535,9 @@ fn reconstruct_events_from_git(
 }
 
 /// Insert a synthetic event with metadata.source=git-reconstructed.
+///
+/// Silently skips insertion if the issue doesn't exist (handles deleted beads
+/// from git history gracefully).
 fn insert_synthetic_event(
     storage: &Storage,
     issue_id: &str,
@@ -535,6 +547,18 @@ fn insert_synthetic_event(
     created_at: DateTime<Utc>,
 ) -> Result<()> {
     storage.with_immediate_transaction(|tx| {
+        // Check if issue exists before inserting event
+        let exists: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+            rusqlite::params![issue_id],
+            |row| row.get(0),
+        )?;
+
+        if !exists {
+            // Issue doesn't exist - likely deleted, skip event insertion
+            return Ok(());
+        }
+
         tx.execute(
             "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at)
              VALUES (?1, ?2, 'git-reconstructed', ?3, ?4, ?5)",

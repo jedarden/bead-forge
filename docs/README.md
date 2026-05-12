@@ -279,6 +279,98 @@ See [`docs/plan/plan.md`](plan/plan.md) for the complete implementation plan inc
 
 ---
 
+## Migration from br to bf
+
+### Per-Machine Installation
+
+```bash
+# Install bf binary
+curl -L https://github.com/jedarden/bead-forge/releases/latest/download/bf-linux-x86_64 \
+  -o ~/.local/bin/bf && chmod +x ~/.local/bin/bf
+
+# Drop-in replace br (all existing scripts work unchanged)
+ln -sf ~/.local/bin/bf ~/.local/bin/br
+
+# Verify installation
+bf --version
+br --version  # should show same version
+```
+
+### Per-Workspace Migration
+
+**Standard migration** (Path B: explicit, with backup and verification):
+
+```bash
+# Migrate a single workspace
+bf migrate --workspace /path/to/workspace
+
+# Or migrate all workspaces in a loop
+for workspace in \
+  /home/coding/FORGE \
+  /home/coding/NEEDLE \
+  /home/coding/AgentScribe \
+  /home/coding/ARMOR \
+  /home/coding/SIGIL \
+  /home/coding/CLASP \
+  /home/coding/bead-forge; do
+  bf migrate --workspace "$workspace"
+done
+```
+
+**What `bf migrate` does:**
+1. Acquires migration lock (prevents concurrent claims during migration)
+2. Backs up `beads.db` → `beads.db.br-backup-<timestamp>`
+3. Applies schema migrations (creates bf-only tables via `CREATE TABLE IF NOT EXISTS`)
+4. Primes critical_path_cache for all epics
+5. Seeds `config.yaml` with bf-specific defaults if missing
+6. Verifies forward compatibility (br can still open the database)
+7. Verifies backward compatibility (`bf doctor --check` passes)
+8. Releases migration lock
+
+**Dry-run mode** (see what would happen without making changes):
+
+```bash
+bf migrate --workspace /path/to/workspace --dry-run
+```
+
+**Recovery mode** (for corrupted/missing databases):
+
+If `beads.db` is corrupted or missing, `bf migrate --from-jsonl` rebuilds from `issues.jsonl` and reconstructs events from git history:
+
+```bash
+bf migrate --workspace /path/to/workspace --from-jsonl [--seed-velocity]
+```
+
+### Verification After Migration
+
+After migrating each workspace, verify both tools can read the database:
+
+```bash
+# Verify bf doctor passes
+cd /path/to/workspace
+bf doctor
+
+# Verify br doctor passes (forward compatibility)
+br doctor
+```
+
+Both commands should exit 0 with no errors.
+
+**Known limitation:** The migration may show a forward compatibility warning: "Forward compatibility check failed: issues table column count mismatch". This is expected because bf adds a `content_hash` column to the issues table for sync optimization. The database remains fully functional — both `bf doctor` and `br doctor` will pass. The warning indicates that br sees an extra column, but all br operations continue to work correctly.
+
+### NEEDLE Integration Update
+
+After migration, update NEEDLE adapter configs to pass worker metadata for velocity tracking:
+
+```yaml
+# In .config/needle/adapters/claude-sonnet.yaml, update invoke_template:
+bf claim --model claude-sonnet-4-6 --harness needle --harness-version 0.5.2 ...
+```
+
+This enables velocity-aware routing (see §Velocity-Aware Scoring above).
+
+---
+
 ## Build & Deploy
 
 Built via Argo Workflows on `iad-ci`. WorkflowTemplate: `bead-forge-build` in `jedarden/declarative-config`.
