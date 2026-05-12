@@ -1225,7 +1225,7 @@ impl Storage {
             "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
                     COALESCE(c.float, 999) as critical_float,
                     i.priority,
-                    strftime('%s', i.created_at) as created_ts
+                    CAST(strftime('%s', i.created_at) AS INTEGER) as created_ts
              FROM issues i
              LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
              LEFT JOIN critical_path_cache c ON c.bead_id = i.id
