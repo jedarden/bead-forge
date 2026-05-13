@@ -121,14 +121,16 @@ fn test_seed_velocity_from_closed_events() {
 
     // Create a synthetic closed event
     let storage = ws.storage().unwrap();
-    storage.with_immediate_transaction(|tx| {
-        tx.execute(
-            "INSERT INTO events (issue_id, event_type, actor, new_value, created_at)
+    storage
+        .with_immediate_transaction(|tx| {
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, new_value, created_at)
              VALUES (?1, 'closed', 'model-a', 'Done', '2024-01-01T01:00:00Z')",
-            rusqlite::params!["bf-vel1"],
-        )?;
-        Ok::<(), anyhow::Error>(())
-    }).unwrap();
+                rusqlite::params!["bf-vel1"],
+            )?;
+            Ok::<(), anyhow::Error>(())
+        })
+        .unwrap();
 
     // The velocity seeding should pick up this event
     // (The actual seeding is tested as part of the migration command)

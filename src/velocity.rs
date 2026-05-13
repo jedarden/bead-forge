@@ -62,7 +62,8 @@ pub fn update_session_on_close(
     closed_at: DateTime<Utc>,
 ) -> Result<bool> {
     // Find the most recent session for this bead
-    let session = tx.query_row(
+    let session = tx
+        .query_row(
             "SELECT ws.claimed_at, ws.model, ws.harness, i.issue_type
              FROM worker_sessions ws
              INNER JOIN issues i ON i.id = ws.bead_id
@@ -80,7 +81,12 @@ pub fn update_session_on_close(
         )
         .optional()?;
 
-    let (claimed_at_str, model, harness, issue_type): (String, Option<String>, Option<String>, Option<String>) = match session {
+    let (claimed_at_str, model, harness, issue_type): (
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) = match session {
         None => return Ok(false), // No worker session exists for this bead
         Some(s) => s,
     };
@@ -160,7 +166,11 @@ fn recompute_velocity_stats(
         let p50_idx = (len as f64 * 0.5).floor() as usize;
         let p90_idx = (len as f64 * 0.9).floor() as usize;
         let p50 = Some(durations[p50_idx]);
-        let p90 = if len > 1 { Some(durations[p90_idx]) } else { p50 };
+        let p90 = if len > 1 {
+            Some(durations[p90_idx])
+        } else {
+            p50
+        };
 
         // Calculate average
         let sum: i64 = durations.iter().sum();
@@ -320,7 +330,8 @@ pub fn get_velocity_stats(
     query.push_str(" ORDER BY sample_count DESC");
 
     let mut stmt = tx.prepare(&query)?;
-    let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+    let param_refs: Vec<&dyn rusqlite::ToSql> =
+        params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
 
     let mut stats = Vec::new();
     let mut rows = stmt.query(param_refs.as_slice())?;
@@ -344,8 +355,8 @@ pub fn get_velocity_stats(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::schema::apply_schema;
     use crate::model::{Issue, IssueType, Status};
+    use crate::storage::schema::apply_schema;
 
     fn setup_test_db() -> tempfile::NamedTempFile {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -373,7 +384,8 @@ mod tests {
                 Utc::now().to_rfc3339(),
                 Utc::now().to_rfc3339(),
             ],
-        ).unwrap();
+        )
+        .unwrap();
 
         // Create a worker session
         let claimed_at = Utc::now() - chrono::Duration::minutes(10);
@@ -390,11 +402,13 @@ mod tests {
         assert!(updated);
 
         // Verify the session was updated
-        let (session_closed_at, duration): (Option<String>, Option<i64>) = conn.query_row(
-            "SELECT closed_at, duration_seconds FROM worker_sessions WHERE bead_id = ?1",
-            params!["bf-test1"],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        ).unwrap();
+        let (session_closed_at, duration): (Option<String>, Option<i64>) = conn
+            .query_row(
+                "SELECT closed_at, duration_seconds FROM worker_sessions WHERE bead_id = ?1",
+                params!["bf-test1"],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
 
         assert!(session_closed_at.is_some());
         assert!(duration.is_some());
@@ -448,12 +462,14 @@ mod tests {
         recompute_velocity_stats(&conn, "claude-4.7", "cli", "task").unwrap();
 
         // Verify stats were computed
-        let (count, p50, avg): (i64, Option<i64>, Option<f64>) = conn.query_row(
-            "SELECT sample_count, p50_seconds, avg_seconds FROM velocity_stats
+        let (count, p50, avg): (i64, Option<i64>, Option<f64>) = conn
+            .query_row(
+                "SELECT sample_count, p50_seconds, avg_seconds FROM velocity_stats
              WHERE model = ?1 AND harness = ?2 AND issue_type = ?3",
-            params!["claude-4.7", "cli", "task"],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        ).unwrap();
+                params!["claude-4.7", "cli", "task"],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
 
         assert_eq!(count, 10);
         assert!(p50.is_some());

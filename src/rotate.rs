@@ -8,10 +8,10 @@ use crate::config::{load_config, load_metadata};
 use crate::model::Issue;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Duration, Utc};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::collections::HashSet;
 
 /// Result of a rotation operation.
 #[derive(Debug, Clone, Default)]
@@ -489,7 +489,7 @@ pub fn list_archives(beads_dir: &Path) -> Result<Vec<(PathBuf, DateTime<Utc>)>> 
 mod tests {
     use super::*;
     use crate::config::init_workspace;
-    use crate::model::{Issue, Priority, Status, IssueType};
+    use crate::model::{Issue, IssueType, Priority, Status};
     use tempfile::TempDir;
 
     fn create_test_bead(id: &str, days_ago: i64, status: Status) -> Issue {

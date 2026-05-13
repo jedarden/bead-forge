@@ -44,7 +44,10 @@ impl Formatter for ToonFormatter {
 fn format_toon_issue_line(issue: &Issue) -> String {
     format!(
         "[{}] {} - {} ({})",
-        issue.id, issue.title, issue.status, format_priority(issue.priority.0)
+        issue.id,
+        issue.title,
+        issue.status,
+        format_priority(issue.priority.0)
     )
 }
 
@@ -52,13 +55,7 @@ fn format_priority(p: i32) -> String {
     format!("P{}", p)
 }
 
-pub fn format_ready_bead(
-    id: &str,
-    title: &str,
-    priority: i32,
-    impact: i64,
-    float: f64,
-) -> String {
+pub fn format_ready_bead(id: &str, title: &str, priority: i32, impact: i64, float: f64) -> String {
     format!(
         "[{}] {} (priority={}, impact={}, float={})",
         id, title, priority, impact, float

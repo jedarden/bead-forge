@@ -443,11 +443,13 @@ fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
     // Migration 1: Update critical_path_cache schema if it has the old format
     // Old format: bead_id, float (REAL), updated_at
     // New format: bead_id, epic_id, es (INTEGER), ls (INTEGER), float (INTEGER), updated_at
-    let has_es: bool = conn.query_row(
-        "SELECT COUNT(*) FROM pragma_table_info('critical_path_cache') WHERE name='es'",
-        [],
-        |row| row.get::<_, i64>(0).map(|n| n > 0),
-    ).unwrap_or(false);
+    let has_es: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('critical_path_cache') WHERE name='es'",
+            [],
+            |row| row.get::<_, i64>(0).map(|n| n > 0),
+        )
+        .unwrap_or(false);
 
     if !has_es {
         // Table has old schema - recreate with new schema
@@ -466,38 +468,51 @@ fn apply_migrations(conn: &Connection) -> anyhow::Result<()> {
                  SELECT bead_id, CAST(float AS INTEGER), updated_at FROM critical_path_cache;
              DROP TABLE critical_path_cache;
              ALTER TABLE critical_path_cache_new RENAME TO critical_path_cache;
-             COMMIT;"
+             COMMIT;",
         )?;
     }
 
     // Create indexes for critical_path_cache (idempotent)
     let _ = conn.execute_batch(
         "CREATE INDEX IF NOT EXISTS idx_critical_path_cache_epic ON critical_path_cache(epic_id);
-         CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float ON critical_path_cache(float);"
+         CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float ON critical_path_cache(float);",
     );
 
     // Migration 2: Add workspace_path to worker_sessions if missing
     // Older databases may not have this column; br never reads worker_sessions so this is safe.
-    let has_workspace_path: bool = conn.query_row(
-        "SELECT COUNT(*) FROM pragma_table_info('worker_sessions') WHERE name='workspace_path'",
-        [],
-        |row| row.get::<_, i64>(0).map(|n| n > 0),
-    ).unwrap_or(false);
+    let has_workspace_path: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('worker_sessions') WHERE name='workspace_path'",
+            [],
+            |row| row.get::<_, i64>(0).map(|n| n > 0),
+        )
+        .unwrap_or(false);
 
     if !has_workspace_path {
-        conn.execute("ALTER TABLE worker_sessions ADD COLUMN workspace_path TEXT", [])?;
+        conn.execute(
+            "ALTER TABLE worker_sessions ADD COLUMN workspace_path TEXT",
+            [],
+        )?;
     }
 
     // Migration 3: Add closed_at and duration_seconds to worker_sessions for velocity tracking
-    let has_closed_at: bool = conn.query_row(
-        "SELECT COUNT(*) FROM pragma_table_info('worker_sessions') WHERE name='closed_at'",
-        [],
-        |row| row.get::<_, i64>(0).map(|n| n > 0),
-    ).unwrap_or(false);
+    let has_closed_at: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('worker_sessions') WHERE name='closed_at'",
+            [],
+            |row| row.get::<_, i64>(0).map(|n| n > 0),
+        )
+        .unwrap_or(false);
 
     if !has_closed_at {
-        conn.execute("ALTER TABLE worker_sessions ADD COLUMN closed_at DATETIME", [])?;
-        conn.execute("ALTER TABLE worker_sessions ADD COLUMN duration_seconds INTEGER", [])?;
+        conn.execute(
+            "ALTER TABLE worker_sessions ADD COLUMN closed_at DATETIME",
+            [],
+        )?;
+        conn.execute(
+            "ALTER TABLE worker_sessions ADD COLUMN duration_seconds INTEGER",
+            [],
+        )?;
     }
 
     Ok(())
@@ -510,7 +525,7 @@ pub fn ensure_wal_mode(conn: &Connection) -> anyhow::Result<()> {
          PRAGMA foreign_keys = ON;
          PRAGMA busy_timeout = 30000;
          PRAGMA cache_size = -8000;
-         PRAGMA synchronous = NORMAL;"
+         PRAGMA synchronous = NORMAL;",
     )?;
     Ok(())
 }

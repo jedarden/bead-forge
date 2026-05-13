@@ -38,8 +38,18 @@ pub struct Score {
 
 impl Score {
     /// Create a new score from candidate fields.
-    pub fn new(downstream_impact: i64, critical_float: i64, priority: i32, created_at_ts: i64) -> Self {
-        Self { downstream_impact, critical_float, priority, created_at_ts }
+    pub fn new(
+        downstream_impact: i64,
+        critical_float: i64,
+        priority: i32,
+        created_at_ts: i64,
+    ) -> Self {
+        Self {
+            downstream_impact,
+            critical_float,
+            priority,
+            created_at_ts,
+        }
     }
 }
 
@@ -110,13 +120,14 @@ pub fn claim(
     now: DateTime<Utc>,
     worker_metadata: Option<&WorkerMetadata>,
 ) -> Result<Option<ClaimResult>> {
-
     // Step 0: Check migration_lock - return NONE if migration is in progress
-    let lock_count: i64 = tx.query_row(
-        "SELECT COUNT(*) FROM migration_lock WHERE expires_at > ?1",
-        params![now.to_rfc3339()],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let lock_count: i64 = tx
+        .query_row(
+            "SELECT COUNT(*) FROM migration_lock WHERE expires_at > ?1",
+            params![now.to_rfc3339()],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
     if lock_count > 0 {
         // Migration in progress - return None gracefully
         return Ok(None);
@@ -484,7 +495,6 @@ fn get_beads_dir(workspace_path: &Path) -> Result<std::path::PathBuf> {
 /// Searches for directories containing a .beads subdirectory.
 /// Searches upward from the start path through parent directories.
 pub fn find_workspaces(start_path: &Path) -> Result<Vec<PathBuf>> {
-
     let mut workspaces = Vec::new();
 
     // Start from the given path and search upward
@@ -509,8 +519,8 @@ pub fn find_workspaces(start_path: &Path) -> Result<Vec<PathBuf>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::Storage;
     use crate::model::{Issue, Status};
+    use crate::storage::Storage;
 
     fn setup_test_db() -> (tempfile::NamedTempFile, Storage) {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -523,13 +533,17 @@ mod tests {
         let (_temp, mut storage) = setup_test_db();
 
         // Create an open bead
-        let issue = Issue::new("bf-test1".to_string(), "Test bead".to_string(), ".".to_string());
+        let issue = Issue::new(
+            "bf-test1".to_string(),
+            "Test bead".to_string(),
+            ".".to_string(),
+        );
         storage.create_issue(&issue).unwrap();
 
         // Claim it
-        let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, "worker1", 30, Utc::now(), None)
-        }).unwrap();
+        let result = storage
+            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+            .unwrap();
 
         assert!(result.is_some());
         let claim_result = result.unwrap();
@@ -547,9 +561,9 @@ mod tests {
         let (_temp, mut storage) = setup_test_db();
 
         // No beads available
-        let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, "worker1", 30, Utc::now(), None)
-        }).unwrap();
+        let result = storage
+            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+            .unwrap();
 
         assert!(result.is_none());
     }
@@ -559,20 +573,28 @@ mod tests {
         let (_temp, mut storage) = setup_test_db();
 
         // Create an in_progress bead with old updated_at
-        let mut issue = Issue::new("bf-stale".to_string(), "Stale bead".to_string(), ".".to_string());
+        let mut issue = Issue::new(
+            "bf-stale".to_string(),
+            "Stale bead".to_string(),
+            ".".to_string(),
+        );
         issue.status = Status::InProgress;
         issue.assignee = Some("worker_old".to_string());
         issue.updated_at = Utc::now() - Duration::minutes(60);
         storage.create_issue(&issue).unwrap();
 
         // Create an open bead
-        let issue2 = Issue::new("bf-open".to_string(), "Open bead".to_string(), ".".to_string());
+        let issue2 = Issue::new(
+            "bf-open".to_string(),
+            "Open bead".to_string(),
+            ".".to_string(),
+        );
         storage.create_issue(&issue2).unwrap();
 
         // Claim with 30 min TTL - should reclaim the stale one
-        let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, "worker_new", 30, Utc::now(), None)
-        }).unwrap();
+        let result = storage
+            .with_immediate_transaction(|tx| claim(tx, "worker_new", 30, Utc::now(), None))
+            .unwrap();
 
         assert!(result.is_some());
         let claim_result = result.unwrap();
@@ -593,7 +615,11 @@ mod tests {
 
         // Create 20 open beads
         for i in 0..20 {
-            let issue = Issue::new(format!("bf-{:0>4}", i), format!("Test bead {}", i), ".".to_string());
+            let issue = Issue::new(
+                format!("bf-{:0>4}", i),
+                format!("Test bead {}", i),
+                ".".to_string(),
+            );
             storage.create_issue(&issue).unwrap();
         }
 
@@ -606,9 +632,11 @@ mod tests {
             let claimed_clone = Arc::clone(&claimed_beads);
 
             let handle = thread::spawn(move || {
-                let result = storage_clone.with_immediate_transaction(|tx| {
-                    claim(tx, &format!("worker-{}", worker_id), 30, Utc::now(), None)
-                }).unwrap();
+                let result = storage_clone
+                    .with_immediate_transaction(|tx| {
+                        claim(tx, &format!("worker-{}", worker_id), 30, Utc::now(), None)
+                    })
+                    .unwrap();
 
                 if let Some(claim_result) = result {
                     let mut claimed = claimed_clone.lock().unwrap();
@@ -627,12 +655,22 @@ mod tests {
         let claimed = claimed_beads.lock().unwrap();
 
         // All 20 beads should be claimed exactly once
-        assert_eq!(claimed.len(), 20, "Expected 20 unique claims, got {}", claimed.len());
+        assert_eq!(
+            claimed.len(),
+            20,
+            "Expected 20 unique claims, got {}",
+            claimed.len()
+        );
 
         // No duplicates allowed
         let mut unique_beads = claimed.clone();
         unique_beads.sort();
         unique_beads.dedup();
-        assert_eq!(unique_beads.len(), 20, "Found duplicate claims: {:?}", claimed);
+        assert_eq!(
+            unique_beads.len(),
+            20,
+            "Found duplicate claims: {:?}",
+            claimed
+        );
     }
 }

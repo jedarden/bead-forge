@@ -76,22 +76,30 @@ fn check_database(db_path: &Path) -> Result<(usize, bool)> {
     let conn = Connection::open(db_path)?;
 
     // Apply schema if database is new (no tables yet)
-    let needs_schema: bool = conn.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='issues'",
-        [],
-        |row| row.get::<_, i64>(0),
-    ).map(|n| n == 0).unwrap_or(true);
+    let needs_schema: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='issues'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|n| n == 0)
+        .unwrap_or(true);
     if needs_schema {
         crate::storage::schema::apply_schema(&conn)?;
     }
 
     // Run PRAGMA integrity_check
-    let integrity_result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    let integrity_result: String =
+        conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
 
     let integrity_ok = integrity_result == "ok";
 
     // Count issues
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL", [], |row| row.get(0))?;
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
 
     Ok((count as usize, integrity_ok))
 }
@@ -130,7 +138,11 @@ fn check_jsonl(jsonl_path: &Path) -> Result<(usize, bool)> {
 /// Returns Some(count) if counts differ, None if they match.
 fn check_consistency(db_path: &Path, jsonl_path: &Path) -> Result<Option<usize>> {
     let conn = Connection::open(db_path)?;
-    let db_count: i64 = conn.query_row("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL", [], |row| row.get(0))?;
+    let db_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
 
     let jsonl_count = if jsonl_path.exists() {
         let iter = stream_issues(jsonl_path)?;
@@ -269,10 +281,7 @@ pub fn init_from_jsonl(workspace_dir: &Path, jsonl_path: &Path) -> Result<usize>
 
     // Check if JSONL exists
     if !jsonl_path.exists() {
-        return Err(anyhow!(
-            "JSONL file not found at {}",
-            jsonl_path.display()
-        ));
+        return Err(anyhow!("JSONL file not found at {}", jsonl_path.display()));
     }
 
     // Create new database and import JSONL
@@ -302,9 +311,17 @@ pub fn verify_schema(workspace_dir: &Path) -> Result<bool> {
 
     // Check for critical tables
     let tables = [
-        "issues", "dependencies", "labels", "comments", "events",
-        "config", "metadata", "dirty_issues", "export_hashes",
-        "blocked_issues_cache", "child_counters",
+        "issues",
+        "dependencies",
+        "labels",
+        "comments",
+        "events",
+        "config",
+        "metadata",
+        "dirty_issues",
+        "export_hashes",
+        "blocked_issues_cache",
+        "child_counters",
     ];
 
     for table in &tables {
@@ -327,8 +344,8 @@ pub fn verify_schema(workspace_dir: &Path) -> Result<bool> {
 mod tests {
     use super::*;
     use crate::config::init_workspace;
-    use crate::model::{Issue, Status, Priority, IssueType};
     use crate::jsonl::export_jsonl;
+    use crate::model::{Issue, IssueType, Priority, Status};
     use tempfile::TempDir;
 
     #[test]

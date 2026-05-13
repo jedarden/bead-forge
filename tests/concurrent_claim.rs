@@ -8,11 +8,11 @@ use bead_forge::claim::claim;
 use bead_forge::config::{init_workspace, load_metadata};
 use bead_forge::model::{Issue, Priority};
 use bead_forge::storage::Storage;
+use chrono::Utc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
-use chrono::Utc;
 
 /// Helper to set up a test workspace with N beads.
 fn setup_workspace_with_beads(num_beads: usize) -> (TempDir, Arc<Storage>) {
@@ -42,9 +42,9 @@ fn setup_workspace_with_beads(num_beads: usize) -> (TempDir, Arc<Storage>) {
 
 /// Claim a bead using the storage layer directly.
 fn claim_bead(storage: &Arc<Storage>, worker: &str) -> Option<bead_forge::claim::ClaimResult> {
-    storage.with_immediate_transaction(|tx| {
-        claim(tx, worker, 30, Utc::now(), None)
-    }).unwrap()
+    storage
+        .with_immediate_transaction(|tx| claim(tx, worker, 30, Utc::now(), None))
+        .unwrap()
 }
 
 #[test]
@@ -120,7 +120,10 @@ fn test_concurrent_claim_no_duplicates() {
         claimed_ids.len()
     );
 
-    println!("✓ Concurrent claim test passed: {} workers claimed {} beads with no duplicates", num_workers, num_beads);
+    println!(
+        "✓ Concurrent claim test passed: {} workers claimed {} beads with no duplicates",
+        num_workers, num_beads
+    );
 }
 
 #[test]
@@ -172,7 +175,11 @@ fn test_concurrent_claim_priority_ordering() {
     // All 5 beads should be claimed with unique priorities
     assert_eq!(priorities.len(), 5);
     let unique_priorities: std::collections::HashSet<_> = priorities.iter().cloned().collect();
-    assert_eq!(unique_priorities.len(), 5, "All priorities should be unique");
+    assert_eq!(
+        unique_priorities.len(),
+        5,
+        "All priorities should be unique"
+    );
 
     // The first claimed should have priority 0 (highest)
     assert!(priorities.contains(&0), "Priority 0 should be claimed");
@@ -243,10 +250,18 @@ fn test_concurrent_claim_stale_reclamation() {
     let stale1 = storage.get_issue("bf-0001").unwrap().unwrap();
 
     // At least one should be reclaimed to open or claimed by fresh-worker
-    let reclamation_happened = stale0.status.to_string() == "open" ||
-                                stale1.status.to_string() == "open" ||
-                                stale0.assignee.as_ref().map(|s| s == "fresh-worker").unwrap_or(false) ||
-                                stale1.assignee.as_ref().map(|s| s == "fresh-worker").unwrap_or(false);
+    let reclamation_happened = stale0.status.to_string() == "open"
+        || stale1.status.to_string() == "open"
+        || stale0
+            .assignee
+            .as_ref()
+            .map(|s| s == "fresh-worker")
+            .unwrap_or(false)
+        || stale1
+            .assignee
+            .as_ref()
+            .map(|s| s == "fresh-worker")
+            .unwrap_or(false);
 
     assert!(reclamation_happened, "Stale beads should be reclaimed");
 }

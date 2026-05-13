@@ -31,8 +31,9 @@ pub struct SyncResult {
 /// # Returns
 /// * `Ok(usize)` - Number of beads exported
 pub fn flush(workspace_dir: &Path) -> Result<usize> {
-    let beads_dir = find_beads_dir(workspace_dir)
-        .ok_or_else(|| anyhow::anyhow!("No .beads directory found in {}", workspace_dir.display()))?;
+    let beads_dir = find_beads_dir(workspace_dir).ok_or_else(|| {
+        anyhow::anyhow!("No .beads directory found in {}", workspace_dir.display())
+    })?;
     let metadata = load_metadata(&beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let jsonl_path = beads_dir.join(&metadata.jsonl_export);
@@ -65,8 +66,9 @@ pub fn flush(workspace_dir: &Path) -> Result<usize> {
 /// # Returns
 /// * `Ok(usize)` - Number of beads exported
 pub fn flush_dirty(workspace_dir: &Path) -> Result<usize> {
-    let beads_dir = find_beads_dir(workspace_dir)
-        .ok_or_else(|| anyhow::anyhow!("No .beads directory found in {}", workspace_dir.display()))?;
+    let beads_dir = find_beads_dir(workspace_dir).ok_or_else(|| {
+        anyhow::anyhow!("No .beads directory found in {}", workspace_dir.display())
+    })?;
     let metadata = load_metadata(&beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let jsonl_path = beads_dir.join(&metadata.jsonl_export);
@@ -106,8 +108,9 @@ pub fn flush_dirty(workspace_dir: &Path) -> Result<usize> {
 /// # Returns
 /// * `Ok(SyncResult)` - Import statistics
 pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
-    let beads_dir = find_beads_dir(workspace_dir)
-        .ok_or_else(|| anyhow::anyhow!("No .beads directory found in {}", workspace_dir.display()))?;
+    let beads_dir = find_beads_dir(workspace_dir).ok_or_else(|| {
+        anyhow::anyhow!("No .beads directory found in {}", workspace_dir.display())
+    })?;
     let metadata = load_metadata(&beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let jsonl_path = beads_dir.join(&metadata.jsonl_export);

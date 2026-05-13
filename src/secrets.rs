@@ -82,7 +82,10 @@ impl SecretScanner {
             match Regex::new(pattern) {
                 Ok(re) => scanner.allowlist.push(re),
                 Err(e) => {
-                    eprintln!("Warning: invalid allowlist regex pattern '{}': {}", pattern, e);
+                    eprintln!(
+                        "Warning: invalid allowlist regex pattern '{}': {}",
+                        pattern, e
+                    );
                 }
             }
         }
@@ -94,61 +97,113 @@ impl SecretScanner {
     fn built_in_patterns() -> Result<Vec<(&'static str, Regex)>, regex::Error> {
         Ok(vec![
             // AWS Access Key ID
-            ("AWS Access Key", Regex::new(r"(?i)(?:aws_access_key_id|aws.*key|access key)[\s=:]+[A-Z0-9]{20}")?),
-            ("AWS Access Key (AKIA)", Regex::new(r"\bAKIA[0-9A-Z]{16}\b")?),
-
+            (
+                "AWS Access Key",
+                Regex::new(r"(?i)(?:aws_access_key_id|aws.*key|access key)[\s=:]+[A-Z0-9]{20}")?,
+            ),
+            (
+                "AWS Access Key (AKIA)",
+                Regex::new(r"\bAKIA[0-9A-Z]{16}\b")?,
+            ),
             // AWS Secret Access Key
-            ("AWS Secret Key", Regex::new(r"(?i)(?:aws_secret_access_key|secret.*key)[\s=:]+[a-zA-Z0-9+/]{40}")?),
-
+            (
+                "AWS Secret Key",
+                Regex::new(r"(?i)(?:aws_secret_access_key|secret.*key)[\s=:]+[a-zA-Z0-9+/]{40}")?,
+            ),
             // Generic API tokens
             ("API Token (sk-)", Regex::new(r"\bsk-[a-zA-Z0-9]{20,}\b")?),
-            ("API Token (xoxb-)", Regex::new(r"\bxoxb-[0-9]{11,13}-[0-9]{11,13}-[a-zA-Z0-9]{24}\b")?),
+            (
+                "API Token (xoxb-)",
+                Regex::new(r"\bxoxb-[0-9]{11,13}-[0-9]{11,13}-[a-zA-Z0-9]{24}\b")?,
+            ),
             ("API Token (ghp_)", Regex::new(r"\bghp_[a-zA-Z0-9]{36}\b")?),
             ("API Token (gho_)", Regex::new(r"\bgho_[a-zA-Z0-9]{36}\b")?),
             ("API Token (ghu_)", Regex::new(r"\bghu_[a-zA-Z0-9]{36}\b")?),
             ("API Token (ghs_)", Regex::new(r"\bghs_[a-zA-Z0-9]{36}\b")?),
             ("API Token (ghr_)", Regex::new(r"\bghr_[a-zA-Z0-9]{36}\b")?),
-            ("API Token (github_pat_)", Regex::new(r"\bgithub_pat_[a-zA-Z0-9_]{82}\b")?),
-
+            (
+                "API Token (github_pat_)",
+                Regex::new(r"\bgithub_pat_[a-zA-Z0-9_]{82}\b")?,
+            ),
             // Private keys (PEM headers and base64 blocks)
-            ("RSA Private Key", Regex::new(r"-----BEGIN RSA PRIVATE KEY-----")?),
+            (
+                "RSA Private Key",
+                Regex::new(r"-----BEGIN RSA PRIVATE KEY-----")?,
+            ),
             ("Private Key", Regex::new(r"-----BEGIN PRIVATE KEY-----")?),
-            ("EC Private Key", Regex::new(r"-----BEGIN EC PRIVATE KEY-----")?),
-            ("OpenSSH Private Key", Regex::new(r"-----BEGIN OPENSSH PRIVATE KEY-----")?),
-
+            (
+                "EC Private Key",
+                Regex::new(r"-----BEGIN EC PRIVATE KEY-----")?,
+            ),
+            (
+                "OpenSSH Private Key",
+                Regex::new(r"-----BEGIN OPENSSH PRIVATE KEY-----")?,
+            ),
             // JWT tokens
-            ("JWT Token", Regex::new(r"\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b")?),
-
+            (
+                "JWT Token",
+                Regex::new(r"\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b")?,
+            ),
             // Bearer tokens
-            ("Bearer Token", Regex::new(r"(?i)bearer\s+[a-zA-Z0-9_\-\.~+/]+")?),
-
+            (
+                "Bearer Token",
+                Regex::new(r"(?i)bearer\s+[a-zA-Z0-9_\-\.~+/]+")?,
+            ),
             // Database connection strings
-            ("PostgreSQL URL", Regex::new(r"(?i)postgresql://[^\s]+:[^\s]+@[^\s]+")?),
-            ("MySQL URL", Regex::new(r"(?i)mysql://[^\s]+:[^\s]+@[^\s]+")?),
-            ("MongoDB URL", Regex::new(r"(?i)mongodb(?:\+srv)://[^\s]+:[^\s]+@[^\s]+")?),
-
+            (
+                "PostgreSQL URL",
+                Regex::new(r"(?i)postgresql://[^\s]+:[^\s]+@[^\s]+")?,
+            ),
+            (
+                "MySQL URL",
+                Regex::new(r"(?i)mysql://[^\s]+:[^\s]+@[^\s]+")?,
+            ),
+            (
+                "MongoDB URL",
+                Regex::new(r"(?i)mongodb(?:\+srv)://[^\s]+:[^\s]+@[^\s]+")?,
+            ),
             // API keys in query parameters
-            ("API Key in URL", Regex::new(r"[?&](?:api[_-]?key|apikey|token|auth)[\s=]+[a-zA-Z0-9_\-]{16,}")?),
-
+            (
+                "API Key in URL",
+                Regex::new(r"[?&](?:api[_-]?key|apikey|token|auth)[\s=]+[a-zA-Z0-9_\-]{16,}")?,
+            ),
             // Stripe keys
-            ("Stripe Key", Regex::new(r"\bsk_(?:live|test)_[a-zA-Z0-9]{24,}\b")?),
-            ("Stripe Publishable Key", Regex::new(r"\bpk_(?:live|test)_[a-zA-Z0-9]{24,}\b")?),
-
+            (
+                "Stripe Key",
+                Regex::new(r"\bsk_(?:live|test)_[a-zA-Z0-9]{24,}\b")?,
+            ),
+            (
+                "Stripe Publishable Key",
+                Regex::new(r"\bpk_(?:live|test)_[a-zA-Z0-9]{24,}\b")?,
+            ),
             // SendGrid keys
-            ("SendGrid Key", Regex::new(r"\bSG\.[a-zA-Z0-9_-]{22,}\.[a-zA-Z0-9_-]{43,}\b")?),
-
+            (
+                "SendGrid Key",
+                Regex::new(r"\bSG\.[a-zA-Z0-9_-]{22,}\.[a-zA-Z0-9_-]{43,}\b")?,
+            ),
             // Slack webhooks
-            ("Slack Webhook", Regex::new(r"\bhttps://hooks\.slack\.com/services/T[A-Z0-9]{8}/B[A-Z0-9]{8}/[a-zA-Z0-9]{24}\b")?),
-
+            (
+                "Slack Webhook",
+                Regex::new(
+                    r"\bhttps://hooks\.slack\.com/services/T[A-Z0-9]{8}/B[A-Z0-9]{8}/[a-zA-Z0-9]{24}\b",
+                )?,
+            ),
             // Google Cloud credentials
-            ("Google Cloud Key", Regex::new(r#""type":\s*"service_account""#)?),
-            ("Google OAuth", Regex::new(r"\b[0-9]+-[a-zA-Z0-9_]{32}\.apps\.googleusercontent\.com\b")?),
-
+            (
+                "Google Cloud Key",
+                Regex::new(r#""type":\s*"service_account""#)?,
+            ),
+            (
+                "Google OAuth",
+                Regex::new(r"\b[0-9]+-[a-zA-Z0-9_]{32}\.apps\.googleusercontent\.com\b")?,
+            ),
             // Azure keys
             ("Azure Key", Regex::new(r"[a-zA-Z0-9/_-]{44}")?),
-
             // Password fields (common patterns)
-            ("Password in Key", Regex::new(r"(?i)(?:password|passwd|pwd)[\s':=]+[^\s]{4,}")?),
+            (
+                "Password in Key",
+                Regex::new(r"(?i)(?:password|passwd|pwd)[\s':=]+[^\s]{4,}")?,
+            ),
         ])
     }
 

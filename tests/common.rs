@@ -74,8 +74,9 @@ impl TempWorkspace {
         let ws = Self::new()?;
         let fixture_path = PathBuf::from("tests/fixtures").join(fixture_name);
 
-        let fixture_content = fs::read_to_string(&fixture_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read fixture {}: {}", fixture_path.display(), e))?;
+        let fixture_content = fs::read_to_string(&fixture_path).map_err(|e| {
+            anyhow::anyhow!("Failed to read fixture {}: {}", fixture_path.display(), e)
+        })?;
 
         fs::write(&ws.jsonl_path, fixture_content)?;
         Ok(ws)
@@ -183,7 +184,8 @@ pub fn assert_jsonl_eq(jsonl1: &str, jsonl2: &str) -> anyhow::Result<()> {
     if issue1 != issue2 {
         anyhow::bail!(
             "JSONL mismatch:\n  Expected: {}\n  Got:      {}",
-            jsonl1, jsonl2
+            jsonl1,
+            jsonl2
         );
     }
     Ok(())

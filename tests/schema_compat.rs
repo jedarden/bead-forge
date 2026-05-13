@@ -20,7 +20,8 @@ fn test_schema_matches_br_column_order() {
     // Get the column list from pragma_table_info
     let columns: Vec<(String, String)> = storage
         .with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT name, type FROM pragma_table_info('issues') ORDER BY cid")?;
+            let mut stmt =
+                tx.prepare("SELECT name, type FROM pragma_table_info('issues') ORDER BY cid")?;
             let mut rows = stmt.query([])?;
             let mut cols = Vec::new();
             while let Some(row) = rows.next()? {
@@ -116,11 +117,7 @@ fn test_bf_tables_dont_interfere_with_br() {
                 )?)
             })
             .unwrap();
-        assert!(
-            exists,
-            "bf-specific table '{}' should exist",
-            table
-        );
+        assert!(exists, "bf-specific table '{}' should exist", table);
     }
 
     // br's core tables should exist with correct structure
@@ -146,11 +143,7 @@ fn test_bf_tables_dont_interfere_with_br() {
                 )?)
             })
             .unwrap();
-        assert!(
-            exists,
-            "br core table '{}' should exist",
-            table
-        );
+        assert!(exists, "br core table '{}' should exist", table);
     }
 }
 
@@ -195,8 +188,10 @@ fn test_bf_annotations_dont_pollute_issues_table() {
         "Annotated".to_string(),
         ".".to_string(),
     );
-    bead.annotations.insert("key1".to_string(), "value1".to_string());
-    bead.annotations.insert("key2".to_string(), "value2".to_string());
+    bead.annotations
+        .insert("key1".to_string(), "value1".to_string());
+    bead.annotations
+        .insert("key2".to_string(), "value2".to_string());
 
     let storage = ws.storage().unwrap();
     storage.create_issue(&bead).unwrap();
@@ -218,7 +213,10 @@ fn test_bf_annotations_dont_pollute_issues_table() {
         })
         .unwrap();
 
-    assert!(!has_annotations_col, "issues table should NOT have annotations column");
+    assert!(
+        !has_annotations_col,
+        "issues table should NOT have annotations column"
+    );
 }
 
 #[test]
@@ -246,9 +244,7 @@ fn test_bf_worker_sessions_table_structure() {
     // Query the session back
     let sessions: Vec<(String, Option<String>, Option<String>)> = storage
         .with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare(
-                "SELECT worker_id, model, harness FROM worker_sessions"
-            )?;
+            let mut stmt = tx.prepare("SELECT worker_id, model, harness FROM worker_sessions")?;
             let mut rows = stmt.query([])?;
             let mut result = Vec::new();
             while let Some(row) = rows.next()? {
@@ -296,9 +292,8 @@ fn test_bf_velocity_stats_table_structure() {
     // Query the stats back
     let stats: Vec<(String, String, String, i64)> = storage
         .with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare(
-                "SELECT model, harness, issue_type, sample_count FROM velocity_stats"
-            )?;
+            let mut stmt =
+                tx.prepare("SELECT model, harness, issue_type, sample_count FROM velocity_stats")?;
             let mut rows = stmt.query([])?;
             let mut result = Vec::new();
             while let Some(row) = rows.next()? {
@@ -322,27 +317,29 @@ fn test_migration_lock_table_structure() {
     let storage = ws.storage().unwrap();
 
     // Try to insert multiple rows - should fail due to CHECK constraint
-    let result: Result<(), anyhow::Error> = storage
-        .with_immediate_transaction(|tx| {
-            use chrono::Utc;
+    let result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+        use chrono::Utc;
 
-            tx.execute(
-                "INSERT INTO migration_lock (id, locked_by, locked_at, expires_at)
+        tx.execute(
+            "INSERT INTO migration_lock (id, locked_by, locked_at, expires_at)
                  VALUES (1, 'worker-1', ?, ?)",
-                [Utc::now().to_rfc3339(), Utc::now().to_rfc3339()],
-            )?;
+            [Utc::now().to_rfc3339(), Utc::now().to_rfc3339()],
+        )?;
 
-            // This should fail due to PRIMARY KEY CHECK(id = 1)
-            tx.execute(
-                "INSERT INTO migration_lock (id, locked_by, locked_at, expires_at)
+        // This should fail due to PRIMARY KEY CHECK(id = 1)
+        tx.execute(
+            "INSERT INTO migration_lock (id, locked_by, locked_at, expires_at)
                  VALUES (1, 'worker-2', ?, ?)",
-                [Utc::now().to_rfc3339(), Utc::now().to_rfc3339()],
-            )?;
+            [Utc::now().to_rfc3339(), Utc::now().to_rfc3339()],
+        )?;
 
-            Ok(())
-        });
+        Ok(())
+    });
 
-    assert!(result.is_err(), "Should fail to insert second migration lock row");
+    assert!(
+        result.is_err(),
+        "Should fail to insert second migration lock row"
+    );
 }
 
 #[test]
@@ -352,14 +349,13 @@ fn test_foreign_keys_enforced() {
     let storage = ws.storage().unwrap();
 
     // Try to insert a label for non-existent issue - should fail
-    let result: Result<(), anyhow::Error> = storage
-        .with_immediate_transaction(|tx| {
-            tx.execute(
-                "INSERT INTO labels (issue_id, label) VALUES (?, ?)",
-                ["non-existent", "bug"],
-            )?;
-            Ok(())
-        });
+    let result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+        tx.execute(
+            "INSERT INTO labels (issue_id, label) VALUES (?, ?)",
+            ["non-existent", "bug"],
+        )?;
+        Ok(())
+    });
 
     // Note: rusqlite may not enforce FKs by default, so this might not fail
     // but the schema should have the FK defined
@@ -404,7 +400,8 @@ fn test_critical_path_cache_table_structure() {
         .with_immediate_transaction(|tx| {
             tx.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| {
                 row.get(0)
-            }).map_err(|e| anyhow::anyhow!(e))
+            })
+            .map_err(|e| anyhow::anyhow!(e))
         })
         .unwrap();
 
@@ -412,7 +409,9 @@ fn test_critical_path_cache_table_structure() {
     // but the table structure should be correct
     let columns: Vec<String> = storage
         .with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT name FROM pragma_table_info('critical_path_cache') ORDER BY cid")?;
+            let mut stmt = tx.prepare(
+                "SELECT name FROM pragma_table_info('critical_path_cache') ORDER BY cid",
+            )?;
             let mut rows = stmt.query([])?;
             let mut cols = Vec::new();
             while let Some(row) = rows.next()? {
@@ -467,15 +466,12 @@ fn test_indexes_created() {
                     "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name=?",
                     &[index_name],
                     |row| row.get::<_, i64>(0).map(|n| n > 0),
-                ).map_err(|e| anyhow::anyhow!(e))
+                )
+                .map_err(|e| anyhow::anyhow!(e))
             })
             .unwrap();
 
-        assert!(
-            exists,
-            "Expected index '{}' should exist",
-            index_name
-        );
+        assert!(exists, "Expected index '{}' should exist", index_name);
     }
 }
 

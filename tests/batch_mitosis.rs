@@ -25,7 +25,11 @@ fn test_mitosis_atomic_batch() {
 
     // Create parent bead
     let parent_id = "bf-parent".to_string();
-    let parent = Issue::new(parent_id.clone(), "Parent task".to_string(), ".".to_string());
+    let parent = Issue::new(
+        parent_id.clone(),
+        "Parent task".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&parent).unwrap();
 
     // Verify parent exists and is open
@@ -53,12 +57,12 @@ fn test_mitosis_atomic_batch() {
         // Use placeholder references @0 and @1 for the created children
         // For mitosis: children block the parent (parent depends on children)
         BatchOp::DepAddBlocker {
-            parent: "@0".to_string(),      // first created child (blocks)
-            child: parent_id.clone(),      // parent is blocked
+            parent: "@0".to_string(), // first created child (blocks)
+            child: parent_id.clone(), // parent is blocked
         },
         BatchOp::DepAddBlocker {
-            parent: "@1".to_string(),      // second created child (blocks)
-            child: parent_id.clone(),      // parent is blocked
+            parent: "@1".to_string(), // second created child (blocks)
+            child: parent_id.clone(), // parent is blocked
         },
         BatchOp::Close {
             id: parent_id.clone(),
@@ -115,7 +119,11 @@ fn test_batch_rollback_on_error() {
 
     // Create parent bead
     let parent_id = "bf-parent".to_string();
-    let parent = Issue::new(parent_id.clone(), "Parent task".to_string(), ".".to_string());
+    let parent = Issue::new(
+        parent_id.clone(),
+        "Parent task".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&parent).unwrap();
 
     // Count beads before
@@ -144,7 +152,10 @@ fn test_batch_rollback_on_error() {
 
     // Verify no partial state: bead count should be unchanged
     let after_count = storage.list_issues(&IssueFilter::default()).unwrap().len();
-    assert_eq!(before_count, after_count, "Batch should have rolled back completely");
+    assert_eq!(
+        before_count, after_count,
+        "Batch should have rolled back completely"
+    );
 }
 
 /// Test that mitosis() produces BatchOps with correct @-reference placeholders.
@@ -209,7 +220,11 @@ fn test_cli_batch_json_at_references() {
 
     // Create the parent bead via the storage API
     let parent_id = "bf-parent";
-    let parent = Issue::new(parent_id.to_string(), "Parent task".to_string(), ".".to_string());
+    let parent = Issue::new(
+        parent_id.to_string(),
+        "Parent task".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&parent).unwrap();
     drop(storage); // release the connection before the subprocess opens it
 
@@ -246,15 +261,16 @@ fn test_cli_batch_json_at_references() {
 
     // Parent should be closed
     let parent = storage.get_issue(parent_id).unwrap().unwrap();
-    assert_eq!(parent.status.to_string(), "closed", "parent should be closed after mitosis");
+    assert_eq!(
+        parent.status.to_string(),
+        "closed",
+        "parent should be closed after mitosis"
+    );
     assert_eq!(parent.close_reason.as_deref(), Some("Split via CLI batch"));
 
     // Two children should have been created and are open
     let all_issues = storage.list_all_issues().unwrap();
-    let children: Vec<_> = all_issues
-        .iter()
-        .filter(|i| i.id != parent_id)
-        .collect();
+    let children: Vec<_> = all_issues.iter().filter(|i| i.id != parent_id).collect();
     assert_eq!(children.len(), 2, "expected exactly 2 child beads");
 
     let titles: Vec<&str> = children.iter().map(|i| i.title.as_str()).collect();
@@ -272,7 +288,11 @@ fn test_cli_batch_json_at_references() {
 
     // Both children should appear as blockers in the parent's dependencies
     let parent_deps = storage.get_dependencies(parent_id).unwrap();
-    assert_eq!(parent_deps.len(), 2, "parent should have 2 blocking dependencies");
+    assert_eq!(
+        parent_deps.len(),
+        2,
+        "parent should have 2 blocking dependencies"
+    );
 
     let child_ids: Vec<&str> = children.iter().map(|i| i.id.as_str()).collect();
     for dep in &parent_deps {

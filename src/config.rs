@@ -1,7 +1,7 @@
+use crate::secrets::SecretProtectionConfig;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use anyhow::Result;
-use crate::secrets::SecretProtectionConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -186,7 +186,11 @@ pub fn load_metadata(beads_dir: &Path) -> Result<Metadata> {
 }
 
 pub fn get_default_prefix(config: &Config) -> &str {
-    config.issue_prefixes.first().map(|s| s.as_str()).unwrap_or("bf")
+    config
+        .issue_prefixes
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("bf")
 }
 
 /// Initialize a new workspace directory with default config and metadata.

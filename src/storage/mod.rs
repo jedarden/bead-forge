@@ -1,4 +1,4 @@
 pub mod schema;
 pub mod sqlite;
 
-pub use sqlite::{DepTreeNode, Storage, Stats};
+pub use sqlite::{DepTreeNode, Stats, Storage};

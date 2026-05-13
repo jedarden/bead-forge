@@ -30,9 +30,9 @@ pub struct CriticalPathResult {
 pub struct BeadFloat {
     pub bead_id: String,
     pub epic_id: Option<String>,
-    pub es: i64,  // earliest start
-    pub ls: i64,  // latest start
-    pub float: i64,  // ls - es
+    pub es: i64,    // earliest start
+    pub ls: i64,    // latest start
+    pub float: i64, // ls - es
 }
 
 /// Invalidate the critical path cache.
@@ -97,7 +97,9 @@ pub fn compute_all_critical_paths(tx: &Connection) -> Result<CriticalPathResult>
     loop {
         iteration += 1;
         if iteration > max_iterations {
-            return Err(anyhow::anyhow!("Forward pass: too many iterations, possible cycle"));
+            return Err(anyhow::anyhow!(
+                "Forward pass: too many iterations, possible cycle"
+            ));
         }
 
         // Find beads whose all dependencies are already computed
@@ -148,7 +150,9 @@ pub fn compute_all_critical_paths(tx: &Connection) -> Result<CriticalPathResult>
     loop {
         iteration += 1;
         if iteration > max_iterations {
-            return Err(anyhow::anyhow!("Backward pass: too many iterations, possible cycle"));
+            return Err(anyhow::anyhow!(
+                "Backward pass: too many iterations, possible cycle"
+            ));
         }
 
         let affected = tx.execute(
@@ -280,16 +284,12 @@ pub fn compute_all_critical_paths(tx: &Connection) -> Result<CriticalPathResult>
 /// Find the longest chain through critical path beads.
 ///
 /// Traces back from leaves to root through zero-float beads.
-fn find_longest_chain(
-    tx: &Connection,
-    critical_beads: &[String],
-) -> Result<Vec<String>> {
+fn find_longest_chain(tx: &Connection, critical_beads: &[String]) -> Result<Vec<String>> {
     if critical_beads.is_empty() {
         return Ok(Vec::new());
     }
 
-    let critical_set: std::collections::HashSet<&String> =
-        critical_beads.iter().collect();
+    let critical_set: std::collections::HashSet<&String> = critical_beads.iter().collect();
 
     // Find leaf beads (zero float, no blocking dependents or dependents are closed)
     let mut leaf_candidates: Vec<String> = Vec::new();
@@ -332,7 +332,7 @@ fn find_longest_chain(
                   AND c.float = 0
                 ORDER BY c.es DESC
                 LIMIT 1
-                "#
+                "#,
             )?;
             let mut rows = stmt.query(params![&current])?;
             if let Some(row) = rows.next()? {
@@ -370,7 +370,9 @@ fn find_longest_chain(
 /// * `Ok(CriticalPathResult)` - Results for this epic
 pub fn compute_epic_critical_path(tx: &Connection, epic_id: &str) -> Result<CriticalPathResult> {
     // First, check if cache is populated. If not, compute all paths.
-    let cache_count: i64 = tx.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| row.get(0))?;
+    let cache_count: i64 = tx.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| {
+        row.get(0)
+    })?;
     if cache_count == 0 {
         compute_all_critical_paths(tx)?;
     }
@@ -425,8 +427,8 @@ pub fn compute_epic_critical_path(tx: &Connection, epic_id: &str) -> Result<Crit
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::schema::{apply_schema, ensure_wal_mode};
     use crate::model::Status;
+    use crate::storage::schema::{apply_schema, ensure_wal_mode};
 
     fn setup_test_db() -> (tempfile::NamedTempFile, Connection) {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -500,12 +502,18 @@ mod tests {
         // In a diamond with equal-length paths, all beads are on critical path.
         // A (ES=0, LS=0), B (ES=1, LS=1), C (ES=1, LS=1), D (ES=2, LS=2)
         // All have float = 0 because they're all required for the minimum completion time.
-        let critical: Vec<&str> = result.beads.iter()
+        let critical: Vec<&str> = result
+            .beads
+            .iter()
             .filter(|b| b.float == 0)
             .map(|b| b.bead_id.as_str())
             .collect();
 
-        assert_eq!(critical.len(), 4, "All beads in diamond should be on critical path");
+        assert_eq!(
+            critical.len(),
+            4,
+            "All beads in diamond should be on critical path"
+        );
         assert!(critical.contains(&"bf-a"));
         assert!(critical.contains(&"bf-b"));
         assert!(critical.contains(&"bf-c"));
@@ -513,7 +521,11 @@ mod tests {
 
         // All beads should have float = 0 in equal-length diamond
         for bead in &result.beads {
-            assert_eq!(bead.float, 0, "{} should have float 0 in equal-length diamond", bead.bead_id);
+            assert_eq!(
+                bead.float, 0,
+                "{} should have float 0 in equal-length diamond",
+                bead.bead_id
+            );
         }
     }
 
@@ -543,7 +555,9 @@ mod tests {
 
         // A, C, D, E are on the critical path through C-F (longer path)
         // B should have float since it's on the shorter A-B-D-E path
-        let critical: Vec<&str> = result.beads.iter()
+        let critical: Vec<&str> = result
+            .beads
+            .iter()
             .filter(|b| b.float == 0)
             .map(|b| b.bead_id.as_str())
             .collect();
@@ -579,14 +593,22 @@ mod tests {
         compute_all_critical_paths(&conn).unwrap();
 
         // Verify cache is populated
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| row.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         assert_eq!(count, 2);
 
         // Invalidate cache
         invalidate_cache(&conn).unwrap();
 
         // Verify cache is cleared
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| row.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         assert_eq!(count, 0);
     }
 }

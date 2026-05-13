@@ -8,11 +8,11 @@
 
 mod common;
 
+use chrono::Utc;
+use rand;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration as StdDuration;
-use chrono::Utc;
-use rand;
 
 #[test]
 fn test_thundering_herd_20_workers_no_duplicates() {
@@ -51,7 +51,13 @@ fn test_thundering_herd_20_workers_no_duplicates() {
             thread::sleep(StdDuration::from_micros(delay));
 
             let result = storage_clone.with_immediate_transaction(|tx| {
-                bead_forge::claim::claim(tx, &format!("worker-{:02}", worker_id), 30, Utc::now(), None)
+                bead_forge::claim::claim(
+                    tx,
+                    &format!("worker-{:02}", worker_id),
+                    30,
+                    Utc::now(),
+                    None,
+                )
             });
 
             match result {
@@ -111,7 +117,10 @@ fn test_thundering_herd_20_workers_no_duplicates() {
         claimed_ids.len()
     );
 
-    println!("✓ Thundering herd test passed: {} workers claimed {} beads with zero duplicates", num_workers, num_beads);
+    println!(
+        "✓ Thundering herd test passed: {} workers claimed {} beads with zero duplicates",
+        num_workers, num_beads
+    );
 }
 
 #[test]
@@ -156,7 +165,7 @@ fn test_concurrent_claim_priority_preserved() {
                     if let Ok(priority) = tx.query_row(
                         "SELECT priority FROM issues WHERE id = ?",
                         [&claimed.bead_id],
-                        |row| row.get::<_, i32>(0)
+                        |row| row.get::<_, i32>(0),
                     ) {
                         let mut priorities = priorities_clone.lock().unwrap();
                         priorities.push(priority);
@@ -186,7 +195,11 @@ fn test_concurrent_claim_priority_preserved() {
 
     // Verify we got 2 of each priority (0-4)
     for i in 0..5 {
-        assert_eq!(counts[i], 2, "Should have claimed 2 beads of priority {}", i);
+        assert_eq!(
+            counts[i], 2,
+            "Should have claimed 2 beads of priority {}",
+            i
+        );
     }
 
     println!("✓ Priority preserved under concurrency: {:?}", counts);
@@ -252,8 +265,14 @@ fn test_concurrent_claim_with_dependencies() {
 
     // Parent and unrelated should be claimable, child should not
     assert_eq!(claimed_ids.len(), 2);
-    assert!(!claimed_ids.contains(&"bf-child".to_string()), "Child bead should not be claimed (blocked by parent)");
-    assert!(claimed_ids.contains(&"bf-parent".to_string()) || claimed_ids.contains(&"bf-unrelated".to_string()));
+    assert!(
+        !claimed_ids.contains(&"bf-child".to_string()),
+        "Child bead should not be claimed (blocked by parent)"
+    );
+    assert!(
+        claimed_ids.contains(&"bf-parent".to_string())
+            || claimed_ids.contains(&"bf-unrelated".to_string())
+    );
 }
 
 #[test]
@@ -263,7 +282,8 @@ fn test_concurrent_stale_reclamation() {
 
     // Create beads
     for i in 0..5 {
-        ws.create_bead(&format!("bf-{:0>2}", i), &format!("Bead {}", i)).unwrap();
+        ws.create_bead(&format!("bf-{:0>2}", i), &format!("Bead {}", i))
+            .unwrap();
     }
 
     let storage = Arc::new(ws.storage().unwrap());
@@ -318,14 +338,25 @@ fn test_concurrent_stale_reclamation() {
     let count = claimed_count.lock().unwrap();
 
     // All 5 beads should be claimed (2 stale + 3 open)
-    assert_eq!(*count, 5, "All beads including stale ones should be claimed");
+    assert_eq!(
+        *count, 5,
+        "All beads including stale ones should be claimed"
+    );
 
     // Verify stale beads were reclaimed
     let bead_00 = ws.get_bead("bf-00").unwrap().unwrap();
     let bead_01 = ws.get_bead("bf-01").unwrap().unwrap();
 
-    let stale_reclaimed = bead_00.assignee.as_ref().map(|s| s.starts_with("worker-")).unwrap_or(false)
-        || bead_01.assignee.as_ref().map(|s| s.starts_with("worker-")).unwrap_or(false)
+    let stale_reclaimed = bead_00
+        .assignee
+        .as_ref()
+        .map(|s| s.starts_with("worker-"))
+        .unwrap_or(false)
+        || bead_01
+            .assignee
+            .as_ref()
+            .map(|s| s.starts_with("worker-"))
+            .unwrap_or(false)
         || bead_00.status.to_string() == "open"
         || bead_01.status.to_string() == "open";
 
@@ -377,7 +408,10 @@ fn test_concurrent_claim_empty_workspace() {
     let claims = successful_claims.lock().unwrap();
 
     assert_eq!(*attempts, 10);
-    assert_eq!(*claims, 0, "No beads should be claimed from empty workspace");
+    assert_eq!(
+        *claims, 0,
+        "No beads should be claimed from empty workspace"
+    );
 }
 
 #[test]
@@ -387,7 +421,8 @@ fn test_rapid_claim_release_cycle() {
 
     // Create 10 beads
     for i in 0..10 {
-        ws.create_bead(&format!("bf-cycle-{}", i), &format!("Cycle {}", i)).unwrap();
+        ws.create_bead(&format!("bf-cycle-{}", i), &format!("Cycle {}", i))
+            .unwrap();
     }
 
     let storage = Arc::new(ws.storage().unwrap());
@@ -446,7 +481,10 @@ fn test_rapid_claim_release_cycle() {
     let count = completed_count.lock().unwrap();
 
     // Up to 10 beads can be closed (5 workers * 2 cycles each, but limited by bead count)
-    assert!(*count <= 10 && *count > 0, "Should complete between 1 and 10 beads");
+    assert!(
+        *count <= 10 && *count > 0,
+        "Should complete between 1 and 10 beads"
+    );
     println!("✓ Rapid claim-release cycle: {} beads completed", *count);
 }
 
@@ -587,7 +625,8 @@ fn test_high_frequency_claim_attempts() {
 
     // Create 5 beads
     for i in 0..5 {
-        ws.create_bead(&format!("bf-stress{}", i), &format!("Stress {}", i)).unwrap();
+        ws.create_bead(&format!("bf-stress{}", i), &format!("Stress {}", i))
+            .unwrap();
     }
 
     let storage = Arc::new(ws.storage().unwrap());
