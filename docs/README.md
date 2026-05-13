@@ -441,10 +441,43 @@ This enables velocity-aware routing (see §Velocity-Aware Scoring above).
 
 ## Build & Deploy
 
-Built via Argo Workflows on `iad-ci`. WorkflowTemplate: `bead-forge-build` in `jedarden/declarative-config`.
+### Local Build
 
 ```bash
+# Clone and build
+git clone https://github.com/jedarden/bead-forge.git
+cd bead-forge
+cargo build --release
+
 # Install
+cp target/release/bf ~/.local/bin/bf
+chmod +x ~/.local/bin/bf
+
+# Drop-in replace br
+ln -sf ~/.local/bin/bf ~/.local/bin/br
+
+# Verify
+bf --help
+bf list
+br list  # should work identically
+```
+
+### CI/CD Deployment
+
+Built via Argo Workflows on `iad-ci`. WorkflowTemplate: `bead-forge-build` in `jedarden/declarative-config`.
+
+**Deployment steps (automated by WorkflowTemplate):**
+
+1. **Build**: `cargo build --release` produces `target/release/bf` (7.4M optimized binary)
+2. **Package**: Upload binary to GitHub Releases as `bf-linux-x86_64`
+3. **Install**: Download and install to `~/.local/bin/bf`
+4. **Symlink**: Create `~/.local/bin/br → bf` symlink for drop-in replacement
+5. **Verify**: Test `bf list` and `br list` in a NEEDLE workspace
+
+**Manual installation from release:**
+
+```bash
+# Download latest release
 curl -L https://github.com/jedarden/bead-forge/releases/latest/download/bf-linux-x86_64 \
   -o ~/.local/bin/bf && chmod +x ~/.local/bin/bf
 
@@ -452,7 +485,17 @@ curl -L https://github.com/jedarden/bead-forge/releases/latest/download/bf-linux
 ln -sf ~/.local/bin/bf ~/.local/bin/br
 
 # Verify
-bf --version
-bf init --prefix bf
-bf create "first bead" --type task
+bf list
+br list  # should work identically
 ```
+
+**Verification in NEEDLE workspace:**
+
+```bash
+# In any NEEDLE workspace (e.g., /home/coding/NEEDLE)
+cd /home/coding/NEEDLE
+br list  # should use bf binary via symlink
+bf list  # direct call
+```
+
+Both commands should produce identical output, confirming the symlink works correctly.
