@@ -802,3 +802,127 @@ fn integration_secret_in_acceptance_criteria_is_blocked() {
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "JWT in acceptance_criteria must be blocked");
 }
+
+// Additional built-in pattern coverage ───────────────────────────────────────────
+
+#[test]
+fn integration_refuses_aws_secret_access_key() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-aws-secret",
+        "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject AWS Secret Access Key");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("AWS Secret Key"), "error must name the AWS Secret Key pattern: {err}");
+}
+
+// NOTE: Slack xoxb- token test removed because any pattern matching the
+// real format triggers GitHub push protection, even with fake values.
+// The pattern is tested by src/secrets.rs unit tests.
+
+#[test]
+fn integration_refuses_github_pat_token() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    // github_pat_ with 82 chars
+    let issue = issue_with_description(
+        "bf-gh-pat",
+        "GITHUB_TOKEN=github_pat_1234567890abcdefghijklmnopqrstuvxyz1234567890ABCDEFGHIJKLMNOPQRSTUV",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject GitHub PAT token");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("github_pat_"), "error must name the github_pat_ pattern: {err}");
+}
+
+// NOTE: Stripe key test removed because any pattern matching the real format
+// triggers GitHub push protection, even with fake values. The pattern is
+// tested by src/secrets.rs unit tests.
+
+#[test]
+fn integration_refuses_bearer_token() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-bearer",
+        "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject Bearer token");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("Bearer"), "error must name the Bearer pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_postgresql_url() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-pg-url",
+        "DATABASE_URL=postgresql://user:secretPassword@localhost:5432/mydb",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject PostgreSQL URL with password");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("PostgreSQL"), "error must name the PostgreSQL pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_sendgrid_key() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    // SG. with 22+ and 43+ chars
+    let issue = issue_with_description(
+        "bf-sendgrid",
+        "SENDGRID_API_KEY=SG.AbcDefGhIjKlMnOpQrStUv123456.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEfGhIjKlMn",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject SendGrid key");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("SendGrid"), "error must name the SendGrid pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_google_cloud_service_account() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-gcp-sa",
+        "GCLOUD_KEY={\"type\": \"service_account\", \"project_id\": \"my-project\"}",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject Google Cloud service account key");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("Google Cloud"), "error must name the Google Cloud pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_password_field_pattern() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-password-field",
+        "Config: password=MySecretPassword123",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject password field pattern");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("Password"), "error must name the Password pattern: {err}");
+}
