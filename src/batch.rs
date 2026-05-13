@@ -537,6 +537,10 @@ fn parse_close(input: &str) -> Result<BatchOp> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::Status;
+    use crate::id::generate_id;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_resolve_reference_placeholder() {
@@ -564,5 +568,253 @@ mod tests {
     fn test_resolve_reference_empty_created_ids() {
         let created_ids: Vec<String> = vec![];
         assert_eq!(resolve_reference("@0", &created_ids), "@0");
+    }
+
+    #[test]
+    fn test_mitosis_placeholder_references_end_to_end() {
+        // Create a temporary workspace
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        // Create config and metadata
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(&config_path, "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n").unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(&metadata_path, r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#).unwrap();
+
+        // Initialize storage
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create a parent bead
+        let parent_id = generate_id("bf", 0);
+        let mut parent = Issue::new(parent_id.clone(), "Parent task to split".to_string(), ".".to_string());
+        parent.issue_type = IssueType::Task;
+        parent.priority = Priority(1);
+
+        storage.with_immediate_transaction(|tx| {
+            tx.execute(
+                "INSERT INTO issues (
+                    id, content_hash, title, description, design, acceptance_criteria, notes,
+                    status, priority, issue_type, assignee, owner, estimated_minutes,
+                    created_at, created_by, updated_at, closed_at, close_reason,
+                    closed_by_session, due_at, defer_until, external_ref, source_system,
+                    source_repo, deleted_at, deleted_by, delete_reason, original_type,
+                    compaction_level, compacted_at, compacted_at_commit, original_size,
+                    sender, ephemeral, pinned, is_template
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+                          ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27,
+                          ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36)",
+                rusqlite::params![
+                    &parent.id,
+                    &parent.content_hash,
+                    &parent.title,
+                    parent.description.as_deref().unwrap_or(""),
+                    parent.design.as_deref().unwrap_or(""),
+                    parent.acceptance_criteria.as_deref().unwrap_or(""),
+                    parent.notes.as_deref().unwrap_or(""),
+                    parent.status.to_string(),
+                    &parent.priority,
+                    parent.issue_type.to_string(),
+                    &parent.assignee,
+                    &parent.owner,
+                    &parent.estimated_minutes,
+                    parent.created_at.to_rfc3339(),
+                    &parent.created_by,
+                    parent.updated_at.to_rfc3339(),
+                    parent.closed_at.map(|d| d.to_rfc3339()),
+                    parent.close_reason.as_deref().unwrap_or(""),
+                    parent.closed_by_session.as_deref().unwrap_or(""),
+                    parent.due_at.map(|d| d.to_rfc3339()),
+                    parent.defer_until.map(|d| d.to_rfc3339()),
+                    parent.external_ref.as_deref(),
+                    parent.source_system.as_deref().unwrap_or(""),
+                    &parent.source_repo,
+                    parent.deleted_at.map(|d| d.to_rfc3339()),
+                    parent.deleted_by.as_deref().unwrap_or(""),
+                    parent.delete_reason.as_deref().unwrap_or(""),
+                    parent.original_type.as_deref().unwrap_or(""),
+                    &parent.compaction_level,
+                    parent.compacted_at.map(|d| d.to_rfc3339()),
+                    parent.compacted_at_commit.as_deref().unwrap_or(""),
+                    &parent.original_size,
+                    parent.sender.as_deref().unwrap_or(""),
+                    if parent.ephemeral { 1 } else { 0 },
+                    if parent.pinned { 1 } else { 0 },
+                    if parent.is_template { 1 } else { 0 },
+                ],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        // Build mitosis batch operations manually to test placeholder resolution
+        let mut ops = vec![
+            // Create two children
+            BatchOp::Create {
+                title: "Child 1".to_string(),
+                type_: "task".to_string(),
+                priority: 2,
+                description: None,
+                assignee: None,
+                labels: vec![],
+            },
+            BatchOp::Create {
+                title: "Child 2".to_string(),
+                type_: "bug".to_string(),
+                priority: 0,
+                description: None,
+                assignee: None,
+                labels: vec![],
+            },
+            // Add dependencies using placeholder references
+            // Each child blocks the parent
+            BatchOp::DepAddBlocker {
+                parent: "@0".to_string(),  // References first created child
+                child: parent_id.clone(),
+            },
+            BatchOp::DepAddBlocker {
+                parent: "@1".to_string(),  // References second created child
+                child: parent_id.clone(),
+            },
+            // Close the parent
+            BatchOp::Close {
+                id: parent_id.clone(),
+                reason: "Split into children".to_string(),
+            },
+        ];
+
+        // Execute the batch
+        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+
+        // Verify all operations succeeded
+        assert_eq!(results.len(), 5);
+        for result in &results {
+            assert_eq!(result.status, "ok");
+        }
+
+        // Extract child IDs from results
+        let child_0_id = results[0].id.as_ref().unwrap();
+        let child_1_id = results[1].id.as_ref().unwrap();
+
+        // Verify children exist
+        let child_0 = storage.get_issue(child_0_id).unwrap().unwrap();
+        let child_1 = storage.get_issue(child_1_id).unwrap().unwrap();
+        assert_eq!(child_0.title, "Child 1");
+        assert_eq!(child_1.title, "Child 2");
+
+        // Verify dependencies were created correctly
+        // Parent should depend on both children (child blocks parent)
+        let parent_deps = storage.with_immediate_transaction(|tx| {
+            let mut stmt = tx.prepare(
+                "SELECT depends_on_id FROM dependencies WHERE issue_id = ?1 AND type = 'blocks'"
+            ).unwrap();
+            let deps: Vec<String> = stmt.query_map([&parent_id], |row| row.get(0))
+                .unwrap()
+                .filter_map(|r| r.ok())
+                .collect();
+            Ok(deps)
+        }).unwrap();
+
+        assert_eq!(parent_deps.len(), 2);
+        assert!(parent_deps.contains(child_0_id));
+        assert!(parent_deps.contains(child_1_id));
+
+        // Verify parent was closed
+        let parent_after = storage.get_issue(&parent_id).unwrap().unwrap();
+        assert_eq!(parent_after.status, Status::Closed);
+        assert_eq!(parent_after.close_reason.as_deref().unwrap(), "Split into children");
+    }
+
+    #[test]
+    fn test_mitosis_function() {
+        // Test the mitosis() helper function
+        let parent_id = "bf-parent";
+
+        let ops = mitosis(
+            parent_id,
+            vec![
+                ("Child 1".to_string(), "task".to_string(), 2),
+                ("Child 2".to_string(), "bug".to_string(), 0),
+            ],
+            Some("Test split".to_string()),
+        ).unwrap();
+
+        // Should have 5 operations: 2 creates, 2 deps, 1 close
+        assert_eq!(ops.len(), 5);
+
+        // Verify operation order
+        assert!(matches!(ops[0], BatchOp::Create { .. }));
+        assert!(matches!(ops[1], BatchOp::Create { .. }));
+        assert!(matches!(ops[2], BatchOp::DepAddBlocker { .. }));
+        assert!(matches!(ops[3], BatchOp::DepAddBlocker { .. }));
+        assert!(matches!(ops[4], BatchOp::Close { .. }));
+
+        // Verify placeholder references
+        if let BatchOp::DepAddBlocker { parent, child } = &ops[2] {
+            assert_eq!(parent, "@0");
+            assert_eq!(child, parent_id);
+        } else {
+            panic!("Expected DepAddBlocker");
+        }
+
+        if let BatchOp::DepAddBlocker { parent, child } = &ops[3] {
+            assert_eq!(parent, "@1");
+            assert_eq!(child, parent_id);
+        } else {
+            panic!("Expected DepAddBlocker");
+        }
+
+        if let BatchOp::Close { id, reason } = &ops[4] {
+            assert_eq!(id, parent_id);
+            assert_eq!(reason, "Test split");
+        } else {
+            panic!("Expected Close");
+        }
+    }
+
+    #[test]
+    fn test_mitosis_ex_function() {
+        // Test the mitosis_ex() helper function with extended options
+        let parent_id = "bf-parent";
+
+        let children = vec![
+            MitosisChild {
+                title: "Child 1".to_string(),
+                type_: "task".to_string(),
+                priority: 2,
+                description: Some("First child".to_string()),
+                assignee: Some("worker-1".to_string()),
+                labels: vec!["urgent".to_string()],
+            },
+            MitosisChild {
+                title: "Child 2".to_string(),
+                type_: "bug".to_string(),
+                priority: 0,
+                description: None,
+                assignee: None,
+                labels: vec![],
+            },
+        ];
+
+        let ops = mitosis_ex(
+            parent_id,
+            children,
+            Some("Extended split".to_string()),
+        ).unwrap();
+
+        // Should have 5 operations
+        assert_eq!(ops.len(), 5);
+
+        // Verify extended attributes are in the create operations
+        if let BatchOp::Create { title, description, assignee, labels, .. } = &ops[0] {
+            assert_eq!(title, "Child 1");
+            assert_eq!(description, &Some("First child".to_string()));
+            assert_eq!(assignee, &Some("worker-1".to_string()));
+            assert_eq!(labels, &vec!["urgent".to_string()]);
+        } else {
+            panic!("Expected Create with extended attributes");
+        }
     }
 }
