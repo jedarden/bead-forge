@@ -837,3 +837,88 @@ fn verify_migration(storage: &Storage) -> Result<VerificationResult> {
 
     Ok(VerificationResult { errors })
 }
+
+/// Migrate a br workspace to bf using Path B (explicit migration with backup and verification).
+///
+/// This is a convenience wrapper for the `migrate()` function that matches the naming
+/// convention specified in Phase 4C of the implementation plan.
+///
+/// # Arguments
+/// * `workspace_path` - Path to the workspace root directory
+/// * `dry_run` - If true, print what would be done without making changes
+/// * `skip_verify` - If true, skip forward/backward compatibility checks
+///
+/// # Steps
+/// 1. Acquire migration lock (pause fleet)
+/// 2. Backup database to beads.db.br-backup-<timestamp>
+/// 3. Apply schema migrations (CREATE TABLE IF NOT EXISTS)
+/// 4. Prime critical_path_cache for all epics
+/// 5. Seed config.yaml with bf-specific defaults
+/// 6. Verify forward compatibility (br can still open the database)
+/// 7. Verify backward compatibility (bf doctor checks pass)
+/// 8. Release migration lock
+///
+/// # Example
+/// ```no_run
+/// use bead_forge::migrate::migrate_workspace_path_b;
+/// use std::path::PathBuf;
+///
+/// let result = migrate_workspace_path_b(
+///     &PathBuf::from("/path/to/workspace"),
+///     false,  // dry_run
+///     false   // skip_verify
+/// ).unwrap();
+/// ```
+pub fn migrate_workspace_path_b(
+    workspace_path: &std::path::Path,
+    dry_run: bool,
+    skip_verify: bool,
+) -> Result<MigrateResult> {
+    let opts = MigrateOptions::new(workspace_path.to_path_buf())
+        .with_dry_run(dry_run)
+        .skip_verify(skip_verify);
+    migrate(opts)
+}
+
+/// Migrate a br workspace to bf using Path C (rebuild from JSONL with git log reconstruction).
+///
+/// This is a convenience wrapper for the `migrate_from_jsonl()` function that matches the
+/// naming convention specified in Phase 4C of the implementation plan.
+///
+/// Use this when the database is missing or corrupted and only the JSONL export is available.
+/// This function reconstructs the events table by parsing git log history, allowing recovery
+/// of claim/close history that would otherwise be lost.
+///
+/// # Arguments
+/// * `workspace_path` - Path to the workspace root directory
+/// * `seed_velocity` - If true, populate velocity_stats from reconstructed events
+///
+/// # Steps
+/// 1. Import issues from issues.jsonl (rebuilds issues table)
+/// 2. Parse git log --follow -p .beads/issues.jsonl to get historical snapshots
+/// 3. Create synthetic events for state transitions (created, claimed, closed, etc.)
+/// 4. Optionally seed velocity_stats from reconstructed closed events
+/// 5. Verify migration (check for orphaned dependencies, etc.)
+///
+/// # Recovery Completeness
+/// - Daily syncs: ~95% of events reconstructed
+/// - Hourly syncs: ~99% of events reconstructed
+///
+/// All synthetic events are marked with `metadata.source=git-reconstructed` annotation.
+///
+/// # Example
+/// ```no_run
+/// use bead_forge::migrate::migrate_workspace_from_jsonl;
+/// use std::path::PathBuf;
+///
+/// let result = migrate_workspace_from_jsonl(
+///     &PathBuf::from("/path/to/workspace"),
+///     true  // seed_velocity
+/// ).unwrap();
+/// ```
+pub fn migrate_workspace_from_jsonl(
+    workspace_path: &std::path::Path,
+    seed_velocity: bool,
+) -> Result<MigrateResult> {
+    migrate_from_jsonl(workspace_path, seed_velocity)
+}
