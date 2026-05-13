@@ -26,7 +26,11 @@ fn setup_workspace_with_parent() -> (TempDir, PathBuf, String) {
 
     // Create parent bead
     let parent_id = "bf-parent".to_string();
-    let parent = Issue::new(parent_id.clone(), "Parent task".to_string(), ".".to_string());
+    let parent = Issue::new(
+        parent_id.clone(),
+        "Parent task".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&parent).unwrap();
 
     (temp_dir, db_path, parent_id)
@@ -85,7 +89,9 @@ fn test_batch_rollback_on_invalid_dependency() {
     // Verify no child beads exist
     let all_issues = storage.list_all_issues().unwrap();
     assert!(
-        !all_issues.iter().any(|i| i.title == "Child 1" || i.title == "Child 2"),
+        !all_issues
+            .iter()
+            .any(|i| i.title == "Child 1" || i.title == "Child 2"),
         "Child beads should not exist after rollback"
     );
 }
@@ -137,7 +143,9 @@ fn test_batch_rollback_on_invalid_close() {
     // Verify no child beads exist
     let all_issues = storage.list_all_issues().unwrap();
     assert!(
-        !all_issues.iter().any(|i| i.title == "Child 1" || i.title == "Child 2"),
+        !all_issues
+            .iter()
+            .any(|i| i.title == "Child 1" || i.title == "Child 2"),
         "Child beads should not exist after rollback"
     );
 }
@@ -278,7 +286,10 @@ fn test_mitosis_atomicity_all_operations() {
     // Verify parent is now closed
     let parent = storage.get_issue(&parent_id).unwrap().unwrap();
     assert_eq!(parent.status.to_string(), "closed");
-    assert_eq!(parent.close_reason.as_deref().unwrap(), "Split into children");
+    assert_eq!(
+        parent.close_reason.as_deref().unwrap(),
+        "Split into children"
+    );
 
     // Verify children exist and are open
     let child1 = storage.get_issue(child1_id).unwrap().unwrap();
@@ -326,7 +337,9 @@ fn test_mitosis_rollback_on_dependency_failure() {
 
     let all_issues = storage.list_all_issues().unwrap();
     assert!(
-        !all_issues.iter().any(|i| i.title == "Child 1" || i.title == "Child 2"),
+        !all_issues
+            .iter()
+            .any(|i| i.title == "Child 1" || i.title == "Child 2"),
         "Children should not exist after rollback"
     );
 }
@@ -430,13 +443,20 @@ fn test_sqlite_rollback_on_database_reopen() {
     // Create initial parent bead
     let storage = Storage::open(&db_path).unwrap();
     let parent_id = "bf-parent".to_string();
-    let parent = Issue::new(parent_id.clone(), "Parent task".to_string(), ".".to_string());
+    let parent = Issue::new(
+        parent_id.clone(),
+        "Parent task".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&parent).unwrap();
     drop(storage);
 
     // Record initial state
     let storage_before = Storage::open(&db_path).unwrap();
-    let count_before = storage_before.list_issues(&IssueFilter::default()).unwrap().len();
+    let count_before = storage_before
+        .list_issues(&IssueFilter::default())
+        .unwrap()
+        .len();
     drop(storage_before);
 
     // Note: We can't actually test kill -9 in a Rust test without forking.
@@ -467,7 +487,10 @@ fn test_sqlite_rollback_on_database_reopen() {
 
     // Reopen database and verify no partial state persisted
     let storage_after = Storage::open(&db_path).unwrap();
-    let count_after = storage_after.list_issues(&IssueFilter::default()).unwrap().len();
+    let count_after = storage_after
+        .list_issues(&IssueFilter::default())
+        .unwrap()
+        .len();
     let all_issues = storage_after.list_all_issues().unwrap();
 
     assert_eq!(
@@ -542,7 +565,11 @@ fn test_batch_literal_id_references() {
 
     // Create a second parent bead
     let parent2_id = "bf-parent2".to_string();
-    let parent2 = Issue::new(parent2_id.clone(), "Parent 2 task".to_string(), ".".to_string());
+    let parent2 = Issue::new(
+        parent2_id.clone(),
+        "Parent 2 task".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&parent2).unwrap();
 
     // Use literal IDs instead of placeholders
@@ -599,13 +626,20 @@ fn test_crash_mid_transaction_rolls_back_on_reopen() {
     // Create initial bead
     let storage = Storage::open(&db_path).unwrap();
     let parent_id = "bf-parent".to_string();
-    let parent = Issue::new(parent_id.clone(), "Parent task".to_string(), ".".to_string());
+    let parent = Issue::new(
+        parent_id.clone(),
+        "Parent task".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&parent).unwrap();
     drop(storage);
 
     // Record initial state
     let storage_before = Storage::open(&db_path).unwrap();
-    let count_before = storage_before.list_issues(&IssueFilter::default()).unwrap().len();
+    let count_before = storage_before
+        .list_issues(&IssueFilter::default())
+        .unwrap()
+        .len();
     drop(storage_before);
 
     // Create a Rust program that will crash mid-transaction
@@ -700,7 +734,10 @@ fn main() {
         .arg("-o")
         .arg(temp_dir.path().join("crash_test"))
         .arg("--extern")
-        .arg(format!("bead_forge={}", std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target/debug".to_string())))
+        .arg(format!(
+            "bead_forge={}",
+            std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target/debug".to_string())
+        ))
         .current_dir(&temp_dir.path())
         .output();
 
@@ -725,7 +762,10 @@ fn main() {
 
     // Reopen the database and verify the bead was not created
     let storage_after = Storage::open(&db_path).unwrap();
-    let count_after = storage_after.list_issues(&IssueFilter::default()).unwrap().len();
+    let count_after = storage_after
+        .list_issues(&IssueFilter::default())
+        .unwrap()
+        .len();
     let all_issues = storage_after.list_all_issues().unwrap();
 
     assert_eq!(

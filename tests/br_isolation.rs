@@ -17,7 +17,10 @@ fn test_bf_respects_tool_field_in_config() {
 
     let config = ws.config().unwrap();
     // Config has issue_prefixes which indicates the tool (bf vs br)
-    assert!(config.issue_prefixes.contains(&"bf".to_string()), "Config should have bf prefix");
+    assert!(
+        config.issue_prefixes.contains(&"bf".to_string()),
+        "Config should have bf prefix"
+    );
 }
 
 #[test]
@@ -50,7 +53,10 @@ fn test_bf_validates_tool_before_operations() {
 
     // Now bf operations should detect this is a br workspace
     let config = ws.config().unwrap();
-    assert!(config.issue_prefixes.contains(&"br".to_string()), "Config should have br prefix after change");
+    assert!(
+        config.issue_prefixes.contains(&"br".to_string()),
+        "Config should have br prefix after change"
+    );
 
     // Note: Currently bf may not enforce this check, but the config should be read correctly
     // This test documents the expected behavior
@@ -67,7 +73,9 @@ fn test_bf_tables_dont_corrupt_br_database() {
 
     // Add bf-specific data
     let storage = ws.storage().unwrap();
-    storage.set_annotation("bf-001", "bf_key", "bf_value").unwrap();
+    storage
+        .set_annotation("bf-001", "bf_key", "bf_value")
+        .unwrap();
 
     // Record a worker session
     storage
@@ -86,7 +94,8 @@ fn test_bf_tables_dont_corrupt_br_database() {
 
     // Verify the JSONL contains core bead data
     let jsonl_content = fs::read_to_string(&ws.jsonl_path).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
+    let json: serde_json::Value =
+        serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
 
     // Core fields should be present
     assert!(json.get("id").is_some());
@@ -165,9 +174,7 @@ fn test_bf_worker_sessions_isolation() {
     // Verify sessions exist
     let session_count: i64 = storage
         .with_immediate_transaction(|tx| {
-            Ok(tx.query_row("SELECT COUNT(*) FROM worker_sessions", [], |row| {
-                row.get(0)
-            })?)
+            Ok(tx.query_row("SELECT COUNT(*) FROM worker_sessions", [], |row| row.get(0))?)
         })
         .unwrap();
 
@@ -216,9 +223,7 @@ fn test_bf_velocity_stats_isolation() {
     // Verify stats exist
     let stats_count: i64 = storage
         .with_immediate_transaction(|tx| {
-            Ok(tx.query_row("SELECT COUNT(*) FROM velocity_stats", [], |row| {
-                row.get(0)
-            })?)
+            Ok(tx.query_row("SELECT COUNT(*) FROM velocity_stats", [], |row| row.get(0))?)
         })
         .unwrap();
 
@@ -238,22 +243,28 @@ fn test_bf_migration_lock_isolation() {
     let storage = ws.storage().unwrap();
 
     // Try to acquire migration lock
-    use chrono::{Utc, Duration};
+    use chrono::{Duration, Utc};
 
-    let lock_result: Result<(), anyhow::Error> = storage
-        .with_immediate_transaction(|tx| {
-            let now = Utc::now();
-            let expires = now + Duration::minutes(5);
+    let lock_result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+        let now = Utc::now();
+        let expires = now + Duration::minutes(5);
 
-            tx.execute(
-                "INSERT INTO migration_lock (id, locked_by, locked_at, expires_at)
+        tx.execute(
+            "INSERT INTO migration_lock (id, locked_by, locked_at, expires_at)
                  VALUES (1, ?, ?, ?)",
-                [&"test-worker", now.to_rfc3339().as_str(), expires.to_rfc3339().as_str()],
-            )?;
-            Ok(())
-        });
+            [
+                &"test-worker",
+                now.to_rfc3339().as_str(),
+                expires.to_rfc3339().as_str(),
+            ],
+        )?;
+        Ok(())
+    });
 
-    assert!(lock_result.is_ok(), "Should be able to insert migration lock");
+    assert!(
+        lock_result.is_ok(),
+        "Should be able to insert migration lock"
+    );
 
     // Normal operations should still work
     ws.create_bead("bf-lock2", "Lock test 2").unwrap();
@@ -343,11 +354,7 @@ fn test_bf_core_tables_match_br_schema() {
             })
             .unwrap();
 
-        assert!(
-            exists,
-            "br table '{}' should exist in bf database",
-            table
-        );
+        assert!(exists, "br table '{}' should exist in bf database", table);
     }
 }
 
@@ -358,7 +365,8 @@ fn test_bf_database_integrity_after_operations() {
 
     // Do various operations
     for i in 0..10 {
-        ws.create_bead(&format!("bf-integrity-{}", i), &format!("Bead {}", i)).unwrap();
+        ws.create_bead(&format!("bf-integrity-{}", i), &format!("Bead {}", i))
+            .unwrap();
     }
 
     let storage = ws.storage().unwrap();
@@ -385,7 +393,9 @@ fn test_bf_database_integrity_after_operations() {
         .with_immediate_transaction(|tx| {
             // Check for foreign key violations (returns rows if any FK issues exist)
             let mut fk_stmt = tx.prepare("PRAGMA foreign_key_check")?;
-            let fk_violations: Result<Vec<_>, _> = fk_stmt.query_map([], |_row| Ok::<_, rusqlite::Error>(()))?.collect();
+            let fk_violations: Result<Vec<_>, _> = fk_stmt
+                .query_map([], |_row| Ok::<_, rusqlite::Error>(()))?
+                .collect();
             let has_fk_issues = fk_violations.map(|v| !v.is_empty()).unwrap_or(false);
 
             // Check integrity
@@ -410,7 +420,8 @@ fn test_bf_jsonl_export_only_includes_core_fields() {
         "Field test".to_string(),
         ".".to_string(),
     );
-    bead.annotations.insert("bf_data".to_string(), "sensitive".to_string());
+    bead.annotations
+        .insert("bf_data".to_string(), "sensitive".to_string());
 
     let storage = ws.storage().unwrap();
     storage.create_issue(&bead).unwrap();
@@ -432,7 +443,8 @@ fn test_bf_jsonl_export_only_includes_core_fields() {
 
     // Read JSONL and verify it has expected fields
     let jsonl_content = fs::read_to_string(&ws.jsonl_path).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
+    let json: serde_json::Value =
+        serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
 
     // Core fields
     assert!(json.get("id").is_some());
@@ -450,7 +462,10 @@ fn test_bf_jsonl_export_only_includes_core_fields() {
 
     // Verify annotations from database match what was in JSONL
     let stored_annotations = storage.get_annotations("bf-fields").unwrap();
-    assert_eq!(stored_annotations.get("bf_data"), Some(&"sensitive".to_string()));
+    assert_eq!(
+        stored_annotations.get("bf_data"),
+        Some(&"sensitive".to_string())
+    );
 }
 
 #[test]
@@ -521,7 +536,9 @@ fn test_walk_up_discovery_stops_at_tempdir_boundary() {
 
     // Create a bead in the parent workspace
     parent_ws.create_bead("bf-parent", "Parent bead").unwrap();
-    parent_ws.create_bead("bf-parent-2", "Another parent bead").unwrap();
+    parent_ws
+        .create_bead("bf-parent-2", "Another parent bead")
+        .unwrap();
 
     // Record the parent database state
     let parent_storage = parent_ws.storage().unwrap();
@@ -635,10 +652,7 @@ fn test_sync_import_only_doesnt_write_original_jsonl() {
         common::sample_bead_jsonl("bf-fixture-2", "Fixture bead 2"),
         common::sample_bead_jsonl("bf-fixture-3", "Fixture bead 3"),
     ];
-    fs::write(
-        &fixture_jsonl_path,
-        fixture_content.join("\n") + "\n",
-    ).unwrap();
+    fs::write(&fixture_jsonl_path, fixture_content.join("\n") + "\n").unwrap();
 
     // Record the original JSONL content and mtime
     let original_jsonl_mtime = fs::metadata(&fixture_jsonl_path)
@@ -709,10 +723,7 @@ fn test_multiple_sync_import_only_operations_dont_corrupt_fixture() {
         common::sample_bead_jsonl("bf-multi-1", "Multi bead 1"),
         common::sample_bead_jsonl("bf-multi-2", "Multi bead 2"),
     ];
-    fs::write(
-        &fixture_jsonl_path,
-        fixture_content.join("\n") + "\n",
-    ).unwrap();
+    fs::write(&fixture_jsonl_path, fixture_content.join("\n") + "\n").unwrap();
 
     let original_content = fs::read_to_string(&fixture_jsonl_path).unwrap();
     let original_mtime = fs::metadata(&fixture_jsonl_path)
@@ -728,14 +739,17 @@ fn test_multiple_sync_import_only_operations_dont_corrupt_fixture() {
         if i == 0 {
             assert_eq!(result.imported, 2);
         } else {
-            assert!(result.imported == 0 || result.skipped > 0,
-                    "Subsequent imports should skip unchanged beads");
+            assert!(
+                result.imported == 0 || result.skipped > 0,
+                "Subsequent imports should skip unchanged beads"
+            );
         }
 
         // Verify fixture is unchanged after each import
         let current_content = fs::read_to_string(&fixture_jsonl_path).unwrap();
         assert_eq!(
-            original_content, current_content,
+            original_content,
+            current_content,
             "Fixture content should not change after import #{}",
             i + 1
         );

@@ -1,7 +1,7 @@
-use rand::Rng;
-use sha2::{Digest, Sha256};
 use num_bigint::BigUint;
 use num_traits::Zero;
+use rand::Rng;
+use sha2::{Digest, Sha256};
 
 const BASE36_CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
@@ -124,8 +124,13 @@ mod tests {
         for _ in 0..100 {
             let id = generate_id("bf", 100);
             let hash_part = id.split('-').nth(1).unwrap();
-            assert!(hash_part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
-                    "Hash should be lowercase alphanumeric: {}", id);
+            assert!(
+                hash_part
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
+                "Hash should be lowercase alphanumeric: {}",
+                id
+            );
         }
     }
 
@@ -154,9 +159,18 @@ mod tests {
 
         for _ in 0..corpus_size {
             let id = generate_id("bf", corpus_size);
-            assert!(ids.insert(id.clone()), "Collision detected in {}-ID corpus", corpus_size);
+            assert!(
+                ids.insert(id.clone()),
+                "Collision detected in {}-ID corpus",
+                corpus_size
+            );
         }
 
-        assert_eq!(ids.len(), corpus_size, "Should generate {} unique IDs", corpus_size);
+        assert_eq!(
+            ids.len(),
+            corpus_size,
+            "Should generate {} unique IDs",
+            corpus_size
+        );
     }
 }

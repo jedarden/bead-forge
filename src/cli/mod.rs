@@ -1,11 +1,13 @@
 use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild};
-use crate::claim::{claim, claim_any, ClaimResult, get_ready_candidates, WorkerMetadata, find_workspaces};
-use crate::commit_check::{scan_staged_beads, format_scan_results};
-use crate::config::{find_beads_dir, load_config, load_metadata, get_default_prefix};
+use crate::claim::{
+    claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
+};
+use crate::commit_check::{format_scan_results, scan_staged_beads};
+use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
 use crate::critical_path::compute_epic_critical_path;
-use crate::format::{OutputFormat, get_formatter};
+use crate::format::{get_formatter, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
-use crate::rotate::{rotate, RotateOptions, find_bead_in_archives, list_all_with_archives};
+use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
@@ -666,60 +668,193 @@ pub fn run(cli: Cli) -> Result<()> {
 
     match cli.command {
         Commands::Init { prefix } => cmd_init(&beads_dir, &prefix),
-        Commands::Create { title, type_, priority, description, assignee, label } => {
-            cmd_create(&beads_dir, title, type_, priority, description, assignee, label)
-        }
-        Commands::List { status, type_, assignee, priority, limit, all, format, json } => {
+        Commands::Create {
+            title,
+            type_,
+            priority,
+            description,
+            assignee,
+            label,
+        } => cmd_create(
+            &beads_dir,
+            title,
+            type_,
+            priority,
+            description,
+            assignee,
+            label,
+        ),
+        Commands::List {
+            status,
+            type_,
+            assignee,
+            priority,
+            limit,
+            all,
+            format,
+            json,
+        } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_list(&beads_dir, status, type_, assignee, priority, limit, all, &format)
+            cmd_list(
+                &beads_dir, status, type_, assignee, priority, limit, all, &format,
+            )
         }
         Commands::Show { id, format, json } => {
             let format = if json { "json".to_string() } else { format };
             cmd_show(&beads_dir, &id, &format)
         }
-        Commands::Update { id, title, status, priority, assignee } => {
-            cmd_update(&beads_dir, &id, title, status, priority, assignee)
-        }
+        Commands::Update {
+            id,
+            title,
+            status,
+            priority,
+            assignee,
+        } => cmd_update(&beads_dir, &id, title, status, priority, assignee),
         Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason),
         Commands::Reopen { id } => cmd_reopen(&beads_dir, &id),
         Commands::Delete { id } => cmd_delete(&beads_dir, &id),
-        Commands::Ready { limit, format, json } => {
+        Commands::Ready {
+            limit,
+            format,
+            json,
+        } => {
             let format = if json { "json".to_string() } else { format };
             cmd_ready(&beads_dir, limit, &format)
         }
-        Commands::Claim { assignee, model, harness, harness_version, any, fallback, workspace_paths, dry_run, format, json } => {
+        Commands::Claim {
+            assignee,
+            model,
+            harness,
+            harness_version,
+            any,
+            fallback,
+            workspace_paths,
+            dry_run,
+            format,
+            json,
+        } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_claim(&beads_dir, &assignee, model, harness, harness_version, any, fallback.as_deref(), &workspace_paths, dry_run, &format)
+            cmd_claim(
+                &beads_dir,
+                &assignee,
+                model,
+                harness,
+                harness_version,
+                any,
+                fallback.as_deref(),
+                &workspace_paths,
+                dry_run,
+                &format,
+            )
         }
-        Commands::Sync { flush_only, import_only } => cmd_sync(&beads_dir, flush_only, import_only),
-        Commands::Doctor { repair, reclaim_stale, ttl } => cmd_doctor(&beads_dir, repair, reclaim_stale, ttl),
+        Commands::Sync {
+            flush_only,
+            import_only,
+        } => cmd_sync(&beads_dir, flush_only, import_only),
+        Commands::Doctor {
+            repair,
+            reclaim_stale,
+            ttl,
+        } => cmd_doctor(&beads_dir, repair, reclaim_stale, ttl),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
         Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
-        Commands::Mitosis { id, children, reason, format } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format),
+        Commands::Mitosis {
+            id,
+            children,
+            reason,
+            format,
+        } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format),
         Commands::Dep(dep) => cmd_dep(&beads_dir, dep),
         Commands::Label(label) => cmd_label(&beads_dir, label),
         Commands::Comments(comments) => cmd_comments(&beads_dir, comments),
-        Commands::Search { query, status, type_, assignee, label, priority_min, priority_max, limit, format } => {
-            cmd_search(&beads_dir, query, status, type_, assignee, label, priority_min, priority_max, limit, &format)
-        }
-        Commands::Stats { by_type, by_priority, by_assignee, by_label, format } => {
-            cmd_stats(&beads_dir, by_type, by_priority, by_assignee, by_label, &format)
-        }
+        Commands::Search {
+            query,
+            status,
+            type_,
+            assignee,
+            label,
+            priority_min,
+            priority_max,
+            limit,
+            format,
+        } => cmd_search(
+            &beads_dir,
+            query,
+            status,
+            type_,
+            assignee,
+            label,
+            priority_min,
+            priority_max,
+            limit,
+            &format,
+        ),
+        Commands::Stats {
+            by_type,
+            by_priority,
+            by_assignee,
+            by_label,
+            format,
+        } => cmd_stats(
+            &beads_dir,
+            by_type,
+            by_priority,
+            by_assignee,
+            by_label,
+            &format,
+        ),
         Commands::Schema { target, format } => cmd_schema(&target, &format),
         Commands::Config(config) => cmd_config(&beads_dir, config),
-        Commands::Velocity { model, harness, format } => cmd_velocity(&beads_dir, model, harness, &format),
+        Commands::Velocity {
+            model,
+            harness,
+            format,
+        } => cmd_velocity(&beads_dir, model, harness, &format),
         Commands::Labels { id, format } => cmd_labels(&beads_dir, &id, &format),
         Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate),
-        Commands::Log { id, limit, since, actor, status_changes, diff, format, json } => {
+        Commands::Log {
+            id,
+            limit,
+            since,
+            actor,
+            status_changes,
+            diff,
+            format,
+            json,
+        } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_log(&beads_dir, id, limit, since, actor, status_changes, diff, &format)
+            cmd_log(
+                &beads_dir,
+                id,
+                limit,
+                since,
+                actor,
+                status_changes,
+                diff,
+                &format,
+            )
         }
-        Commands::CriticalPath { id, max_depth, format } => cmd_critical_path(&beads_dir, &id, max_depth, &format),
+        Commands::CriticalPath {
+            id,
+            max_depth,
+            format,
+        } => cmd_critical_path(&beads_dir, &id, max_depth, &format),
         Commands::Rotate { days, dry_run } => cmd_rotate(&beads_dir, days, dry_run),
-        Commands::Migrate { workspace, from_jsonl, seed_velocity, dry_run, skip_verify } => {
-            cmd_migrate(&beads_dir, workspace, from_jsonl, seed_velocity, dry_run, skip_verify)
-        }
+        Commands::Migrate {
+            workspace,
+            from_jsonl,
+            seed_velocity,
+            dry_run,
+            skip_verify,
+        } => cmd_migrate(
+            &beads_dir,
+            workspace,
+            from_jsonl,
+            seed_velocity,
+            dry_run,
+            skip_verify,
+        ),
     }
 }
 
@@ -812,7 +947,8 @@ fn cmd_list(
             filter.status = Some(Status::from_str(s.as_str()).map_err(|e| anyhow::anyhow!(e))?);
         }
         if let Some(ref t) = type_ {
-            filter.issue_type = Some(IssueType::from_str(t.as_str()).map_err(|e| anyhow::anyhow!(e))?);
+            filter.issue_type =
+                Some(IssueType::from_str(t.as_str()).map_err(|e| anyhow::anyhow!(e))?);
         }
         filter.assignee = assignee.clone();
         filter.priority = priority;
@@ -985,9 +1121,7 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    let candidates = storage.with_immediate_transaction(|tx| {
-        get_ready_candidates(tx, limit)
-    })?;
+    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit))?;
 
     match format {
         "json" => {
@@ -997,20 +1131,28 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
         }
         "toon" => {
             for candidate in candidates {
-                println!("{}", crate::format::toon::format_ready_bead(
-                    &candidate.id,
-                    &candidate.title,
-                    candidate.priority,
-                    candidate.downstream_impact,
-                    candidate.critical_float,
-                ));
+                println!(
+                    "{}",
+                    crate::format::toon::format_ready_bead(
+                        &candidate.id,
+                        &candidate.title,
+                        candidate.priority,
+                        candidate.downstream_impact,
+                        candidate.critical_float,
+                    )
+                );
             }
         }
         _ => {
             for candidate in candidates {
-                println!("[{}] {} (priority={}, impact={}, float={})",
-                    candidate.id, candidate.title, candidate.priority,
-                    candidate.downstream_impact, candidate.critical_float);
+                println!(
+                    "[{}] {} (priority={}, impact={}, float={})",
+                    candidate.id,
+                    candidate.title,
+                    candidate.priority,
+                    candidate.downstream_impact,
+                    candidate.critical_float
+                );
             }
         }
     }
@@ -1043,7 +1185,8 @@ fn cmd_claim(
 
     if dry_run {
         // Dry run mode - show what would be claimed
-        let candidates: Vec<(PathBuf, crate::claim::ScoredBead)> = if any || fallback == Some("any") {
+        let candidates: Vec<(PathBuf, crate::claim::ScoredBead)> = if any || fallback == Some("any")
+        {
             // Multi-workspace dry run
             let paths = if workspace_paths.is_empty() {
                 // Auto-discover workspaces from current directory
@@ -1062,9 +1205,9 @@ fn cmd_claim(
                     };
                     let local_db_path = local_beads_dir.join(&local_metadata.database);
                     if let Ok(local_storage) = Storage::open(&local_db_path) {
-                        if let Ok(local_candidates) = local_storage.with_immediate_transaction(|tx| {
-                            get_ready_candidates(tx, 1)
-                        }) {
+                        if let Ok(local_candidates) = local_storage
+                            .with_immediate_transaction(|tx| get_ready_candidates(tx, 1))
+                        {
                             for c in local_candidates {
                                 all_candidates.push((path.clone(), c));
                             }
@@ -1085,10 +1228,12 @@ fn cmd_claim(
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
-            let candidates = storage.with_immediate_transaction(|tx| {
-                get_ready_candidates(tx, 1)
-            })?;
-            candidates.into_iter().map(|c| (beads_dir.parent().unwrap_or(beads_dir).to_path_buf(), c)).collect()
+            let candidates =
+                storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 1))?;
+            candidates
+                .into_iter()
+                .map(|c| (beads_dir.parent().unwrap_or(beads_dir).to_path_buf(), c))
+                .collect()
         };
 
         if let Some((path, candidate)) = candidates.first() {
@@ -1106,8 +1251,13 @@ fn cmd_claim(
                     println!("{}", output);
                 }
                 _ => {
-                    println!("{} (priority={}, impact={}, workspace={})",
-                        candidate.id, candidate.priority, candidate.downstream_impact, path.display());
+                    println!(
+                        "{} (priority={}, impact={}, workspace={})",
+                        candidate.id,
+                        candidate.priority,
+                        candidate.downstream_impact,
+                        path.display()
+                    );
                 }
             }
         } else if format == "json" {
@@ -1127,26 +1277,28 @@ fn cmd_claim(
         let result = claim_any(&paths, assignee, claim_ttl, Some(&worker_metadata))?;
 
         match result {
-            Some(ClaimResult { bead_id, reclaimed, workspace_path }) => {
-                match format {
-                    "json" => {
-                        let output = serde_json::json!({
-                            "bead_id": bead_id,
-                            "reclaimed": reclaimed,
-                            "assignee": assignee,
-                            "workspace": workspace_path.map(|p| p.display().to_string())
-                        });
-                        println!("{}", output);
-                    }
-                    _ => {
-                        if let Some(path) = workspace_path {
-                            println!("{} (workspace: {})", bead_id, path.display());
-                        } else {
-                            println!("{}", bead_id);
-                        }
+            Some(ClaimResult {
+                bead_id,
+                reclaimed,
+                workspace_path,
+            }) => match format {
+                "json" => {
+                    let output = serde_json::json!({
+                        "bead_id": bead_id,
+                        "reclaimed": reclaimed,
+                        "assignee": assignee,
+                        "workspace": workspace_path.map(|p| p.display().to_string())
+                    });
+                    println!("{}", output);
+                }
+                _ => {
+                    if let Some(path) = workspace_path {
+                        println!("{} (workspace: {})", bead_id, path.display());
+                    } else {
+                        println!("{}", bead_id);
                     }
                 }
-            }
+            },
             None => {
                 if format == "json" {
                     println!("{{}}");
@@ -1166,21 +1318,21 @@ fn cmd_claim(
         })?;
 
         match result {
-            Some(ClaimResult { bead_id, reclaimed, .. }) => {
-                match format {
-                    "json" => {
-                        let output = serde_json::json!({
-                            "bead_id": bead_id,
-                            "reclaimed": reclaimed,
-                            "assignee": assignee
-                        });
-                        println!("{}", output);
-                    }
-                    _ => {
-                        println!("{}", bead_id);
-                    }
+            Some(ClaimResult {
+                bead_id, reclaimed, ..
+            }) => match format {
+                "json" => {
+                    let output = serde_json::json!({
+                        "bead_id": bead_id,
+                        "reclaimed": reclaimed,
+                        "assignee": assignee
+                    });
+                    println!("{}", output);
                 }
-            }
+                _ => {
+                    println!("{}", bead_id);
+                }
+            },
             None => {
                 // Fallback to any workspace
                 let paths = if workspace_paths.is_empty() {
@@ -1192,26 +1344,28 @@ fn cmd_claim(
                 let result = claim_any(&paths, assignee, claim_ttl, Some(&worker_metadata))?;
 
                 match result {
-                    Some(ClaimResult { bead_id, reclaimed, workspace_path }) => {
-                        match format {
-                            "json" => {
-                                let output = serde_json::json!({
-                                    "bead_id": bead_id,
-                                    "reclaimed": reclaimed,
-                                    "assignee": assignee,
-                                    "workspace": workspace_path.map(|p| p.display().to_string())
-                                });
-                                println!("{}", output);
-                            }
-                            _ => {
-                                if let Some(path) = workspace_path {
-                                    println!("{} (workspace: {})", bead_id, path.display());
-                                } else {
-                                    println!("{}", bead_id);
-                                }
+                    Some(ClaimResult {
+                        bead_id,
+                        reclaimed,
+                        workspace_path,
+                    }) => match format {
+                        "json" => {
+                            let output = serde_json::json!({
+                                "bead_id": bead_id,
+                                "reclaimed": reclaimed,
+                                "assignee": assignee,
+                                "workspace": workspace_path.map(|p| p.display().to_string())
+                            });
+                            println!("{}", output);
+                        }
+                        _ => {
+                            if let Some(path) = workspace_path {
+                                println!("{} (workspace: {})", bead_id, path.display());
+                            } else {
+                                println!("{}", bead_id);
                             }
                         }
-                    }
+                    },
                     None => {
                         if format == "json" {
                             println!("{{}}");
@@ -1233,21 +1387,21 @@ fn cmd_claim(
         })?;
 
         match result {
-            Some(ClaimResult { bead_id, reclaimed, .. }) => {
-                match format {
-                    "json" => {
-                        let output = serde_json::json!({
-                            "bead_id": bead_id,
-                            "reclaimed": reclaimed,
-                            "assignee": assignee
-                        });
-                        println!("{}", output);
-                    }
-                    _ => {
-                        println!("{}", bead_id);
-                    }
+            Some(ClaimResult {
+                bead_id, reclaimed, ..
+            }) => match format {
+                "json" => {
+                    let output = serde_json::json!({
+                        "bead_id": bead_id,
+                        "reclaimed": reclaimed,
+                        "assignee": assignee
+                    });
+                    println!("{}", output);
                 }
-            }
+                _ => {
+                    println!("{}", bead_id);
+                }
+            },
             None => {
                 if format == "json" {
                     println!("{{}}");
@@ -1278,7 +1432,11 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
         println!("Flushed {} beads to JSONL", count);
     } else {
         let result = crate::sync::sync(workspace_dir)?;
-        println!("Synced {} beads from JSONL and flushed {} to JSONL", result.imported + result.updated, result.exported);
+        println!(
+            "Synced {} beads from JSONL and flushed {} to JSONL",
+            result.imported + result.updated,
+            result.exported
+        );
         if result.updated > 0 {
             println!("Updated {} beads", result.updated);
         }
@@ -1290,7 +1448,12 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
     Ok(())
 }
 
-fn cmd_doctor(beads_dir: &PathBuf, repair: bool, reclaim_stale: bool, ttl: Option<i64>) -> Result<()> {
+fn cmd_doctor(
+    beads_dir: &PathBuf,
+    repair: bool,
+    reclaim_stale: bool,
+    ttl: Option<i64>,
+) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
@@ -1299,7 +1462,10 @@ fn cmd_doctor(beads_dir: &PathBuf, repair: bool, reclaim_stale: bool, ttl: Optio
         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
         let storage = Storage::open(&db_path)?;
         let result = storage.sync_from_jsonl(&jsonl_path)?;
-        println!("Repaired database: imported {} beads from JSONL", result.imported);
+        println!(
+            "Repaired database: imported {} beads from JSONL",
+            result.imported
+        );
     } else if reclaim_stale {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let config = load_config(beads_dir)?;
@@ -1347,7 +1513,12 @@ fn cmd_count(beads_dir: &PathBuf, status: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn cmd_batch(beads_dir: &PathBuf, file: Option<PathBuf>, json: Option<String>, stdin: bool) -> Result<()> {
+fn cmd_batch(
+    beads_dir: &PathBuf,
+    file: Option<PathBuf>,
+    json: Option<String>,
+    stdin: bool,
+) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -1375,14 +1546,24 @@ fn cmd_batch(beads_dir: &PathBuf, file: Option<PathBuf>, json: Option<String>, s
                 println!("[op {}] ok", result.op);
             }
         } else {
-            eprintln!("[op {}] error: {}", result.op, result.error.unwrap_or_default());
+            eprintln!(
+                "[op {}] error: {}",
+                result.op,
+                result.error.unwrap_or_default()
+            );
         }
     }
 
     Ok(())
 }
 
-fn cmd_mitosis(beads_dir: &PathBuf, id: &str, children: &str, reason: &str, format: &str) -> Result<()> {
+fn cmd_mitosis(
+    beads_dir: &PathBuf,
+    id: &str,
+    children: &str,
+    reason: &str,
+    format: &str,
+) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -1408,7 +1589,11 @@ fn cmd_mitosis(beads_dir: &PathBuf, id: &str, children: &str, reason: &str, form
                     println!("Created child: {}", child_id);
                 }
             }
-            println!("Parent bead {} closed with {} children", id, results.len() - 2); // -2 for close + last dep
+            println!(
+                "Parent bead {} closed with {} children",
+                id,
+                results.len() - 2
+            ); // -2 for close + last dep
         }
     }
 
@@ -1446,7 +1631,9 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
                     prefix.push_str("│   ");
                 } else {
                     // Check if this is the last node at this depth
-                    let is_last = nodes.iter().skip(i + 1)
+                    let is_last = nodes
+                        .iter()
+                        .skip(i + 1)
                         .all(|n| n.depth < node.depth || (n.depth == node.depth && n.id > node.id));
                     if is_last {
                         prefix.push_str("└── ");
@@ -1467,7 +1654,8 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
         let cycle_mark = if is_cycle { " [CYCLE]" } else { "" };
         let dep_type_str = node.dep_type.as_deref().unwrap_or("blocks");
 
-        println!("{}[{}] {} {} (P{}, {}){}",
+        println!(
+            "{}[{}] {} {} (P{}, {}){}",
             prefix,
             node.id,
             status_symbol(&node.status),
@@ -1483,14 +1671,21 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
 
 fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
     match dep {
-        DepCommands::Add { issue, depends_on, type_ } => {
+        DepCommands::Add {
+            issue,
+            depends_on,
+            type_,
+        } => {
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
-            let dep_type = crate::model::DependencyType::from_str(&type_)
-                .map_err(|e| anyhow::anyhow!(e))?;
+            let dep_type =
+                crate::model::DependencyType::from_str(&type_).map_err(|e| anyhow::anyhow!(e))?;
             storage.add_dependency(&issue, &depends_on, &dep_type, "cli")?;
-            println!("Added dependency: {} depends on {} ({})", issue, depends_on, type_);
+            println!(
+                "Added dependency: {} depends on {} ({})",
+                issue, depends_on, type_
+            );
         }
         DepCommands::Remove { issue, depends_on } => {
             let metadata = load_metadata(beads_dir)?;
@@ -1508,11 +1703,20 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                 println!("No dependencies found for {}", id);
             } else {
                 for dep in deps {
-                    println!("  {} depends on {} ({})", dep.issue_id, dep.depends_on_id, dep.dep_type);
+                    println!(
+                        "  {} depends on {} ({})",
+                        dep.issue_id, dep.depends_on_id, dep.dep_type
+                    );
                 }
             }
         }
-        DepCommands::Tree { id, direction, max_depth, format, json } => {
+        DepCommands::Tree {
+            id,
+            direction,
+            max_depth,
+            format,
+            json,
+        } => {
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
@@ -1521,7 +1725,12 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
             // Validate direction
             let direction = match direction.as_str() {
                 "down" | "up" | "both" => direction.as_str(),
-                _ => return Err(anyhow!("Invalid direction: {}. Use 'down', 'up', or 'both'", direction)),
+                _ => {
+                    return Err(anyhow!(
+                        "Invalid direction: {}. Use 'down', 'up', or 'both'",
+                        direction
+                    ))
+                }
             };
 
             if format == "json" {
@@ -1551,7 +1760,10 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                 // Text output format
                 if direction == "both" {
                     // Show both directions separately
-                    println!("Dependency tree for {} (downward - what this depends on):\n", id);
+                    println!(
+                        "Dependency tree for {} (downward - what this depends on):\n",
+                        id
+                    );
                     let down_nodes = storage.get_dep_tree(&id, "down", max_depth)?;
                     print_dep_tree(&down_nodes, &storage)?;
 
@@ -1559,7 +1771,10 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                         println!();
                     }
 
-                    println!("Reverse dependency tree for {} (upward - what depends on this):\n", id);
+                    println!(
+                        "Reverse dependency tree for {} (upward - what depends on this):\n",
+                        id
+                    );
                     let up_nodes = storage.get_dep_tree(&id, "up", max_depth)?;
                     print_dep_tree(&up_nodes, &storage)?;
                 } else {
@@ -1672,10 +1887,12 @@ fn cmd_search(
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    let statuses: Vec<Status> = status.iter()
+    let statuses: Vec<Status> = status
+        .iter()
         .filter_map(|s| Status::from_str(s).ok())
         .collect();
-    let types: Vec<IssueType> = type_.iter()
+    let types: Vec<IssueType> = type_
+        .iter()
         .filter_map(|t| IssueType::from_str(t).ok())
         .collect();
 
@@ -1848,11 +2065,7 @@ fn cmd_velocity(
     let storage = Storage::open(&db_path)?;
 
     let stats = storage.with_immediate_transaction(|tx| {
-        crate::velocity::get_velocity_stats(
-            tx,
-            model.as_deref(),
-            harness.as_deref(),
-        )
+        crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())
     })?;
 
     match format {
@@ -1884,16 +2097,24 @@ fn cmd_velocity(
             } else {
                 println!("Velocity Statistics:");
                 println!();
-                println!("{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8}", "Model", "Harness", "Type", "Samples", "P50(s)", "P90(s)", "Avg(s)");
+                println!(
+                    "{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8}",
+                    "Model", "Harness", "Type", "Samples", "P50(s)", "P90(s)", "Avg(s)"
+                );
                 println!("{}", "-".repeat(85));
                 for stat in stats {
-                    println!("{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8.1}",
+                    println!(
+                        "{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8.1}",
                         stat.model,
                         stat.harness,
                         stat.issue_type,
                         stat.sample_count,
-                        stat.p50_seconds.map(|s| s.to_string()).unwrap_or_else(|| "-".to_string()),
-                        stat.p90_seconds.map(|s| s.to_string()).unwrap_or_else(|| "-".to_string()),
+                        stat.p50_seconds
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "-".to_string()),
+                        stat.p90_seconds
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "-".to_string()),
                         stat.avg_seconds.unwrap_or(0.0),
                     );
                 }
@@ -1989,7 +2210,9 @@ fn cmd_log(
                 filter = filter.with_since(dt.with_timezone(&chrono::Utc));
             }
             Err(_) => {
-                return Err(anyhow::anyhow!("Invalid --since date format. Use RFC3339 format, e.g., 2026-05-01T00:00:00Z"));
+                return Err(anyhow::anyhow!(
+                    "Invalid --since date format. Use RFC3339 format, e.g., 2026-05-01T00:00:00Z"
+                ));
             }
         }
     }
@@ -2026,16 +2249,15 @@ fn cmd_critical_path(beads_dir: &PathBuf, id: &str, _max_depth: usize, format: &
     let storage = Storage::open(&db_path)?;
 
     // Compute critical path for the epic
-    let result = storage.with_immediate_transaction(|tx| {
-        compute_epic_critical_path(tx, id)
-    })?;
+    let result = storage.with_immediate_transaction(|tx| compute_epic_critical_path(tx, id))?;
 
     match format {
         "json" => {
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         _ => {
-            println!("Critical path for {} ({} open beads, {} on critical path):",
+            println!(
+                "Critical path for {} ({} open beads, {} on critical path):",
                 id,
                 result.beads.len(),
                 result.beads.iter().filter(|b| b.float == 0).count()
@@ -2044,13 +2266,19 @@ fn cmd_critical_path(beads_dir: &PathBuf, id: &str, _max_depth: usize, format: &
 
             for bead in &result.beads {
                 let float_marker = if bead.float == 0 { "★" } else { " " };
-                println!("  {} float={:<3} [{}]", float_marker, bead.float, bead.bead_id);
+                println!(
+                    "  {} float={:<3} [{}]",
+                    float_marker, bead.float, bead.bead_id
+                );
             }
 
             println!();
             if !result.longest_chain.is_empty() {
                 println!("Longest chain: {}", result.longest_chain.join(" → "));
-                println!("Minimum remaining time: {} bead-completions on critical path", result.min_remaining);
+                println!(
+                    "Minimum remaining time: {} bead-completions on critical path",
+                    result.min_remaining
+                );
             }
         }
     }
@@ -2101,9 +2329,8 @@ fn cmd_migrate(
     skip_verify: bool,
 ) -> Result<()> {
     // Determine workspace path
-    let workspace_path = workspace.unwrap_or_else(|| {
-        beads_dir.parent().unwrap_or(beads_dir).to_path_buf()
-    });
+    let workspace_path =
+        workspace.unwrap_or_else(|| beads_dir.parent().unwrap_or(beads_dir).to_path_buf());
 
     if from_jsonl {
         // Migration Path C: Reimport from JSONL

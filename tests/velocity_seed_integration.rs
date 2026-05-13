@@ -100,7 +100,11 @@ fn test_seed_velocity_from_events() {
         .find(|(m, h, it, ..)| m == "claude-sonnet-4-6" && h == "unknown" && it == "task")
         .expect("Should have claude-sonnet-4-6 stats");
     assert_eq!(sonnet_task.3, 3, "Should have 3 samples for sonnet task");
-    assert_eq!(sonnet_task.4, Some(150), "p50 should be 150 for sonnet task");
+    assert_eq!(
+        sonnet_task.4,
+        Some(150),
+        "p50 should be 150 for sonnet task"
+    );
 
     // Check claude-opus-4-7 task stats
     let opus_task = stats
@@ -124,7 +128,11 @@ fn test_seed_velocity_from_events() {
         .find(|(m, h, it, ..)| m == "claude-4.7" && h == "unknown" && it == "task")
         .expect("Should have claude-4.7 stats");
     assert_eq!(claude_task.3, 1, "Should have 1 sample for claude-4.7 task");
-    assert_eq!(claude_task.4, Some(180), "p50 should be 180 for claude-4.7 task");
+    assert_eq!(
+        claude_task.4,
+        Some(180),
+        "p50 should be 180 for claude-4.7 task"
+    );
 
     // Check unknown actor fallback
     let unknown_task = stats
@@ -132,7 +140,11 @@ fn test_seed_velocity_from_events() {
         .find(|(m, h, it, ..)| m == "unknown" && h == "unknown" && it == "task")
         .expect("Should have unknown actor stats");
     assert_eq!(unknown_task.3, 1, "Should have 1 sample for unknown task");
-    assert_eq!(unknown_task.4, Some(300), "p50 should be 300 for unknown task");
+    assert_eq!(
+        unknown_task.4,
+        Some(300),
+        "p50 should be 300 for unknown task"
+    );
 
     // Cleanup
     let _ = std::fs::remove_file(db_path);

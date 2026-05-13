@@ -73,12 +73,8 @@ struct JsonlSnapshot {
 /// 8. Release fleet: remove migration_lock
 pub fn migrate(opts: MigrateOptions) -> Result<MigrateResult> {
     let workspace = &opts.workspace_path;
-    let beads_dir = find_beads_dir(workspace).ok_or_else(|| {
-        anyhow!(
-            "No .beads directory found in {:?}",
-            workspace
-        )
-    })?;
+    let beads_dir = find_beads_dir(workspace)
+        .ok_or_else(|| anyhow!("No .beads directory found in {:?}", workspace))?;
 
     let metadata = load_metadata(&beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -87,7 +83,15 @@ pub fn migrate(opts: MigrateOptions) -> Result<MigrateResult> {
     // Dry-run mode: print what would be done
     if opts.dry_run {
         println!("Dry-run migration for {:?}", workspace);
-        println!("  Would back up: {} -> {}", db_path.display(), format!("{}.br-backup-{}", db_path.display(), Utc::now().format("%Y%m%d%H%M%S")));
+        println!(
+            "  Would back up: {} -> {}",
+            db_path.display(),
+            format!(
+                "{}.br-backup-{}",
+                db_path.display(),
+                Utc::now().format("%Y%m%d%H%M%S")
+            )
+        );
         println!("  Would apply schema migrations");
         println!("  Would prime critical_path_cache");
         println!("  Would seed config.yaml with bf defaults");
@@ -107,7 +111,13 @@ pub fn migrate(opts: MigrateOptions) -> Result<MigrateResult> {
 
     // Ensure lock is released even if migration fails
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let result = inner_migrate(&storage, &beads_dir, &db_path, &config_path, &opts.skip_verify);
+        let result = inner_migrate(
+            &storage,
+            &beads_dir,
+            &db_path,
+            &config_path,
+            &opts.skip_verify,
+        );
         // Release lock on completion (regardless of success/failure)
         let _ = release_migration_lock(&storage, lock_id);
         result
@@ -133,7 +143,11 @@ fn inner_migrate(
     // Step 2: Backup database
     let timestamp = Utc::now().format("%Y%m%d%H%M%S");
     let backup_path = db_path.with_extension(&format!("db.br-backup-{}", timestamp));
-    println!("  Backing up {} -> {}", db_path.display(), backup_path.display());
+    println!(
+        "  Backing up {} -> {}",
+        db_path.display(),
+        backup_path.display()
+    );
     std::fs::copy(db_path, &backup_path)?;
 
     // Step 3: Apply migrations (CREATE TABLE IF NOT EXISTS is idempotent)
@@ -158,7 +172,8 @@ fn inner_migrate(
         let forward_compat_ok = verify_forward_compat(storage)?;
         if !forward_compat_ok {
             verification.errors.push(
-                "Forward compatibility check failed: issues table column count mismatch".to_string()
+                "Forward compatibility check failed: issues table column count mismatch"
+                    .to_string(),
             );
         }
 
@@ -168,7 +183,8 @@ fn inner_migrate(
             Ok(doctor_result) => {
                 if !doctor_result.db_ok {
                     verification.errors.push(
-                        "Backward compatibility check failed: database integrity check failed".to_string()
+                        "Backward compatibility check failed: database integrity check failed"
+                            .to_string(),
                     );
                 }
                 if !doctor_result.issues.is_empty() {
@@ -178,7 +194,9 @@ fn inner_migrate(
                 }
             }
             Err(e) => {
-                verification.errors.push(format!("Backward compatibility check failed: {}", e));
+                verification
+                    .errors
+                    .push(format!("Backward compatibility check failed: {}", e));
             }
         }
     }
@@ -225,7 +243,9 @@ fn prime_critical_path_cache(storage: &Storage) -> Result<usize> {
         crate::critical_path::compute_all_critical_paths(tx)?;
 
         // Count how many beads were cached
-        let count: i64 = tx.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| row.get(0))?;
+        let count: i64 = tx.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| {
+            row.get(0)
+        })?;
         Ok(count as usize)
     })
 }
@@ -272,7 +292,10 @@ fn seed_config(config_path: &std::path::Path) -> Result<bool> {
     let yaml = serde_yaml::to_string(&config)?;
     let mut file = std::fs::File::create(config_path)?;
     writeln!(file, "# bead-forge configuration")?;
-    writeln!(file, "# br ignores bf-specific keys (claim_ttl_minutes, rotate_*)")?;
+    writeln!(
+        file,
+        "# br ignores bf-specific keys (claim_ttl_minutes, rotate_*)"
+    )?;
     file.write_all(yaml.as_bytes())?;
 
     Ok(true)
@@ -291,13 +314,41 @@ fn verify_forward_compat(storage: &Storage) -> Result<bool> {
     // These are the actual columns in br's issues table (from beads_rust schema)
     // Note: labels, dependencies, comments are in separate tables, NOT columns
     let expected_br_columns = vec![
-        "id", "title", "description", "design", "acceptance_criteria", "notes",
-        "status", "priority", "issue_type", "assignee", "owner", "estimated_minutes",
-        "created_at", "created_by", "updated_at", "closed_at", "close_reason",
-        "closed_by_session", "due_at", "defer_until", "external_ref", "source_system",
-        "source_repo", "deleted_at", "deleted_by", "delete_reason", "original_type",
-        "compaction_level", "compacted_at", "compacted_at_commit", "original_size",
-        "sender", "ephemeral", "pinned", "is_template",
+        "id",
+        "title",
+        "description",
+        "design",
+        "acceptance_criteria",
+        "notes",
+        "status",
+        "priority",
+        "issue_type",
+        "assignee",
+        "owner",
+        "estimated_minutes",
+        "created_at",
+        "created_by",
+        "updated_at",
+        "closed_at",
+        "close_reason",
+        "closed_by_session",
+        "due_at",
+        "defer_until",
+        "external_ref",
+        "source_system",
+        "source_repo",
+        "deleted_at",
+        "deleted_by",
+        "delete_reason",
+        "original_type",
+        "compaction_level",
+        "compacted_at",
+        "compacted_at_commit",
+        "original_size",
+        "sender",
+        "ephemeral",
+        "pinned",
+        "is_template",
     ];
 
     storage.with_immediate_transaction(|tx| {
@@ -337,12 +388,8 @@ fn verify_forward_compat(storage: &Storage) -> Result<bool> {
 /// 3. Creates synthetic events for state transitions
 /// 4. Optionally seeds velocity stats from reconstructed events
 pub fn migrate_from_jsonl(workspace: &Path, seed_velocity: bool) -> Result<MigrateResult> {
-    let beads_dir = find_beads_dir(workspace).ok_or_else(|| {
-        anyhow!(
-            "No .beads directory found in {:?}",
-            workspace
-        )
-    })?;
+    let beads_dir = find_beads_dir(workspace)
+        .ok_or_else(|| anyhow!("No .beads directory found in {:?}", workspace))?;
 
     let metadata = load_metadata(&beads_dir)?;
     let config = load_config(&beads_dir)?;
@@ -586,22 +633,13 @@ fn insert_synthetic_event(
 ///
 /// Runs: git log --follow --date=iso-strict -- .beads/issues.jsonl
 /// Then for each commit, runs: git show <commit>:path to get full contents
-fn parse_git_log_snapshots(
-    workspace: &Path,
-    jsonl_path: &Path,
-) -> Result<Vec<JsonlSnapshot>> {
+fn parse_git_log_snapshots(workspace: &Path, jsonl_path: &Path) -> Result<Vec<JsonlSnapshot>> {
     let relative_path = jsonl_path.strip_prefix(workspace).unwrap_or(jsonl_path);
     let path_str = relative_path.to_str().unwrap_or(".beads/issues.jsonl");
 
     // First, get list of commits that touched this file
     let output = Command::new("git")
-        .args([
-            "log",
-            "--follow",
-            "--format=%H|%ci",
-            "--",
-            path_str,
-        ])
+        .args(["log", "--follow", "--format=%H|%ci", "--", path_str])
         .current_dir(workspace)
         .output()?;
 

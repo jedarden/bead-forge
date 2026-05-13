@@ -18,20 +18,38 @@ fn test_critical_path_cache_invalidated_on_claim() {
     storage.create_issue(&b).unwrap();
     storage.create_issue(&c).unwrap();
 
-    storage.add_dependency("bf-b", "bf-a", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
-    storage.add_dependency("bf-c", "bf-b", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
+    storage
+        .add_dependency(
+            "bf-b",
+            "bf-a",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
+    storage
+        .add_dependency(
+            "bf-c",
+            "bf-b",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // Compute critical path - all beads should have float = 0
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
     assert_eq!(result.beads.len(), 3);
     for bead in &result.beads {
         assert_eq!(bead.float, 0, "Bead {} should have float 0", bead.bead_id);
     }
 
     // Claim bead A (status changes to in_progress)
-    let claim_result = storage.with_immediate_transaction(|tx| {
-        bead_forge::claim::claim(tx, "worker1", 30, Utc::now(), None)
-    }).unwrap();
+    let claim_result = storage
+        .with_immediate_transaction(|tx| {
+            bead_forge::claim::claim(tx, "worker1", 30, Utc::now(), None)
+        })
+        .unwrap();
 
     assert!(claim_result.is_some());
     assert_eq!(claim_result.unwrap().bead_id, "bf-a");
@@ -39,7 +57,9 @@ fn test_critical_path_cache_invalidated_on_claim() {
     // Verify cache was invalidated and recomputed
     // After claim, bf-a is in_progress so it's no longer an open root
     // The critical path should only have bf-b and bf-c (since bf-a is in_progress)
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
 
     // The cache should still have all 3 beads (compute_all_critical_paths computes all)
     // But the backward pass should now exclude bf-a from the "leaves" calculation
@@ -65,13 +85,17 @@ fn test_critical_path_cache_invalidated_on_reclaim() {
     storage.create_issue(&stale_bead).unwrap();
 
     // Compute initial critical path
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
     assert_eq!(result.beads.len(), 1);
 
     // Claim with a new worker - should reclaim the stale bead
-    let claim_result = storage.with_immediate_transaction(|tx| {
-        bead_forge::claim::claim(tx, "worker_new", 30, Utc::now(), None)
-    }).unwrap();
+    let claim_result = storage
+        .with_immediate_transaction(|tx| {
+            bead_forge::claim::claim(tx, "worker_new", 30, Utc::now(), None)
+        })
+        .unwrap();
 
     assert!(claim_result.is_some());
     assert_eq!(claim_result.unwrap().reclaimed, 1);
@@ -100,18 +124,29 @@ fn test_critical_path_cache_invalidated_on_dependency_add() {
     storage.create_issue(&b).unwrap();
 
     // Compute initial critical path - both are roots (float = 0)
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
     assert_eq!(result.beads.len(), 2);
     for bead in &result.beads {
         assert_eq!(bead.float, 0);
     }
 
     // Add dependency: B depends on A
-    storage.add_dependency("bf-b", "bf-a", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
+    storage
+        .add_dependency(
+            "bf-b",
+            "bf-a",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // Verify cache was invalidated and recomputed
     // Now A has ES=0, B has ES=1, both still on critical path
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
     assert_eq!(result.beads.len(), 2);
 
     let bead_a = result.beads.iter().find(|b| b.bead_id == "bf-a").unwrap();
@@ -139,10 +174,19 @@ fn test_critical_path_cache_invalidated_on_dependency_remove() {
 
     storage.create_issue(&a).unwrap();
     storage.create_issue(&b).unwrap();
-    storage.add_dependency("bf-b", "bf-a", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
+    storage
+        .add_dependency(
+            "bf-b",
+            "bf-a",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // Compute initial critical path
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
     assert_eq!(result.beads.len(), 2);
 
     // Remove dependency
@@ -150,7 +194,9 @@ fn test_critical_path_cache_invalidated_on_dependency_remove() {
 
     // Verify cache was invalidated and recomputed
     // Now both are independent roots (ES=0 for both)
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
     assert_eq!(result.beads.len(), 2);
 
     let bead_a = result.beads.iter().find(|b| b.bead_id == "bf-a").unwrap();
@@ -179,12 +225,32 @@ fn test_critical_path_cache_invalidated_on_status_change() {
     storage.create_issue(&b).unwrap();
     storage.create_issue(&c).unwrap();
 
-    storage.add_dependency("bf-b", "bf-a", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
-    storage.add_dependency("bf-c", "bf-b", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
+    storage
+        .add_dependency(
+            "bf-b",
+            "bf-a",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
+    storage
+        .add_dependency(
+            "bf-c",
+            "bf-b",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // All on critical path initially
-    let result = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
-    assert_eq!(result.beads.len(), 3, "All 3 beads should be in cache initially");
+    let result = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
+    assert_eq!(
+        result.beads.len(),
+        3,
+        "All 3 beads should be in cache initially"
+    );
 
     // Verify B is on critical path (float = 0)
     let bead_b = result.beads.iter().find(|b| b.bead_id == "bf-b").unwrap();
@@ -199,7 +265,9 @@ fn test_critical_path_cache_invalidated_on_status_change() {
 
     // Verify cache was invalidated by checking that the cache count changed
     // When we recompute after closing B, the cache should be different
-    let result2 = storage.with_immediate_transaction(|tx| compute_all_critical_paths(tx)).unwrap();
+    let result2 = storage
+        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .unwrap();
 
     // The cache should have been invalidated (deleted and recomputed)
     // After closing B, the critical path computation changes
@@ -210,9 +278,12 @@ fn test_critical_path_cache_invalidated_on_status_change() {
     // Initially: A(0) -> B(1) -> C(2), min_remaining = 3
     // After B closes: A is still a root, C depends on B (closed), so C becomes unblocked
     // The min_remaining should change
-    assert!(result2.min_remaining <= result.min_remaining,
+    assert!(
+        result2.min_remaining <= result.min_remaining,
         "min_remaining should change after closing B: was {}, now {}",
-        result.min_remaining, result2.min_remaining);
+        result.min_remaining,
+        result2.min_remaining
+    );
 
     // Cleanup
     let _ = std::fs::remove_file(db_path);

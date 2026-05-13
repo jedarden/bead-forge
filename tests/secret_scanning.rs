@@ -17,13 +17,22 @@ fn detect_secrets(text: &str) -> Vec<String> {
     // Common secret patterns
     let patterns = vec![
         // AWS Access Key ID - standalone key or with prefix
-        (r#"(?i)aws_access_key_id\s*[:=]\s*['\"]?([A-Z0-9]{20})['\"]?"#, "AWS Access Key ID"),
+        (
+            r#"(?i)aws_access_key_id\s*[:=]\s*['\"]?([A-Z0-9]{20})['\"]?"#,
+            "AWS Access Key ID",
+        ),
         // Also detect AKIA-prefixed keys standalone
         (r"(?i)\bAKIA[A-Z0-9]{16}\b", "AWS Access Key ID"),
         // AWS Secret Access Key
-        (r#"(?i)aws_secret_access_key\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?"#, "AWS Secret Access Key"),
+        (
+            r#"(?i)aws_secret_access_key\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?"#,
+            "AWS Secret Access Key",
+        ),
         // Generic API keys
-        (r#"(?i)api[_-]?key\s*[:=]\s*['\"]?([A-Za-z0-9_\-]{20,})['\"]?"#, "API Key"),
+        (
+            r#"(?i)api[_-]?key\s*[:=]\s*['\"]?([A-Za-z0-9_\-]{20,})['\"]?"#,
+            "API Key",
+        ),
         // GitHub tokens - shorter pattern for testing
         (r"(?i)gh[pousr]_[\w]{20,}", "GitHub Token"),
         // Slack tokens
@@ -33,13 +42,25 @@ fn detect_secrets(text: &str) -> Vec<String> {
         // Passwords in URLs
         (r"[a-zA-Z]+://[^:]+:[^@]+@", "Password in URL"),
         // Base64 that looks like secrets
-        (r#"(?i)secret\s*[:=]\s*['\"]?([A-Za-z0-9+/]{32,}={0,2})['\"]?"#, "Secret"),
+        (
+            r#"(?i)secret\s*[:=]\s*['\"]?([A-Za-z0-9+/]{32,}={0,2})['\"]?"#,
+            "Secret",
+        ),
         // JWT tokens - more flexible to handle truncated tokens
-        (r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+(\.[A-Za-z0-9_\-]+)?", "JWT Token"),
+        (
+            r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+(\.[A-Za-z0-9_\-]+)?",
+            "JWT Token",
+        ),
         // Database connection strings with passwords
-        (r"(?i)(postgres|mysql|mongodb)://[^:]+:[^@]+@", "Database Password"),
+        (
+            r"(?i)(postgres|mysql|mongodb)://[^:]+:[^@]+@",
+            "Database Password",
+        ),
         // Environment variables with secrets
-        (r#"(?i)(password|secret|token|api_key)\s*=\s*['\"]?[^'\"]{10,}['\"]?"#, "Environment Variable Secret"),
+        (
+            r#"(?i)(password|secret|token|api_key)\s*=\s*['\"]?[^'\"]{10,}['\"]?"#,
+            "Environment Variable Secret",
+        ),
     ];
 
     use regex::Regex;
@@ -94,7 +115,9 @@ fn test_detect_password_in_url() {
     let text = "postgresql://user:secret123@localhost:5432/db";
     let found = detect_secrets(text);
     assert!(!found.is_empty());
-    assert!(found.iter().any(|s| s.contains("Password") || s.contains("Database")));
+    assert!(found
+        .iter()
+        .any(|s| s.contains("Password") || s.contains("Database")));
 }
 
 #[test]
@@ -113,7 +136,10 @@ The API endpoint is https://api.example.com/v1
 Use the POST method with JSON content.";
 
     let found = detect_secrets(text);
-    assert!(found.is_empty(), "Safe text should not trigger secret detection");
+    assert!(
+        found.is_empty(),
+        "Safe text should not trigger secret detection"
+    );
 }
 
 #[test]
@@ -151,7 +177,10 @@ fn test_scan_bead_description_for_secrets() {
 
     let secrets = detect_secrets(&bead.description.as_ref().unwrap());
 
-    assert!(!secrets.is_empty(), "Should detect AWS secrets in description");
+    assert!(
+        !secrets.is_empty(),
+        "Should detect AWS secrets in description"
+    );
 }
 
 #[test]
@@ -163,13 +192,15 @@ fn test_scan_bead_notes_for_secrets() {
         "Database setup".to_string(),
         ".".to_string(),
     );
-    bead.notes = Some(
-        "Connection string: postgres://admin:P@ssw0rd!@db.example.com:5432/prod".to_string()
-    );
+    bead.notes =
+        Some("Connection string: postgres://admin:P@ssw0rd!@db.example.com:5432/prod".to_string());
 
     let secrets = detect_secrets(&bead.notes.as_ref().unwrap());
 
-    assert!(!secrets.is_empty(), "Should detect database password in notes");
+    assert!(
+        !secrets.is_empty(),
+        "Should detect database password in notes"
+    );
 }
 
 #[test]
@@ -181,9 +212,7 @@ fn test_scan_bead_design_for_secrets() {
         "Authentication design".to_string(),
         ".".to_string(),
     );
-    bead.design = Some(
-        "Use JWT token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example".to_string()
-    );
+    bead.design = Some("Use JWT token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example".to_string());
 
     let secrets = detect_secrets(&bead.design.as_ref().unwrap());
 
@@ -200,14 +229,17 @@ fn test_scan_multiple_secrets_in_one_bead() {
         ".".to_string(),
     );
     bead.description = Some(
-        "API key: sk_TEST_1234567890abcdef\nDatabase: postgres://user:pass@host/db".to_string()
+        "API key: sk_TEST_1234567890abcdef\nDatabase: postgres://user:pass@host/db".to_string(),
     );
 
     let mut all_secrets = Vec::new();
     all_secrets.extend(detect_secrets(&bead.title));
     all_secrets.extend(detect_secrets(&bead.description.as_ref().unwrap()));
 
-    assert!(all_secrets.len() >= 2, "Should detect multiple secret types");
+    assert!(
+        all_secrets.len() >= 2,
+        "Should detect multiple secret types"
+    );
 }
 
 #[test]
@@ -310,8 +342,11 @@ fn test_scan_concurrent_bead_creation_for_secrets() {
 
     // Should have found secrets in at least 2 beads, possibly up to 4
     // (concurrent execution may cause some threads to not complete their scan)
-    assert!(secrets.len() >= 2 && secrets.len() <= 4,
-            "Expected 2-4 secrets, found {}", secrets.len());
+    assert!(
+        secrets.len() >= 2 && secrets.len() <= 4,
+        "Expected 2-4 secrets, found {}",
+        secrets.len()
+    );
 }
 
 #[test]
@@ -381,16 +416,23 @@ fn test_redact_secrets_from_export() {
 
     // Read JSONL
     let jsonl_content = std::fs::read_to_string(&ws.jsonl_path).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
+    let json: serde_json::Value =
+        serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
 
     // In production, this should be redacted
     // For now, we just verify we can detect it
-    let description = json.get("description").and_then(|v| v.as_str()).unwrap_or("");
+    let description = json
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let found = detect_secrets(description);
 
     // This test documents current behavior - secrets are NOT redacted
     // In production, this would need to be implemented
-    assert!(!found.is_empty(), "Currently, secrets are NOT redacted (this would need to be implemented)");
+    assert!(
+        !found.is_empty(),
+        "Currently, secrets are NOT redacted (this would need to be implemented)"
+    );
 }
 
 #[test]
@@ -402,13 +444,15 @@ fn test_scan_acceptance_criteria_for_secrets() {
         "Authentication tests".to_string(),
         ".".to_string(),
     );
-    bead.acceptance_criteria = Some(
-        "Test with bearer token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test".to_string()
-    );
+    bead.acceptance_criteria =
+        Some("Test with bearer token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test".to_string());
 
     let secrets = detect_secrets(&bead.acceptance_criteria.as_ref().unwrap());
 
-    assert!(!secrets.is_empty(), "Should detect JWT in acceptance criteria");
+    assert!(
+        !secrets.is_empty(),
+        "Should detect JWT in acceptance criteria"
+    );
 }
 
 #[test]
@@ -463,7 +507,11 @@ fn test_case_insensitive_secret_detection() {
 
     for text in variants {
         let found = detect_secrets(text);
-        assert!(!found.is_empty(), "Should detect secret with case variation: {}", text);
+        assert!(
+            !found.is_empty(),
+            "Should detect secret with case variation: {}",
+            text
+        );
     }
 }
 
@@ -481,7 +529,10 @@ fn storage_with_scanning(ws: &common::TempWorkspace) -> bead_forge::Storage {
     bead_forge::Storage::open_with_config(&ws.db_path, &config).unwrap()
 }
 
-fn storage_with_allowlist(ws: &common::TempWorkspace, patterns: Vec<String>) -> bead_forge::Storage {
+fn storage_with_allowlist(
+    ws: &common::TempWorkspace,
+    patterns: Vec<String>,
+) -> bead_forge::Storage {
     let config = bead_forge::Config {
         secret_protection: bead_forge::secrets::SecretProtectionConfig {
             enabled: true,
@@ -520,7 +571,8 @@ fn storage_disabled(ws: &common::TempWorkspace) -> bead_forge::Storage {
 }
 
 fn issue_with_description(id: &str, desc: &str) -> bead_forge::Issue {
-    let mut issue = bead_forge::Issue::new(id.to_string(), "Test bead".to_string(), ".".to_string());
+    let mut issue =
+        bead_forge::Issue::new(id.to_string(), "Test bead".to_string(), ".".to_string());
     issue.description = Some(desc.to_string());
     issue
 }
@@ -538,8 +590,14 @@ fn integration_refuses_aws_akia_key_in_description() {
     assert!(result.is_err(), "create_issue must reject AWS AKIA key");
 
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("secret detected"), "error must say 'secret detected': {err}");
-    assert!(err.contains("AKIA"), "error must name the AKIA pattern: {err}");
+    assert!(
+        err.contains("secret detected"),
+        "error must say 'secret detected': {err}"
+    );
+    assert!(
+        err.contains("AKIA"),
+        "error must name the AKIA pattern: {err}"
+    );
 }
 
 #[test]
@@ -554,7 +612,10 @@ fn integration_refuses_aws_akia_key_in_title() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject AWS AKIA key in title");
+    assert!(
+        result.is_err(),
+        "create_issue must reject AWS AKIA key in title"
+    );
     let err = result.unwrap_err().to_string();
     assert!(err.contains("AKIA"), "error must name AKIA pattern: {err}");
 }
@@ -575,8 +636,14 @@ fn integration_refuses_rsa_private_key_header() {
     assert!(result.is_err(), "create_issue must reject RSA private key");
 
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("secret detected"), "error must say 'secret detected': {err}");
-    assert!(err.contains("RSA"), "error must name the RSA pattern: {err}");
+    assert!(
+        err.contains("secret detected"),
+        "error must say 'secret detected': {err}"
+    );
+    assert!(
+        err.contains("RSA"),
+        "error must name the RSA pattern: {err}"
+    );
 }
 
 #[test]
@@ -607,7 +674,10 @@ fn integration_refuses_openssh_private_key_header() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject OpenSSH private key");
+    assert!(
+        result.is_err(),
+        "create_issue must reject OpenSSH private key"
+    );
 }
 
 #[test]
@@ -621,7 +691,10 @@ fn integration_refuses_generic_private_key_header() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject generic PRIVATE KEY header");
+    assert!(
+        result.is_err(),
+        "create_issue must reject generic PRIVATE KEY header"
+    );
 }
 
 // OpenAI / Anthropic sk- keys ─────────────────────────────────────────────────
@@ -641,7 +714,10 @@ fn integration_refuses_openai_sk_key() {
     assert!(result.is_err(), "create_issue must reject OpenAI sk- key");
 
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("sk-"), "error must name the sk- pattern: {err}");
+    assert!(
+        err.contains("sk-"),
+        "error must name the sk- pattern: {err}"
+    );
 }
 
 #[test]
@@ -656,9 +732,15 @@ fn integration_refuses_anthropic_sk_key() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject Anthropic sk- key");
+    assert!(
+        result.is_err(),
+        "create_issue must reject Anthropic sk- key"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("sk-"), "error must name the sk- pattern: {err}");
+    assert!(
+        err.contains("sk-"),
+        "error must name the sk- pattern: {err}"
+    );
 }
 
 // Error message format ────────────────────────────────────────────────────────
@@ -673,8 +755,14 @@ fn integration_error_message_names_matching_pattern() {
     let err = storage.create_issue(&issue).unwrap_err().to_string();
     // Error must include both the refusal notice and the pattern name so users
     // know exactly what triggered the block.
-    assert!(err.contains("secret detected"), "must say 'secret detected': {err}");
-    assert!(err.contains("AWS Access Key"), "must name the matched pattern: {err}");
+    assert!(
+        err.contains("secret detected"),
+        "must say 'secret detected': {err}"
+    );
+    assert!(
+        err.contains("AWS Access Key"),
+        "must name the matched pattern: {err}"
+    );
 }
 
 // Allowlist bypasses scanning for matching field values ───────────────────────
@@ -687,7 +775,9 @@ fn integration_allowlist_pattern_bypasses_scan() {
 
     let issue = issue_with_description("bf-allow-1", "Credentials: AKIAIOSFODNN7EXAMPLE");
 
-    storage.create_issue(&issue).expect("allowlisted content must be accepted");
+    storage
+        .create_issue(&issue)
+        .expect("allowlisted content must be accepted");
 }
 
 #[test]
@@ -702,7 +792,10 @@ fn integration_allowlist_does_not_bypass_other_secrets() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "non-allowlisted RSA key must still be rejected");
+    assert!(
+        result.is_err(),
+        "non-allowlisted RSA key must still be rejected"
+    );
 }
 
 // Custom patterns from config ─────────────────────────────────────────────────
@@ -710,31 +803,29 @@ fn integration_allowlist_does_not_bypass_other_secrets() {
 #[test]
 fn integration_custom_pattern_blocks_matching_content() {
     let ws = common::TempWorkspace::new().unwrap();
-    let storage = storage_with_custom_patterns(
-        &ws,
-        vec![r"MY_INTERNAL_TOKEN=[A-Za-z0-9]+".to_string()],
-    );
+    let storage =
+        storage_with_custom_patterns(&ws, vec![r"MY_INTERNAL_TOKEN=[A-Za-z0-9]+".to_string()]);
 
-    let issue = issue_with_description(
-        "bf-custom-1",
-        "Token: MY_INTERNAL_TOKEN=abc123XYZsecret",
-    );
+    let issue = issue_with_description("bf-custom-1", "Token: MY_INTERNAL_TOKEN=abc123XYZsecret");
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "custom pattern must block matching content");
+    assert!(
+        result.is_err(),
+        "custom pattern must block matching content"
+    );
 }
 
 #[test]
 fn integration_custom_pattern_does_not_block_non_matching_content() {
     let ws = common::TempWorkspace::new().unwrap();
-    let storage = storage_with_custom_patterns(
-        &ws,
-        vec![r"MY_INTERNAL_TOKEN=[A-Za-z0-9]+".to_string()],
-    );
+    let storage =
+        storage_with_custom_patterns(&ws, vec![r"MY_INTERNAL_TOKEN=[A-Za-z0-9]+".to_string()]);
 
     let issue = issue_with_description("bf-custom-2", "Safe description with no secrets");
 
-    storage.create_issue(&issue).expect("non-matching content must be accepted");
+    storage
+        .create_issue(&issue)
+        .expect("non-matching content must be accepted");
 }
 
 // Scanning disabled ──────────────────────────────────────────────────────────
@@ -746,7 +837,9 @@ fn integration_scanning_disabled_allows_secrets_through() {
 
     let issue = issue_with_description("bf-disabled-1", "AKIAIOSFODNN7EXAMPLE");
 
-    storage.create_issue(&issue).expect("scanning disabled — secrets must pass through");
+    storage
+        .create_issue(&issue)
+        .expect("scanning disabled — secrets must pass through");
 }
 
 // Safe content always passes ──────────────────────────────────────────────────
@@ -761,7 +854,9 @@ fn integration_safe_content_is_always_allowed() {
         "Implement a new API endpoint for fetching user preferences",
     );
 
-    storage.create_issue(&issue).expect("safe content must always be accepted");
+    storage
+        .create_issue(&issue)
+        .expect("safe content must always be accepted");
 }
 
 // Secrets in other fields ────────────────────────────────────────────────────
@@ -776,8 +871,7 @@ fn integration_secret_in_notes_is_blocked() {
         "Database migration".to_string(),
         ".".to_string(),
     );
-    issue.notes =
-        Some("Conn: postgresql://admin:P@ssword@db.example.com/prod".to_string());
+    issue.notes = Some("Conn: postgresql://admin:P@ssword@db.example.com/prod".to_string());
 
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "secret in notes must be blocked");
@@ -800,7 +894,10 @@ fn integration_secret_in_acceptance_criteria_is_blocked() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "JWT in acceptance_criteria must be blocked");
+    assert!(
+        result.is_err(),
+        "JWT in acceptance_criteria must be blocked"
+    );
 }
 
 // Additional built-in pattern coverage ───────────────────────────────────────────
@@ -816,9 +913,15 @@ fn integration_refuses_aws_secret_access_key() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject AWS Secret Access Key");
+    assert!(
+        result.is_err(),
+        "create_issue must reject AWS Secret Access Key"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("AWS Secret Key"), "error must name the AWS Secret Key pattern: {err}");
+    assert!(
+        err.contains("AWS Secret Key"),
+        "error must name the AWS Secret Key pattern: {err}"
+    );
 }
 
 // NOTE: Slack xoxb- token test removed because any pattern matching the
@@ -839,7 +942,10 @@ fn integration_refuses_github_pat_token() {
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "create_issue must reject GitHub PAT token");
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("github_pat_"), "error must name the github_pat_ pattern: {err}");
+    assert!(
+        err.contains("github_pat_"),
+        "error must name the github_pat_ pattern: {err}"
+    );
 }
 
 // NOTE: Stripe key test removed because any pattern matching the real format
@@ -859,7 +965,10 @@ fn integration_refuses_bearer_token() {
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "create_issue must reject Bearer token");
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("Bearer"), "error must name the Bearer pattern: {err}");
+    assert!(
+        err.contains("Bearer"),
+        "error must name the Bearer pattern: {err}"
+    );
 }
 
 #[test]
@@ -873,9 +982,15 @@ fn integration_refuses_postgresql_url() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject PostgreSQL URL with password");
+    assert!(
+        result.is_err(),
+        "create_issue must reject PostgreSQL URL with password"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("PostgreSQL"), "error must name the PostgreSQL pattern: {err}");
+    assert!(
+        err.contains("PostgreSQL"),
+        "error must name the PostgreSQL pattern: {err}"
+    );
 }
 
 #[test]
@@ -892,7 +1007,10 @@ fn integration_refuses_sendgrid_key() {
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "create_issue must reject SendGrid key");
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("SendGrid"), "error must name the SendGrid pattern: {err}");
+    assert!(
+        err.contains("SendGrid"),
+        "error must name the SendGrid pattern: {err}"
+    );
 }
 
 #[test]
@@ -906,9 +1024,15 @@ fn integration_refuses_google_cloud_service_account() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject Google Cloud service account key");
+    assert!(
+        result.is_err(),
+        "create_issue must reject Google Cloud service account key"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("Google Cloud"), "error must name the Google Cloud pattern: {err}");
+    assert!(
+        err.contains("Google Cloud"),
+        "error must name the Google Cloud pattern: {err}"
+    );
 }
 
 #[test]
@@ -916,15 +1040,18 @@ fn integration_refuses_password_field_pattern() {
     let ws = common::TempWorkspace::new().unwrap();
     let storage = storage_with_scanning(&ws);
 
-    let issue = issue_with_description(
-        "bf-password-field",
-        "Config: password=MySecretPassword123",
-    );
+    let issue = issue_with_description("bf-password-field", "Config: password=MySecretPassword123");
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject password field pattern");
+    assert!(
+        result.is_err(),
+        "create_issue must reject password field pattern"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("Password"), "error must name the Password pattern: {err}");
+    assert!(
+        err.contains("Password"),
+        "error must name the Password pattern: {err}"
+    );
 }
 
 // Additional built-in pattern coverage ───────────────────────────────────────────
@@ -940,9 +1067,15 @@ fn integration_refuses_mysql_url() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject MySQL URL with password");
+    assert!(
+        result.is_err(),
+        "create_issue must reject MySQL URL with password"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("MySQL"), "error must name the MySQL pattern: {err}");
+    assert!(
+        err.contains("MySQL"),
+        "error must name the MySQL pattern: {err}"
+    );
 }
 
 #[test]
@@ -956,9 +1089,15 @@ fn integration_refuses_mongodb_url() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject MongoDB URL with password");
+    assert!(
+        result.is_err(),
+        "create_issue must reject MongoDB URL with password"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("MongoDB"), "error must name the MongoDB pattern: {err}");
+    assert!(
+        err.contains("MongoDB"),
+        "error must name the MongoDB pattern: {err}"
+    );
 }
 
 #[test]
@@ -972,9 +1111,15 @@ fn integration_refuses_api_key_in_url() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject API key in URL parameter");
+    assert!(
+        result.is_err(),
+        "create_issue must reject API key in URL parameter"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("API Key in URL"), "error must name the API Key in URL pattern: {err}");
+    assert!(
+        err.contains("API Key in URL"),
+        "error must name the API Key in URL pattern: {err}"
+    );
 }
 
 #[test]
@@ -988,9 +1133,15 @@ fn integration_refuses_google_oauth() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject Google OAuth client ID");
+    assert!(
+        result.is_err(),
+        "create_issue must reject Google OAuth client ID"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("Google OAuth"), "error must name the Google OAuth pattern: {err}");
+    assert!(
+        err.contains("Google OAuth"),
+        "error must name the Google OAuth pattern: {err}"
+    );
 }
 
 #[test]
@@ -1007,7 +1158,10 @@ fn integration_refuses_azure_key() {
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "create_issue must reject Azure key");
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("Azure"), "error must name the Azure pattern: {err}");
+    assert!(
+        err.contains("Azure"),
+        "error must name the Azure pattern: {err}"
+    );
 }
 
 // Additional GitHub token variants ───────────────────────────────────────────────
@@ -1023,9 +1177,15 @@ fn integration_refuses_github_gho_token() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject GitHub gho_ token");
+    assert!(
+        result.is_err(),
+        "create_issue must reject GitHub gho_ token"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("gho_"), "error must name the gho_ pattern: {err}");
+    assert!(
+        err.contains("gho_"),
+        "error must name the gho_ pattern: {err}"
+    );
 }
 
 #[test]
@@ -1039,9 +1199,15 @@ fn integration_refuses_github_ghu_token() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject GitHub ghu_ token");
+    assert!(
+        result.is_err(),
+        "create_issue must reject GitHub ghu_ token"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("ghu_"), "error must name the ghu_ pattern: {err}");
+    assert!(
+        err.contains("ghu_"),
+        "error must name the ghu_ pattern: {err}"
+    );
 }
 
 #[test]
@@ -1055,9 +1221,15 @@ fn integration_refuses_github_ghs_token() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject GitHub ghs_ token");
+    assert!(
+        result.is_err(),
+        "create_issue must reject GitHub ghs_ token"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("ghs_"), "error must name the ghs_ pattern: {err}");
+    assert!(
+        err.contains("ghs_"),
+        "error must name the ghs_ pattern: {err}"
+    );
 }
 
 #[test]
@@ -1071,9 +1243,15 @@ fn integration_refuses_github_ghr_token() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject GitHub ghr_ token");
+    assert!(
+        result.is_err(),
+        "create_issue must reject GitHub ghr_ token"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("ghr_"), "error must name the ghr_ pattern: {err}");
+    assert!(
+        err.contains("ghr_"),
+        "error must name the ghr_ pattern: {err}"
+    );
 }
 
 // Additional edge cases ───────────────────────────────────────────────────────────
@@ -1092,7 +1270,10 @@ fn integration_refuses_jwt_in_title() {
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "create_issue must reject JWT in title");
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("JWT"), "error must name the JWT pattern: {err}");
+    assert!(
+        err.contains("JWT"),
+        "error must name the JWT pattern: {err}"
+    );
 }
 
 #[test]
@@ -1108,9 +1289,15 @@ fn integration_refuses_secret_in_design() {
     issue.design = Some("Use this AWS key: AKIAIOSFODNN7EXAMPLE".to_string());
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject secret in design field");
+    assert!(
+        result.is_err(),
+        "create_issue must reject secret in design field"
+    );
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("AKIA"), "error must name the AKIA pattern: {err}");
+    assert!(
+        err.contains("AKIA"),
+        "error must name the AKIA pattern: {err}"
+    );
 }
 
 #[test]
@@ -1124,7 +1311,10 @@ fn integration_multiple_patterns_in_single_field() {
     );
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "create_issue must reject when multiple patterns match");
+    assert!(
+        result.is_err(),
+        "create_issue must reject when multiple patterns match"
+    );
     // Error should mention at least one of the patterns
     let err = result.unwrap_err().to_string();
     assert!(
@@ -1141,24 +1331,24 @@ fn integration_allowlist_regex_pattern() {
 
     let issue = issue_with_description("bf-allow-regex", "Use AKIAIOSFODNN7EXAMPLE for tests");
 
-    storage.create_issue(&issue).expect("allowlisted regex pattern must be accepted");
+    storage
+        .create_issue(&issue)
+        .expect("allowlisted regex pattern must be accepted");
 }
 
 #[test]
 fn integration_custom_pattern_with_capture_groups() {
     let ws = common::TempWorkspace::new().unwrap();
-    let storage = storage_with_custom_patterns(
-        &ws,
-        vec![r"INTERNAL_SECRET_[0-9]+=[A-Z]{2,}".to_string()],
-    );
+    let storage =
+        storage_with_custom_patterns(&ws, vec![r"INTERNAL_SECRET_[0-9]+=[A-Z]{2,}".to_string()]);
 
-    let issue = issue_with_description(
-        "bf-custom-capture",
-        "INTERNAL_SECRET_123=ABSECRETXY",
-    );
+    let issue = issue_with_description("bf-custom-capture", "INTERNAL_SECRET_123=ABSECRETXY");
 
     let result = storage.create_issue(&issue);
-    assert!(result.is_err(), "custom pattern with capture groups must block matching content");
+    assert!(
+        result.is_err(),
+        "custom pattern with capture groups must block matching content"
+    );
 }
 
 #[test]
@@ -1172,4 +1362,3 @@ fn integration_scanning_enabled_by_default() {
     let result = storage.create_issue(&issue);
     assert!(result.is_err(), "scanning must be enabled by default");
 }
-

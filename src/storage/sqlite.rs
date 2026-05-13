@@ -1,7 +1,8 @@
 use crate::critical_path::invalidate_cache;
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
-    Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter, IssueType, Status,
+    Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter,
+    IssueType, Status,
 };
 use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
@@ -31,7 +32,7 @@ pub struct DepTreeNode {
     pub priority: i32,
     pub depth: i64,
     pub dep_type: Option<String>,
-    pub path: String,  // Comma-separated path of IDs for cycle detection
+    pub path: String, // Comma-separated path of IDs for cycle detection
 }
 
 pub struct Storage {
@@ -126,8 +127,12 @@ impl Storage {
                     Ok(_) => {
                         let r = f(&conn);
                         match &r {
-                            Ok(_) => { let _ = conn.execute_batch("COMMIT"); }
-                            Err(_) => { let _ = conn.execute_batch("ROLLBACK"); }
+                            Ok(_) => {
+                                let _ = conn.execute_batch("COMMIT");
+                            }
+                            Err(_) => {
+                                let _ = conn.execute_batch("ROLLBACK");
+                            }
                         }
                         Some(r)
                     }
@@ -205,7 +210,8 @@ impl Storage {
         }
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(&query)?;
-        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
         let mut rows = stmt.query(param_refs.as_slice())?;
         let mut issues = Vec::new();
         while let Some(row) = rows.next()? {
@@ -272,7 +278,11 @@ impl Storage {
         }
 
         // Compute content_hash if not already set, and wrap in Some for storage
-        let content_hash: Option<String> = issue.content_hash.as_ref().cloned().or_else(|| Some(issue.content_hash()));
+        let content_hash: Option<String> = issue
+            .content_hash
+            .as_ref()
+            .cloned()
+            .or_else(|| Some(issue.content_hash()));
 
         self.with_immediate_transaction(|tx| {
             tx.execute(
@@ -458,14 +468,23 @@ impl Storage {
             if let Some(ref labels) = changes.labels {
                 tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![id])?;
                 for label in labels {
-                    tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![id, label])?;
+                    tx.execute(
+                        "INSERT INTO labels (issue_id, label) VALUES (?1, ?2)",
+                        params![id, label],
+                    )?;
                 }
             }
             // Handle annotation updates separately
             if let Some(ref annotations) = changes.annotations {
-                tx.execute("DELETE FROM bead_annotations WHERE bead_id = ?1", params![id])?;
+                tx.execute(
+                    "DELETE FROM bead_annotations WHERE bead_id = ?1",
+                    params![id],
+                )?;
                 for (key, value) in annotations {
-                    tx.execute("INSERT INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)", params![id, key, value])?;
+                    tx.execute(
+                        "INSERT INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)",
+                        params![id, key, value],
+                    )?;
                 }
             }
             // Mark as dirty for export (if any changes were made)
@@ -644,10 +663,13 @@ impl Storage {
         })
     }
 
-
     pub fn sync_to_jsonl(&self, jsonl_path: &Path, dirty_only: bool) -> Result<usize> {
         if dirty_only {
-            let result = export_jsonl_dirty(jsonl_path, || self.list_dirty_issues(), || self.clear_dirty())?;
+            let result = export_jsonl_dirty(
+                jsonl_path,
+                || self.list_dirty_issues(),
+                || self.clear_dirty(),
+            )?;
             Ok(result.count)
         } else {
             let result = export_jsonl(jsonl_path, || self.list_all_issues())?;
@@ -732,8 +754,11 @@ impl Storage {
             deps.push(Dependency {
                 issue_id: row.get(0)?,
                 depends_on_id: row.get(1)?,
-                dep_type: DependencyType::from_str(&type_str).unwrap_or(DependencyType::Custom(type_str)),
-                metadata: row.get::<_, Option<String>>(3)?.and_then(|s| serde_json::from_str(&s).ok()),
+                dep_type: DependencyType::from_str(&type_str)
+                    .unwrap_or(DependencyType::Custom(type_str)),
+                metadata: row
+                    .get::<_, Option<String>>(3)?
+                    .and_then(|s| serde_json::from_str(&s).ok()),
                 thread_id: row.get(4)?,
                 created_at: parse_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
@@ -760,8 +785,12 @@ impl Storage {
         Ok(comments)
     }
 
-    fn load_annotations_conn(conn: &Connection, issue_id: &str) -> Result<BTreeMap<String, String>> {
-        let mut stmt = conn.prepare("SELECT key, value FROM bead_annotations WHERE bead_id = ?1")?;
+    fn load_annotations_conn(
+        conn: &Connection,
+        issue_id: &str,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut stmt =
+            conn.prepare("SELECT key, value FROM bead_annotations WHERE bead_id = ?1")?;
         let mut rows = stmt.query(params![issue_id])?;
         let mut annotations = BTreeMap::new();
         while let Some(row) = rows.next()? {
@@ -792,7 +821,13 @@ impl Storage {
         Self::load_annotations_conn(&conn, issue_id)
     }
 
-    pub fn add_dependency(&self, issue_id: &str, depends_on_id: &str, dep_type: &DependencyType, created_by: &str) -> Result<()> {
+    pub fn add_dependency(
+        &self,
+        issue_id: &str,
+        depends_on_id: &str,
+        dep_type: &DependencyType,
+        created_by: &str,
+    ) -> Result<()> {
         self.with_immediate_transaction(|tx| {
             let now = Utc::now();
             tx.execute(
@@ -807,7 +842,10 @@ impl Storage {
 
     pub fn remove_dependency(&self, issue_id: &str, depends_on_id: &str) -> Result<()> {
         self.with_immediate_transaction(|tx| {
-            tx.execute("DELETE FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2", params![issue_id, depends_on_id])?;
+            tx.execute(
+                "DELETE FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2",
+                params![issue_id, depends_on_id],
+            )?;
             // Invalidate critical path cache after removing a dependency
             invalidate_cache(tx)?;
             Ok(())
@@ -827,7 +865,12 @@ impl Storage {
     ///
     /// # Returns
     /// Vector of tree nodes ordered by depth, suitable for tree display.
-    pub fn get_dep_tree(&self, root_id: &str, direction: &str, max_depth: usize) -> Result<Vec<DepTreeNode>> {
+    pub fn get_dep_tree(
+        &self,
+        root_id: &str,
+        direction: &str,
+        max_depth: usize,
+    ) -> Result<Vec<DepTreeNode>> {
         let conn = self.conn.lock().unwrap();
 
         // Build recursive CTE based on direction
@@ -840,7 +883,7 @@ impl Storage {
                     "d.depends_on_id = ?1",
                     "d.depends_on_id = rec.id",
                     "d.issue_id",
-                    "d.depends_on_id"
+                    "d.depends_on_id",
                 )
             }
             _ => {
@@ -851,7 +894,7 @@ impl Storage {
                     "d.issue_id = ?1",
                     "d.issue_id = rec.id",
                     "d.depends_on_id",
-                    "d.issue_id"
+                    "d.issue_id",
                 )
             }
         };
@@ -915,7 +958,11 @@ impl Storage {
                 priority: row.get(3)?,
                 depth: row.get(4)?,
                 dep_type: row.get::<_, Option<String>>(5)?,
-                path: if is_cycle { format!("{} [CYCLE]", path) } else { path },
+                path: if is_cycle {
+                    format!("{} [CYCLE]", path)
+                } else {
+                    path
+                },
             });
         }
         Ok(nodes)
@@ -933,8 +980,11 @@ impl Storage {
             deps.push(Dependency {
                 issue_id: row.get(0)?,
                 depends_on_id: row.get(1)?,
-                dep_type: DependencyType::from_str(&type_str).unwrap_or(DependencyType::Custom(type_str)),
-                metadata: row.get::<_, Option<String>>(3)?.and_then(|s| serde_json::from_str(&s).ok()),
+                dep_type: DependencyType::from_str(&type_str)
+                    .unwrap_or(DependencyType::Custom(type_str)),
+                metadata: row
+                    .get::<_, Option<String>>(3)?
+                    .and_then(|s| serde_json::from_str(&s).ok()),
                 thread_id: row.get(4)?,
                 created_at: parse_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
@@ -945,14 +995,20 @@ impl Storage {
 
     pub fn add_label(&self, issue_id: &str, label: &str) -> Result<()> {
         self.with_immediate_transaction(|tx| {
-            tx.execute("INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)", params![issue_id, label])?;
+            tx.execute(
+                "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
+                params![issue_id, label],
+            )?;
             Ok(())
         })
     }
 
     pub fn remove_label(&self, issue_id: &str, label: &str) -> Result<()> {
         self.with_immediate_transaction(|tx| {
-            tx.execute("DELETE FROM labels WHERE issue_id = ?1 AND label = ?2", params![issue_id, label])?;
+            tx.execute(
+                "DELETE FROM labels WHERE issue_id = ?1 AND label = ?2",
+                params![issue_id, label],
+            )?;
             Ok(())
         })
     }
@@ -963,7 +1019,9 @@ impl Storage {
 
     pub fn list_all_labels(&self) -> Result<Vec<(String, i64)>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT label, COUNT(*) as count FROM labels GROUP BY label ORDER BY count DESC")?;
+        let mut stmt = conn.prepare(
+            "SELECT label, COUNT(*) as count FROM labels GROUP BY label ORDER BY count DESC",
+        )?;
         let mut rows = stmt.query([])?;
         let mut labels = Vec::new();
         while let Some(row) = rows.next()? {
@@ -1058,8 +1116,7 @@ impl Storage {
         Ok(Event {
             id: row.get(0)?,
             issue_id: row.get(1)?,
-            event_type: EventType::from_str(&type_str)
-                .unwrap_or(EventType::Custom(type_str)),
+            event_type: EventType::from_str(&type_str).unwrap_or(EventType::Custom(type_str)),
             actor: row.get(3)?,
             old_value: row.get(4)?,
             new_value: row.get(5)?,
@@ -1095,11 +1152,24 @@ impl Storage {
 
     pub fn clear_annotations(&self, issue_id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM bead_annotations WHERE bead_id = ?1", params![issue_id])?;
+        conn.execute(
+            "DELETE FROM bead_annotations WHERE bead_id = ?1",
+            params![issue_id],
+        )?;
         Ok(())
     }
 
-    pub fn search_issues(&self, query: Option<&str>, status: &[Status], issue_type: &[IssueType], assignee: Option<&str>, labels: &[String], priority_min: Option<i32>, priority_max: Option<i32>, limit: usize) -> Result<Vec<Issue>> {
+    pub fn search_issues(
+        &self,
+        query: Option<&str>,
+        status: &[Status],
+        issue_type: &[IssueType],
+        assignee: Option<&str>,
+        labels: &[String],
+        priority_min: Option<i32>,
+        priority_max: Option<i32>,
+        limit: usize,
+    ) -> Result<Vec<Issue>> {
         let mut sql = String::from(
             "SELECT DISTINCT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
                     i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
@@ -1115,7 +1185,11 @@ impl Storage {
         let mut params = Vec::new();
         let mut param_idx = 1;
         if let Some(q) = query {
-            sql.push_str(&format!(" AND (i.title LIKE ?{} OR i.description LIKE ?{})", param_idx, param_idx + 1));
+            sql.push_str(&format!(
+                " AND (i.title LIKE ?{} OR i.description LIKE ?{})",
+                param_idx,
+                param_idx + 1
+            ));
             params.push(format!("%{}%", q));
             params.push(format!("%{}%", q));
             param_idx += 2;
@@ -1136,7 +1210,11 @@ impl Storage {
             param_idx += 1;
         }
         if !labels.is_empty() {
-            let label_conditions: Vec<String> = labels.iter().enumerate().map(|(i, _)| format!("l.label = ?{}", param_idx + i)).collect();
+            let label_conditions: Vec<String> = labels
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("l.label = ?{}", param_idx + i))
+                .collect();
             sql.push_str(&format!(" AND ({}) ", label_conditions.join(" OR ")));
             for label in labels {
                 params.push(label.clone());
@@ -1159,7 +1237,8 @@ impl Storage {
         }
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(&sql)?;
-        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
         let mut rows = stmt.query(param_refs.as_slice())?;
         let mut issues = Vec::new();
         while let Some(row) = rows.next()? {
@@ -1170,11 +1249,32 @@ impl Storage {
 
     pub fn get_stats(&self) -> Result<Stats> {
         let conn = self.conn.lock().unwrap();
-        let total: i64 = conn.query_row("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL", [], |row| row.get(0))?;
-        let open: i64 = conn.query_row("SELECT COUNT(*) FROM issues WHERE status = 'open' AND deleted_at IS NULL", [], |row| row.get(0))?;
-        let in_progress: i64 = conn.query_row("SELECT COUNT(*) FROM issues WHERE status = 'in_progress' AND deleted_at IS NULL", [], |row| row.get(0))?;
-        let closed: i64 = conn.query_row("SELECT COUNT(*) FROM issues WHERE status = 'closed' AND deleted_at IS NULL", [], |row| row.get(0))?;
-        Ok(Stats { total: total as usize, open: open as usize, in_progress: in_progress as usize, closed: closed as usize })
+        let total: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let open: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM issues WHERE status = 'open' AND deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let in_progress: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM issues WHERE status = 'in_progress' AND deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let closed: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM issues WHERE status = 'closed' AND deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(Stats {
+            total: total as usize,
+            open: open as usize,
+            in_progress: in_progress as usize,
+            closed: closed as usize,
+        })
     }
 
     pub fn get_stats_by_type(&self) -> Result<Vec<(String, i64)>> {
@@ -1317,7 +1417,11 @@ impl Storage {
     /// Create an issue within a transaction context.
     pub fn create_issue_tx(tx: &Connection, issue: &Issue) -> Result<()> {
         // Compute content_hash if not already set, and wrap in Some for storage
-        let content_hash: Option<String> = issue.content_hash.as_ref().cloned().or_else(|| Some(issue.content_hash()));
+        let content_hash: Option<String> = issue
+            .content_hash
+            .as_ref()
+            .cloned()
+            .or_else(|| Some(issue.content_hash()));
 
         tx.execute(
             "INSERT INTO issues (
@@ -1332,29 +1436,49 @@ impl Storage {
                   ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
                   ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36)",
             params![
-                &issue.id, &content_hash, &issue.title,
+                &issue.id,
+                &content_hash,
+                &issue.title,
                 issue.description.as_deref().unwrap_or(""),
                 issue.design.as_deref().unwrap_or(""),
                 issue.acceptance_criteria.as_deref().unwrap_or(""),
                 issue.notes.as_deref().unwrap_or(""),
                 &issue.status.to_string(),
-                &issue.priority, &issue.issue_type.to_string(), &issue.assignee, &issue.owner,
-                &issue.estimated_minutes, &issue.created_at.to_rfc3339(), &issue.created_by,
-                &issue.updated_at.to_rfc3339(), issue.closed_at.map(|d| d.to_rfc3339()),
-                &issue.close_reason, &issue.closed_by_session, issue.due_at.map(|d| d.to_rfc3339()),
-                issue.defer_until.map(|d| d.to_rfc3339()), &issue.external_ref, &issue.source_system,
+                &issue.priority,
+                &issue.issue_type.to_string(),
+                &issue.assignee,
+                &issue.owner,
+                &issue.estimated_minutes,
+                &issue.created_at.to_rfc3339(),
+                &issue.created_by,
+                &issue.updated_at.to_rfc3339(),
+                issue.closed_at.map(|d| d.to_rfc3339()),
+                &issue.close_reason,
+                &issue.closed_by_session,
+                issue.due_at.map(|d| d.to_rfc3339()),
+                issue.defer_until.map(|d| d.to_rfc3339()),
+                &issue.external_ref,
+                &issue.source_system,
                 issue.source_repo.as_deref().unwrap_or("."),
-                issue.deleted_at.map(|d| d.to_rfc3339()), &issue.deleted_by,
-                &issue.delete_reason, &issue.original_type, &issue.compaction_level,
-                issue.compacted_at.map(|d| d.to_rfc3339()), &issue.compacted_at_commit,
-                &issue.original_size, &issue.sender,
+                issue.deleted_at.map(|d| d.to_rfc3339()),
+                &issue.deleted_by,
+                &issue.delete_reason,
+                &issue.original_type,
+                &issue.compaction_level,
+                issue.compacted_at.map(|d| d.to_rfc3339()),
+                &issue.compacted_at_commit,
+                &issue.original_size,
+                &issue.sender,
                 if issue.ephemeral { 1 } else { 0 },
                 if issue.pinned { 1 } else { 0 },
                 if issue.is_template { 1 } else { 0 },
             ],
         )?;
         for label in &issue.labels {
-            tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+            tx.execute(
+                "INSERT INTO labels (issue_id, label) VALUES (?1, ?2)",
+                params![&issue.id, label],
+            )?;
         }
         for dep in &issue.dependencies {
             tx.execute(
@@ -1388,12 +1512,25 @@ impl Storage {
     /// Update an issue from JSON within a transaction context.
     pub fn update_issue_from_json_tx(tx: &Connection, issue: &Issue) -> Result<()> {
         // Compute content_hash (it's None when importing from JSONL due to #[serde(skip)])
-        let content_hash = issue.content_hash.as_ref().cloned().unwrap_or_else(|| issue.content_hash());
+        let content_hash = issue
+            .content_hash
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| issue.content_hash());
 
         tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
-        tx.execute("DELETE FROM dependencies WHERE issue_id = ?1", params![&issue.id])?;
-        tx.execute("DELETE FROM comments WHERE issue_id = ?1", params![&issue.id])?;
-        tx.execute("DELETE FROM bead_annotations WHERE bead_id = ?1", params![&issue.id])?;
+        tx.execute(
+            "DELETE FROM dependencies WHERE issue_id = ?1",
+            params![&issue.id],
+        )?;
+        tx.execute(
+            "DELETE FROM comments WHERE issue_id = ?1",
+            params![&issue.id],
+        )?;
+        tx.execute(
+            "DELETE FROM bead_annotations WHERE bead_id = ?1",
+            params![&issue.id],
+        )?;
 
         tx.execute(
             "UPDATE issues SET
@@ -1408,22 +1545,38 @@ impl Storage {
                 original_size = ?31, sender = ?32, ephemeral = ?33, pinned = ?34, is_template = ?35
              WHERE id = ?36",
             params![
-                &content_hash, &issue.title,
+                &content_hash,
+                &issue.title,
                 issue.description.as_deref().unwrap_or(""),
                 issue.design.as_deref().unwrap_or(""),
                 issue.acceptance_criteria.as_deref().unwrap_or(""),
                 issue.notes.as_deref().unwrap_or(""),
                 &issue.status.to_string(),
-                &issue.priority, &issue.issue_type.to_string(), &issue.assignee, &issue.owner,
-                &issue.estimated_minutes, &issue.created_at.to_rfc3339(), &issue.created_by,
-                &issue.updated_at.to_rfc3339(), issue.closed_at.map(|d| d.to_rfc3339()),
-                &issue.close_reason, &issue.closed_by_session, issue.due_at.map(|d| d.to_rfc3339()),
-                issue.defer_until.map(|d| d.to_rfc3339()), &issue.external_ref, &issue.source_system,
+                &issue.priority,
+                &issue.issue_type.to_string(),
+                &issue.assignee,
+                &issue.owner,
+                &issue.estimated_minutes,
+                &issue.created_at.to_rfc3339(),
+                &issue.created_by,
+                &issue.updated_at.to_rfc3339(),
+                issue.closed_at.map(|d| d.to_rfc3339()),
+                &issue.close_reason,
+                &issue.closed_by_session,
+                issue.due_at.map(|d| d.to_rfc3339()),
+                issue.defer_until.map(|d| d.to_rfc3339()),
+                &issue.external_ref,
+                &issue.source_system,
                 issue.source_repo.as_deref().unwrap_or("."),
-                issue.deleted_at.map(|d| d.to_rfc3339()), &issue.deleted_by,
-                &issue.delete_reason, &issue.original_type, &issue.compaction_level,
-                issue.compacted_at.map(|d| d.to_rfc3339()), &issue.compacted_at_commit,
-                &issue.original_size, &issue.sender,
+                issue.deleted_at.map(|d| d.to_rfc3339()),
+                &issue.deleted_by,
+                &issue.delete_reason,
+                &issue.original_type,
+                &issue.compaction_level,
+                issue.compacted_at.map(|d| d.to_rfc3339()),
+                &issue.compacted_at_commit,
+                &issue.original_size,
+                &issue.sender,
                 if issue.ephemeral { 1 } else { 0 },
                 if issue.pinned { 1 } else { 0 },
                 if issue.is_template { 1 } else { 0 },
@@ -1432,7 +1585,10 @@ impl Storage {
         )?;
 
         for label in &issue.labels {
-            tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+            tx.execute(
+                "INSERT INTO labels (issue_id, label) VALUES (?1, ?2)",
+                params![&issue.id, label],
+            )?;
         }
         for dep in &issue.dependencies {
             tx.execute(
@@ -1473,7 +1629,16 @@ pub struct Stats {
 }
 
 fn is_busy_error(e: &rusqlite::Error) -> bool {
-    matches!(e, rusqlite::Error::SqliteFailure(rusqlite::ffi::Error { code: rusqlite::ErrorCode::DatabaseBusy, .. }, _))
+    matches!(
+        e,
+        rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error {
+                code: rusqlite::ErrorCode::DatabaseBusy,
+                ..
+            },
+            _
+        )
+    )
 }
 
 fn parse_datetime(s: String) -> Result<DateTime<Utc>> {
@@ -1486,7 +1651,8 @@ fn format_secret_matches(matches: &[SecretMatch]) -> String {
     msg.push_str("The following patterns matched:\n");
 
     // Group by pattern name
-    let mut by_pattern: std::collections::HashMap<&str, Vec<&SecretMatch>> = std::collections::HashMap::new();
+    let mut by_pattern: std::collections::HashMap<&str, Vec<&SecretMatch>> =
+        std::collections::HashMap::new();
     for m in matches {
         by_pattern.entry(&m.pattern_name).or_default().push(m);
     }
@@ -1504,7 +1670,9 @@ fn format_secret_matches(matches: &[SecretMatch]) -> String {
         }
     }
 
-    msg.push_str("\nIf this is a false positive, add an allowlist pattern to .beads/config.yaml:\n");
+    msg.push_str(
+        "\nIf this is a false positive, add an allowlist pattern to .beads/config.yaml:\n",
+    );
     msg.push_str("  secret_protection:\n");
     msg.push_str("    allowlist:\n");
     msg.push_str("      - \"<regex pattern to exclude>\"\n");

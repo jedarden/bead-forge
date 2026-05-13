@@ -85,7 +85,9 @@ fn parse_diff_and_scan(
             // New file path
             let path = line[4..].trim().to_string();
             // Strip "a/" or "b/" prefix if present
-            let path = path.strip_prefix("a/").or_else(|| path.strip_prefix("b/"))
+            let path = path
+                .strip_prefix("a/")
+                .or_else(|| path.strip_prefix("b/"))
                 .unwrap_or(&path);
             // Strip trailing tab with timestamp if present
             let path = path.split('\t').next().unwrap_or(path);
@@ -113,12 +115,7 @@ fn parse_diff_and_scan(
                     // Deduplicate by (file, line, matched_text)
                     let key = (file.clone(), current_line, m.matched_text.clone());
                     if seen.insert(key) {
-                        secrets_found.push((
-                            file.clone(),
-                            current_line,
-                            content.to_string(),
-                            m,
-                        ));
+                        secrets_found.push((file.clone(), current_line, content.to_string(), m));
                     }
                 }
             }
@@ -169,12 +166,7 @@ fn scan_staged_files(
             for m in matches {
                 let key = (file.to_string(), line_num + 1, m.matched_text.clone());
                 if seen.insert(key) {
-                    secrets_found.push((
-                        file.to_string(),
-                        line_num + 1,
-                        line.to_string(),
-                        m,
-                    ));
+                    secrets_found.push((file.to_string(), line_num + 1, line.to_string(), m));
                 }
             }
         }
@@ -195,25 +187,14 @@ pub fn format_scan_results(result: &ScanResult) -> String {
     let mut output = String::from("Secrets detected in staged .beads/ changes:\n");
 
     for (file, line_num, line_content, secret_match) in &result.secrets_found {
-        output.push_str(&format!(
-            "\n  {}:{}\n",
-            file, line_num
-        ));
-        output.push_str(&format!(
-            "    Pattern: {}\n",
-            secret_match.pattern_name
-        ));
-        output.push_str(&format!(
-            "    Matched: {}\n",
-            secret_match.matched_text
-        ));
-        output.push_str(&format!(
-            "    Line: {}\n",
-            line_content.trim()
-        ));
+        output.push_str(&format!("\n  {}:{}\n", file, line_num));
+        output.push_str(&format!("    Pattern: {}\n", secret_match.pattern_name));
+        output.push_str(&format!("    Matched: {}\n", secret_match.matched_text));
+        output.push_str(&format!("    Line: {}\n", line_content.trim()));
     }
 
-    output.push_str("\nCommit rejected. Remove secrets or add to allowlist in .beads/config.yaml:\n");
+    output
+        .push_str("\nCommit rejected. Remove secrets or add to allowlist in .beads/config.yaml:\n");
     output.push_str("  secret_protection:\n");
     output.push_str("    allowlist:\n");
     output.push_str("      - \"pattern_regex\"\n");

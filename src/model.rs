@@ -13,7 +13,9 @@ impl rusqlite::types::ToSql for Priority {
 }
 
 impl rusqlite::types::FromSql for Priority {
-    fn column_result(value: rusqlite::types::ValueRef<'_>) -> Result<Self, rusqlite::types::FromSqlError> {
+    fn column_result(
+        value: rusqlite::types::ValueRef<'_>,
+    ) -> Result<Self, rusqlite::types::FromSqlError> {
         i32::column_result(value).map(Priority)
     }
 }
@@ -902,7 +904,10 @@ mod tests {
         assert_eq!(issue.status, Status::InProgress);
         assert_eq!(issue.priority, Priority::CRITICAL);
         assert_eq!(issue.issue_type, IssueType::Task);
-        assert_eq!(issue.assignee.as_deref(), Some("claude-code-glm-4.7-november"));
+        assert_eq!(
+            issue.assignee.as_deref(),
+            Some("claude-code-glm-4.7-november")
+        );
         assert_eq!(issue.source_repo.as_deref(), Some("."));
         assert_eq!(issue.compaction_level, Some(0));
         assert_eq!(issue.original_size, Some(0));
@@ -910,7 +915,8 @@ mod tests {
 
         // Serialize back and verify
         let serialized = serde_json::to_string(&issue).expect("Failed to serialize");
-        let roundtrip: Issue = serde_json::from_str(&serialized).expect("Failed to deserialize roundtrip");
+        let roundtrip: Issue =
+            serde_json::from_str(&serialized).expect("Failed to deserialize roundtrip");
 
         // All fields should match after roundtrip
         assert_eq!(issue, roundtrip);

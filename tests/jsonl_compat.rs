@@ -102,11 +102,8 @@ fn test_jsonl_round_trip_with_dependencies() {
     ws.create_bead("bf-parent", "Parent").unwrap();
 
     // Create child bead with dependency
-    let mut child = bead_forge::Issue::new(
-        "bf-child".to_string(),
-        "Child".to_string(),
-        ".".to_string(),
-    );
+    let mut child =
+        bead_forge::Issue::new("bf-child".to_string(), "Child".to_string(), ".".to_string());
     child.dependencies.push(bead_forge::model::Dependency {
         issue_id: "bf-child".to_string(),
         depends_on_id: "bf-parent".to_string(),
@@ -273,18 +270,25 @@ fn test_jsonl_round_trip_recomputes_content_hash() {
 
     // Verify content is semantically identical using sync_equals
     let reimported = ws2.get_bead("bf-hash").unwrap().unwrap();
-    assert!(original.sync_equals(&reimported),
-            "Content should be semantically identical after JSONL round-trip");
+    assert!(
+        original.sync_equals(&reimported),
+        "Content should be semantically identical after JSONL round-trip"
+    );
 
     // Verify content_hash was computed (not None)
-    assert!(reimported.content_hash.is_some(),
-            "content_hash should be computed on import");
+    assert!(
+        reimported.content_hash.is_some(),
+        "content_hash should be computed on import"
+    );
 
     // Verify the JSONL doesn't contain content_hash (it's #[serde(skip)])
     let jsonl_content = fs::read_to_string(&ws.jsonl_path).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
-    assert!(json.get("content_hash").is_none(),
-            "content_hash should NOT be serialized in JSONL (it's #[serde(skip)])");
+    let json: serde_json::Value =
+        serde_json::from_str(&jsonl_content.lines().next().unwrap()).unwrap();
+    assert!(
+        json.get("content_hash").is_none(),
+        "content_hash should NOT be serialized in JSONL (it's #[serde(skip)])"
+    );
 }
 
 #[test]
@@ -401,8 +405,14 @@ fn test_jsonl_handles_unicode() {
 
     let reimported = ws2.get_bead("bf-unicode").unwrap().unwrap();
     assert_eq!(reimported.title, "Unicode: 你好 🎉 Ñoño");
-    assert_eq!(reimported.description, Some("Description with émojis: 🚀 🔥".to_string()));
-    assert_eq!(reimported.notes, Some("Notes: Café, naïve, Zürich".to_string()));
+    assert_eq!(
+        reimported.description,
+        Some("Description with émojis: 🚀 🔥".to_string())
+    );
+    assert_eq!(
+        reimported.notes,
+        Some("Notes: Café, naïve, Zürich".to_string())
+    );
 }
 
 #[test]
@@ -418,8 +428,12 @@ fn test_jsonl_handles_special_characters() {
         ".".to_string(),
     );
     bead.description = Some(special_content.to_string());
-    bead.created_at = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap().with_timezone(&chrono::Utc);
-    bead.updated_at = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z").unwrap().with_timezone(&chrono::Utc);
+    bead.created_at = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    bead.updated_at = chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
 
     let jsonl = serde_json::to_string(&bead).unwrap();
     fs::write(&ws.jsonl_path, jsonl).unwrap();

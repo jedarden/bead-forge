@@ -80,10 +80,16 @@ where
 
     std::fs::rename(&temp_path, path)?;
 
-    Ok(ExportResult { count: issues.len() })
+    Ok(ExportResult {
+        count: issues.len(),
+    })
 }
 
-pub fn export_jsonl_dirty<F1, F2>(path: &Path, mut list_dirty: F1, mut clear_dirty: F2) -> Result<ExportResult>
+pub fn export_jsonl_dirty<F1, F2>(
+    path: &Path,
+    mut list_dirty: F1,
+    mut clear_dirty: F2,
+) -> Result<ExportResult>
 where
     F1: FnMut() -> Result<Vec<Issue>>,
     F2: FnMut() -> Result<()>,
