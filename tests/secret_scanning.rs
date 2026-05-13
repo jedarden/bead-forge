@@ -926,3 +926,250 @@ fn integration_refuses_password_field_pattern() {
     let err = result.unwrap_err().to_string();
     assert!(err.contains("Password"), "error must name the Password pattern: {err}");
 }
+
+// Additional built-in pattern coverage ───────────────────────────────────────────
+
+#[test]
+fn integration_refuses_mysql_url() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-mysql-url",
+        "DATABASE_URL=mysql://user:secretPassword@localhost:3306/mydb",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject MySQL URL with password");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("MySQL"), "error must name the MySQL pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_mongodb_url() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-mongo-url",
+        "MONGODB_URI=mongodb+srv://admin:secretPassword@cluster0.example.com/mydb",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject MongoDB URL with password");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("MongoDB"), "error must name the MongoDB pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_api_key_in_url() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-apikey-url",
+        "API endpoint: https://api.example.com/v1?apikey=sk_test_1234567890abcdef",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject API key in URL parameter");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("API Key in URL"), "error must name the API Key in URL pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_google_oauth() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-gcp-oauth",
+        "OAuth client: 123456789-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject Google OAuth client ID");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("Google OAuth"), "error must name the Google OAuth pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_azure_key() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    // Azure storage account keys are 44 chars (base64-like)
+    let issue = issue_with_description(
+        "bf-azure-key",
+        "AZURE_KEY=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJK",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject Azure key");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("Azure"), "error must name the Azure pattern: {err}");
+}
+
+// Additional GitHub token variants ───────────────────────────────────────────────
+
+#[test]
+fn integration_refuses_github_gho_token() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-gh-gho",
+        "GITHUB_TOKEN=gho_1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCD",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject GitHub gho_ token");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("gho_"), "error must name the gho_ pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_github_ghu_token() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-gh-ghu",
+        "GITHUB_TOKEN=ghu_1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCD",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject GitHub ghu_ token");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("ghu_"), "error must name the ghu_ pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_github_ghs_token() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-gh-ghs",
+        "GITHUB_TOKEN=ghs_1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCD",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject GitHub ghs_ token");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("ghs_"), "error must name the ghs_ pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_github_ghr_token() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-gh-ghr",
+        "GITHUB_TOKEN=ghr_1234567890abcdefghijklmnopqrstuvwxyz1234567890ABCD",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject GitHub ghr_ token");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("ghr_"), "error must name the ghr_ pattern: {err}");
+}
+
+// Additional edge cases ───────────────────────────────────────────────────────────
+
+#[test]
+fn integration_refuses_jwt_in_title() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = bead_forge::Issue::new(
+        "bf-jwt-title".to_string(),
+        "Auth with eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string(),
+        ".".to_string(),
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject JWT in title");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("JWT"), "error must name the JWT pattern: {err}");
+}
+
+#[test]
+fn integration_refuses_secret_in_design() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let mut issue = bead_forge::Issue::new(
+        "bf-design-secret".to_string(),
+        "API design".to_string(),
+        ".".to_string(),
+    );
+    issue.design = Some("Use this AWS key: AKIAIOSFODNN7EXAMPLE".to_string());
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject secret in design field");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("AKIA"), "error must name the AKIA pattern: {err}");
+}
+
+#[test]
+fn integration_multiple_patterns_in_single_field() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description(
+        "bf-multi-pattern",
+        "Keys: AKIAIOSFODNN7EXAMPLE and -----BEGIN RSA PRIVATE KEY-----",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "create_issue must reject when multiple patterns match");
+    // Error should mention at least one of the patterns
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("AKIA") || err.contains("RSA"),
+        "error must name at least one matched pattern: {err}"
+    );
+}
+
+#[test]
+fn integration_allowlist_regex_pattern() {
+    let ws = common::TempWorkspace::new().unwrap();
+    // Allowlist all AKIA* keys in test documentation
+    let storage = storage_with_allowlist(&ws, vec![r"\bAKIA[A-Z0-9]{16}\b".to_string()]);
+
+    let issue = issue_with_description("bf-allow-regex", "Use AKIAIOSFODNN7EXAMPLE for tests");
+
+    storage.create_issue(&issue).expect("allowlisted regex pattern must be accepted");
+}
+
+#[test]
+fn integration_custom_pattern_with_capture_groups() {
+    let ws = common::TempWorkspace::new().unwrap();
+    let storage = storage_with_custom_patterns(
+        &ws,
+        vec![r"INTERNAL_SECRET_[0-9]+=[A-Z]{2,}".to_string()],
+    );
+
+    let issue = issue_with_description(
+        "bf-custom-capture",
+        "INTERNAL_SECRET_123=ABSECRETXY",
+    );
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "custom pattern with capture groups must block matching content");
+}
+
+#[test]
+fn integration_scanning_enabled_by_default() {
+    let ws = common::TempWorkspace::new().unwrap();
+    // Config::default() has secret_protection.enabled = true
+    let storage = storage_with_scanning(&ws);
+
+    let issue = issue_with_description("bf-default-on", "AKIAIOSFODNN7EXAMPLE");
+
+    let result = storage.create_issue(&issue);
+    assert!(result.is_err(), "scanning must be enabled by default");
+}
+
