@@ -341,14 +341,82 @@ If `beads.db` is corrupted or missing, `bf migrate --from-jsonl` rebuilds from `
 bf migrate --workspace /path/to/workspace --from-jsonl [--seed-velocity]
 ```
 
+### Migration Checklist
+
+**Step 1: Per-machine installation**
+
+```bash
+# Install bf binary
+curl -L https://github.com/jedarden/bead-forge/releases/latest/download/bf-linux-x86_64 \
+  -o ~/.local/bin/bf && chmod +x ~/.local/bin/bf
+
+# Drop-in replace br (all existing scripts work unchanged)
+ln -sf ~/.local/bin/bf ~/.local/bin/br
+
+# Verify installation
+bf --version
+br --version  # should show same version
+```
+
+**Step 2: Per-workspace migration loop**
+
+```bash
+# Migrate all workspaces
+for workspace in \
+  /home/coding/FORGE \
+  /home/coding/NEEDLE \
+  /home/coding/AgentScribe \
+  /home/coding/ARMOR \
+  /home/coding/SIGIL \
+  /home/coding/CLASP \
+  /home/coding/bead-forge; do
+  echo "Migrating $workspace..."
+  bf migrate --workspace "$workspace"
+done
+```
+
+**Step 3: Verify each migration**
+
+```bash
+# Verify each workspace passes both doctor checks
+for workspace in \
+  /home/coding/FORGE \
+  /home/coding/NEEDLE \
+  /home/coding/AgentScribe \
+  /home/coding/ARMOR \
+  /home/coding/SIGIL \
+  /home/coding/CLASP \
+  /home/coding/bead-forge; do
+  echo "Checking $workspace..."
+  cd "$workspace" || continue
+  echo "  bf doctor:"
+  bf doctor || echo "  ❌ bf doctor failed"
+  echo "  br doctor:"
+  br doctor || echo "  ❌ br doctor failed"
+done
+```
+
+Both `bf doctor` and `br doctor` should exit 0 with no errors for each workspace.
+
+**Step 4: Update NEEDLE adapter configs**
+
+After migration, update NEEDLE adapter configs to pass worker metadata for velocity tracking:
+
+```yaml
+# In .config/needle/adapters/claude-sonnet.yaml, update invoke_template:
+bf claim --model claude-sonnet-4-6 --harness needle --harness-version 0.5.2 ...
+```
+
+This enables velocity-aware routing (see §Velocity-Aware Scoring above).
+
 ### Verification After Migration
 
-After migrating each workspace, verify both tools can read the database:
+For each workspace, verify both tools can read the database:
 
 ```bash
 # Verify bf doctor passes
 cd /path/to/workspace
-bf doctor
+bf doctor --check
 
 # Verify br doctor passes (forward compatibility)
 br doctor
