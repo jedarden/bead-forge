@@ -342,3 +342,104 @@ fn test_claim_fallback_any_multiple_workspaces() {
     assert_eq!(workspace_path, workspace_c.workspace_path());
     assert_eq!(claimed.bead_id, "bf-c1");
 }
+
+#[test]
+fn test_cli_claim_fallback_any_exhausted_workspace() {
+    // CLI-level integration test for `bf claim --fallback any`.
+    // Creates two workspaces, exhausts workspace A, verifies that
+    // `bf claim --workspace A --fallback any` returns a bead from workspace B.
+
+    use std::process::Command;
+    use std::path::PathBuf;
+
+    let workspace_a = common::TempWorkspace::new().unwrap();
+    let workspace_b = common::TempWorkspace::new().unwrap();
+
+    // Workspace A: no beads (exhausted)
+    // Workspace B: 2 beads available
+    workspace_b.create_bead("bf-b1", "Bead in B").unwrap();
+    workspace_b.create_bead("bf-b2", "Another bead in B").unwrap();
+
+    // Build the bf binary if it doesn't exist
+    // Note: cargo tests run with cwd = project root, but we change current_dir for the command
+    // so we need an absolute path to the binary
+    let project_root = std::env::current_dir().unwrap();
+    let bf_binary: PathBuf = if cfg!(debug_assertions) {
+        project_root.join("target/debug/bf")
+    } else {
+        project_root.join("target/release/bf")
+    };
+
+    // If binary doesn't exist, skip this test (requires cargo build)
+    if !bf_binary.exists() {
+        println!("CLI binary not found at {:?}, skipping CLI test. Run 'cargo build' first.", bf_binary);
+        return;
+    }
+
+    // Run: bf claim --workspace <workspace_a> --fallback any --workspace-paths <workspace_a> --workspace-paths <workspace_b> --assignee test-worker --format json
+    // Note: --workspace-paths is needed because find_workspaces searches upward from cwd
+    // and won't find sibling temp workspaces. Each workspace needs its own --workspace-paths flag.
+    let output = Command::new(&bf_binary)
+        .arg("--workspace")
+        .arg(workspace_a.workspace_path())
+        .arg("claim")
+        .arg("--fallback")
+        .arg("any")
+        .arg("--workspace-paths")
+        .arg(workspace_a.workspace_path())
+        .arg("--workspace-paths")
+        .arg(workspace_b.workspace_path())
+        .arg("--assignee")
+        .arg("test-worker")
+        .arg("--format")
+        .arg("json")
+        .current_dir(workspace_a.workspace_path())
+        .output();
+
+    match output {
+        Ok(output) => {
+            // Check that command succeeded
+            assert!(
+                output.status.success(),
+                "bf claim command failed: stderr={}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+
+            // Parse JSON output
+            let stdout = String::from_utf8(output.stdout).unwrap();
+            let json: serde_json::Value = serde_json::from_str(&stdout)
+                .expect("Output should be valid JSON");
+
+            // Verify a bead was claimed
+            let bead_id = json["bead_id"].as_str();
+            assert!(
+                bead_id.is_some(),
+                "Expected 'bead_id' in JSON output, got: {}",
+                stdout
+            );
+
+            // The claimed bead should be from workspace B
+            let claimed_bead_id = bead_id.unwrap();
+            assert!(
+                claimed_bead_id.starts_with("bf-b"),
+                "Expected bead from workspace B (bf-b*), got: {}",
+                claimed_bead_id
+            );
+
+            // Verify workspace is in output (should be workspace B's path)
+            let workspace_path = json["workspace"].as_str();
+            assert!(
+                workspace_path.is_some(),
+                "Expected 'workspace' in JSON output when claiming via fallback"
+            );
+
+            // Verify the bead was actually claimed in workspace B
+            let bead = workspace_b.get_bead(claimed_bead_id).unwrap().unwrap();
+            assert_eq!(bead.status.to_string(), "in_progress");
+            assert_eq!(bead.assignee.as_ref().unwrap(), "test-worker");
+        }
+        Err(e) => {
+            panic!("Failed to execute bf binary: {}", e);
+        }
+    }
+}
