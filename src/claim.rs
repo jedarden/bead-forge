@@ -694,7 +694,7 @@ mod tests {
         issue.updated_at = Utc::now() - Duration::minutes(60);
         storage.create_issue(&issue).unwrap();
 
-        // Create an open bead
+        // Create an open bead (slightly newer so bf-stale should be claimed first after reclaim)
         let issue2 = Issue::new(
             "bf-open".to_string(),
             "Open bead".to_string(),
@@ -711,9 +711,18 @@ mod tests {
         let claim_result = result.unwrap();
         assert_eq!(claim_result.reclaimed, 1);
 
-        // The open bead should be claimed (not the stale one, since it was reclaimed to open)
-        // After reclaim, the stale bead is open again, so it could be claimed too
-        // But the open bead has priority by created_at order
+        // The stale bead should be claimed (it was reclaimed to open, then claimed since it's older)
+        assert_eq!(claim_result.bead_id, "bf-stale");
+
+        // Verify the claimed bead is now owned by worker_new
+        let claimed = storage.get_issue("bf-stale").unwrap().unwrap();
+        assert_eq!(claimed.status, Status::InProgress);
+        assert_eq!(claimed.assignee.as_ref().unwrap(), "worker_new");
+
+        // The open bead should still be open
+        let still_open = storage.get_issue("bf-open").unwrap().unwrap();
+        assert_eq!(still_open.status, Status::Open);
+        assert!(still_open.assignee.is_none());
     }
 
     #[test]
