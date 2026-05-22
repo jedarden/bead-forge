@@ -1499,9 +1499,70 @@ fn cmd_doctor(
         let reclaimed = crate::doctor::reclaim_stale(workspace_dir, ttl_minutes)?;
         println!("Reclaimed {} stale bead(s)", reclaimed);
     } else {
-        let storage = Storage::open(&db_path)?;
-        let count = storage.count_issues()?;
-        println!("Database is healthy: {} beads", count);
+        // Run health check
+        let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
+        let result = crate::doctor::check(workspace_dir)?;
+
+        // Report results
+        if result.db_ok && result.jsonl_ok {
+            println!("✓ Database integrity: OK");
+            println!("✓ JSONL validity: OK");
+            println!("  Database beads: {}", result.db_issue_count);
+            println!("  JSONL beads: {}", result.jsonl_line_count);
+
+            let total_drift = result.missing_in_jsonl.len()
+                + result.missing_in_sqlite.len()
+                + result.hash_mismatch.len();
+
+            if total_drift == 0 {
+                println!("✓ Consistency: No drift detected");
+            } else {
+                println!("⚠ Consistency: Drift detected");
+                if !result.missing_in_jsonl.is_empty() {
+                    println!("  Missing in JSONL ({}):", result.missing_in_jsonl.len());
+                    for id in result.missing_in_jsonl.iter().take(10) {
+                        println!("    - {}", id);
+                    }
+                    if result.missing_in_jsonl.len() > 10 {
+                        println!("    ... and {} more", result.missing_in_jsonl.len() - 10);
+                    }
+                }
+                if !result.missing_in_sqlite.is_empty() {
+                    println!("  Missing in SQLite ({}):", result.missing_in_sqlite.len());
+                    for id in result.missing_in_sqlite.iter().take(10) {
+                        println!("    - {}", id);
+                    }
+                    if result.missing_in_sqlite.len() > 10 {
+                        println!("    ... and {} more", result.missing_in_sqlite.len() - 10);
+                    }
+                }
+                if !result.hash_mismatch.is_empty() {
+                    println!("  Hash mismatch ({}):", result.hash_mismatch.len());
+                    for id in result.hash_mismatch.iter().take(10) {
+                        println!("    - {}", id);
+                    }
+                    if result.hash_mismatch.len() > 10 {
+                        println!("    ... and {} more", result.hash_mismatch.len() - 10);
+                    }
+                }
+                println!();
+                println!("Run 'bf doctor --repair' to rebuild SQLite from JSONL");
+            }
+        } else {
+            if !result.db_ok {
+                println!("✗ Database integrity: FAILED");
+            }
+            if !result.jsonl_ok {
+                println!("✗ JSONL validity: FAILED");
+            }
+            for issue in &result.issues {
+                eprintln!("  {}", issue);
+            }
+            if !result.jsonl_ok || !result.db_ok {
+                println!();
+                println!("Run 'bf doctor --repair' to rebuild SQLite from JSONL");
+            }
+        }
     }
 
     Ok(())
