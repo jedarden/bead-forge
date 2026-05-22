@@ -3,3 +3,5 @@
 /home/coding/bead-forge/target/debug/deps/batch_mitosis-8c8722c37dbcad9e: tests/batch_mitosis.rs
 
 tests/batch_mitosis.rs:
+
+# env-dep:CARGO_BIN_EXE_bf=/home/coding/bead-forge/target/debug/bf
