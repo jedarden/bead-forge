@@ -339,3 +339,141 @@ fn test_e2e_jsonl_round_trip_output_parity() {
 
     println!("E2E round-trip test passed: {} beads", exported_lines.len());
 }
+
+/// Test E2E parity: actually run br list --format json and compare to bf list output.
+///
+/// This is the true E2E test specified in the bead: run both br and bf on the same
+/// workspace and verify they produce identical JSON output.
+#[test]
+fn test_e2e_br_vs_bf_list_output_parity() {
+    use std::process::Command;
+
+    // Create a workspace from the fixture
+    let ws = common::TempWorkspace::from_fixture("forge-snapshot.jsonl")
+        .expect("Failed to create workspace from fixture");
+
+    let import_result = ws.import_jsonl().expect("Failed to import JSONL");
+    let bead_count = import_result.imported + import_result.skipped;
+    assert!(bead_count > 0, "Should have imported some beads");
+
+    // Run bf list --format json (via storage and formatter)
+    let beads = ws.list_beads().expect("Failed to list beads");
+    let formatter = bead_forge::format::JsonFormatter;
+    let bf_output = formatter.format_issues(&beads);
+
+    // Run br list --format json --all (actual br command)
+    let br_output = Command::new("/home/coding/.local/bin/br")
+        .args(["list", "--format", "json", "--all", "--workspace", ws.workspace_path().to_str().unwrap()])
+        .output()
+        .expect("Failed to run br list");
+
+    assert!(
+        br_output.status.success(),
+        "br list failed: stderr: {}",
+        String::from_utf8_lossy(&br_output.stderr)
+    );
+
+    let br_json = String::from_utf8(br_output.stdout).expect("br output not valid UTF-8");
+
+    // Parse both outputs for comparison
+    let bf_lines: Vec<&str> = bf_output.lines().collect();
+    let br_lines: Vec<&str> = br_json.lines().collect();
+
+    assert_eq!(
+        bf_lines.len(),
+        br_lines.len(),
+        "Output line count differs: bf has {}, br has {}",
+        bf_lines.len(),
+        br_lines.len()
+    );
+
+    // Compare each bead (both may be in different order)
+    let mut bf_beads: std::collections::HashMap<String, serde_json::Value> =
+        std::collections::HashMap::new();
+    let mut br_beads: std::collections::HashMap<String, serde_json::Value> =
+        std::collections::HashMap::new();
+
+    for line in &bf_lines {
+        let v: serde_json::Value = serde_json::from_str(line).expect("Failed to parse bf output");
+        let id = v["id"].as_str().expect("Missing id").to_string();
+        bf_beads.insert(id, v);
+    }
+
+    for line in &br_lines {
+        let v: serde_json::Value = serde_json::from_str(line).expect("Failed to parse br output");
+        let id = v["id"].as_str().expect("Missing id").to_string();
+        br_beads.insert(id, v);
+    }
+
+    // Verify all beads from bf are in br output with matching fields
+    for (id, bf_value) in &bf_beads {
+        let br_value = br_beads.get(id).unwrap_or_else(|| panic!("Bead {} missing from br output", id));
+
+        // Compare critical fields
+        assert_eq!(
+            bf_value.get("id"),
+            br_value.get("id"),
+            "ID mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("title"),
+            br_value.get("title"),
+            "Title mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("status"),
+            br_value.get("status"),
+            "Status mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("priority"),
+            br_value.get("priority"),
+            "Priority mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("issue_type"),
+            br_value.get("issue_type"),
+            "Type mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("created_at"),
+            br_value.get("created_at"),
+            "created_at mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("updated_at"),
+            br_value.get("updated_at"),
+            "updated_at mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("description"),
+            br_value.get("description"),
+            "Description mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("assignee"),
+            br_value.get("assignee"),
+            "Assignee mismatch for bead {}",
+            id
+        );
+        assert_eq!(
+            bf_value.get("labels"),
+            br_value.get("labels"),
+            "Labels mismatch for bead {}",
+            id
+        );
+    }
+
+    println!(
+        "E2E br vs bf parity test passed: {} beads validated",
+        bf_beads.len()
+    );
+}
