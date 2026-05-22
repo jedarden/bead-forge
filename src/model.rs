@@ -867,6 +867,7 @@ pub struct IssueFilter {
     pub assignee: Option<String>,
     pub priority: Option<i32>,
     pub labels: Option<Vec<String>>,
+    pub annotation: Option<(String, String)>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
