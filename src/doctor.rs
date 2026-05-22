@@ -165,7 +165,7 @@ struct ConsistencyDrift {
 ///
 /// Compares each bead's content_hash between JSONL and SQLite to detect drift.
 fn check_consistency_with_hash(db_path: &Path, jsonl_path: &Path) -> Result<ConsistencyDrift> {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     let storage = Storage::open(db_path)?;
 
@@ -180,14 +180,16 @@ fn check_consistency_with_hash(db_path: &Path, jsonl_path: &Path) -> Result<Cons
         .collect();
 
     let mut drift = ConsistencyDrift::default();
+    let mut jsonl_seen: HashSet<String> = HashSet::new();
 
-    // Stream JSONL and compare
+    // Stream JSONL and compare, tracking seen IDs
     if jsonl_path.exists() {
         let iter = stream_issues(jsonl_path)?;
         for result in iter {
             let jsonl_issue = result?;
             let jsonl_hash = jsonl_issue.content_hash();
             let bead_id = jsonl_issue.id.clone();
+            jsonl_seen.insert(bead_id.clone());
 
             match sqlite_issues.get(&bead_id) {
                 Some(sqlite_hash) => {
@@ -202,58 +204,14 @@ fn check_consistency_with_hash(db_path: &Path, jsonl_path: &Path) -> Result<Cons
         }
     }
 
-    // Find beads in SQLite but not in JSONL
+    // Find beads in SQLite but not in JSONL (using tracked seen IDs)
     for bead_id in sqlite_issues.keys() {
-        // We need to check if this bead was seen in JSONL
-        // Since we already iterated JSONL, anything not found there is missing
-        let was_in_jsonl = if jsonl_path.exists() {
-            // Re-stream to check - this is O(n*m) but acceptable for doctor check
-            let iter = stream_issues(jsonl_path)?;
-            let mut found = false;
-            for result in iter {
-                if let Ok(issue) = result {
-                    if &issue.id == bead_id {
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            found
-        } else {
-            false
-        };
-
-        if !was_in_jsonl {
+        if !jsonl_seen.contains(bead_id) {
             drift.missing_in_jsonl.push(bead_id.clone());
         }
     }
 
     Ok(drift)
-}
-
-/// Check consistency between database and JSONL.
-///
-/// Returns Some(count) if counts differ, None if they match.
-fn check_consistency(db_path: &Path, jsonl_path: &Path) -> Result<Option<usize>> {
-    let conn = Connection::open(db_path)?;
-    let db_count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL",
-        [],
-        |row| row.get(0),
-    )?;
-
-    let jsonl_count = if jsonl_path.exists() {
-        let iter = stream_issues(jsonl_path)?;
-        iter.count() as i64
-    } else {
-        0
-    };
-
-    if db_count != jsonl_count {
-        Ok(Some(db_count as usize))
-    } else {
-        Ok(None)
-    }
 }
 
 /// Repair the database by rebuilding from JSONL.
