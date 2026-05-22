@@ -1121,7 +1121,7 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit))?;
+    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
 
     match format {
         "json" => {
@@ -1206,7 +1206,7 @@ fn cmd_claim(
                     let local_db_path = local_beads_dir.join(&local_metadata.database);
                     if let Ok(local_storage) = Storage::open(&local_db_path) {
                         if let Ok(local_candidates) = local_storage
-                            .with_immediate_transaction(|tx| get_ready_candidates(tx, 1))
+                            .with_immediate_transaction(|tx| get_ready_candidates(tx, 1, None, None))
                         {
                             for c in local_candidates {
                                 all_candidates.push((path.clone(), c));
@@ -1229,7 +1229,7 @@ fn cmd_claim(
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let candidates =
-                storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 1))?;
+                storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 1, None, None))?;
             candidates
                 .into_iter()
                 .map(|c| (beads_dir.parent().unwrap_or(beads_dir).to_path_buf(), c))

@@ -1325,47 +1325,123 @@ impl Storage {
     /// The claim scoring uses 1000.0 / (float + 1) as a bonus, which is
     /// monotonically decreasing with float. Therefore, ordering by float ASC
     /// is equivalent to ordering by bonus DESC.
-    pub fn top_candidate_score(&self) -> Result<Option<crate::claim::Score>> {
+    ///
+    /// When model and harness are provided, uses velocity-aware scoring:
+    /// - LEFT JOINs velocity_stats on (issue_type, model, harness)
+    /// - Returns expected_seconds and combined_score for velocity-adjusted comparison
+    pub fn top_candidate_score(
+        &self,
+        model: Option<&str>,
+        harness: Option<&str>,
+    ) -> Result<Option<crate::claim::Score>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                    COALESCE(c.float, 999) as critical_float,
-                    i.priority,
-                    CAST(strftime('%s', i.created_at) AS INTEGER) as created_ts
-             FROM issues i
-             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
-             WHERE i.status = 'open'
-               AND i.ephemeral = 0
-               AND i.pinned = 0
-               AND i.is_template = 0
-               AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status != 'closed'
-               )
-             GROUP BY i.id
-             ORDER BY
-                 downstream_impact DESC,
-                 critical_float ASC,
-                 i.priority ASC,
-                 i.created_at ASC
-             LIMIT 1",
-        )?;
 
-        let mut rows = stmt.query([])?;
-        if let Some(row) = rows.next()? {
-            Ok(Some(crate::claim::Score {
-                downstream_impact: row.get(0)?,
-                critical_float: row.get(1)?,
-                priority: row.get(2)?,
-                created_at_ts: row.get(3)?,
-            }))
+        if let (Some(m), Some(h)) = (model, harness) {
+            // Velocity-aware scoring: join velocity_stats and compute combined_score
+            let mut stmt = conn.prepare(
+                "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                        COALESCE(c.float, 999) as critical_float,
+                        i.priority,
+                        CAST(strftime('%s', i.created_at) AS INTEGER) as created_ts,
+                        vs.p50_seconds as expected_seconds,
+                        (COALESCE(COUNT(d.issue_id), 0) * 3.0
+                         + (4 - i.priority) * 2.0
+                         + 1000.0 / (COALESCE(c.float, 999) + 1)) as combined_score
+                 FROM issues i
+                 LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+                 LEFT JOIN velocity_stats vs ON vs.issue_type = i.issue_type
+                     AND vs.model = ?1
+                     AND vs.harness = ?2
+                 WHERE i.status = 'open'
+                   AND i.ephemeral = 0
+                   AND i.pinned = 0
+                   AND i.is_template = 0
+                   AND i.deleted_at IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM dependencies blocker_dep
+                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                       WHERE blocker_dep.issue_id = i.id
+                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                       AND blocker.status != 'closed'
+                   )
+                 GROUP BY i.id
+                 ORDER BY
+                     combined_score / COALESCE(vs.p50_seconds, 1800) DESC,
+                     downstream_impact DESC,
+                     critical_float ASC,
+                     i.priority ASC,
+                     i.created_at ASC
+                 LIMIT 1",
+            )?;
+
+            let mut rows = stmt.query(params![m, h])?;
+            if let Some(row) = rows.next()? {
+                Ok(Some(crate::claim::Score::new(
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                )))
+            } else {
+                Ok(None)
+            }
         } else {
-            Ok(None)
+            // Standard scoring without velocity data
+            let mut stmt = conn.prepare(
+                "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                        COALESCE(c.float, 999) as critical_float,
+                        i.priority,
+                        CAST(strftime('%s', i.created_at) AS INTEGER) as created_ts
+                 FROM issues i
+                 LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+                 WHERE i.status = 'open'
+                   AND i.ephemeral = 0
+                   AND i.pinned = 0
+                   AND i.is_template = 0
+                   AND i.deleted_at IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM dependencies blocker_dep
+                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                       WHERE blocker_dep.issue_id = i.id
+                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                       AND blocker.status != 'closed'
+                   )
+                 GROUP BY i.id
+                 ORDER BY
+                     downstream_impact DESC,
+                     critical_float ASC,
+                     i.priority ASC,
+                     i.created_at ASC
+                 LIMIT 1",
+            )?;
+
+            let mut rows = stmt.query([])?;
+            if let Some(row) = rows.next()? {
+                let downstream_impact: i64 = row.get(0)?;
+                let critical_float: i64 = row.get(1)?;
+                let priority: i32 = row.get(2)?;
+                let created_at_ts: i64 = row.get(3)?;
+
+                // Compute combined_score for consistency
+                let combined_score = downstream_impact as f64 * 3.0
+                    + (4 - priority) as f64 * 2.0
+                    + 1000.0 / (critical_float as f64 + 1.0);
+
+                Ok(Some(crate::claim::Score::new(
+                    downstream_impact,
+                    critical_float,
+                    priority,
+                    created_at_ts,
+                    None, // No expected_seconds without velocity data
+                    combined_score,
+                )))
+            } else {
+                Ok(None)
+            }
         }
     }
 
