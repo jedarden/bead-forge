@@ -1,4 +1,4 @@
-use crate::critical_path::invalidate_cache;
+use crate::critical_path::{compute_all_critical_paths, invalidate_cache};
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
     Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter,
@@ -350,6 +350,7 @@ impl Storage {
             }
             // Invalidate critical path cache: new beads may add dependencies
             invalidate_cache(tx)?;
+            compute_all_critical_paths(tx)?;
             Ok(())
         })
     }
@@ -497,6 +498,7 @@ impl Storage {
             // Invalidate critical path cache if status changed (affects dependency graph)
             if changes.status.is_some() {
                 invalidate_cache(tx)?;
+                compute_all_critical_paths(tx)?;
             }
             Ok(())
         })
@@ -577,6 +579,7 @@ impl Storage {
 
             // Invalidate critical path cache after updating from JSON (may change deps/status)
             invalidate_cache(tx)?;
+            compute_all_critical_paths(tx)?;
 
             Ok(())
         })
@@ -601,6 +604,7 @@ impl Storage {
             crate::velocity::update_session_on_close(tx, id, now)?;
             // Invalidate critical path cache: closing a bead can unblock dependents
             invalidate_cache(tx)?;
+            compute_all_critical_paths(tx)?;
             Ok(())
         })
     }
@@ -836,6 +840,7 @@ impl Storage {
             )?;
             // Invalidate critical path cache after adding a dependency
             invalidate_cache(tx)?;
+            compute_all_critical_paths(tx)?;
             Ok(())
         })
     }
@@ -848,6 +853,7 @@ impl Storage {
             )?;
             // Invalidate critical path cache after removing a dependency
             invalidate_cache(tx)?;
+            compute_all_critical_paths(tx)?;
             Ok(())
         })
     }
