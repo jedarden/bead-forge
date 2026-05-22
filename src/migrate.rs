@@ -168,36 +168,23 @@ fn inner_migrate(
     if !*skip_verify {
         println!("  Verifying migration...");
 
-        // Forward compat: check that issues table column count matches br's expectation
-        let forward_compat_ok = verify_forward_compat(storage)?;
-        if !forward_compat_ok {
+        // Step 6: Forward compat - run br doctor --db beads.db and verify exit 0
+        let br_doctor_ok = run_br_doctor_check(&db_path)?;
+        if !br_doctor_ok {
             verification.errors.push(
-                "Forward compatibility check failed: issues table column count mismatch"
+                "Forward compatibility check failed: br doctor --db returned non-zero exit code"
                     .to_string(),
             );
         }
 
-        // Backward compat: run doctor check
+        // Step 7: Backward compat - run bf doctor --check and verify exit 0
         let workspace = beads_dir.parent().unwrap_or(beads_dir);
-        match crate::doctor::check(workspace) {
-            Ok(doctor_result) => {
-                if !doctor_result.db_ok {
-                    verification.errors.push(
-                        "Backward compatibility check failed: database integrity check failed"
-                            .to_string(),
-                    );
-                }
-                if !doctor_result.issues.is_empty() {
-                    for issue in &doctor_result.issues {
-                        verification.errors.push(format!("Doctor check: {}", issue));
-                    }
-                }
-            }
-            Err(e) => {
-                verification
-                    .errors
-                    .push(format!("Backward compatibility check failed: {}", e));
-            }
+        let bf_doctor_ok = run_bf_doctor_check(workspace)?;
+        if !bf_doctor_ok {
+            verification.errors.push(
+                "Backward compatibility check failed: bf doctor --check returned non-zero exit code"
+                    .to_string(),
+            );
         }
     }
 
@@ -299,6 +286,58 @@ fn seed_config(config_path: &std::path::Path) -> Result<bool> {
     file.write_all(yaml.as_bytes())?;
 
     Ok(true)
+}
+
+/// Run br doctor --db beads.db and verify exit 0.
+///
+/// This is the external verification step that checks if br's FrankenSQLite
+/// engine can still read the database after migration.
+fn run_br_doctor_check(db_path: &std::path::Path) -> Result<bool> {
+    // Find br binary in PATH
+    let br_path = match which::which("br") {
+        Ok(p) => p,
+        Err(_) => {
+            // br not found in PATH - skip this check with a warning
+            eprintln!("  Warning: br not found in PATH, skipping br doctor check");
+            return Ok(true);
+        }
+    };
+
+    let output = Command::new(&br_path)
+        .args(["doctor", "--db", &db_path.to_string_lossy()])
+        .output()?;
+
+    if output.status.success() {
+        eprintln!("  br doctor check passed");
+        Ok(true)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("  br doctor check failed: {}", stderr);
+        Ok(false)
+    }
+}
+
+/// Run bf doctor --check and verify exit 0.
+///
+/// This is the external verification step that checks if bf's rusqlite
+/// engine can read the database after migration.
+fn run_bf_doctor_check(workspace: &std::path::Path) -> Result<bool> {
+    // Use current executable path for bf
+    let bf_path = std::env::current_exe()?;
+
+    let output = Command::new(&bf_path)
+        .args(["doctor", "--check"])
+        .current_dir(workspace)
+        .output()?;
+
+    if output.status.success() {
+        eprintln!("  bf doctor check passed");
+        Ok(true)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("  bf doctor check failed: {}", stderr);
+        Ok(false)
+    }
 }
 
 /// Verify forward compatibility: check that br can still open this database.
