@@ -24,6 +24,7 @@ thiserror = "1"
 num-bigint = "0.4"
 num-traits = "0.2"
 shell-words = "1"
+which = "7"
 
 [dev-dependencies]
 tempfile = "3"
