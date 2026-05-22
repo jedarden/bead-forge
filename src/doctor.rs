@@ -11,13 +11,17 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// Doctor check results.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DoctorResult {
     pub db_ok: bool,
     pub jsonl_ok: bool,
     pub jsonl_line_count: usize,
     pub db_issue_count: usize,
     pub issues: Vec<String>,
+    // Drift tracking
+    pub missing_in_jsonl: Vec<String>,
+    pub missing_in_sqlite: Vec<String>,
+    pub hash_mismatch: Vec<String>,
 }
 
 /// Perform a health check on the bead database and JSONL file.
@@ -37,9 +41,11 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
     let mut issues = Vec::new();
     let mut db_ok = true;
     let mut jsonl_ok = true;
+    let mut result = DoctorResult::default();
 
     // Check database
     let (db_issue_count, db_integrity_ok) = check_database(&db_path)?;
+    result.db_issue_count = db_issue_count;
     if !db_integrity_ok {
         db_ok = false;
         issues.push("Database integrity check failed".to_string());
@@ -47,28 +53,39 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
 
     // Check JSONL file
     let (jsonl_line_count, jsonl_valid) = check_jsonl(&jsonl_path)?;
+    result.jsonl_line_count = jsonl_line_count;
     if !jsonl_valid {
         jsonl_ok = false;
         issues.push("JSONL file contains invalid lines".to_string());
     }
 
-    // Check consistency
+    // Check consistency with content_hash comparison
     if db_ok && jsonl_ok {
-        if check_consistency(&db_path, &jsonl_path)?.is_some() {
+        let drift = check_consistency_with_hash(&db_path, &jsonl_path)?;
+
+        let total_drift = drift.missing_in_jsonl.len()
+            + drift.missing_in_sqlite.len()
+            + drift.hash_mismatch.len();
+
+        result.missing_in_jsonl = drift.missing_in_jsonl.clone();
+        result.missing_in_sqlite = drift.missing_in_sqlite.clone();
+        result.hash_mismatch = drift.hash_mismatch.clone();
+
+        if total_drift > 0 {
             issues.push(format!(
-                "Count mismatch: database has {} issues, JSONL has {}",
-                db_issue_count, jsonl_line_count
+                "Drift detected: {} missing in JSONL, {} missing in SQLite, {} hash mismatch",
+                result.missing_in_jsonl.len(),
+                result.missing_in_sqlite.len(),
+                result.hash_mismatch.len()
             ));
         }
     }
 
-    Ok(DoctorResult {
-        db_ok,
-        jsonl_ok,
-        jsonl_line_count,
-        db_issue_count,
-        issues,
-    })
+    result.db_ok = db_ok;
+    result.jsonl_ok = jsonl_ok;
+    result.issues = issues;
+
+    Ok(result)
 }
 
 /// Check database integrity.
@@ -131,6 +148,87 @@ fn check_jsonl(jsonl_path: &Path) -> Result<(usize, bool)> {
     }
 
     Ok((count, valid))
+}
+
+/// Consistency drift details.
+#[derive(Debug, Clone, Default)]
+struct ConsistencyDrift {
+    /// Bead IDs that exist in SQLite but not in JSONL
+    missing_in_jsonl: Vec<String>,
+    /// Bead IDs that exist in JSONL but not in SQLite
+    missing_in_sqlite: Vec<String>,
+    /// Bead IDs where content_hash differs between JSONL and SQLite
+    hash_mismatch: Vec<String>,
+}
+
+/// Check consistency between database and JSONL using content_hash.
+///
+/// Compares each bead's content_hash between JSONL and SQLite to detect drift.
+fn check_consistency_with_hash(db_path: &Path, jsonl_path: &Path) -> Result<ConsistencyDrift> {
+    use std::collections::HashMap;
+
+    let storage = Storage::open(db_path)?;
+
+    // Build a map of all SQLite issues with their content_hash
+    let sqlite_issues: HashMap<String, String> = storage
+        .list_all_issues()?
+        .into_iter()
+        .map(|issue| {
+            let hash = issue.content_hash();
+            (issue.id, hash)
+        })
+        .collect();
+
+    let mut drift = ConsistencyDrift::default();
+
+    // Stream JSONL and compare
+    if jsonl_path.exists() {
+        let iter = stream_issues(jsonl_path)?;
+        for result in iter {
+            let jsonl_issue = result?;
+            let jsonl_hash = jsonl_issue.content_hash();
+            let bead_id = jsonl_issue.id.clone();
+
+            match sqlite_issues.get(&bead_id) {
+                Some(sqlite_hash) => {
+                    if sqlite_hash != &jsonl_hash {
+                        drift.hash_mismatch.push(bead_id);
+                    }
+                }
+                None => {
+                    drift.missing_in_sqlite.push(bead_id);
+                }
+            }
+        }
+    }
+
+    // Find beads in SQLite but not in JSONL
+    for bead_id in sqlite_issues.keys() {
+        // We need to check if this bead was seen in JSONL
+        // Since we already iterated JSONL, anything not found there is missing
+        let was_in_jsonl = if jsonl_path.exists() {
+            // Re-stream to check - this is O(n*m) but acceptable for doctor check
+            let iter = stream_issues(jsonl_path)?;
+            let mut found = false;
+            for result in iter {
+                if let Ok(issue) = result {
+                    if &issue.id == bead_id {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            found
+        } else {
+            false
+        };
+
+        if !was_in_jsonl {
+            drift.missing_in_jsonl.push(bead_id.clone());
+        }
+    }
+
+    Ok(drift)
 }
 
 /// Check consistency between database and JSONL.
