@@ -356,10 +356,19 @@ fn test_e2e_br_vs_bf_list_output_parity() {
     let bead_count = import_result.imported + import_result.skipped;
     assert!(bead_count > 0, "Should have imported some beads");
 
-    // Run bf list --format json (via storage and formatter)
-    let beads = ws.list_beads().expect("Failed to list beads");
-    let formatter = bead_forge::format::JsonFormatter;
-    let bf_output = formatter.format_issues(&beads);
+    // Run bf list --format json --all (actual bf command)
+    let bf_output = Command::new(env!("CARGO_BIN_EXE_bf"))
+        .args(["list", "--format", "json", "--all", "--workspace", ws.workspace_path().to_str().unwrap()])
+        .output()
+        .expect("Failed to run bf list");
+
+    assert!(
+        bf_output.status.success(),
+        "bf list failed: stderr: {}",
+        String::from_utf8_lossy(&bf_output.stderr)
+    );
+
+    let bf_json = String::from_utf8(bf_output.stdout).expect("bf output not valid UTF-8");
 
     // Run br list --format json --all (actual br command)
     let br_output = Command::new("/home/coding/.local/bin/br")
@@ -376,7 +385,7 @@ fn test_e2e_br_vs_bf_list_output_parity() {
     let br_json = String::from_utf8(br_output.stdout).expect("br output not valid UTF-8");
 
     // Parse both outputs for comparison
-    let bf_lines: Vec<&str> = bf_output.lines().collect();
+    let bf_lines: Vec<&str> = bf_json.lines().collect();
     let br_lines: Vec<&str> = br_json.lines().collect();
 
     assert_eq!(

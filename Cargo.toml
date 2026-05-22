@@ -29,6 +29,11 @@ which = "7"
 [dev-dependencies]
 tempfile = "3"
 
+[[test]]
+name = "test_jsonl"
+path = "tests/test_jsonl.rs"
+required-features = []
+
 [[bin]]
 name = "bf"
 path = "src/main.rs"
