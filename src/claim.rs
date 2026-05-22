@@ -673,4 +673,152 @@ mod tests {
             claimed
         );
     }
+
+    #[test]
+    fn test_critical_path_bonus_in_claim() {
+        use crate::storage::schema;
+
+        let (_temp, mut storage) = setup_test_db();
+
+        // Create a dependency chain: bf-critical (float=0) -> bf-blocked
+        // And an independent bead: bf-independent (no critical path data)
+
+        let critical = Issue::new(
+            "bf-critical".to_string(),
+            "Critical path bead".to_string(),
+            ".".to_string(),
+        );
+        storage.create_issue(&critical).unwrap();
+
+        let blocked = Issue::new(
+            "bf-blocked".to_string(),
+            "Blocked bead".to_string(),
+            ".".to_string(),
+        );
+        storage.create_issue(&blocked).unwrap();
+
+        let independent = Issue::new(
+            "bf-independent".to_string(),
+            "Independent bead".to_string(),
+            ".".to_string(),
+        );
+        storage.create_issue(&independent).unwrap();
+
+        // Add dependency: bf-blocked depends on bf-critical
+        storage
+            .add_dependency(
+                "bf-blocked",
+                "bf-critical",
+                &crate::model::DependencyType::Blocks,
+                "test",
+            )
+            .unwrap();
+
+        // Manually populate critical_path_cache
+        // (create_issue already calls compute_all_critical_paths, so use REPLACE)
+        storage
+            .with_immediate_transaction(|tx| {
+                // First, clear any existing entries for our test beads
+                tx.execute("DELETE FROM critical_path_cache WHERE bead_id IN ('bf-critical', 'bf-blocked', 'bf-independent')", [])?;
+
+                // bf-critical has float=0 (on critical path)
+                tx.execute(
+                    "INSERT INTO critical_path_cache (bead_id, epic_id, es, ls, float, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        "bf-critical",
+                        "bf-critical",
+                        0i64,  // es
+                        0i64,  // ls
+                        0i64,  // float = ls - es = 0
+                        Utc::now().to_rfc3339()
+                    ],
+                )?;
+
+                // bf-blocked has float=1 (not on critical path)
+                tx.execute(
+                    "INSERT INTO critical_path_cache (bead_id, epic_id, es, ls, float, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        "bf-blocked",
+                        "bf-critical",
+                        1i64,  // es
+                        2i64,  // ls
+                        1i64,  // float = ls - es = 1
+                        Utc::now().to_rfc3339()
+                    ],
+                )?;
+
+                // bf-independent has no entry in critical_path_cache
+                Ok(())
+            })
+            .unwrap();
+
+        // Get ready candidates - should be ordered by critical path bonus
+        let candidates = storage
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10))
+            .unwrap();
+
+        // bf-critical should be first (bonus=1000.0/1=1000)
+        // bf-independent should be second (bonus=1000.0/1000=1)
+        // bf-blocked is NOT in the list because it's blocked by bf-critical
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].id, "bf-critical");
+        assert_eq!(candidates[1].id, "bf-independent");
+
+        // Verify bonus values
+        // critical_float stores the BONUS value, not the raw float
+        assert!((candidates[0].critical_float - 1000.0).abs() < 0.01); // float=0 → bonus=1000
+        assert!((candidates[1].critical_float - 1.0).abs() < 0.01); // no cache → bonus≈1
+    }
+
+    #[test]
+    fn test_critical_path_zero_float_outranks_high_priority() {
+        let (_temp, mut storage) = setup_test_db();
+
+        // Create a zero-float bead with low priority (4=Backlog)
+        let mut zero_float = Issue::new("bf-zero".to_string(), "Zero float".to_string(), ".".to_string());
+        zero_float.priority = crate::model::Priority(4);
+        storage.create_issue(&zero_float).unwrap();
+
+        // Create a non-critical bead with high priority (0=Critical)
+        let mut high_priority = Issue::new(
+            "bf-high".to_string(),
+            "High priority non-critical".to_string(),
+            ".".to_string(),
+        );
+        high_priority.priority = crate::model::Priority(0);
+        storage.create_issue(&high_priority).unwrap();
+
+        // Populate critical_path_cache
+        storage
+            .with_immediate_transaction(|tx| {
+                // Clear any existing entries first
+                tx.execute("DELETE FROM critical_path_cache WHERE bead_id IN ('bf-zero', 'bf-high')", [])?;
+
+                // bf-zero has float=0, priority=4
+                tx.execute(
+                    "INSERT INTO critical_path_cache (bead_id, epic_id, es, ls, float, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params!["bf-zero", "bf-zero", 0i64, 0i64, 0i64, Utc::now().to_rfc3339()],
+                )?;
+
+                // bf-high has no critical path entry (float defaults to 999)
+                Ok(())
+            })
+            .unwrap();
+
+        // Get ready candidates
+        let candidates = storage
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10))
+            .unwrap();
+
+        assert_eq!(candidates.len(), 2);
+        // Zero-float with low priority should outrank non-critical with high priority
+        // because the bonus (1000) is much larger than priority difference
+        assert_eq!(candidates[0].id, "bf-zero");
+        assert_eq!(candidates[0].priority, 4);
+        assert_eq!(candidates[1].id, "bf-high");
+        assert_eq!(candidates[1].priority, 0);
+    }
 }
