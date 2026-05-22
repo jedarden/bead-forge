@@ -429,6 +429,10 @@ pub enum Commands {
         #[arg(long)]
         diff: bool,
 
+        /// Include git history from .beads/issues.jsonl
+        #[arg(long)]
+        git: bool,
+
         /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
@@ -825,6 +829,7 @@ pub fn run(cli: Cli) -> Result<()> {
             actor,
             status_changes,
             diff,
+            git,
             format,
             json,
         } => {
@@ -837,6 +842,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 actor,
                 status_changes,
                 diff,
+                git,
                 &format,
             )
         }
@@ -2261,25 +2267,29 @@ fn cmd_log(
     actor: Option<String>,
     status_changes: bool,
     diff: bool,
+    git: bool,
     format: &str,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
+    let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+    let workspace = beads_dir.parent().unwrap_or(beads_dir);
+
     let storage = Storage::open(&db_path)?;
 
     // Build filter
     let mut filter = crate::log::EventFilter::new();
 
-    if let Some(issue_id) = id {
-        filter = filter.with_issue_id(issue_id);
+    if let Some(ref issue_id) = id {
+        filter = filter.with_issue_id(issue_id.clone());
     }
 
     if let Some(limit_val) = limit {
         filter = filter.with_limit(limit_val);
     }
 
-    if let Some(actor_val) = actor {
-        filter = filter.with_actor(actor_val);
+    if let Some(ref actor_val) = actor {
+        filter = filter.with_actor(actor_val.clone());
     }
 
     if status_changes {
@@ -2291,8 +2301,8 @@ fn cmd_log(
     }
 
     // Parse since date if provided
-    if let Some(since_str) = since {
-        match chrono::DateTime::parse_from_rfc3339(&since_str) {
+    if let Some(ref since_str) = since {
+        match chrono::DateTime::parse_from_rfc3339(since_str) {
             Ok(dt) => {
                 filter = filter.with_since(dt.with_timezone(&chrono::Utc));
             }
@@ -2304,8 +2314,60 @@ fn cmd_log(
         }
     }
 
-    // Query events
-    let events = crate::log::query_events(&storage, &filter)?;
+    // Query events from SQLite
+    let sqlite_events = crate::log::query_events(&storage, &filter)?;
+
+    // If --git flag is set, also query git history
+    let events = if git {
+        let git_events =
+            crate::git_log::reconstruct_events_from_git(workspace, &jsonl_path, id.as_deref())?;
+
+        // Merge git events with SQLite events
+        crate::git_log::merge_events(sqlite_events, git_events)
+    } else {
+        sqlite_events
+    };
+
+    // Apply limit after merging (if limit was set)
+    let events = if let Some(limit_val) = limit {
+        if events.len() > limit_val {
+            // Take the last N events (most recent)
+            events.into_iter().rev().take(limit_val).rev().collect()
+        } else {
+            events
+        }
+    } else {
+        events
+    };
+
+    // Apply actor filter in-memory for git events
+    let events = if let Some(ref actor_val) = actor {
+        events
+            .into_iter()
+            .filter(|e| e.actor == *actor_val)
+            .collect()
+    } else {
+        events
+    };
+
+    // Apply status_changes_only filter in-memory
+    let events = if status_changes {
+        events
+            .into_iter()
+            .filter(|e| {
+                matches!(
+                    e.event_type,
+                    crate::model::EventType::StatusChanged
+                        | crate::model::EventType::Closed
+                        | crate::model::EventType::Reopened
+                        | crate::model::EventType::PriorityChanged
+                        | crate::model::EventType::AssigneeChanged
+                )
+            })
+            .collect()
+    } else {
+        events
+    };
 
     match format {
         "json" => {

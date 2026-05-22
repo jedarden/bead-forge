@@ -6,6 +6,7 @@ pub mod config;
 pub mod critical_path;
 pub mod doctor;
 pub mod format;
+pub mod git_log;
 pub mod id;
 pub mod jsonl;
 pub mod log;
