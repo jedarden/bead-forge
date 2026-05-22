@@ -170,38 +170,56 @@ impl Storage {
 
     pub fn list_issues(&self, filter: &IssueFilter) -> Result<Vec<Issue>> {
         let mut query = String::from(
-            "SELECT id, content_hash, title, description, design, acceptance_criteria, notes,
-                    status, priority, issue_type, assignee, owner, estimated_minutes,
-                    created_at, created_by, updated_at, closed_at, close_reason,
-                    closed_by_session, due_at, defer_until, external_ref, source_system,
-                    source_repo, deleted_at, deleted_by, delete_reason, original_type,
-                    compaction_level, compacted_at, compacted_at_commit, original_size,
-                    sender, ephemeral, pinned, is_template
-             FROM issues WHERE deleted_at IS NULL",
+            "SELECT DISTINCT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+                    i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
+                    i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
+                    i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
+                    i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
+                    i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
+                    i.sender, i.ephemeral, i.pinned, i.is_template
+             FROM issues i",
         );
         let mut params = Vec::new();
         let mut param_idx = 1;
+        let needs_join = filter.annotation.is_some();
+
+        if needs_join {
+            query.push_str(
+                " LEFT JOIN bead_annotations a ON i.id = a.bead_id WHERE i.deleted_at IS NULL",
+            );
+        } else {
+            query.push_str(" WHERE i.deleted_at IS NULL");
+        }
+
         if let Some(ref status) = filter.status {
-            query.push_str(&format!(" AND status = ?{}", param_idx));
+            query.push_str(&format!(" AND i.status = ?{}", param_idx));
             params.push(status.to_string());
             param_idx += 1;
         }
         if let Some(ref issue_type) = filter.issue_type {
-            query.push_str(&format!(" AND issue_type = ?{}", param_idx));
+            query.push_str(&format!(" AND i.issue_type = ?{}", param_idx));
             params.push(issue_type.to_string());
             param_idx += 1;
         }
         if let Some(ref assignee) = filter.assignee {
-            query.push_str(&format!(" AND assignee = ?{}", param_idx));
+            query.push_str(&format!(" AND i.assignee = ?{}", param_idx));
             params.push(assignee.clone());
             param_idx += 1;
         }
         if let Some(priority) = filter.priority {
-            query.push_str(&format!(" AND priority = ?{}", param_idx));
+            query.push_str(&format!(" AND i.priority = ?{}", param_idx));
             params.push(priority.to_string());
             param_idx += 1;
         }
-        query.push_str(" ORDER BY priority ASC, created_at ASC");
+        if let Some((ref key, ref value)) = filter.annotation {
+            query.push_str(&format!(" AND a.key = ?{}", param_idx));
+            params.push(key.clone());
+            param_idx += 1;
+            query.push_str(&format!(" AND a.value = ?{}", param_idx));
+            params.push(value.clone());
+            param_idx += 1;
+        }
+        query.push_str(" ORDER BY i.priority ASC, i.created_at ASC");
         if let Some(limit) = filter.limit {
             query.push_str(&format!(" LIMIT {}", limit));
         }
@@ -1459,9 +1477,10 @@ impl Storage {
         workspace_path: &str,
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
+        let now = Utc::now();
         conn.execute(
-            "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path, claimed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 worker_id,
                 model,
@@ -1469,6 +1488,7 @@ impl Storage {
                 harness_version,
                 bead_id,
                 workspace_path,
+                now.to_rfc3339(),
             ],
         )?;
         Ok(())

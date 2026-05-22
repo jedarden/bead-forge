@@ -74,6 +74,10 @@ pub enum Commands {
         #[arg(long)]
         priority: Option<i32>,
 
+        /// Filter by annotation (key=value)
+        #[arg(long)]
+        annotation: Option<String>,
+
         /// Limit results (0 = unlimited)
         #[arg(long)]
         limit: Option<usize>,
@@ -689,6 +693,7 @@ pub fn run(cli: Cli) -> Result<()> {
             type_,
             assignee,
             priority,
+            annotation,
             limit,
             all,
             format,
@@ -696,7 +701,7 @@ pub fn run(cli: Cli) -> Result<()> {
         } => {
             let format = if json { "json".to_string() } else { format };
             cmd_list(
-                &beads_dir, status, type_, assignee, priority, limit, all, &format,
+                &beads_dir, status, type_, assignee, priority, annotation, limit, all, &format,
             )
         }
         Commands::Show { id, format, json } => {
@@ -929,10 +934,23 @@ fn cmd_list(
     type_: Option<String>,
     assignee: Option<String>,
     priority: Option<i32>,
+    annotation: Option<String>,
     limit: Option<usize>,
     all: bool,
     format: &str,
 ) -> Result<()> {
+    // Parse annotation filter (key=value format)
+    let annotation_filter = match annotation {
+        Some(ref ann) => {
+            let parts: Vec<&str> = ann.splitn(2, '=').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Invalid annotation format. Use key=value"));
+            }
+            Some((parts[0].to_string(), parts[1].to_string()))
+        }
+        None => None,
+    };
+
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -952,6 +970,7 @@ fn cmd_list(
         }
         filter.assignee = assignee.clone();
         filter.priority = priority;
+        filter.annotation = annotation_filter.clone();
         // --limit 0 means unlimited
         filter.limit = limit.and_then(|l| if l == 0 { None } else { Some(l) });
         storage.list_issues(&filter)?
@@ -972,6 +991,13 @@ fn cmd_list(
         }
         if let Some(p) = priority {
             issues.retain(|i| i.priority.0 == p);
+        }
+        if let Some((ref key, ref value)) = annotation_filter {
+            issues.retain(|i| {
+                i.annotations
+                    .get(key)
+                    .map_or(false, |v| v == value)
+            });
         }
         // Apply limit
         if let Some(l) = limit {
