@@ -18,7 +18,7 @@ pub mod sync;
 pub mod velocity;
 
 pub use batch::{execute_batch, mitosis, mitosis_ex, BatchOp, BatchResult, MitosisChild};
-pub use claim::{claim, get_ready_candidates, ClaimResult, ScoredBead};
+pub use claim::{claim, claim_any, get_ready_candidates, ClaimResult, ScoredBead};
 pub use config::{find_beads_dir, load_config, load_metadata, Config, Metadata, RotateConfig};
 pub use doctor::{check, rebuild_cache, reclaim_stale, repair, verify_schema, DoctorResult};
 pub use id::{generate_id, is_valid_bead_id};
