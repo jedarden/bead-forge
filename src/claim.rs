@@ -24,17 +24,39 @@ pub struct ClaimResult {
 /// Score for cross-workspace candidate comparison.
 ///
 /// Higher scores are better. Ordered by:
-/// 1. downstream_impact (more blocking = higher priority)
-/// 2. negative critical_float (lower float = more critical)
-/// 3. negative priority (lower number = higher priority)
-/// 4. negative created timestamp (older = higher priority/FIFO)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// 1. combined_score / expected_seconds (impact per unit time, when velocity data available)
+/// 2. downstream_impact (more blocking = higher priority)
+/// 3. negative critical_float (lower float = more critical)
+/// 4. negative priority (lower number = higher priority)
+/// 5. negative created timestamp (older = higher priority/FIFO)
+#[derive(Debug, Clone, Copy)]
 pub struct Score {
     pub downstream_impact: i64,
     pub critical_float: i64,
     pub priority: i32,
     pub created_at_ts: i64,
+    /// Expected duration in seconds from velocity_stats (None = no velocity data)
+    pub expected_seconds: Option<i64>,
+    /// Combined impact score (downstream * 3 + (4-priority) * 2 + critical_bonus)
+    pub combined_score: f64,
 }
+
+impl PartialEq for Score {
+    fn eq(&self, other: &Self) -> bool {
+        self.downstream_impact == other.downstream_impact
+            && self.critical_float == other.critical_float
+            && self.priority == other.priority
+            && self.created_at_ts == other.created_at_ts
+            && self.expected_seconds == other.expected_seconds
+            && self
+                .combined_score
+                .partial_cmp(&other.combined_score)
+                .map(|o| o == std::cmp::Ordering::Equal)
+                .unwrap_or(false)
+    }
+}
+
+impl Eq for Score {}
 
 impl Score {
     /// Create a new score from candidate fields.
@@ -43,12 +65,29 @@ impl Score {
         critical_float: i64,
         priority: i32,
         created_at_ts: i64,
+        expected_seconds: Option<i64>,
+        combined_score: f64,
     ) -> Self {
         Self {
             downstream_impact,
             critical_float,
             priority,
             created_at_ts,
+            expected_seconds,
+            combined_score,
+        }
+    }
+
+    /// Get the velocity-adjusted score (impact per unit time).
+    ///
+    /// When expected_seconds is available, returns combined_score / expected_seconds.
+    /// Otherwise returns combined_score (no adjustment).
+    fn velocity_adjusted_score(&self) -> f64 {
+        let expected_sec = self.expected_seconds.unwrap_or(1800);
+        if expected_sec > 0 {
+            self.combined_score / expected_sec as f64
+        } else {
+            self.combined_score
         }
     }
 }
@@ -61,6 +100,17 @@ impl PartialOrd for Score {
 
 impl Ord for Score {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Primary: velocity-adjusted score DESC (higher impact per unit time is better)
+        match self
+            .velocity_adjusted_score()
+            .partial_cmp(&other.velocity_adjusted_score())
+        {
+            Some(std::cmp::Ordering::Equal) => {}
+            Some(ord) => return ord.reverse(),
+            None => {
+                // NaN comparison - treat as equal and fall through to other fields
+            }
+        }
         // downstream_impact: DESC (higher is better)
         match other.downstream_impact.cmp(&self.downstream_impact) {
             std::cmp::Ordering::Equal => {}
@@ -345,6 +395,7 @@ pub fn claim(
 ///
 /// This returns a list of beads that would be considered for claiming,
 /// ordered by the same scoring formula:
+/// - velocity_adjusted_score DESC (impact per unit time, when velocity data available)
 /// - downstream_impact DESC (more blocking = higher priority)
 /// - critical_path_bonus DESC (1000.0/(float+1), higher bonus = more critical)
 /// - priority ASC (0=Critical, 4=Backlog)
@@ -353,40 +404,93 @@ pub fn claim(
 /// # Arguments
 /// * `tx` - The transaction to use
 /// * `limit` - Maximum number of candidates to return
+/// * `model` - Optional model name for velocity-aware scoring
+/// * `harness` - Optional harness name for velocity-aware scoring
 ///
 /// # Returns
 /// * `Ok(Vec<ScoredBead>)` - List of scored bead candidates
-pub fn get_ready_candidates(tx: &Connection, limit: usize) -> Result<Vec<ScoredBead>> {
-    let mut stmt = tx.prepare(
-        "SELECT i.id, i.title, i.status, i.priority,
-                COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
-                i.created_at
-         FROM issues i
-         LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-         LEFT JOIN critical_path_cache c ON c.bead_id = i.id
-         WHERE i.status = 'open'
-           AND i.ephemeral = 0
-           AND i.pinned = 0
-           AND i.is_template = 0
-           AND i.deleted_at IS NULL
-           AND NOT EXISTS (
-               SELECT 1 FROM dependencies blocker_dep
-               INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-               WHERE blocker_dep.issue_id = i.id
-               AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-               AND blocker.status != 'closed'
-           )
-         GROUP BY i.id
-         ORDER BY
-             downstream_impact DESC,
-             critical_path_bonus DESC,
-             i.priority ASC,
-             i.created_at ASC
-         LIMIT ?1",
-    )?;
+pub fn get_ready_candidates(
+    tx: &Connection,
+    limit: usize,
+    model: Option<&str>,
+    harness: Option<&str>,
+) -> Result<Vec<ScoredBead>> {
+    let mut stmt = if let (Some(_m), Some(_h)) = (model, harness) {
+        // Velocity-aware scoring: divide combined score by expected seconds
+        tx.prepare(
+            "SELECT i.id, i.title, i.status, i.priority,
+                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                    i.created_at,
+                    vs.p50_seconds as expected_seconds
+             FROM issues i
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+             LEFT JOIN velocity_stats vs ON vs.issue_type = i.issue_type
+                 AND vs.model = ?1
+                 AND vs.harness = ?2
+             WHERE i.status = 'open'
+               AND i.ephemeral = 0
+               AND i.pinned = 0
+               AND i.is_template = 0
+               AND i.deleted_at IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM dependencies blocker_dep
+                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                   WHERE blocker_dep.issue_id = i.id
+                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                   AND blocker.status != 'closed'
+               )
+             GROUP BY i.id
+             ORDER BY (
+                 COALESCE(COUNT(d.issue_id), 0) * 3.0
+                 + (4 - i.priority) * 2.0
+                 + 1000.0 / (COALESCE(c.float, 999) + 1)
+             ) / COALESCE(vs.p50_seconds, 1800) DESC,
+                 downstream_impact DESC,
+                 critical_path_bonus DESC,
+                 i.priority ASC,
+                 i.created_at ASC
+             LIMIT ?3",
+        )?
+    } else {
+        // Standard scoring without velocity data
+        tx.prepare(
+            "SELECT i.id, i.title, i.status, i.priority,
+                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                    i.created_at
+             FROM issues i
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+             WHERE i.status = 'open'
+               AND i.ephemeral = 0
+               AND i.pinned = 0
+               AND i.is_template = 0
+               AND i.deleted_at IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM dependencies blocker_dep
+                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                   WHERE blocker_dep.issue_id = i.id
+                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                   AND blocker.status != 'closed'
+               )
+             GROUP BY i.id
+             ORDER BY
+                 downstream_impact DESC,
+                 critical_path_bonus DESC,
+                 i.priority ASC,
+                 i.created_at ASC
+             LIMIT ?1",
+        )?
+    };
 
-    let mut rows = stmt.query(params![limit as i64])?;
+    let mut rows = if model.is_some() && harness.is_some() {
+        stmt.query(params![model.unwrap(), harness.unwrap(), limit as i64])?
+    } else {
+        stmt.query(params![limit as i64])?
+    };
+
     let mut candidates = Vec::new();
 
     while let Some(row) = rows.next()? {
@@ -428,6 +532,13 @@ pub fn claim_any(
     use crate::config::load_metadata;
     use crate::storage::Storage;
 
+    // Extract model and harness for velocity-aware scoring
+    let (model, harness) = if let Some(meta) = worker_metadata {
+        (meta.model.as_deref(), meta.harness.as_deref())
+    } else {
+        (None, None)
+    };
+
     // Score across all workspaces
     let mut best: Option<(Score, usize)> = None;
     for (idx, workspace_path) in workspace_paths.iter().enumerate() {
@@ -438,7 +549,7 @@ pub fn claim_any(
         // Open each workspace's SQLite
         match Storage::open(&db_path) {
             Ok(storage) => {
-                if let Some(score) = storage.top_candidate_score()? {
+                if let Some(score) = storage.top_candidate_score(model, harness)? {
                     if best.as_ref().map(|(b, _)| score > *b).unwrap_or(true) {
                         best = Some((score, idx));
                     }
@@ -756,7 +867,7 @@ mod tests {
 
         // Get ready candidates - should be ordered by critical path bonus
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10))
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
             .unwrap();
 
         // bf-critical should be first (bonus=1000.0/1=1000)
@@ -810,7 +921,7 @@ mod tests {
 
         // Get ready candidates
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10))
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
             .unwrap();
 
         assert_eq!(candidates.len(), 2);

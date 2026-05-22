@@ -231,7 +231,7 @@ pub fn get_ready(workspace: &Path, limit: usize) -> Result<Vec<crate::claim::Sco
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    storage.with_immediate_transaction(|tx| crate::claim::get_ready_candidates(tx, limit))
+    storage.with_immediate_transaction(|tx| crate::claim::get_ready_candidates(tx, limit, None, None))
 }
 
 /// Check if a bead is ready to be claimed (not blocked).
