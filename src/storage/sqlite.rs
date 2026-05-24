@@ -7,7 +7,7 @@ use crate::model::{
 use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -1744,7 +1744,52 @@ fn is_busy_error(e: &rusqlite::Error) -> bool {
 }
 
 fn parse_datetime(s: String) -> Result<DateTime<Utc>> {
-    Ok(DateTime::parse_from_rfc3339(&s)?.with_timezone(&Utc))
+    let t = s.trim();
+    // bf's own format: RFC3339 (with timezone; optional fractional seconds).
+    match DateTime::parse_from_rfc3339(t) {
+        Ok(dt) => Ok(dt.with_timezone(&Utc)),
+        Err(e) => {
+            // br / SQLite-native datetime() format: no timezone, space or 'T'
+            // separator (e.g. "2026-05-15 21:10:36"). Assume UTC. A workspace
+            // touched by both `br` and `bf` mixes these, and the RFC3339-only
+            // parser used to crash the entire list/flush ("premature end of
+            // input") on the first such row.
+            for fmt in [
+                "%Y-%m-%d %H:%M:%S%.f",
+                "%Y-%m-%dT%H:%M:%S%.f",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S",
+            ] {
+                if let Ok(ndt) = NaiveDateTime::parse_from_str(t, fmt) {
+                    return Ok(ndt.and_utc());
+                }
+            }
+            Err(e.into())
+        }
+    }
+}
+
+#[cfg(test)]
+mod parse_datetime_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_rfc3339_and_sqlite_native_formats() {
+        // RFC3339 with timezone (bf's own format)
+        assert!(parse_datetime("2026-05-15T20:00:00+00:00".into()).is_ok());
+        // RFC3339 with nanosecond fraction
+        assert!(parse_datetime("2026-05-24T02:26:10.191834420+00:00".into()).is_ok());
+        // br / SQLite-native: space separator, no timezone — previously crashed
+        // with "premature end of input" and broke list/flush for the workspace.
+        let dt = parse_datetime("2026-05-15 21:10:36".into()).unwrap();
+        assert_eq!(dt.to_rfc3339(), "2026-05-15T21:10:36+00:00");
+        // naive 'T' separator without timezone
+        assert!(parse_datetime("2026-05-15T21:10:36".into()).is_ok());
+        // genuinely unparseable values still error (callers map NULL/empty to None
+        // via parse_opt_dt before reaching here)
+        assert!(parse_datetime("not a date".into()).is_err());
+        assert!(parse_datetime(String::new()).is_err());
+    }
 }
 
 /// Format secret matches into a user-friendly error message.
