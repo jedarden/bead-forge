@@ -247,7 +247,10 @@ mod tests {
 
     #[test]
     fn test_find_workspace_not_found() {
-        let temp_dir = TempDir::new().unwrap();
+        // Use /tmp directly instead of TMPDIR which may be under project root
+        // On this system TMPDIR=/home/coding/.tmp which is under /home/coding/.beads/
+        // causing find_beads_dir() to walk up and find it, making this test fail.
+        let temp_dir = TempDir::new_in("/tmp").unwrap();
         let workspace = temp_dir.path();
 
         let result = find_workspace(workspace);
