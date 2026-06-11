@@ -443,3 +443,70 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
         }
     }
 }
+
+#[test]
+fn test_claim_fallback_to_1800s_when_velocity_stats_empty() {
+    // Regression test for plan §4B.6: verify claim scorer uses COALESCE(vs.p50_seconds, 1800)
+    // correctly when no velocity_stats rows exist for the requesting worker model/harness.
+
+    use chrono::Utc;
+
+    let workspace = common::TempWorkspace::new().unwrap();
+
+    // Create some test beads
+    workspace.create_bead("bf-1", "First bead").unwrap();
+    workspace.create_bead("bf-2", "Second bead").unwrap();
+    workspace.create_bead("bf-3", "Third bead").unwrap();
+
+    // Set up worker metadata with an unknown model/harness combination
+    // that has no entries in velocity_stats
+    let worker_metadata = bead_forge::claim::WorkerMetadata {
+        worker_id: "test-worker".to_string(),
+        model: Some("unknown-model".to_string()),
+        harness: Some("unknown-harness".to_string()),
+        harness_version: None,
+    };
+
+    // Claim should succeed and return a bead, using 1800s as the default p50_seconds
+    let storage = workspace.storage().unwrap();
+    let claim_result = storage
+        .with_immediate_transaction(|tx| {
+            bead_forge::claim::claim(
+                tx,
+                "test-worker",
+                30,
+                Utc::now(),
+                Some(&worker_metadata),
+            )
+        })
+        .unwrap();
+
+    // Should claim a bead successfully (no error despite empty velocity_stats)
+    assert!(
+        claim_result.is_some(),
+        "Should claim a bead even when velocity_stats is empty for the model/harness"
+    );
+
+    let claimed = claim_result.unwrap();
+    let bead = workspace.get_bead(&claimed.bead_id).unwrap().unwrap();
+
+    // Verify the bead was actually claimed
+    assert_eq!(bead.status.to_string(), "in_progress");
+    assert_eq!(bead.assignee.as_ref().unwrap(), "test-worker");
+
+    // Verify velocity_stats is still empty for this model/harness
+    let count = storage
+        .with_immediate_transaction(|tx| {
+            Ok(tx.query_row(
+                "SELECT COUNT(*) FROM velocity_stats WHERE model = ?1 AND harness = ?2",
+                [&"unknown-model", &"unknown-harness"],
+                |row| row.get::<_, i64>(0),
+            )?)
+        })
+        .unwrap();
+
+    assert_eq!(
+        count, 0,
+        "velocity_stats should still be empty - fallback used 1800s default"
+    );
+}
