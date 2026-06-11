@@ -1,0 +1,13 @@
+[Unit]
+Description=Update bf binary from latest GitHub release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=coding
+Environment=PATH=/run/wrappers/bin:/home/coding/.local/bin:/home/coding/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin
+ExecStart=/home/coding/bead-forge/deploy/bf-update.sh
+
+[Install]
+WantedBy=multi-user.target

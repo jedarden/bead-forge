@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly check for bf binary updates
+Requires=bf-update.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
