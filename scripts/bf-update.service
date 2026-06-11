@@ -1,0 +1,9 @@
+[Unit]
+Description=Update bf binary from GitHub releases
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/run/current-system/sw/bin/bash %h/.local/bin/bf-update
+Environment=PATH=/home/coding/.local/bin:/home/coding/bin:/home/coding/.cargo/bin:/run/current-system/sw/bin
