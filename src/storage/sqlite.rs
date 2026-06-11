@@ -366,6 +366,11 @@ impl Storage {
                     params![&issue.id, key, value],
                 )?;
             }
+            // Mark as dirty for export (new beads need to be flushed to JSONL)
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                params![&issue.id, chrono::Utc::now().to_rfc3339()],
+            )?;
             // Invalidate critical path cache: new beads may add dependencies
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
@@ -695,6 +700,8 @@ impl Storage {
             Ok(result.count)
         } else {
             let result = export_jsonl(jsonl_path, || self.list_all_issues())?;
+            // Clear dirty flags after full export (all beads are now synced)
+            self.clear_dirty()?;
             Ok(result.count)
         }
     }

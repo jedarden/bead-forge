@@ -242,7 +242,21 @@ fn is_busy_error(e: &rusqlite::Error) -> bool {
 
 - `doctor --repair`: Delete `beads.db`, reimport from JSONL
 - `doctor --check`: Validate JSONL line integrity, check SQLite <-> JSONL consistency
-- Recovery from corruption: JSONL export is always authoritative — `beads.db` can be rebuilt from it at any time
+- `doctor --repair --flush-first`: Flush unflushed beads to JSONL before repairing (protects against data loss)
+- `doctor --repair --force`: Force repair even with unflushed beads (WARNING: unflushed beads are lost)
+- **Flush-before-repair rule**: Always run `bf sync --flush-only` before `bf doctor --repair` to protect against losing unflushed beads
+- Recovery from corruption: JSONL export is the authoritative checkpoint for recovery — `beads.db` can be rebuilt from it at any time
+
+**CRITICAL DATA AUTHORITY NOTE**: bead-forge inverts the authority model from upstream beads/br:
+
+| Tool | Source of truth | Checkpoint role |
+|------|----------------|-----------------|
+| beads / br | JSONL (`issues.jsonl`) | SQLite is read-cache |
+| bead-forge | SQLite (`beads.db`) | JSONL is git-tracked checkpoint |
+
+This inversion is necessary for atomic multi-worker operations. **Beads created or modified since the last `bf sync --flush-only` exist only in SQLite**. Running `bf doctor --repair` without flushing first destroys these unflushed beads.
+
+**Historical context**: On 2026-06-10, seven independent agents across seven workspaces (ARMOR, NEEDLE, AgentScribe, kalshi-weather, jedarden.com, vibe-coding-discovery, face/pose/sun repos) each lost their entire first batch of freshly created beads by running `doctor --repair` after bulk creates. Four db-only beads in ARMOR (bf-4rm7/5zxa/tojg/tr44) were permanently lost. This fix implements the flush-before-repair protection.
 
 ---
 

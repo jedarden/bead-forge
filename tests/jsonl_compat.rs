@@ -212,8 +212,11 @@ fn test_jsonl_export_dirty_only() {
     ws.create_bead("bf-001", "Bead 1").unwrap();
     ws.create_bead("bf-002", "Bead 2").unwrap();
 
-    // Mark one as dirty
+    // Clear dirty flags (both beads are dirty after creation)
     let storage = ws.storage().unwrap();
+    storage.clear_dirty().unwrap();
+
+    // Mark one as dirty
     storage.mark_dirty("bf-001").unwrap();
 
     // Export dirty only

@@ -102,6 +102,11 @@ pub fn flush_dirty(workspace_dir: &Path) -> Result<usize> {
 /// Collision resolution: when both JSONL and SQLite have changes for the
 /// same bead, the one with the later `updated_at` timestamp wins.
 ///
+/// NOTE: If there are unflushed beads (db-only or db-newer), this function
+/// will emit a warning but proceed. The collision resolution logic preserves
+/// SQLite versions when they are newer, so unflushed beads are protected.
+/// Run `bf sync --flush-only` first to silence the warning.
+///
 /// # Arguments
 /// * `workspace_dir` - Path to the workspace root (contains .beads/)
 ///
@@ -116,6 +121,27 @@ pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
     let jsonl_path = beads_dir.join(&metadata.jsonl_export);
 
     let storage = Storage::open(&db_path)?;
+
+    // Check for unflushed beads and warn
+    let dirty_issues = storage.list_dirty_issues()?;
+    if !dirty_issues.is_empty() {
+        eprintln!(
+            "WARNING: {} unflushed bead(s) exist in SQLite (modified/created since last flush to JSONL).",
+            dirty_issues.len()
+        );
+        eprintln!("  Import will preserve SQLite versions when they are newer.");
+        eprintln!("  Run 'bf sync --flush-only' first to flush these beads to JSONL.");
+        let dirty_ids: Vec<String> = dirty_issues.iter().map(|i| i.id.clone()).collect();
+        if dirty_ids.len() <= 5 {
+            eprintln!("  Unflushed: {}", dirty_ids.join(", "));
+        } else {
+            eprintln!(
+                "  Unflushed: {}, ... and {} more",
+                dirty_ids[..5].join(", "),
+                dirty_ids.len() - 5
+            );
+        }
+    }
 
     // Stream import with content_hash comparison
     let result = storage.with_immediate_transaction(|tx| {

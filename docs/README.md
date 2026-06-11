@@ -216,7 +216,7 @@ bf dep           add-blocker <blocker> <blockee>
 bf dep           tree <id>
 bf label         <id> add <label> [<label> ...]
 bf sync          [--flush-only] [--import-only]
-bf doctor        [--repair] [--check] [--reclaim-stale [--ttl <duration>]]
+bf doctor        [--repair [--flush-first] [--force]] [--check] [--reclaim-stale [--ttl <duration>]]
 bf init          [--prefix <p>]
 bf stats
 bf search        <query>
@@ -262,7 +262,8 @@ ln -sf ~/.local/bin/bf ~/.local/bin/br
 - **WAL mode** — concurrent reads never block writes; writers queue, not corrupt
 - **`BEGIN IMMEDIATE`** — acquires write lock before any reads; eliminates TOCTOU
 - **`SQLITE_BUSY` retry** — exponential backoff up to 5 retries; converts contention spikes to short waits
-- **JSONL always authoritative** — `bf doctor --repair` rebuilds `beads.db` from `issues.jsonl` at any time
+- **SQLite is authoritative** — all mutations (create/update/claim) go to SQLite; JSONL is a git checkpoint written only by `bf sync --flush-only`
+- **Flush-before-repair** — `bf doctor --repair` refuses to run if unflushed beads exist (to prevent data loss); use `bf doctor --repair --flush-first` to flush then repair, or `bf doctor --repair --force` to proceed with data loss warning
 
 ---
 
