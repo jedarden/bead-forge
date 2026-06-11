@@ -93,6 +93,39 @@ These tables are additive — `br` ignores them when operating on a migrated wor
 | `critical_path_cache` | Pre-computed DAG float scores (invalidated on dep changes) |
 | `operation_log` | Full event history per bead |
 
+### Data authority: SQLite vs JSONL
+
+**CRITICAL**: bead-forge inverts the authority model from upstream beads/br:
+
+| Tool | Source of truth | Checkpoint role |
+|------|----------------|-----------------|
+| beads / br | JSONL (`issues.jsonl`) | SQLite is read-cache |
+| bead-forge | SQLite (`beads.db`) | JSONL is git-tracked checkpoint |
+
+**Why the inversion**: Multi-worker fleets need atomic read-modify-write operations (`bf claim`, `bf mitosis`, `bf batch`). These execute inside `BEGIN IMMEDIATE` transactions on SQLite. JSONL is append-only and cannot support atomic read-write cycles.
+
+**Implication**: Beads created or modified since the last `bf sync --flush-only` exist **only in SQLite**. Running `bf doctor --repair` without flushing first destroys these unflushed beads.
+
+### Flush-before-repair rule
+
+`bf doctor --repair` rebuilds SQLite from JSONL. To protect against data loss:
+
+```bash
+# ALWAYS flush first (or use --flush-first)
+bf sync --flush-only
+bf doctor --repair
+
+# OR use the safe flag
+bf doctor --repair --flush-first
+
+# OR force (WARNING: unflushed beads are lost)
+bf doctor --repair --force
+```
+
+If unflushed beads exist and neither `--flush-first` nor `--force` is specified, `repair` refuses with an error listing the beads that would be lost.
+
+**Why this matters**: On 2026-06-10, seven independent agents across seven workspaces each lost their entire first batch of freshly created beads by running `doctor --repair` after bulk creates. Four db-only beads were permanently lost.
+
 ### Claim scoring
 
 `bf claim` selects the highest-priority ready bead using a composite score:

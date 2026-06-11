@@ -235,6 +235,14 @@ pub enum Commands {
         #[arg(long)]
         repair: bool,
 
+        /// Flush unflushed beads to JSONL before repair (protects against data loss)
+        #[arg(long)]
+        flush_first: bool,
+
+        /// Force repair even with unflushed beads (WARNING: unflushed beads will be lost)
+        #[arg(long)]
+        force: bool,
+
         /// Reclaim stale in_progress beads (reset to open without claiming)
         #[arg(long)]
         reclaim_stale: bool,
@@ -762,9 +770,11 @@ pub fn run(cli: Cli) -> Result<()> {
         } => cmd_sync(&beads_dir, flush_only, import_only),
         Commands::Doctor {
             repair,
+            flush_first,
+            force,
             reclaim_stale,
             ttl,
-        } => cmd_doctor(&beads_dir, repair, reclaim_stale, ttl),
+        } => cmd_doctor(&beads_dir, repair, flush_first, force, reclaim_stale, ttl),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
         Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
@@ -1483,6 +1493,8 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
 fn cmd_doctor(
     beads_dir: &PathBuf,
     repair: bool,
+    flush_first: bool,
+    force: bool,
     reclaim_stale: bool,
     ttl: Option<i64>,
 ) -> Result<()> {
@@ -1490,13 +1502,11 @@ fn cmd_doctor(
     let db_path = beads_dir.join(&metadata.database);
 
     if repair {
-        std::fs::remove_file(&db_path)?;
-        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
-        let storage = Storage::open(&db_path)?;
-        let result = storage.sync_from_jsonl(&jsonl_path)?;
+        let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
+        let imported = crate::doctor::repair(workspace_dir, flush_first, force)?;
         println!(
             "Repaired database: imported {} beads from JSONL",
-            result.imported
+            imported
         );
     } else if reclaim_stale {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
