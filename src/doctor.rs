@@ -315,13 +315,33 @@ pub fn repair(workspace_dir: &Path, flush_first: bool, force: bool) -> Result<us
     }
 
     // Check for unflushed beads if database exists and is valid
-    // If db is corrupted, we can't detect unflushed beads - they'll be lost
-    let unflushed_ids = if db_path.exists() {
-        // Try to get unflushed IDs, but if db is corrupted return empty list
-        // (the beads will be lost during repair, which is unavoidable)
-        get_unflushed_ids(&db_path).unwrap_or_else(|_| Vec::new())
+    // If db is corrupted, we can't detect unflushed beads - proceed with warning
+    let (unflushed_ids, db_corrupted) = if db_path.exists() {
+        match get_unflushed_ids(&db_path) {
+            Ok(ids) => (ids, false),
+            Err(_) => {
+                // Database is corrupted or unreadable
+                // We can't detect unflushed beads, so proceed with a warning
+                if flush_first {
+                    // Cannot flush from a corrupt database
+                    return Err(anyhow!(
+                        "Cannot flush: database is corrupted and unreadable.\n\
+                         Flushing from a corrupt DB would poison the JSONL checkpoint.\n\
+                         Unflushed beads cannot be recovered.\n\
+                         Remove --flush-first to proceed with repair only."
+                    ));
+                }
+                // Proceed without unflushed check (db is unreadable)
+                // No --force needed since we can't detect unflushed beads anyway
+                eprintln!("WARNING: Database is corrupted and unreadable.");
+                eprintln!("  Cannot detect unflushed beads - any db-only beads will be lost.");
+                eprintln!("  Proceeding with repair from JSONL...");
+                (Vec::new(), true)
+            }
+        }
     } else {
-        Vec::new()
+        // DB doesn't exist - no unflushed beads possible
+        (Vec::new(), false)
     };
 
     if !unflushed_ids.is_empty() {
