@@ -3,7 +3,7 @@ use crate::claim::{
     claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
 };
 use crate::commit_check::{format_scan_results, scan_staged_beads};
-use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
+use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, save_config};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
@@ -611,6 +611,15 @@ pub enum ConfigCommands {
     Get {
         /// Config key
         key: String,
+    },
+
+    /// Set a config value
+    Set {
+        /// Config key (supports dot notation for nested values, e.g., scoring.priority_weight)
+        key: String,
+
+        /// Config value
+        value: String,
     },
 
     /// Show config file path
@@ -2148,14 +2157,125 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
         }
         ConfigCommands::Get { key } => {
             let cfg = load_config(beads_dir)?;
-            let value = match key.as_str() {
-                "issue_prefixes" => format!("{:?}", cfg.issue_prefixes),
-                "default_priority" => cfg.default_priority.to_string(),
-                "default_type" => cfg.default_type,
-                "claim_ttl_minutes" => cfg.claim_ttl_minutes.to_string(),
+            // Parse key with dot notation support (e.g., scoring.priority_weight)
+            let parts: Vec<&str> = key.split('.').collect();
+            let value = match parts.as_slice() {
+                ["issue_prefixes"] => format!("{:?}", cfg.issue_prefixes),
+                ["default_priority"] => cfg.default_priority.to_string(),
+                ["default_type"] => cfg.default_type.clone(),
+                ["claim_ttl_minutes"] => cfg.claim_ttl_minutes.to_string(),
+                ["scoring", "priority_weight"] => cfg.scoring.priority_weight.to_string(),
+                ["scoring", "blockers_weight"] => cfg.scoring.blockers_weight.to_string(),
+                ["scoring", "age_weight"] => cfg.scoring.age_weight.to_string(),
+                ["scoring", "labels_weight"] => cfg.scoring.labels_weight.to_string(),
+                ["scoring", "max_age_hours"] => cfg.scoring.max_age_hours.to_string(),
+                ["scoring", "max_blockers"] => cfg.scoring.max_blockers.to_string(),
+                ["rotate", "rotate_age_days"] => cfg.rotate.rotate_age_days.to_string(),
+                ["rotate", "rotate_max_size_mb"] => cfg.rotate.rotate_max_size_mb.to_string(),
+                ["rotate", "rotate_max_archives"] => cfg.rotate.rotate_max_archives.to_string(),
+                ["secret_protection", "enabled"] => cfg.secret_protection.enabled.to_string(),
                 _ => return Err(anyhow!("Unknown config key: {}", key)),
             };
             println!("{}", value);
+        }
+        ConfigCommands::Set { key, value } => {
+            use crate::config::save_config;
+            let mut cfg = load_config(beads_dir)?;
+
+            // Parse key with dot notation support (e.g., scoring.priority_weight)
+            let parts: Vec<&str> = key.split('.').collect();
+            let result = match parts.as_slice() {
+                ["issue_prefixes"] => {
+                    // Parse as comma-separated list: "bf,nf,xf"
+                    cfg.issue_prefixes = value
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    Ok(())
+                }
+                ["default_priority"] => {
+                    cfg.default_priority = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid priority: {}. Must be 0-4", value))?;
+                    Ok(())
+                }
+                ["default_type"] => {
+                    cfg.default_type = value.clone();
+                    Ok(())
+                }
+                ["claim_ttl_minutes"] => {
+                    cfg.claim_ttl_minutes = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid TTL minutes: {}. Must be an integer", value))?;
+                    Ok(())
+                }
+                ["scoring", "priority_weight"] => {
+                    cfg.scoring.priority_weight = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid priority_weight: {}. Must be a number", value))?;
+                    Ok(())
+                }
+                ["scoring", "blockers_weight"] => {
+                    cfg.scoring.blockers_weight = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid blockers_weight: {}. Must be a number", value))?;
+                    Ok(())
+                }
+                ["scoring", "age_weight"] => {
+                    cfg.scoring.age_weight = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid age_weight: {}. Must be a number", value))?;
+                    Ok(())
+                }
+                ["scoring", "labels_weight"] => {
+                    cfg.scoring.labels_weight = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid labels_weight: {}. Must be a number", value))?;
+                    Ok(())
+                }
+                ["scoring", "max_age_hours"] => {
+                    cfg.scoring.max_age_hours = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid max_age_hours: {}. Must be an integer", value))?;
+                    Ok(())
+                }
+                ["scoring", "max_blockers"] => {
+                    cfg.scoring.max_blockers = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid max_blockers: {}. Must be an integer", value))?;
+                    Ok(())
+                }
+                ["rotate", "rotate_age_days"] => {
+                    cfg.rotate.rotate_age_days = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid rotate_age_days: {}. Must be an integer", value))?;
+                    Ok(())
+                }
+                ["rotate", "rotate_max_size_mb"] => {
+                    cfg.rotate.rotate_max_size_mb = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid rotate_max_size_mb: {}. Must be an integer", value))?;
+                    Ok(())
+                }
+                ["rotate", "rotate_max_archives"] => {
+                    cfg.rotate.rotate_max_archives = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid rotate_max_archives: {}. Must be an integer", value))?;
+                    Ok(())
+                }
+                ["secret_protection", "enabled"] => {
+                    cfg.secret_protection.enabled = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid enabled: {}. Must be true/false", value))?;
+                    Ok(())
+                }
+                _ => Err(anyhow!("Unknown config key: {}", key)),
+            };
+
+            result?;
+            save_config(beads_dir, &cfg)?;
+            println!("Set {} = {}", key, value);
         }
         ConfigCommands::Path => {
             let config_path = beads_dir.join("config.yaml");
