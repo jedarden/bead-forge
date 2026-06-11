@@ -7,10 +7,10 @@ Created systemd timer-based auto-deployment mechanism on the lab server using fi
 ### Components Created
 
 1. **`deploy/bf-update.sh`** - Update script (tracked in repo) that:
-   - Checks GitHub API for latest release using curl + grep/sed
+   - Checks GitHub API for latest release using curl + jq
    - Compares with installed version (stored in `~/.local/bin/.bf-version`)
    - Downloads and installs new `bf-linux-x86_64` binary if available
-   - No external dependencies (no jq, no gh CLI, no file command required)
+   - Requires: curl, jq (for JSON parsing from GitHub API)
    - Uses temporary directory with automatic cleanup
 
 2. **`deploy/bf-update.service`** - Systemd user service that runs the update script
