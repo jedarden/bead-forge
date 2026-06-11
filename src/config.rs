@@ -185,6 +185,13 @@ pub fn load_metadata(beads_dir: &Path) -> Result<Metadata> {
     }
 }
 
+pub fn save_config(beads_dir: &Path, config: &Config) -> Result<()> {
+    let config_path = beads_dir.join("config.yaml");
+    let config_yaml = serde_yaml::to_string(config)?;
+    std::fs::write(&config_path, config_yaml)?;
+    Ok(())
+}
+
 pub fn get_default_prefix(config: &Config) -> &str {
     config
         .issue_prefixes
