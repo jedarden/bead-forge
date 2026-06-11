@@ -18,6 +18,8 @@ use std::str::FromStr;
 #[derive(Parser)]
 #[command(name = "bf")]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
+#[command(version = "0.1.0")]
+#[command(propagate_version = true)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
