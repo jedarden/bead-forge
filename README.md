@@ -213,9 +213,47 @@ glm-5              bug      91     6m 33s   28m 01s
 
 NEEDLE uses this to route beads: if a `bug`-type bead arrives and a GLM-5 worker is available, it may get priority over a Sonnet worker if GLM-5's p50 for bugs is lower.
 
+## CI/CD and Auto-Deployment
+
+The `bead-forge-build` workflow template on `iad-ci` builds the binary and publishes releases to GitHub:
+
+1. Builds with `cargo test` and `cargo build --release`
+2. Creates GitHub release with `bf-linux-x86_64` asset
+3. Triggers auto-deployment to lab server
+
+### Auto-deployment mechanism
+
+The lab server runs a systemd timer (`bf-update.timer`) that checks hourly for new releases and auto-deploys them to `~/.local/bin/bf`:
+
+```bash
+# Check timer status
+systemctl --user status bf-update.timer
+
+# Manual update
+/home/coding/bead-forge/deploy/bf-update.sh
+```
+
+The update script:
+- Fetches latest release version from GitHub API
+- Compares to installed version (tracked in `~/.local/bin/.bf-version`)
+- Downloads and installs only if newer
+
+See `deploy/bf-update.sh`, `deploy/bf-update.service`, and `deploy/bf-update.timer` for implementation.
+
 ## Installation
 
-No release binary is currently published. Build from source:
+Release binaries are published to GitHub Releases. On the lab server, a systemd timer auto-deploys new versions hourly. For other machines:
+
+```bash
+# Download latest release
+VERSION=$(curl -s https://api.github.com/repos/jedarden/bead-forge/releases/latest | grep -m1 '"tag_name"' | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+curl -fsSL "https://github.com/jedarden/bead-forge/releases/download/${VERSION}/bf-linux-x86_64" -o bf
+chmod +x bf
+sudo mv bf /usr/local/bin/bf
+sudo ln -sf /usr/local/bin/bf /usr/local/bin/br   # drop-in replace br
+```
+
+Or build from source:
 
 ```bash
 git clone https://github.com/jedarden/bead-forge
