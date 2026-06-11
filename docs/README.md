@@ -262,8 +262,35 @@ ln -sf ~/.local/bin/bf ~/.local/bin/br
 - **WAL mode** — concurrent reads never block writes; writers queue, not corrupt
 - **`BEGIN IMMEDIATE`** — acquires write lock before any reads; eliminates TOCTOU
 - **`SQLITE_BUSY` retry** — exponential backoff up to 5 retries; converts contention spikes to short waits
-- **SQLite is authoritative** — all mutations (create/update/claim) go to SQLite; JSONL is a git checkpoint written only by `bf sync --flush-only`
-- **Flush-before-repair** — `bf doctor --repair` refuses to run if unflushed beads exist (to prevent data loss); use `bf doctor --repair --flush-first` to flush then repair, or `bf doctor --repair --force` to proceed with data loss warning
+
+### Data Authority Model
+
+**bead-forge inverts the authority model from upstream beads/br**:
+
+| Tool | Source of truth | Checkpoint role |
+|------|----------------|-----------------|
+| beads / br | JSONL (`issues.jsonl`) | SQLite is read-cache |
+| bead-forge | SQLite (`beads.db`) | JSONL is git-tracked checkpoint |
+
+This inversion is necessary for atomic multi-worker operations. All mutations (create/update/claim) go to SQLite; JSONL is a git checkpoint written only by `bf sync --flush-only`. **Beads created or modified since the last flush exist only in SQLite.**
+
+### Flush-Before-Repair Rule
+
+`bf doctor --repair` rebuilds SQLite from JSONL. Without flushing first, **unflushed beads are silently destroyed**.
+
+```bash
+# Always flush before repair
+bf sync --flush-only
+bf doctor --repair
+
+# Or use the combined command
+bf doctor --repair --flush-first
+
+# Force repair (with data loss warning)
+bf doctor --repair --force
+```
+
+**Historical context**: On 2026-06-10, seven independent agents across seven workspaces (ARMOR, NEEDLE, AgentScribe, kalshi-weather, jedarden.com, vibe-coding-discovery, face/pose/sun repos) each lost their entire first batch of freshly created beads by running `doctor --repair` after bulk creates. Four db-only beads in ARMOR (bf-4rm7/5zxa/tojg/tr44) were permanently lost. This fix implements the flush-before-repair protection.
 
 ---
 
