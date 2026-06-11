@@ -49,6 +49,9 @@ pub fn flush(workspace_dir: &Path) -> Result<usize> {
     // Update export_hashes for all exported issues
     update_export_hashes_for_issues(&storage, &issues)?;
 
+    // Clear dirty marks - all beads have been flushed to JSONL
+    storage.clear_dirty()?;
+
     Ok(result.count)
 }
 
