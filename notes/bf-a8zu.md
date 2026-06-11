@@ -1,99 +1,128 @@
-# Auto-Deployment Implementation for bf Binary
+# Auto-Deployment of bf Binary
 
-## Status: Complete ✓
+## Overview
 
-## Implementation Summary
-
-The auto-deployment system for the `bf` binary to the lab server is fully operational.
+The `bf` binary is automatically deployed to the lab server (`~/.local/bin/bf`) after each successful CI release via a **pull-based** mechanism using systemd timers.
 
 ## Architecture
 
-**Passive Polling Model** (chosen due to infrastructure constraints):
-- CI runs in iad-ci cluster (isolated from lab server)
-- Lab server polls GitHub for new releases via curl
-- No shared storage or direct connectivity between CI and lab
-- No gh CLI dependency on lab server
-
-## Components
-
-### 1. Update Script (`~/bead-forge/deploy/bf-update.sh`)
-- Queries GitHub API for latest release version
-- Downloads `bf-linux-x86_64` asset via `curl`
-- Installs to `~/.local/bin/bf`
-- Tracks installed version in `~/.local/bin/.bf-version`
-- Idempotent (skips if already up-to-date)
-
-### 2. Systemd Timer (`~/.config/systemd/user/bf-update.timer`)
-- **Frequency**: Hourly (OnUnitActiveSec=1h)
-- **Boot delay**: 5 minutes after boot (OnBootSec=5min)
-- **Status**: Active and enabled
-
-```ini
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=1h
-AccuracySec=1s
+```
+GitHub Release → Systemd Timer (hourly) → Update Script → ~/.local/bin/bf
 ```
 
-### 3. Update Service (`~/.config/systemd/user/bf-update.service`)
-- Runs `~/bead-forge/deploy/bf-update.sh`
-- Triggered by timer
-- Logs to systemd journal
+### Components
 
-### 4. CI Integration (`bead-forge-build-workflowtemplate.yml`)
-- Line 61 documents the auto-deployment mechanism
-- CI creates GitHub release with `bf-linux-x86_64` asset
-- Lab server picks up within 1 hour (max)
+1. **CI/CD Workflow** (`bead-forge-build-workflowtemplate.yml`)
+   - Builds `bf` binary from source
+   - Creates GitHub release with `bf-linux-x86_64` asset
+   - Emits note: "Binary will be auto-deployed to lab server via bf-update systemd timer (hourly check)"
 
-## Deployment Timeline
+2. **Systemd Timer** (`~/.config/systemd/user/bf-update.timer`)
+   - Runs 5 minutes after boot
+   - Runs every hour thereafter (`OnUnitActiveSec=1h`)
+   - Triggers `bf-update.service`
 
-**Maximum deployment latency**: 1 hour 5 minutes
-- Timer runs hourly
-- 5-minute initial boot delay
+3. **Systemd Service** (`~/.config/systemd/user/bf-update.service`)
+   - Executes `/home/coding/bead-forge/deploy/bf-update.sh`
+   - Runs as user service (no root required)
+
+4. **Update Script** (`deploy/bf-update.sh`)
+   - Fetches latest release tag from GitHub API
+   - Compares with installed version (stored in `~/.local/bin/.bf-version`)
+   - Downloads `bf-linux-x86_64` asset if newer
+   - Installs to `~/.local/bin/bf`
+   - Updates version file
 
 ## Verification
 
+### Check timer status:
 ```bash
-# Check timer status
 systemctl --user status bf-update.timer
+```
 
-# Manual trigger
+Expected output:
+```
+● bf-update.timer - Hourly check for bf binary updates
+     Loaded: loaded
+     Active: active (waiting)
+```
+
+### View recent update runs:
+```bash
+journalctl --user -u bf-update.service -n 10 --no-pager
+```
+
+### Manually trigger update:
+```bash
 systemctl --user start bf-update.service
+```
 
-# View logs
-journalctl --user -u bf-update.service -n 50
-
-# Check installed version
+### Check installed version:
+```bash
 cat ~/.local/bin/.bf-version
 ```
 
-## Why This Approach?
+## Current Status
 
-Given infrastructure constraints:
-- ❌ No SSH access from CI to lab (banned per CLAUDE.md)
-- ❌ No shared NFS/S3 storage between iad-ci and lab server
-- ❌ Lab server not on same cluster as CI
-- ✓ Lab server has curl and GitHub API access
-- ✓ Systemd timers are reliable and persistent
-- ✓ No external dependencies (gh CLI not required)
+✅ **FULLY OPERATIONAL** as of 2026-06-11
 
-## Implementation Date
+- Timer: Active (runs hourly)
+- Script: Syntactically valid, functional
+- Last run: Successfully checked for v0.1.0
+- Install location: `~/.local/bin/bf`
 
-2026-06-11
+## Deployment Timeline
 
-## Files Modified
+After a new release is created by CI:
+1. **0-60 minutes**: Systemd timer picks up new release (on next hourly check)
+2. **~1 minute**: Update script downloads binary from GitHub
+3. **Immediate**: Binary installed to `~/.local/bin/bf`
 
-- `deploy/bf-update.sh` - Update script (uses curl + GitHub API)
-- `deploy/bf-update.service` - Systemd service unit
-- `deploy/bf-update.timer` - Systemd timer unit
-- `deploy/README.md` - Documentation
-- `~/.config/systemd/user/bf-update.service` - Installed on lab server
-- `~/.config/systemd/user/bf-update.timer` - Installed on lab server
+## Advantages of Pull-Based Approach
 
-## Test Results
+1. **No SSH required**: CI runner doesn't need lab server credentials
+2. **Self-healing**: Recover from failed deploys on next hourly check
+3. **Idempotent**: Safe to run multiple times
+4. **Low complexity**: Simple script, no complex orchestration
+5. **Always up-to-date**: Hourly checks ensure latest version
 
-✓ Timer active and running hourly
-✓ Script successfully fetches version info from GitHub API
-✓ Version comparison working (v0.1.0 detected as current)
-✓ Binary installed at ~/.local/bin/bf
-✓ Service logs clean
+## Alternative Approaches Considered
+
+| Approach | Status | Reason |
+|----------|--------|--------|
+| Push from CI workflow | ❌ Rejected | Requires SSH access from CI runner to lab server |
+| GitHub Actions post-release | ❌ Rejected | Banned per CLAUDE.md |
+| Sidecar deployment pod | ❌ Rejected | Overkill for single binary |
+| Shared storage + cron | ❌ Rejected | More complex than direct download |
+
+## Troubleshooting
+
+### Timer not running:
+```bash
+systemctl --user enable bf-update.timer
+systemctl --user start bf-update.timer
+```
+
+### Manual update test:
+```bash
+bash deploy/bf-update.sh
+```
+
+### Check download URL manually:
+```bash
+VERSION="0.1.0"
+curl -I "https://github.com/jedarden/bead-forge/releases/download/v${VERSION}/bf-linux-x86_64"
+```
+
+### Verify binary after install:
+```bash
+file ~/.local/bin/bf
+# Should output: ELF 64-bit LSB executable, x86-64, ...
+```
+
+## Implementation Notes
+
+- The workflow template was updated on 2026-06-11 to document the auto-deployment mechanism
+- All infrastructure (timer, service, script) was already in place and operational
+- No code changes were required—only verification and documentation
+- Deployment latency is <60 minutes (acceptable for tooling updates)
