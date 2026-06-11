@@ -1,54 +1,90 @@
 #!/usr/bin/env bash
-# bf-update - Update bf binary from GitHub releases
-# Run this manually or via cron to update ~/.local/bin/bf
+# Auto-update script for bf (bead-forge) binary
+# Fetches the latest release from GitHub and installs to ~/.local/bin/bf
+#
+# Install this script to ~/.local/bin/bf-update.sh and make it executable:
+#   cp bf-update.sh ~/.local/bin/bf-update.sh
+#   chmod +x ~/.local/bin/bf-update.sh
+#
+# This script is called by the bf-update systemd timer (see bf-update.timer)
 
 set -euo pipefail
 
-BINARY_DIR="$HOME/.local/bin"
-BINARY_PATH="$BINARY_DIR/bf"
-REPO="jedarden/bead-forge"
-ASSET="bf-linux-x86_64"
+BIN_DIR="$HOME/.local/bin"
 TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+trap "rm -rf $TEMP_DIR" EXIT
 
-echo "Checking for latest bead-forge release..."
+echo "Checking for new bead-forge releases..."
 
-# Get latest release tag
-LATEST_RELEASE=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | jq -r '.tag_name')
-if [[ -z "$LATEST_RELEASE" || "$LATEST_RELEASE" == "null" ]]; then
-  echo "Error: Could not fetch latest release" >&2
-  exit 1
+# Get the latest release tag from GitHub API
+LATEST_RELEASE=$(curl -s https://api.github.com/repos/jedarden/bead-forge/releases/latest | jq -r .tag_name)
+CURRENT_VERSION="unknown"
+
+if [[ -f "$BIN_DIR/bf" ]]; then
+    # Try to get current version from .bf-version file first
+    if [[ -f "$BIN_DIR/.bf-version" ]]; then
+        CURRENT_VERSION=$(cat "$BIN_DIR/.bf-version" 2>/dev/null || echo "unknown")
+    else
+        # Extract version from --version output (exits with code 1, so we capture stderr too)
+        VERSION_OUTPUT=$("$BIN_DIR/bf" --version 2>&1 || true)
+        # Extract version number from output like "bf 0.1.0" or "Error: bf 0.1.0"
+        if [[ "$VERSION_OUTPUT" =~ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            CURRENT_VERSION="v${BASH_REMATCH[1]}"
+        else
+            # Fallback to parsing --help
+            CURRENT_VERSION=$("$BIN_DIR/bf" --help 2>/dev/null | grep -oE 'bead-forge [0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk '{print $2}' || echo "unknown")
+            if [[ "$CURRENT_VERSION" != "unknown" ]]; then
+                CURRENT_VERSION="v$CURRENT_VERSION"
+            fi
+        fi
+    fi
 fi
 
 echo "Latest release: $LATEST_RELEASE"
+echo "Current version: $CURRENT_VERSION"
 
-# Get current version if installed
-if [[ -x "$BINARY_PATH" ]]; then
-  # Compare by checking if we can get the Cargo.toml version from the binary's build
-  # bf doesn't have a --version flag, so we'll check against git releases
-  CURRENT_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" | jq -r '.[0].tag_name')
-  if [[ "$CURRENT_TAG" == "$LATEST_RELEASE" ]]; then
-    echo "Already up to date at $LATEST_RELEASE!"
+# If versions match (and current isn't unknown), skip
+if [[ "$CURRENT_VERSION" == "$LATEST_RELEASE" || "$CURRENT_VERSION" == "v$LATEST_RELEASE" ]]; then
+    echo "Already up to date, exiting"
     exit 0
-  fi
 fi
 
-echo "Downloading $ASSET from $LATEST_RELEASE..."
+echo "Downloading bf-linux-x86_64 from release $LATEST_RELEASE..."
 
-# Download asset
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_RELEASE}/${ASSET}"
-if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/$ASSET"; then
-  echo "Error: Failed to download $ASSET" >&2
-  exit 1
+# Get download URL for the bf-linux-x86_64 asset
+DOWNLOAD_URL=$(curl -s "https://api.github.com/repos/jedarden/bead-forge/releases/latest" |
+    jq -r '.assets[] | select(.name == "bf-linux-x86_64") | .browser_download_url')
+
+if [[ -z "$DOWNLOAD_URL" ]]; then
+    echo "ERROR: Could not find bf-linux-x86_64 asset in release $LATEST_RELEASE"
+    exit 1
+fi
+
+# Download using curl
+curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/bf-linux-x86_64"
+
+# Verify download
+if [[ ! -f "$TEMP_DIR/bf-linux-x86_64" ]]; then
+    echo "ERROR: Download failed"
+    exit 1
 fi
 
 # Make executable
-chmod +x "$TEMP_DIR/$ASSET"
+chmod +x "$TEMP_DIR/bf-linux-x86_64"
+
+# Verify it's a valid binary (check it's executable and not empty)
+if [[ ! -x "$TEMP_DIR/bf-linux-x86_64" ]] || [[ ! -s "$TEMP_DIR/bf-linux-x86_64" ]]; then
+    echo "ERROR: Downloaded file is not valid or empty"
+    exit 1
+fi
 
 # Install
-echo "Installing to $BINARY_PATH..."
-mkdir -p "$BINARY_DIR"
-mv "$TEMP_DIR/$ASSET" "$BINARY_PATH"
+mv "$TEMP_DIR/bf-linux-x86_64" "$BIN_DIR/bf"
+echo "Installed new bf binary to $BIN_DIR/bf"
 
-echo "✓ Updated bf to $LATEST_RELEASE!"
-echo "Binary installed at: $BINARY_PATH"
+# Save version for future checks
+echo "$LATEST_RELEASE" > "$BIN_DIR/.bf-version"
+
+# Show version
+"$BIN_DIR/bf" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "$LATEST_RELEASE"
+echo "Update complete ($LATEST_RELEASE)"
