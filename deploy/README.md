@@ -32,10 +32,14 @@ systemctl --user status bf-update.timer
 ## How it works
 
 1. **Timer triggers hourly**: The `bf-update.timer` unit triggers `bf-update.service` every hour
-2. **Update script runs**: The service executes `bf-update.sh`
+2. **Update script runs**: The service executes `bf-update.sh` using the system bash
 3. **Version check**: Script fetches latest version from GitHub API and compares to installed version
-4. **Download if needed**: If a newer version exists, downloads and installs to `~/.local/bin/bf`
-5. **Version tracking**: Stores installed version in `~/.local/bin/.bf-version`
+4. **Version detection priority**: 
+   - First checks `~/.local/bin/.bf-version` file (most reliable)
+   - Falls back to parsing `bf --version` output
+   - Final fallback to parsing `bf --help` output
+5. **Download if needed**: If a newer version exists, downloads and installs to `~/.local/bin/bf`
+6. **Version tracking**: Saves installed version to `~/.local/bin/.bf-version` for next check
 
 ## Manual update
 
