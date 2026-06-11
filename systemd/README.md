@@ -1,0 +1,66 @@
+# systemd Units for bf Auto-Update
+
+These systemd units enable automatic hourly updates of the `bf` binary from GitHub releases.
+
+## Installation
+
+```bash
+# Copy the script to ~/.local/bin
+cp scripts/bf-update.sh ~/.local/bin/bf-update.sh
+chmod +x ~/.local/bin/bf-update.sh
+
+# Copy systemd units to ~/.config/systemd/user
+cp systemd/bf-update.{service,timer} ~/.config/systemd/user/
+
+# Reload systemd and enable the timer
+systemctl --user daemon-reload
+systemctl --user enable bf-update.timer
+systemctl --user start bf-update.timer
+
+# Verify it's running
+systemctl --user status bf-update.timer
+```
+
+## Usage
+
+The timer runs hourly and automatically:
+- Checks GitHub API for the latest bead-forge release
+- Downloads `bf-linux-x86_64` if newer than the installed version
+- Installs it to `~/.local/bin/bf`
+- Saves version to `~/.local/bin/.bf-version` for comparison
+
+### Manual Update
+
+To trigger an update immediately:
+
+```bash
+~/.local/bin/bf-update.sh
+# or
+systemctl --user start bf-update.service
+```
+
+### Check Status
+
+```bash
+# View timer status
+systemctl --user status bf-update.timer
+
+# View last run logs
+journalctl --user -u bf-update.service -n 20
+
+# List next scheduled run
+systemctl --user list-timers | grep bf-update
+```
+
+## How It Works
+
+1. **CI Release**: The `bead-forge-build` Argo Workflow builds the binary and creates a GitHub release with the `bf-linux-x86_64` asset.
+2. **Auto-Update**: The systemd timer runs `bf-update.sh` hourly, which queries GitHub API and installs updates automatically.
+3. **Version Tracking**: The script stores the installed version in `~/.local/bin/.bf-version` to avoid unnecessary downloads.
+
+## Files
+
+- `~/.local/bin/bf-update.sh` - Update script
+- `~/.config/systemd/user/bf-update.service` - Systemd service unit
+- `~/.config/systemd/user/bf-update.timer` - Systemd timer unit
+- `~/.local/bin/.bf-version` - Installed version tracker
