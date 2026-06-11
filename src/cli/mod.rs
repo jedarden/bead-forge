@@ -1564,6 +1564,12 @@ fn cmd_doctor(
                 println!();
                 println!("Run 'bf doctor --repair' to rebuild SQLite from JSONL");
             }
+
+            // Report unflushed beads (if any)
+            if result.unflushed_count > 0 {
+                println!("⚠ Unflushed beads: {}", result.unflushed_count);
+                println!("  Run 'bf sync --flush-only' before repair to avoid data loss");
+            }
         } else {
             if !result.db_ok {
                 println!("✗ Database integrity: FAILED");
