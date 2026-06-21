@@ -5,7 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+Environment=HOME=%h
 Environment=PATH=/run/current-system/sw/bin:/usr/bin:/bin
+Environment=TMPDIR=/tmp
 ExecStart=/run/current-system/sw/bin/bash %h/.local/bin/bf-update.sh
 Nice=19
 IOSchedulingClass=idle
