@@ -1,8 +1,36 @@
-# systemd Units for bf Auto-Update
+# systemd Units for bf Auto-Update (NixOS Variant)
 
 These systemd units enable automatic hourly updates of the `bf` binary from GitHub releases.
 
-## Installation
+> **⚠️ NixOS-Specific Variant** — This directory contains the **NixOS-specific** systemd units that hardcode `/run/current-system/sw/bin/bash`. For Debian/Ubuntu/portable hosts, use the `deploy/` directory instead.
+
+## Host Variants
+
+| Directory | OS Type | Service Path | Bash Path |
+|-----------|---------|---------------|-----------|
+| `systemd/` | **NixOS** (hardcoded) | `ExecStart=/run/current-system/sw/bin/bash %h/.local/bin/bf-update.sh` | Hardcoded NixOS bash |
+| `deploy/` | **Debian/Ubuntu** (portable) | `ExecStart=%h/.local/bin/bf-update.sh` | Relies on `PATH=/usr/bin:/bin` |
+
+### Host Detection
+
+```bash
+# Check if NixOS
+if [ -d /nix/var/nix/profiles/system ] || [ -d /run/current-system ]; then
+    echo "NixOS host → use systemd/ variant (this directory)"
+else
+    echo "Debian/Portable host → use deploy/ variant instead"
+fi
+```
+
+### Current Fleet Deployment
+
+| Host | OS | Variant | Timer Status |
+|------|-----|---------|--------------|
+| **kalshi-interserver VPS** | NixOS | `systemd/` | ⚠️ Service only, timer rollout needed |
+| **Hetzner** | Debian | `deploy/` | ✅ Installed 2026-06-21 |
+| **lab** | Debian | `deploy/` | ⚠️ Not deployed |
+
+## Installation (NixOS hosts)
 
 ```bash
 # Copy the script to ~/.local/bin

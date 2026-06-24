@@ -1,6 +1,36 @@
 # Auto-Deployment Setup for bf Binary
 
-This directory contains files for auto-deploying the `bf` binary to the lab server after each GitHub release.
+This directory contains files for auto-deploying the `bf` binary to fleet hosts after each GitHub release.
+
+## Host Variants
+
+There are **two** systemd service variants for different OS environments:
+
+| Directory | OS Type | Service Path | Bash Path |
+|-----------|---------|---------------|-----------|
+| `deploy/` | **Debian/Ubuntu** (portable) | `ExecStart=%h/.local/bin/bf-update.sh` | Relies on `PATH=/usr/bin:/bin` |
+| `systemd/` | **NixOS** (hardcoded) | `ExecStart=/run/current-system/sw/bin/bash %h/.local/bin/bf-update.sh` | Hardcoded NixOS bash |
+
+### Host Detection
+
+To determine which variant to use on a host:
+
+```bash
+# Check if NixOS
+if [ -d /nix/var/nix/profiles/system ] || [ -d /run/current-system ]; then
+    echo "NixOS host → use systemd/ variant"
+else
+    echo "Debian/Portable host → use deploy/ variant"
+fi
+```
+
+### Current Fleet Deployment
+
+| Host | OS | Variant | Timer Status |
+|------|-----|---------|--------------|
+| **Hetzner (this host)** | Debian | `deploy/` | ✅ Installed 2026-06-21 |
+| **kalshi-interserver VPS** | NixOS | `systemd/` | ⚠️ Service only, timer needed |
+| **lab** | Debian | `deploy/` | ⚠️ Not deployed |
 
 ## Components
 
@@ -8,7 +38,7 @@ This directory contains files for auto-deploying the `bf` binary to the lab serv
 - **`bf-update.service`** - Systemd user service that runs the update script
 - **`bf-update.timer`** - Systemd timer that triggers the service hourly
 
-## Installation (on lab server)
+## Installation (Debian/Portable hosts)
 
 The systemd units are already installed in `~/.config/systemd/user/`. To reinstall:
 
