@@ -416,6 +416,9 @@ pub fn repair(workspace_dir: &Path, flush_first: bool, force: bool) -> Result<us
     // Rebuild blocked cache
     storage.rebuild_blocked_cache()?;
 
+    // Clear dirty marks - after rebuild from JSONL, db and JSONL are in sync
+    storage.clear_dirty()?;
+
     Ok(result.imported)
 }
 
@@ -501,6 +504,9 @@ pub fn init_from_jsonl(workspace_dir: &Path, jsonl_path: &Path) -> Result<usize>
 
     // Rebuild blocked cache
     storage.rebuild_blocked_cache()?;
+
+    // Clear dirty marks - after import from JSONL, db and JSONL are in sync
+    storage.clear_dirty()?;
 
     Ok(result.imported)
 }
