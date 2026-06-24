@@ -272,3 +272,78 @@ fn test_doctor_repair_corrupt_db_with_unflushed() {
     let bf_002 = ws.get_bead("bf-002").expect("Failed to get bf-002");
     assert!(bf_002.is_none(), "bf-002 should be lost (was unflushed, db corrupted)");
 }
+
+/// Test that count_unflushed is zero after doctor --repair.
+///
+/// Regression test for bf-2hqt: after repair rebuilds the db from JSONL,
+/// the dirty_issues table should be cleared since db and JSONL are in sync.
+#[test]
+fn test_count_unflushed_zero_after_repair() {
+    let ws = common::TempWorkspace::new().expect("Failed to create workspace");
+
+    // Create initial bead and flush to JSONL
+    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
+    ws.export_jsonl(false).expect("Failed to export initial bead");
+
+    // Run doctor --repair (rebuilds db from JSONL)
+    let imported = doctor::repair(ws.workspace_path(), false, false)
+        .expect("Repair should succeed");
+    assert_eq!(imported, 1, "Should import 1 bead from JSONL");
+
+    // Check that count_unflushed returns 0
+    let result = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
+    assert_eq!(result.unflushed_count, 0, "count_unflushed should be 0 after repair");
+}
+
+/// Test that count_unflushed is zero after sync --import.
+///
+/// Regression test for bf-2hqt: after import syncs db from JSONL,
+// the dirty_issues table should be cleared (or not populated) since
+// import uses the tx versions that don't mark dirty.
+#[test]
+fn test_count_unflushed_zero_after_sync_import() {
+    let ws = common::TempWorkspace::new().expect("Failed to create workspace");
+
+    // Create initial bead and flush to JSONL
+    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
+    ws.export_jsonl(false).expect("Failed to export initial bead");
+
+    // Run sync --import
+    let sync_result = bead_forge::sync::import(ws.workspace_path())
+        .expect("Sync import should succeed");
+    assert_eq!(sync_result.imported, 0, "Should import 0 new beads (already in db)");
+    assert_eq!(sync_result.skipped, 1, "Should skip 1 unchanged bead");
+
+    // Check that count_unflushed returns 0
+    let result = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
+    assert_eq!(result.unflushed_count, 0, "count_unflushed should be 0 after sync import");
+}
+
+/// Test that count_unflushed correctly reports after repair with unflushed.
+///
+/// When repair is run with --flush-first, unflushed beads are flushed first,
+/// then repair rebuilds. The final state should have count_unflushed == 0.
+#[test]
+fn test_count_unflushed_zero_after_repair_with_flush_first() {
+    let ws = common::TempWorkspace::new().expect("Failed to create workspace");
+
+    // Create initial bead and flush to JSONL
+    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
+    ws.export_jsonl(false).expect("Failed to export initial bead");
+
+    // Create another bead WITHOUT flushing (db-only)
+    ws.create_bead("bf-002", "Unflushed bead").expect("Failed to create unflushed bead");
+
+    // Verify unflushed count is 1 before repair
+    let result_before = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
+    assert_eq!(result_before.unflushed_count, 1, "Should have 1 unflushed bead before repair");
+
+    // Run repair with --flush-first
+    let imported = doctor::repair(ws.workspace_path(), true, false)
+        .expect("Repair with --flush-first should succeed");
+    assert_eq!(imported, 2, "Should import 2 beads from JSONL after flush");
+
+    // After repair with flush, unflushed count should be 0
+    let result_after = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
+    assert_eq!(result_after.unflushed_count, 0, "count_unflushed should be 0 after repair with flush");
+}
