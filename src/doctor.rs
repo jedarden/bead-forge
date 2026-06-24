@@ -843,4 +843,48 @@ mod tests {
         assert_eq!(result.unflushed_count, 2);
         assert!(result.issues.iter().any(|i| i.contains("unflushed")));
     }
+
+    #[test]
+    fn test_repair_clears_unflushed_count() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+
+        // Create a test bead and flush to JSONL
+        let storage = Storage::open(&db_path).unwrap();
+        let issue = Issue {
+            id: "bf-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+
+        // Use the proper flush() function which clears dirty marks
+        crate::sync::flush(workspace).unwrap();
+
+        // Verify unflushed count is 0 after flush
+        let unflushed = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed, 0);
+
+        // Run repair (no unflushed beads, so no need for force or flush_first)
+        let imported = repair(workspace, false, false).unwrap();
+        assert_eq!(imported, 1);
+
+        // After repair, unflushed count should still be 0
+        let unflushed_after = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed_after, 0, "Repair should not leave unflushed beads");
+
+        // Run doctor check to verify no unflushed issues
+        let result = check(workspace).unwrap();
+        assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed after repair");
+    }
 }
