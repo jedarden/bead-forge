@@ -41,3 +41,27 @@ The bug was fixed in two commits:
 - ✅ `bf ready --help` clarifies semantics of --limit 0
 
 All criteria met. No further work required.
+
+## Re-verification (2026-06-24)
+Verified that the fix remains in place and working correctly:
+
+### Code inspection confirmed:
+1. `src/claim.rs:418-419`: Correctly detects `unlimited = limit == 0`
+2. `src/cli/mod.rs:1039`: For `bf list`, converts `limit=0` to `None` (unlimited)
+3. Both use different SQL queries when unlimited vs limited
+
+### Runtime verification confirmed:
+```bash
+$ ./target/debug/bf ready --limit 0
+[bf-6mca] Test update flags (priority=2, impact=0, float=1000)
+[bf-5me7] Test bead for update flags (priority=2, impact=0, float=1000)
+[bf-1qq1] Test bead (priority=2, impact=0, float=1000)
+[bf-2j9e] Another test bead (priority=2, impact=0, float=1000)
+```
+Returns all 4 ready beads as expected.
+
+### Tests pass:
+```bash
+$ cargo test test_get_ready_candidates_limit_zero_returns_all --lib
+test claim::tests::test_get_ready_candidates_limit_zero_returns_all ... ok
+```
