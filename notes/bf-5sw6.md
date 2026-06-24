@@ -1,18 +1,48 @@
-# bf-5sw6: Verify limit=0 Fix Already Implemented
+# Verification Summary for bf-5sw6
 
 ## Task
-Verify that `bf ready --limit 0` returns all unblocked ready beads (unlimited) instead of returning nothing.
+`bf ready --limit 0` should mean unlimited (returns nothing instead)
 
-## Root Cause
-The original br bug was that `limit=0` was passed directly to SQL `LIMIT 0` clause, which returns no rows.
+## Status
+**ALREADY FIXED** - The bug described in this bead has already been resolved.
 
-## Fix Status
-**ALREADY IMPLEMENTED** ✅
+## Verification
+
+### 1. Functionality Test
+```bash
+# Test that limit=0 returns all ready beads
+./target/release/bf ready --limit 0 --format text
+```
+**Result**: ✓ Returns all 4 ready beads (same as default behavior)
+
+### 2. Comparison Test
+```bash
+# Compare different limit values
+echo "=== All beads (no limit) ===" && ./target/release/bf ready --format text 2>&1 | wc -l
+echo "=== With limit=0 ===" && ./target/release/bf ready --limit 0 --format text 2>&1 | wc -l  
+echo "=== With limit=2 ===" && ./target/release/bf ready --limit 2 --format text 2>&1 | wc -l
+```
+**Result**:
+- All beads (no limit): 4
+- With limit=0: 4 ✓ (unlimited behavior)
+- With limit=2: 2 ✓ (respects limit)
+
+### 3. Help Text Verification
+```bash
+./target/release/bf ready --help
+```
+**Output**: `--limit <LIMIT>  Limit results (0 = unlimited) [default: 10]`
+**Result**: ✓ Help text clearly documents "0 = unlimited"
+
+### 4. Regression Test
+```bash
+cargo test test_get_ready_candidates_limit_zero_returns_all
+```
+**Result**: ✓ Test passes (test claim::tests::test_get_ready_candidates_limit_zero_returns_all ... ok)
 
 ## Implementation Details
 
-### Code Changes in `src/claim.rs`
-The `get_ready_candidates()` function at line 412 handles `limit=0` as unlimited:
+The fix is implemented in `src/claim.rs` in the `get_ready_candidates()` function:
 
 ```rust
 pub fn get_ready_candidates(
@@ -23,45 +53,33 @@ pub fn get_ready_candidates(
 ) -> Result<Vec<ScoredBead>> {
     // limit=0 means unlimited - we'll use two different SQL queries
     let unlimited = limit == 0;
+    
+    // ... code that uses different SQL queries based on `unlimited` flag
+    // When unlimited=true: no LIMIT clause in SQL
+    // When unlimited=false: LIMIT ?3 or LIMIT ?1 clause
+}
 ```
 
-When `limit == 0`, the function uses SQL queries without a `LIMIT` clause.
+The function checks if `limit == 0` and sets `unlimited = true`, then uses SQL queries without LIMIT clauses for unlimited behavior.
 
-### Help Text Documentation
-The `bf ready` help text clearly documents the semantics:
+## Acceptance Criteria Status
 
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| `bf ready --limit 0` returns all unblocked ready beads | ✓ | Verified working |
+| Help text clarifies --limit 0 semantics | ✓ | Help says "0 = unlimited" |
+| Regression test covering limit=0 behavior | ✓ | test_get_ready_candidates_limit_zero_returns_all passes |
+| Consistency with --help text | ✓ | Implementation matches help text |
+
+## Git History
+
+This fix was implemented in commit `d89cf621`:
 ```
---limit <LIMIT>    Limit results (0 = unlimited) [default: 10]
-```
-
-### Test Coverage
-
-#### Unit Tests (`src/claim.rs`)
-- `test_get_ready_candidates_limit_zero_returns_all`: Creates 15 beads, verifies all are returned with limit=0
-- `test_get_ready_candidates_respects_limit`: Verifies normal limit behavior (limit=5 returns exactly 5)
-
-#### Integration Tests (`tests/limit_zero.rs`)
-- `test_ready_limit_zero_returns_all`: Comprehensive test with 15 beads
-- `test_ready_limit_zero_direct_sql_check`: Documents that raw SQL `LIMIT 0` returns 0 rows
-
-### Manual Verification
-```bash
-$ ./target/release/bf ready --limit 0 | wc -l
-4
-
-$ ./target/release/bf ready --limit 5000 | wc -l
-4
-
-$ ./target/release/bf ready --limit 2 | wc -l
-2
+d89cf621 fix(bf-5sw6): make --limit 0 mean unlimited in ready command
 ```
 
-## Summary
-The fix was already implemented with:
-1. ✅ `limit=0` treated as unlimited (no LIMIT clause in SQL)
-2. ✅ Help text documents "0 = unlimited"
-3. ✅ Unit tests cover both unlimited and normal limit behavior
-4. ✅ Integration tests verify the behavior end-to-end
-5. ✅ Manual testing confirms correct behavior
+Multiple verification commits followed confirming the fix works correctly.
 
-No additional changes needed.
+## Conclusion
+
+All acceptance criteria are met. The bug has been completely resolved and regression tests are in place to prevent future breakage.
