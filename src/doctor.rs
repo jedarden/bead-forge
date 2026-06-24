@@ -408,15 +408,18 @@ pub fn repair(workspace_dir: &Path, flush_first: bool, force: bool) -> Result<us
     // Create new database and import JSONL
     let storage = Storage::open(&db_path)?;
 
-    let result = import_jsonl(&jsonl_path, |issue| {
-        storage.create_issue(issue)?;
-        Ok(UpsertResult::New)
+    let result = storage.with_immediate_transaction(|tx| {
+        import_jsonl(&jsonl_path, |issue| {
+            Storage::create_issue_tx(tx, &issue)?;
+            Ok(UpsertResult::New)
+        })
     })?;
 
     // Rebuild blocked cache
     storage.rebuild_blocked_cache()?;
 
     // Clear dirty marks - after rebuild from JSONL, db and JSONL are in sync
+    // (create_issue_tx doesn't mark dirty, but we clear for safety)
     storage.clear_dirty()?;
 
     Ok(result.imported)
@@ -497,15 +500,18 @@ pub fn init_from_jsonl(workspace_dir: &Path, jsonl_path: &Path) -> Result<usize>
     // Create new database and import JSONL
     let storage = Storage::open(&db_path)?;
 
-    let result = import_jsonl(jsonl_path, |issue| {
-        storage.create_issue(issue)?;
-        Ok(UpsertResult::New)
+    let result = storage.with_immediate_transaction(|tx| {
+        import_jsonl(jsonl_path, |issue| {
+            Storage::create_issue_tx(tx, &issue)?;
+            Ok(UpsertResult::New)
+        })
     })?;
 
     // Rebuild blocked cache
     storage.rebuild_blocked_cache()?;
 
     // Clear dirty marks - after import from JSONL, db and JSONL are in sync
+    // (create_issue_tx doesn't mark dirty, but we clear for safety)
     storage.clear_dirty()?;
 
     Ok(result.imported)
@@ -886,5 +892,160 @@ mod tests {
         // Run doctor check to verify no unflushed issues
         let result = check(workspace).unwrap();
         assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed after repair");
+    }
+
+    #[test]
+    fn test_import_leaves_zero_unflushed() {
+        // Regression test for bf-2hqt: import from JSONL should leave unflushed_count == 0
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+
+        // Create initial database with one bead
+        let storage = Storage::open(&db_path).unwrap();
+        let issue = Issue {
+            id: "bf-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+
+        // Flush to JSONL (clears dirty marks)
+        export_jsonl(&jsonl_path, || storage.list_all_issues()).unwrap();
+        storage.clear_dirty().unwrap();
+
+        // Verify unflushed count is 0 after flush
+        let unflushed = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed, 0, "Should be 0 after flush");
+
+        // Delete the database to simulate a fresh import scenario
+        std::fs::remove_file(&db_path).unwrap();
+
+        // Import from JSONL (this recreates the database)
+        let result = crate::sync::import(workspace).unwrap();
+        assert_eq!(result.imported, 1);
+
+        // After import, unflushed count should still be 0 (beads came from JSONL)
+        let unflushed_after = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed_after, 0, "Import should not leave unflushed beads");
+
+        // Run doctor check to verify no unflushed issues
+        let doctor_result = check(workspace).unwrap();
+        assert_eq!(doctor_result.unflushed_count, 0, "Doctor should report 0 unflushed after import");
+    }
+
+    #[test]
+    fn test_repair_cycle_clears_unflushed_correctly() {
+        // Test that after repair -> import -> repair cycle, unflushed count stays at 0
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+
+        // Create initial database with a bead
+        let storage = Storage::open(&db_path).unwrap();
+        let issue = Issue {
+            id: "bf-test".to_string(),
+            title: "Test".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+
+        // Flush to JSONL using sync::flush (the proper flush function)
+        crate::sync::flush(workspace).unwrap();
+
+        // Verify unflushed count is 0
+        let unflushed = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed, 0, "Should be 0 after flush");
+
+        // Simulate a repair scenario (delete db, then import)
+        std::fs::remove_file(&db_path).unwrap();
+        let imported = crate::sync::import(workspace).unwrap();
+        assert_eq!(imported.imported, 1);
+
+        // After import cycle, unflushed should be 0
+        let unflushed_after = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed_after, 0, "Should be 0 after import cycle");
+
+        // Run doctor to verify
+        let result = check(workspace).unwrap();
+        assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed");
+    }
+
+    #[test]
+    fn test_import_clears_pre_existing_dirty_marks() {
+        // Regression test for bf-2hqt: import should clear dirty marks from before the import
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+
+        // Create initial database with two beads
+        let storage = Storage::open(&db_path).unwrap();
+        let issue1 = Issue {
+            id: "bf-test1".to_string(),
+            title: "Test 1".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        let issue2 = Issue {
+            id: "bf-test2".to_string(),
+            title: "Test 2".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&issue1).unwrap();
+        storage.create_issue(&issue2).unwrap();
+
+        // Flush to JSONL
+        crate::sync::flush(workspace).unwrap();
+
+        // Now make a modification (mark one bead as dirty)
+        let storage = Storage::open(&db_path).unwrap();
+        let mut changes = crate::model::IssueChanges::default();
+        changes.title = Some("Modified Title".to_string());
+        storage.update_issue("bf-test1", &changes).unwrap();
+
+        // Verify one bead is dirty
+        let unflushed_before = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed_before, 1, "Should have 1 dirty bead");
+
+        // Now run import (simulates pulling updated JSONL from git)
+        let import_result = crate::sync::import(workspace).unwrap();
+
+        // After import, all dirty marks should be cleared (db is now in sync with JSONL)
+        let unflushed_after = count_unflushed(&db_path).unwrap();
+        assert_eq!(unflushed_after, 0, "Import should clear all dirty marks, leaving 0");
+
+        // Run doctor to verify
+        let result = check(workspace).unwrap();
+        assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed after import");
     }
 }
