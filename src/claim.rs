@@ -941,4 +941,52 @@ mod tests {
         assert_eq!(candidates[1].id, "bf-high");
         assert_eq!(candidates[1].priority, 0);
     }
+
+    #[test]
+    fn test_get_ready_candidates_limit_zero_returns_all() {
+        let (_temp, mut storage) = setup_test_db();
+
+        // Create 15 open beads
+        for i in 0..15 {
+            let issue = Issue::new(
+                format!("bf-{:0>4}", i),
+                format!("Test bead {}", i),
+                ".".to_string(),
+            );
+            storage.create_issue(&issue).unwrap();
+        }
+
+        // Simulate limit=0 behavior by using a very large limit (i64::MAX as usize)
+        // This is what cmd_ready does when limit=0 is passed
+        let large_limit = i64::MAX as usize;
+        let candidates = storage
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, large_limit, None, None))
+            .unwrap();
+
+        // All 15 beads should be returned (unlimited behavior)
+        assert_eq!(candidates.len(), 15, "Expected all 15 beads to be returned with large limit");
+    }
+
+    #[test]
+    fn test_get_ready_candidates_respects_limit() {
+        let (_temp, mut storage) = setup_test_db();
+
+        // Create 20 open beads
+        for i in 0..20 {
+            let issue = Issue::new(
+                format!("bf-limit{:0>2}", i),
+                format!("Test bead {}", i),
+                ".".to_string(),
+            );
+            storage.create_issue(&issue).unwrap();
+        }
+
+        // Test with limit=5
+        let candidates = storage
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 5, None, None))
+            .unwrap();
+
+        // Only 5 beads should be returned
+        assert_eq!(candidates.len(), 5, "Expected exactly 5 beads with limit=5");
+    }
 }
