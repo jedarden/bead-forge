@@ -415,80 +415,159 @@ pub fn get_ready_candidates(
     model: Option<&str>,
     harness: Option<&str>,
 ) -> Result<Vec<ScoredBead>> {
+    // limit=0 means unlimited - we'll use two different SQL queries
+    let unlimited = limit == 0;
+
     let mut stmt = if let (Some(_m), Some(_h)) = (model, harness) {
         // Velocity-aware scoring: divide combined score by expected seconds
-        tx.prepare(
-            "SELECT i.id, i.title, i.status, i.priority,
-                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
-                    i.created_at,
-                    vs.p50_seconds as expected_seconds
-             FROM issues i
-             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
-             LEFT JOIN velocity_stats vs ON vs.issue_type = i.issue_type
-                 AND vs.model = ?1
-                 AND vs.harness = ?2
-             WHERE i.status = 'open'
-               AND i.ephemeral = 0
-               AND i.pinned = 0
-               AND i.is_template = 0
-               AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status != 'closed'
-               )
-             GROUP BY i.id
-             ORDER BY (
-                 COALESCE(COUNT(d.issue_id), 0) * 3.0
-                 + (4 - i.priority) * 2.0
-                 + 1000.0 / (COALESCE(c.float, 999) + 1)
-             ) / COALESCE(vs.p50_seconds, 1800) DESC,
-                 downstream_impact DESC,
-                 critical_path_bonus DESC,
-                 i.priority ASC,
-                 i.created_at ASC
-             LIMIT ?3",
-        )?
+        if unlimited {
+            tx.prepare(
+                "SELECT i.id, i.title, i.status, i.priority,
+                        COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                        1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                        i.created_at,
+                        vs.p50_seconds as expected_seconds
+                 FROM issues i
+                 LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+                 LEFT JOIN velocity_stats vs ON vs.issue_type = i.issue_type
+                     AND vs.model = ?1
+                     AND vs.harness = ?2
+                 WHERE i.status = 'open'
+                   AND i.ephemeral = 0
+                   AND i.pinned = 0
+                   AND i.is_template = 0
+                   AND i.deleted_at IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM dependencies blocker_dep
+                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                       WHERE blocker_dep.issue_id = i.id
+                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                       AND blocker.status != 'closed'
+                   )
+                 GROUP BY i.id
+                 ORDER BY (
+                     COALESCE(COUNT(d.issue_id), 0) * 3.0
+                     + (4 - i.priority) * 2.0
+                     + 1000.0 / (COALESCE(c.float, 999) + 1)
+                 ) / COALESCE(vs.p50_seconds, 1800) DESC,
+                     downstream_impact DESC,
+                     critical_path_bonus DESC,
+                     i.priority ASC,
+                     i.created_at ASC",
+            )?
+        } else {
+            tx.prepare(
+                "SELECT i.id, i.title, i.status, i.priority,
+                        COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                        1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                        i.created_at,
+                        vs.p50_seconds as expected_seconds
+                 FROM issues i
+                 LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+                 LEFT JOIN velocity_stats vs ON vs.issue_type = i.issue_type
+                     AND vs.model = ?1
+                     AND vs.harness = ?2
+                 WHERE i.status = 'open'
+                   AND i.ephemeral = 0
+                   AND i.pinned = 0
+                   AND i.is_template = 0
+                   AND i.deleted_at IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM dependencies blocker_dep
+                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                       WHERE blocker_dep.issue_id = i.id
+                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                       AND blocker.status != 'closed'
+                   )
+                 GROUP BY i.id
+                 ORDER BY (
+                     COALESCE(COUNT(d.issue_id), 0) * 3.0
+                     + (4 - i.priority) * 2.0
+                     + 1000.0 / (COALESCE(c.float, 999) + 1)
+                 ) / COALESCE(vs.p50_seconds, 1800) DESC,
+                     downstream_impact DESC,
+                     critical_path_bonus DESC,
+                     i.priority ASC,
+                     i.created_at ASC
+                 LIMIT ?3",
+            )?
+        }
     } else {
         // Standard scoring without velocity data
-        tx.prepare(
-            "SELECT i.id, i.title, i.status, i.priority,
-                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
-                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
-                    i.created_at
-             FROM issues i
-             LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-             LEFT JOIN critical_path_cache c ON c.bead_id = i.id
-             WHERE i.status = 'open'
-               AND i.ephemeral = 0
-               AND i.pinned = 0
-               AND i.is_template = 0
-               AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status != 'closed'
-               )
-             GROUP BY i.id
-             ORDER BY
-                 downstream_impact DESC,
-                 critical_path_bonus DESC,
-                 i.priority ASC,
-                 i.created_at ASC
-             LIMIT ?1",
-        )?
+        if unlimited {
+            tx.prepare(
+                "SELECT i.id, i.title, i.status, i.priority,
+                        COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                        1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                        i.created_at
+                 FROM issues i
+                 LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+                 WHERE i.status = 'open'
+                   AND i.ephemeral = 0
+                   AND i.pinned = 0
+                   AND i.is_template = 0
+                   AND i.deleted_at IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM dependencies blocker_dep
+                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                       WHERE blocker_dep.issue_id = i.id
+                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                       AND blocker.status != 'closed'
+                   )
+                 GROUP BY i.id
+                 ORDER BY
+                     downstream_impact DESC,
+                     critical_path_bonus DESC,
+                     i.priority ASC,
+                     i.created_at ASC",
+            )?
+        } else {
+            tx.prepare(
+                "SELECT i.id, i.title, i.status, i.priority,
+                        COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                        1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                        i.created_at
+                 FROM issues i
+                 LEFT JOIN dependencies d ON d.depends_on_id = i.id AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 LEFT JOIN critical_path_cache c ON c.bead_id = i.id
+                 WHERE i.status = 'open'
+                   AND i.ephemeral = 0
+                   AND i.pinned = 0
+                   AND i.is_template = 0
+                   AND i.deleted_at IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM dependencies blocker_dep
+                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
+                       WHERE blocker_dep.issue_id = i.id
+                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                       AND blocker.status != 'closed'
+                   )
+                 GROUP BY i.id
+                 ORDER BY
+                     downstream_impact DESC,
+                     critical_path_bonus DESC,
+                     i.priority ASC,
+                     i.created_at ASC
+                 LIMIT ?1",
+            )?
+        }
     };
 
     let mut rows = if model.is_some() && harness.is_some() {
-        stmt.query(params![model.unwrap(), harness.unwrap(), limit as i64])?
+        if unlimited {
+            stmt.query(params![model.unwrap(), harness.unwrap()])?
+        } else {
+            stmt.query(params![model.unwrap(), harness.unwrap(), limit as i64])?
+        }
     } else {
-        stmt.query(params![limit as i64])?
+        if unlimited {
+            stmt.query(params![])?
+        } else {
+            stmt.query(params![limit as i64])?
+        }
     };
 
     let mut candidates = Vec::new();
@@ -956,15 +1035,14 @@ mod tests {
             storage.create_issue(&issue).unwrap();
         }
 
-        // Simulate limit=0 behavior by using a very large limit (i64::MAX as usize)
-        // This is what cmd_ready does when limit=0 is passed
-        let large_limit = i64::MAX as usize;
+        // Test with limit=0 (unlimited)
+        // This should return all ready beads without any LIMIT clause
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, large_limit, None, None))
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None))
             .unwrap();
 
         // All 15 beads should be returned (unlimited behavior)
-        assert_eq!(candidates.len(), 15, "Expected all 15 beads to be returned with large limit");
+        assert_eq!(candidates.len(), 15, "Expected all 15 beads to be returned with limit=0 (unlimited)");
     }
 
     #[test]
