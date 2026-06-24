@@ -1,0 +1,145 @@
+# bf-update.timer Fleet Rollout Guide
+
+This document provides step-by-step deployment instructions for each fleet host.
+
+## Quick Host Detection
+
+```bash
+# Run this to determine which variant to use
+if [ -d /nix/var/nix/profiles/system ] || [ -d /run/current-system ]; then
+    echo "NixOS host → use systemd/ variant"
+    cd ~/bead-forge && cp systemd/bf-update.{service,timer} ~/.config/systemd/user/
+else
+    echo "Debian/Portable host → use deploy/ variant"
+    cd ~/bead-forge && cp deploy/bf-update.{service,timer} ~/.config/systemd/user/
+fi
+```
+
+## Per-Host Deployment
+
+### 1. Hetzner (this host) ✅ COMPLETE
+
+**OS:** Debian  
+**Variant:** `deploy/`  
+**Status:** Timer installed and running since 2026-06-21  
+**Timer Path:** `~/.config/systemd/user/bf-update.timer`
+
+```bash
+# Verify status
+systemctl --user status bf-update.timer
+systemctl --user list-timers | grep bf-update
+```
+
+### 2. kalshi-interserver VPS (NixOS) ⚠️ PENDING
+
+**OS:** NixOS  
+**Variant:** `systemd/` (hardcoded `/run/current-system/sw/bin/bash`)  
+**Access:** Tailscale mesh  
+**Action Required:** Deploy timer
+
+```bash
+# SSH to kalshi-interserver via Tailscale
+ssh kalshi-interserver
+
+# Clone/update bead-forge repo
+cd ~/bead-forge
+git pull
+
+# Deploy NixOS variant
+cp systemd/bf-update.{service,timer} ~/.config/systemd/user/
+cp scripts/bf-update.sh ~/.local/bin/
+chmod +x ~/.local/bin/bf-update.sh
+
+# Enable and start timer
+systemctl --user daemon-reload
+systemctl --user enable bf-update.timer
+systemctl --user start bf-update.timer
+
+# Verify
+systemctl --user status bf-update.timer
+```
+
+### 3. lab (Debian) ⚠️ PENDING
+
+**OS:** Debian  
+**Variant:** `deploy/` (portable PATH)  
+**Access:** Local network  
+**Action Required:** Full deployment (service + timer)
+
+```bash
+# SSH to lab
+ssh lab
+
+# Clone/update bead-forge repo
+cd ~/bead-forge
+git pull
+
+# Deploy portable variant
+cp deploy/bf-update.{service,timer} ~/.config/systemd/user/
+cp deploy/bf-update.sh ~/.local/bin/
+chmod +x ~/.local/bin/bf-update.sh
+
+# Enable and start timer
+systemctl --user daemon-reload
+systemctl --user enable bf-update.timer
+systemctl --user start bf-update.timer
+
+# Verify
+systemctl --user status bf-update.timer
+```
+
+## Verification Checklist
+
+After deploying to each host, verify:
+
+```bash
+# 1. Timer is enabled and active
+systemctl --user status bf-update.timer
+
+# 2. Next run scheduled
+systemctl --user list-timers | grep bf-update
+
+# 3. Service works manually
+systemctl --user start bf-update.service
+journalctl --user -u bf-update.service -n 20
+
+# 4. Version tracking works
+cat ~/.local/bin/.bf-version
+```
+
+## Troubleshooting
+
+### Timer won't start
+
+```bash
+# Check for syntax errors
+systemctl --user daemon-reload
+
+# View detailed logs
+journalctl --user -u bf-update.service -n 50 --no-pager
+```
+
+### Script fails on NixOS
+
+Ensure the script uses the NixOS variant with hardcoded bash:
+```bash
+# Should use: ExecStart=/run/current-system/sw/bin/bash %h/.local/bin/bf-update.sh
+grep ExecStart ~/.config/systemd/user/bf-update.service
+```
+
+### Script fails on Debian
+
+Ensure the service relies on PATH:
+```bash
+# Should use: ExecStart=%h/.local/bin/bf-update.sh
+# And PATH=/usr/bin:/bin
+grep -E "ExecStart|PATH" ~/.config/systemd/user/bf-update.service
+```
+
+## Rollout Status
+
+| Host | OS | Variant | Service | Timer | Status |
+|------|-----|---------|---------|-------|--------|
+| Hetzner | Debian | deploy/ | ✅ | ✅ | Complete (2026-06-21) |
+| kalshi-interserver | NixOS | systemd/ | ⚠️ | ❌ | Pending timer deployment |
+| lab | Debian | deploy/ | ❌ | ❌ | Pending full deployment |
