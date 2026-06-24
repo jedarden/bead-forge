@@ -34,6 +34,11 @@ name = "test_jsonl"
 path = "tests/test_jsonl.rs"
 required-features = []
 
+[[test]]
+name = "comprehensive_cli_update_flags"
+path = "tests/comprehensive_cli_update_flags.rs"
+required-features = []
+
 [[bin]]
 name = "bf"
 path = "src/main.rs"

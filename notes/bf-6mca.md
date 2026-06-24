@@ -32,8 +32,49 @@ Test all `bf update` command flags to ensure they work correctly.
    - Verifies final state with JSON parsing
 
 ## Total Coverage
-- **37 tests** across 4 test files
+- **70 tests** across 5 test files
 - All tests passing ✓
+
+### NEW: Comprehensive CLI Integration Tests (33 tests)
+Created `tests/comprehensive_cli_update_flags.rs` with complete CLI-level testing:
+
+#### Title Flag Tests (4 tests)
+- Basic title update via CLI
+- Special characters and emojis  
+- Empty string handling
+- Unicode support
+
+#### Status Flag Tests (5 tests)
+- Update to: open, in_progress, blocked, deferred
+- Invalid status values (stored as-is, not rejected by CLI)
+
+#### Priority Flag Tests (5 tests)
+- All priority levels: 0=critical, 1=high, 2=medium, 3=low, 4=backlog
+
+#### Assignee Flag Tests (3 tests)  
+- Basic assignment
+- Reassignment
+- Clearing assignee
+
+#### Field-Specific Tests (8 tests)
+- Description (basic, multiline, unicode)
+- Acceptance criteria (basic, multiline)
+- Notes (basic, multiline)
+- Design (basic, multiline)
+
+#### Due-At Flag Tests (2 tests)
+- RFC3339 format validation
+- Invalid date format rejection
+
+#### Combination Tests (4 tests)
+- All flags together
+- Preserves unspecified fields
+- Status + priority combination
+- Title + assignee combination
+
+#### Error Scenario Tests (2 tests)
+- Non-existent bead handling
+- Update without changes (no-op)
 
 ## Flags Tested
 
@@ -86,11 +127,36 @@ let bf_path = std::env::var("CARGO_BIN_EXE_bf")
 
 All tests passing:
 ```
-test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+✓ 33/33 comprehensive CLI integration tests passing
+✓ 70/70 total update flags tests passing
+✓ Build successful with no errors
 ```
+
+### Test Breakdown
+- **33** comprehensive CLI integration tests (NEW)
+- **19** storage-level comprehensive tests  
+- **10** storage-level field tests
+- **7** storage-level CLI tests
+- **1** existing CLI integration test
 
 Coverage spans:
 - Unit tests (storage layer)
 - Integration tests (CLI layer)
 - Edge cases and error conditions
 - Combination scenarios
+- Error handling and validation
+
+## Key Findings
+
+1. **Status Validation**: CLI accepts invalid status values (stored as TEXT)
+   - Design choice: CLI is lenient, validation happens at read-time
+   - Invalid status stored as-is in database
+
+2. **Date Format**: RFC3339 validation works correctly
+   - Valid dates accepted (2025-12-31T23:59:59Z)
+   - Invalid formats rejected with clear error
+
+3. **Multi-line Support**: All text fields support multi-line input
+   - Description, acceptance_criteria, notes, design all handle \n correctly
+
+4. **Unicode Support**: Special characters and emojis work throughout
