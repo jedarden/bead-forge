@@ -9,6 +9,18 @@ fn bf_cmd() -> Command {
     cmd
 }
 
+fn bf_absolute_cmd() -> Command {
+    let bf_path = if let Ok(exe) = std::env::current_exe() {
+        // Get the cargo target directory from the test executable path
+        let target_dir = exe.parent().and_then(|p| p.parent()).unwrap_or_else(|| exe.parent().unwrap());
+        target_dir.join("bf").to_str().unwrap().to_string()
+    } else {
+        "target/debug/bf".to_string()
+    };
+    let mut cmd = Command::new(bf_path);
+    cmd
+}
+
 #[test]
 fn test_ready_limit_zero_returns_unlimited() {
     // Create a test workspace with multiple ready beads
@@ -16,7 +28,8 @@ fn test_ready_limit_zero_returns_unlimited() {
     let workspace = temp_dir.path();
 
     // Initialize workspace
-    let output = Command::new("target/debug/bf")
+    let mut bf_cmd = bf_absolute_cmd();
+    let output = bf_cmd
         .current_dir(workspace)
         .args(["init", "--prefix", "bf"])
         .output()
@@ -25,7 +38,8 @@ fn test_ready_limit_zero_returns_unlimited() {
 
     // Create 15 open beads
     for i in 0..15 {
-        let output = Command::new("target/debug/bf")
+        let mut bf_cmd = bf_absolute_cmd();
+        let output = bf_cmd
             .current_dir(workspace)
             .args([
                 "create",
@@ -39,7 +53,8 @@ fn test_ready_limit_zero_returns_unlimited() {
     }
 
     // Test with --limit 0 (should return all 15 beads)
-    let output = Command::new("target/debug/bf")
+    let mut bf_cmd = bf_absolute_cmd();
+    let output = bf_cmd
         .current_dir(workspace)
         .args(["ready", "--limit", "0"])
         .output()
@@ -51,7 +66,8 @@ fn test_ready_limit_zero_returns_unlimited() {
     assert_eq!(bead_count, 15, "Expected all 15 beads with --limit 0 (unlimited)");
 
     // Test with --limit 5 (should return exactly 5 beads)
-    let output = Command::new("target/debug/bf")
+    let mut bf_cmd = bf_absolute_cmd();
+    let output = bf_cmd
         .current_dir(workspace)
         .args(["ready", "--limit", "5"])
         .output()
@@ -69,7 +85,8 @@ fn test_ready_default_limit() {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace = temp_dir.path();
 
-    let output = Command::new("target/debug/bf")
+    let mut bf_cmd = bf_absolute_cmd();
+    let output = bf_cmd
         .current_dir(workspace)
         .args(["init", "--prefix", "bf"])
         .output()
@@ -78,7 +95,8 @@ fn test_ready_default_limit() {
 
     // Create 20 open beads
     for i in 0..20 {
-        let output = Command::new("target/debug/bf")
+        let mut bf_cmd = bf_absolute_cmd();
+        let output = bf_cmd
             .current_dir(workspace)
             .args([
                 "create",
@@ -91,7 +109,8 @@ fn test_ready_default_limit() {
     }
 
     // Test without --limit (should use default of 10)
-    let output = Command::new("target/debug/bf")
+    let mut bf_cmd = bf_absolute_cmd();
+    let output = bf_cmd
         .current_dir(workspace)
         .args(["ready"])
         .output()
@@ -109,7 +128,8 @@ fn test_list_limit_zero_returns_unlimited() {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace = temp_dir.path();
 
-    let output = Command::new("target/debug/bf")
+    let mut bf_cmd = bf_absolute_cmd();
+    let output = bf_cmd
         .current_dir(workspace)
         .args(["init", "--prefix", "bf"])
         .output()
@@ -118,7 +138,8 @@ fn test_list_limit_zero_returns_unlimited() {
 
     // Create 15 open beads
     for i in 0..15 {
-        let output = Command::new("target/debug/bf")
+        let mut bf_cmd = bf_absolute_cmd();
+        let output = bf_cmd
             .current_dir(workspace)
             .args([
                 "create",
@@ -131,7 +152,8 @@ fn test_list_limit_zero_returns_unlimited() {
     }
 
     // Test list with --limit 0 (should return all 15 beads)
-    let output = Command::new("target/debug/bf")
+    let mut bf_cmd = bf_absolute_cmd();
+    let output = bf_cmd
         .current_dir(workspace)
         .args(["list", "--limit", "0"])
         .output()

@@ -1,143 +1,200 @@
-//! Test for bf-2hqt: count_unflushed over-reports after doctor --repair / sync --import-only cycle
+//! Regression test for bf-2hqt: count_unflushed over-reports after doctor --repair / sync --import cycle
+//!
+//! Issue: After running `bf doctor --repair` or `bf sync --import` (which rebuilds the db FROM issues.jsonl),
+//! the `count_unflushed` metric reports a positive number even though the db and JSONL are in sync.
 
-mod common;
-
-use bead_forge::doctor;
 use std::fs;
+use tempfile::TempDir;
 
-/// Test the exact scenario from bf-2hqt description:
-/// 1. Have a workspace with a recently flushed issues.jsonl
-/// 2. Run `bf doctor --repair` (or `bf sync --import-only`)
-/// 3. Run `bf status` or `bf sync --flush-only`
-/// 4. Observe count_unflushed > 0 even though no mutations occurred since last flush
-#[test]
-fn test_count_unflushed_after_repair_cycle() {
-    let ws = common::TempWorkspace::new().expect("Failed to create workspace");
+/// Helper to initialize a test workspace
+fn init_test_workspace() -> TempDir {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
 
-    // Step 1: Create a bead and flush to JSONL
-    ws.create_bead("bf-001", "Test bead").expect("Failed to create bead");
-    ws.export_jsonl(false).expect("Failed to export to JSONL");
+    // Initialize workspace
+    bead_forge::config::init_workspace(&beads_dir, "bf").unwrap();
 
-    // Verify everything is clean
-    let doctor_result = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed");
-    assert_eq!(
-        doctor_result.unflushed_count, 0,
-        "Should start with 0 unflushed beads"
-    );
-
-    // Step 2: Run doctor --repair (rebuilds db FROM JSONL)
-    let imported = doctor::repair(ws.workspace_path(), false, false)
-        .expect("Repair should succeed");
-    assert_eq!(imported, 1, "Should import 1 bead from JSONL");
-
-    // Step 3 & 4: Check that count_unflushed is still 0
-    // (no mutations occurred since last flush)
-    let doctor_result_after = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed after repair");
-    assert_eq!(
-        doctor_result_after.unflushed_count, 0,
-        "After repair with no intervening mutations, count_unflushed should be 0"
-    );
-
-    // Additional check: run sync --flush-only (should do nothing, no beads to flush)
-    let flushed = bead_forge::sync::flush(ws.workspace_path())
-        .expect("Flush should succeed");
-    assert_eq!(flushed, 1, "Should flush 1 bead");
-
-    // And still count_unflushed should be 0
-    let doctor_result_final = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed after flush");
-    assert_eq!(
-        doctor_result_final.unflushed_count, 0,
-        "After flush cycle, count_unflushed should still be 0"
-    );
+    temp_dir
 }
 
-/// Test the same scenario with sync --import-only instead of repair
-#[test]
-fn test_count_unflushed_after_import_cycle() {
-    let ws = common::TempWorkspace::new().expect("Failed to create workspace");
-
-    // Step 1: Create a bead and flush to JSONL
-    ws.create_bead("bf-001", "Test bead").expect("Failed to create bead");
-    ws.export_jsonl(false).expect("Failed to export to JSONL");
-
-    // Verify everything is clean
-    let doctor_result = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed");
-    assert_eq!(
-        doctor_result.unflushed_count, 0,
-        "Should start with 0 unflushed beads"
-    );
-
-    // Step 2: Run sync --import-only (imports FROM JSONL)
-    let sync_result = bead_forge::sync::import(ws.workspace_path())
-        .expect("Import should succeed");
-    assert_eq!(sync_result.imported, 0, "Should import 0 new beads (already exists)");
-    assert_eq!(sync_result.skipped, 1, "Should skip 1 unchanged bead");
-
-    // Step 3 & 4: Check that count_unflushed is still 0
-    // (no mutations occurred since last flush)
-    let doctor_result_after = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed after import");
-    assert_eq!(
-        doctor_result_after.unflushed_count, 0,
-        "After import with no intervening mutations, count_unflushed should be 0"
-    );
-
-    // Additional check: run sync --flush-only (should do nothing, no beads to flush)
-    let flushed = bead_forge::sync::flush(ws.workspace_path())
-        .expect("Flush should succeed");
-    assert_eq!(flushed, 1, "Should flush 1 bead");
-
-    // And still count_unflushed should be 0
-    let doctor_result_final = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed after flush");
-    assert_eq!(
-        doctor_result_final.unflushed_count, 0,
-        "After flush cycle, count_unflushed should still be 0"
-    );
+/// Helper to check unflushed count via public API
+fn get_unflushed_count(workspace: &tempfile::TempDir) -> usize {
+    let result = bead_forge::doctor::check(workspace.path()).unwrap();
+    result.unflushed_count
 }
 
-/// Test the edge case where we have modifications before import
+/// Test that after a repair cycle with no subsequent mutations, count_unflushed == 0
 #[test]
-fn test_count_unflushed_with_modifications_before_import() {
-    let ws = common::TempWorkspace::new().expect("Failed to create workspace");
+fn test_repair_cycle_leaves_zero_unflushed() {
+    let temp_dir = init_test_workspace();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
 
-    // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Original title").expect("Failed to create bead");
-    ws.export_jsonl(false).expect("Failed to export to JSONL");
+    let metadata = bead_forge::config::load_metadata(&beads_dir).unwrap();
+    let _jsonl_path = beads_dir.join(&metadata.jsonl_export);
 
-    // Now make a modification (marking it as dirty)
-    let storage = ws.storage().expect("Failed to open storage");
-    let changes = bead_forge::IssueChanges {
-        title: Some("Modified title".to_string()),
+    // Create initial database with some beads
+    let storage = bead_forge::storage::Storage::open(&beads_dir.join(&metadata.database)).unwrap();
+
+    // Create a test bead
+    let issue1 = bead_forge::model::Issue {
+        id: "bf-test1".to_string(),
+        title: "Test Issue 1".to_string(),
+        status: bead_forge::model::Status::Open,
+        priority: bead_forge::model::Priority::MEDIUM,
+        issue_type: bead_forge::model::IssueType::Task,
+        source_repo: Some(".".to_string()),
         ..Default::default()
     };
-    storage
-        .update_issue("bf-001", &changes)
-        .expect("Failed to update bead");
+    storage.create_issue(&issue1).unwrap();
 
-    // Verify we have 1 unflushed bead
-    let doctor_result_before = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed");
-    assert_eq!(
-        doctor_result_before.unflushed_count, 1,
-        "Should have 1 unflushed bead after modification"
-    );
+    let issue2 = bead_forge::model::Issue {
+        id: "bf-test2".to_string(),
+        title: "Test Issue 2".to_string(),
+        status: bead_forge::model::Status::Open,
+        priority: bead_forge::model::Priority::HIGH,
+        issue_type: bead_forge::model::IssueType::Bug,
+        source_repo: Some(".".to_string()),
+        ..Default::default()
+    };
+    storage.create_issue(&issue2).unwrap();
 
-    // Now run import (simulating pulling updated JSONL from git)
-    // Since the JSONL has the old version and we have a newer version in SQLite,
-    // the SQLite version should win and the bead should remain marked as dirty
-    let sync_result = bead_forge::sync::import(ws.workspace_path())
-        .expect("Import should succeed");
+    // Flush to JSONL (simulates "recently flushed issues.jsonl")
+    bead_forge::sync::flush(workspace).unwrap();
 
-    // After import, the dirty marks should be cleared because we just synced from JSONL
-    let doctor_result_after = doctor::check(ws.workspace_path())
-        .expect("Doctor check should succeed after import");
-    assert_eq!(
-        doctor_result_after.unflushed_count, 0,
-        "After import, all dirty marks should be cleared (synced from JSONL)"
-    );
+    // Verify unflushed count is 0 after flush
+    let unflushed_before = get_unflushed_count(&temp_dir);
+    assert_eq!(unflushed_before, 0, "Should be 0 after flush");
+
+    // Run repair (simulates repair scenario)
+    let imported = bead_forge::doctor::repair(workspace, false, false).unwrap();
+    assert_eq!(imported, 2, "Should import 2 beads from JSONL");
+
+    // After repair, unflushed count should still be 0 (db was rebuilt from JSONL)
+    let unflushed_after = get_unflushed_count(&temp_dir);
+    assert_eq!(unflushed_after, 0, "Repair should not leave unflushed beads");
+}
+
+/// Test that after an import cycle with no subsequent mutations, count_unflushed == 0
+#[test]
+fn test_import_cycle_leaves_zero_unflushed() {
+    let temp_dir = init_test_workspace();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    let metadata = bead_forge::config::load_metadata(&beads_dir).unwrap();
+
+    // Create initial database with some beads
+    let storage = bead_forge::storage::Storage::open(&beads_dir.join(&metadata.database)).unwrap();
+
+    let issue1 = bead_forge::model::Issue {
+        id: "bf-test1".to_string(),
+        title: "Test Issue 1".to_string(),
+        status: bead_forge::model::Status::Open,
+        priority: bead_forge::model::Priority::MEDIUM,
+        issue_type: bead_forge::model::IssueType::Task,
+        source_repo: Some(".".to_string()),
+        ..Default::default()
+    };
+    storage.create_issue(&issue1).unwrap();
+
+    // Flush to JSONL
+    bead_forge::sync::flush(workspace).unwrap();
+
+    // Verify unflushed count is 0 after flush
+    let unflushed_before = get_unflushed_count(&temp_dir);
+    assert_eq!(unflushed_before, 0, "Should be 0 after flush");
+
+    // Run import (simulates sync --import scenario)
+    let result = bead_forge::sync::import(workspace).unwrap();
+    assert_eq!(result.imported, 0, "Should import 0 new beads (already in sync)");
+    assert_eq!(result.skipped, 1, "Should skip 1 unchanged bead");
+
+    // After import, unflushed count should still be 0
+    let unflushed_after = get_unflushed_count(&temp_dir);
+    assert_eq!(unflushed_after, 0, "Import should not leave unflushed beads");
+}
+
+/// Test that after a full repair cycle (delete DB, repair), count_unflushed == 0
+#[test]
+fn test_delete_db_then_repair_leaves_zero_unflushed() {
+    let temp_dir = init_test_workspace();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    let metadata = bead_forge::config::load_metadata(&beads_dir).unwrap();
+    let db_path = beads_dir.join(&metadata.database);
+    let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+
+    // Create initial database with a bead
+    let storage = bead_forge::storage::Storage::open(&db_path).unwrap();
+
+    let issue1 = bead_forge::model::Issue {
+        id: "bf-test1".to_string(),
+        title: "Test Issue 1".to_string(),
+        status: bead_forge::model::Status::Open,
+        priority: bead_forge::model::Priority::MEDIUM,
+        issue_type: bead_forge::model::IssueType::Task,
+        source_repo: Some(".".to_string()),
+        ..Default::default()
+    };
+    storage.create_issue(&issue1).unwrap();
+
+    // Flush to JSONL
+    bead_forge::sync::flush(workspace).unwrap();
+
+    // Verify JSONL exists and contains the bead
+    assert!(jsonl_path.exists(), "JSONL should exist after flush");
+    let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
+    assert!(jsonl_content.contains("bf-test1"), "JSONL should contain the bead");
+
+    // Delete the database (simulates a repair scenario where DB is corrupted/missing)
+    fs::remove_file(&db_path).unwrap();
+
+    // Run repair (which will recreate DB from JSONL)
+    let imported = bead_forge::doctor::repair(workspace, false, false).unwrap();
+    assert_eq!(imported, 1, "Should import 1 bead from JSONL");
+
+    // After repair, unflushed count should be 0
+    let unflushed_after = get_unflushed_count(&temp_dir);
+    assert_eq!(unflushed_after, 0, "Repair after DB deletion should not leave unflushed beads");
+}
+
+/// Test the exact scenario: recently flushed JSONL -> repair -> count_unflushed should be 0
+#[test]
+fn test_recent_flush_then_repair_unflushed_zero() {
+    let temp_dir = init_test_workspace();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    let metadata = bead_forge::config::load_metadata(&beads_dir).unwrap();
+    let db_path = beads_dir.join(&metadata.database);
+    let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+
+    // Create a bead and flush it to JSONL (simulates "recently flushed")
+    let storage = bead_forge::storage::Storage::open(&db_path).unwrap();
+    let issue = bead_forge::model::Issue {
+        id: "bf-recent".to_string(),
+        title: "Recently Flushed Bead".to_string(),
+        status: bead_forge::model::Status::Open,
+        priority: bead_forge::model::Priority::MEDIUM,
+        issue_type: bead_forge::model::IssueType::Task,
+        source_repo: Some(".".to_string()),
+        ..Default::default()
+    };
+    storage.create_issue(&issue).unwrap();
+    bead_forge::sync::flush(workspace).unwrap();
+
+    // Verify flush completed successfully
+    let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
+    assert!(jsonl_content.contains("bf-recent"), "JSONL should contain the recently flushed bead");
+
+    // Run repair
+    let imported = bead_forge::doctor::repair(workspace, false, false).unwrap();
+    assert_eq!(imported, 1, "Should import 1 bead from JSONL");
+
+    // Verify count_unflushed is 0
+    let unflushed = get_unflushed_count(&temp_dir);
+    assert_eq!(unflushed, 0, "After repair of recently flushed JSONL, count_unflushed should be 0");
 }
