@@ -10,7 +10,7 @@ use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -131,6 +131,26 @@ pub enum Commands {
         /// New assignee
         #[arg(long)]
         assignee: Option<String>,
+
+        /// New description
+        #[arg(long)]
+        description: Option<String>,
+
+        /// New acceptance criteria
+        #[arg(long)]
+        acceptance_criteria: Option<String>,
+
+        /// New notes
+        #[arg(long)]
+        notes: Option<String>,
+
+        /// New design
+        #[arg(long)]
+        design: Option<String>,
+
+        /// New due date (RFC3339 format, e.g., 2025-01-01T00:00:00Z)
+        #[arg(long)]
+        due_at: Option<String>,
     },
 
     /// Close a bead
@@ -737,7 +757,24 @@ pub fn run(cli: Cli) -> Result<()> {
             status,
             priority,
             assignee,
-        } => cmd_update(&beads_dir, &id, title, status, priority, assignee),
+            description,
+            acceptance_criteria,
+            notes,
+            design,
+            due_at,
+        } => cmd_update(
+            &beads_dir,
+            &id,
+            title,
+            status,
+            priority,
+            assignee,
+            description,
+            acceptance_criteria,
+            notes,
+            design,
+            due_at,
+        ),
         Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason),
         Commands::Reopen { id } => cmd_reopen(&beads_dir, &id),
         Commands::Delete { id } => cmd_delete(&beads_dir, &id),
@@ -1111,17 +1148,37 @@ fn cmd_update(
     status: Option<String>,
     priority: Option<i32>,
     assignee: Option<String>,
+    description: Option<String>,
+    acceptance_criteria: Option<String>,
+    notes: Option<String>,
+    design: Option<String>,
+    due_at: Option<String>,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open_with_config(&db_path, &config)?;
 
+    // Parse due_at if provided
+    let due_at_parsed = match due_at {
+        Some(date_str) => {
+            let dt = DateTime::parse_from_rfc3339(&date_str)
+                .map_err(|_| anyhow!("Invalid --due-at format. Use RFC3339 format, e.g., 2025-01-01T00:00:00Z"))?;
+            Some(dt.with_timezone(&Utc))
+        }
+        None => None,
+    };
+
     let changes = IssueChanges {
         title,
         status: status.map(|s| Status::from_str(&s).ok()).flatten(),
         priority,
         assignee,
+        description,
+        acceptance_criteria,
+        notes,
+        design,
+        due_at: due_at_parsed,
         ..Default::default()
     };
 
@@ -1174,7 +1231,10 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
+    // --limit 0 means unlimited (use i64::MAX as sentinel)
+    let effective_limit = if limit == 0 { i64::MAX as usize } else { limit };
+
+    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, effective_limit, None, None))?;
 
     match format {
         "json" => {

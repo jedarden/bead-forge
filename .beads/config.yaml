@@ -1,5 +1,3 @@
-# bead-forge configuration
-# br ignores bf-specific keys (claim_ttl_minutes, rotate_*)
 issue_prefixes:
 - bf
 default_priority: 2
