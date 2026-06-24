@@ -1,6 +1,22 @@
 # bead-forge
 
-Drop-in replacement for [`beads_rust`](https://github.com/dicklesworthstone/beads_rust) (`br`) with atomic claiming, critical-path scoring, velocity tracking, and crash-safe batch operations — designed for NEEDLE multi-worker fleets.
+bead-forge (`bf`) is a repo-local issue tracker built for multi-agent AI coding workflows. Each "bead" is a task (bug, feature, research item, etc.) stored as JSON entries in a JSONL file alongside your code. Agents claim beads, work on them, and close them — like a task queue where each worker is an LLM session.
+
+bead-forge is a drop-in replacement for [`beads_rust`](https://github.com/dicklesworthstone/beads_rust) (`br`) — every `br` command works unchanged. On top of that it adds **atomic claiming** via SQLite `BEGIN IMMEDIATE` transactions, so 20 workers can claim work simultaneously without racing each other.
+
+```bash
+# Drop-in: symlink br → bf
+ln -sf ~/.local/bin/bf ~/.local/bin/br
+
+# Claim the next available bead atomically (no race conditions)
+bf claim --assignee worker-1 --format json
+
+# Split a large bead into children atomically
+bf mitosis bf-a3f8 --children '[{"title": "Implement handler"}, {"title": "Write tests"}]'
+
+# Show all commands, including br-compatible ones
+bf --help
+```
 
 ## The Beads Ecosystem
 
