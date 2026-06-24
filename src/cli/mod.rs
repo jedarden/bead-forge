@@ -1231,10 +1231,8 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    // --limit 0 means unlimited (use i64::MAX as sentinel)
-    let effective_limit = if limit == 0 { i64::MAX as usize } else { limit };
-
-    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, effective_limit, None, None))?;
+    // get_ready_candidates handles limit=0 as unlimited (no LIMIT clause)
+    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
 
     match format {
         "json" => {
