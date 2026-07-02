@@ -1,66 +1,49 @@
-# Test Results: bf update --description Flag (bf-2ofg)
+# Test Results: bf update --description Flag
 
-## Test Date
-2026-07-02
+**Bead:** bf-2ofg  
+**Date:** 2026-07-02
 
 ## Test Summary
-Verified that the `bf update --description` flag works end-to-end.
+
+Verified that `bf update --description` correctly updates the description field in the database.
 
 ## Test Steps
 
-### Test Run 1 (Previous)
-1. Created a test bead: `bf create --type bug --title "Test bead for description flag" --description "Original description" --priority 2`
-   - Result: Created bead `bf-67mq`
-
-2. Updated description: `bf update bf-67mq --description "Updated description via flag"`
-   - Result: Command returned "Updated bead bf-67mq"
-
-3. Verified database persistence:
-   ```sql
-   SELECT id, title, description FROM issues WHERE id = 'bf-67mq';
-   ```
-   - Result: `bf-67mq|Test bead for description flag|Updated description via flag`
-
-4. Verified CLI output: `bf show bf-67mq`
-   - Result: Description field shows "Updated description via flag"
-
-### Test Run 2 (Complete Verification)
-1. Created test bead with initial description:
+1. **Created test bead** with initial description:
    ```bash
-   bf create --title "Test description update" --type task --description "Initial description"
+   cargo run -- create --title "Test bead for description update" --type task --description "Initial description"
    ```
-   Result: `bf-417g`
+   Result: `bf-2nv0` created
 
-2. Updated description:
+2. **Verified initial description**:
    ```bash
-   bf update bf-417g --description "Updated description with more details"
+   cargo run -- show bf-2nv0
    ```
-   Result: `Updated bead bf-417g`
+   Output showed: `Description: Initial description`
 
-3. Verified persistence:
+3. **Updated description** using `--description` flag:
    ```bash
-   bf show bf-417g
+   cargo run -- update bf-2nv0 --description "Updated description via --description flag"
    ```
-   Output:
-   ```
-   ID: bf-417g
-   Title: Test description update
-   Status: open
-   Priority: P2
-   Type: task
-   Description: Updated description with more details
-   ```
+   Result: `Updated bead bf-2nv0`
 
-4. Cleaned up test bead:
+4. **Verified update persisted**:
    ```bash
-   bf delete bf-417g
+   cargo run -- show bf-2nv0
    ```
-   Result: `Deleted bead bf-417g`
+   Output showed: `Description: Updated description via --description flag`
+
+5. **Verified database directly** via SQLite:
+   ```bash
+   sqlite3 .beads/beads.db "SELECT id, title, description FROM issues WHERE id = 'bf-2nv0';"
+   ```
+   Result: `bf-2nv0|Test bead for description update|Updated description via --description flag`
 
 ## Conclusion
-✅ **PASS** - The `--description` flag on `bf update` correctly updates the description field in the database and the change is visible in CLI output.
 
-## Implementation Notes
-- The `update_issue` method in `src/storage/sqlite.rs` (lines 422-425) correctly handles the description field.
-- The update is performed atomically within a transaction using `with_immediate_transaction`.
-- The `cmd_update` CLI function (lines 1144-1187 in `src/cli/mod.rs`) properly passes the description parameter to `IssueChanges`.
+✅ The `bf update --description` flag works correctly end-to-end:
+- Accepts the new description value
+- Persists the change to the SQLite database
+- Updates the description field successfully
+
+**Status:** VERIFIED
