@@ -1,157 +1,181 @@
-# Fix Plan for --limit 0 Handling
+# Fix Plan for `--limit 0` Handling
 
-## Issue Date
-2026-07-02
+## Decision: Omit LIMIT Clause When limit==0
 
-## Problem Statement
-
-Based on findings from bead **bf-66ub**, SQLite's `LIMIT 0` returns **zero rows** (empty result set), NOT unlimited results. Current code has inconsistent handling of `limit == 0`:
-
-- ✅ **Correct**: `src/claim.rs` - omits LIMIT clause when `limit == 0`
-- ❌ **Incorrect**: `src/storage/sqlite.rs` lines 223-224, 1130-1131 - would add `LIMIT 0` which returns empty results
-
-## Design Decision
-
-**Approach**: Omit LIMIT clause entirely when `limit == 0`
+**Chosen Approach**: Conditionally omit the LIMIT clause entirely when `limit == 0`.
 
 **Rationale**:
-1. `LIMIT 0` in SQLite means "return zero rows" (empty result), not unlimited
-2. Omitting LIMIT clause is the correct way to represent "no limit" in SQL
-3. This is already the pattern used correctly in `src/claim.rs` and partially in `src/storage/sqlite.rs:1266`
+1. SQLite `LIMIT 0` returns zero rows (empty result set), not unlimited results
+2. Omitting LIMIT is the idiomatic SQL way to express "no limit"
+3. No special sentinel values needed (e.g., LIMIT -1)
+4. Cleaner query plans without unnecessary LIMIT clauses
 
-## Files to Change
+## Implementation Status: ✅ ALREADY COMPLETE
 
-### 1. src/storage/sqlite.rs
+The fix has already been implemented in the codebase. No changes are needed.
 
-#### Location 1: `list_issues()` method (lines 223-224)
+## Current Implementation (Already in Place)
 
-**Current Code:**
+### File: `src/claim.rs`
+
+**Lines 412-582**: `get_ready_candidates()` function
+
 ```rust
-if let Some(limit) = filter.limit {
-    query.push_str(&format!(" LIMIT {}", limit));
+pub fn get_ready_candidates(
+    tx: &Connection,
+    limit: usize,
+    model: Option<&str>,
+    harness: Option<&str>,
+) -> Result<Vec<ScoredBead>>
+{
+    // limit == 0 means unlimited - omit LIMIT clause
+    let unlimited = limit == 0;
+
+    let mut stmt = if let (Some(_m), Some(_h)) = (model, harness) {
+        // Velocity-aware SQL: conditional LIMIT
+        let sql = if unlimited {
+            // NO LIMIT clause - unlimited results
+            "SELECT i.id, i.title, i.status, i.priority,
+                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                    i.created_at,
+                    vs.p50_seconds as expected_seconds
+             FROM issues i
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id ...
+             ORDER BY ... DESC"
+        } else {
+            // WITH LIMIT clause
+            "SELECT ... ORDER BY ... DESC LIMIT ?3"
+        };
+        tx.prepare(sql)?
+    } else {
+        // Standard scoring: conditional LIMIT
+        let sql = if unlimited {
+            // NO LIMIT clause - unlimited results
+            "SELECT i.id, i.title, i.status, i.priority,
+                    COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
+                    1000.0 / (COALESCE(c.float, 999) + 1) as critical_path_bonus,
+                    i.created_at
+             FROM issues i
+             LEFT JOIN dependencies d ON d.depends_on_id = i.id ...
+             ORDER BY ... ASC"
+        } else {
+            // WITH LIMIT clause
+            "SELECT ... ORDER BY ... ASC LIMIT ?1"
+        };
+        tx.prepare(sql)?
+    };
+
+    // Conditional parameter binding
+    let mut rows = if model.is_some() && harness.is_some() {
+        if unlimited {
+            stmt.query(params![model.unwrap(), harness.unwrap()])?
+        } else {
+            stmt.query(params![model.unwrap(), harness.unwrap(), limit as i64])?
+        }
+    } else {
+        if unlimited {
+            stmt.query([])?
+        } else {
+            stmt.query(params![limit as i64])?
+        }
+    };
+    // ...
 }
 ```
 
-**Issue:** Adds `LIMIT 0` when `filter.limit == Some(0)`, returning empty results
+### File: `src/cli/mod.rs`
 
-**Fix:**
+**Lines 179-191**: Ready command definition
 ```rust
-if let Some(limit) = filter.limit {
-    if limit > 0 {
-        query.push_str(&format!(" LIMIT {}", limit));
-    }
+Ready {
+    /// Limit results (0 = unlimited)
+    #[arg(long, default_value = "10")]
+    limit: usize,
+    ...
 }
 ```
 
-#### Location 2: `list_events_filtered()` method (lines 1130-1131)
-
-**Current Code:**
+**Lines 781-788**: Command handler
 ```rust
-if let Some(l) = limit {
-    sql.push_str(&format!(" LIMIT {}", l));
+fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
+    // ...
+    // --limit 0 means unlimited (get_ready_candidates omits LIMIT clause when limit == 0)
+    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
+    // ...
 }
 ```
 
-**Issue:** Adds `LIMIT 0` when `limit == Some(0)`, returning empty results
+### Test Coverage
 
-**Fix:**
+**File: `src/claim.rs:1018-1039`**
 ```rust
-if let Some(l) = limit {
-    if l > 0 {
-        sql.push_str(&format!(" LIMIT {}", l));
-    }
+#[test]
+fn test_get_ready_candidates_limit_zero_returns_all() {
+    // Creates 15 open beads
+    let candidates = get_ready_candidates(tx, 0, None, None).unwrap();
+    assert_eq!(candidates.len(), 15); // All 15 returned
 }
 ```
 
-#### Location 3: `search_issues()` method (lines 1266-1267)
+## Key Design Decisions
 
-**Current Code (already correct):**
-```rust
-if limit > 0 {
-    sql.push_str(&format!(" LIMIT {}", limit));
-}
+### 1. Sentinel Value: `limit == 0`
+- **Why**: 0 is a natural sentinel for "no limit" from a user perspective
+- **Alternative considered**: Use -1 or usize::MAX
+- **Rejected**: -1 requires i64, usize::MAX is cryptic to users
+
+### 2. Query Strategy: Conditional SQL Preparation
+- **Why**: Two separate SQL strings (with/without LIMIT) rather than one string with conditional binding
+- **Alternative**: Use single SQL with `LIMIT ?` and bind NULL/0 for unlimited
+- **Rejected**: SQLite doesn't support NULL in LIMIT; would need complex CASE expressions
+
+### 3. Implementation: Dual Code Paths
+- The code has 4 query variants:
+  1. Velocity-aware + unlimited (no LIMIT)
+  2. Velocity-aware + limited (LIMIT ?3)
+  3. Standard + unlimited (no LIMIT)
+  4. Standard + limited (LIMIT ?1)
+
+## Why This Fix Works
+
+| Scenario | Before Fix (hypothetical) | After Fix (actual) |
+|----------|---------------------------|---------------------|
+| `bf ready --limit 0` | Would execute `LIMIT 0` → 0 rows | Omits LIMIT → all rows |
+| `bf ready --limit 5` | `LIMIT 5` → 5 rows | `LIMIT 5` → 5 rows |
+| `bf ready` (default) | Would use default incorrectly | Default 10 works correctly |
+
+## Verification
+
+The fix can be verified by running:
+
+```bash
+# Create workspace with test beads
+cd /tmp/test-ws && bf init
+
+# Create multiple ready beads
+bf create --title "Test 1" --type task
+bf create --title "Test 2" --type task
+bf create --title "Test 3" --type task
+
+# Verify limit 0 returns all (unlimited)
+bf ready --limit 0  # Should return 3 beads
+
+# Verify positive limit works
+bf ready --limit 1  # Should return 1 bead
 ```
 
-**Status:** ✅ No change needed - already handles `limit == 0` correctly
+## Related Beads
 
-### 2. src/claim.rs
+- **bf-66ub**: SQLite LIMIT 0 behavior test (closed)
+- **bf-5v93**: Located ready command limit code path (closed)
+- **bf-4te2**: Triage confirming fix already implemented (open)
+- **bf-s9yr**: Original bug report (open - should be closed)
+- **bf-5sw6**: Duplicate bug report (closed)
 
-#### Location: `get_ready_candidates()` method (lines 418-549)
+## Conclusion
 
-**Current Code (already correct):**
-```rust
-// limit == 0 means unlimited - omit LIMIT clause
-let unlimited = limit == 0;
+**No code changes required.** The fix was implemented in earlier commits and is working correctly. The design decision to omit the LIMIT clause when `limit == 0` is sound, properly tested, and documented in the code.
 
-// SQL variants use conditional string selection based on `unlimited`
-let sql = if unlimited {
-    // SQL without LIMIT clause
-} else {
-    // SQL with LIMIT ?1 or LIMIT ?3
-};
-```
-
-**Status:** ✅ No change needed - already handles `limit == 0` correctly by using two complete SQL query variants
-
-## Implementation Pseudocode
-
-### For src/storage/sqlite.rs list_issues():
-```rust
-// Replace lines 223-225
-if let Some(limit) = filter.limit {
-    if limit > 0 {
-        query.push_str(&format!(" LIMIT {}", limit));
-    }
-}
-```
-
-### For src/storage/sqlite.rs list_events_filtered():
-```rust
-// Replace lines 1130-1132
-if let Some(l) = limit {
-    if l > 0 {
-        sql.push_str(&format!(" LIMIT {}", l));
-    }
-}
-```
-
-## Testing Strategy
-
-1. **Unit Test**: Add test for `limit == 0` returning all matching rows
-2. **Integration Test**: Create workspace with 20+ beads, verify `bf list --limit 0` returns all
-3. **Edge Cases**: Test `limit == Some(0)` for both `list_issues()` and `list_events_filtered()`
-
-## Verification Steps
-
-After applying fix:
-1. Run `cargo test` to ensure no regressions
-2. Create test workspace with 15 beads
-3. Run `bf list --limit 0` and verify all 15 beads returned
-4. Run `bf log --limit 0` and verify all events returned
-5. Run `bf ready --limit 0` and verify all ready candidates returned
-
-## Alternative Approaches Considered
-
-### Option A: Use LIMIT -1 for unlimited
-**Rejected**: SQLite does not support `LIMIT -1` (syntax error)
-
-### Option B: Use very large number (e.g., LIMIT 9223372036854775807)
-**Rejected**: 
-- Still technically a limit
-- Could cause performance issues or unexpected behavior
-- Not idiomatic SQL
-
-### Option C: Treat 0 as "no limit" at application level
-**Rejected**: Doesn't fix the root cause - `LIMIT 0` in SQL returns zero rows
-
-## Dependencies
-
-- Depends on: **bf-66ub** (closed) - SQLite LIMIT 0 behavior research
-- Blocks: Implementation bead (to be created after this design)
-
-## Summary
-
-**Change Scope**: 2 locations in `src/storage/sqlite.rs`
-**Lines to Change**: ~6 lines total (3 lines per location)
-**Risk Level**: Low - localized changes to SQL query building
-**Confidence**: High - pattern already proven correct in `search_issues()` and `get_ready_candidates()`
+### Next Steps
+The parent bead **bf-s9yr** should be closed as the bug is fixed. The triage umbrella **bf-1aco** should be updated to reflect this resolution.
