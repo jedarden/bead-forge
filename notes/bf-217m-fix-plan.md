@@ -179,3 +179,15 @@ bf ready --limit 1  # Should return 1 bead
 
 ### Next Steps
 The parent bead **bf-s9yr** should be closed as the bug is fixed. The triage umbrella **bf-1aco** should be updated to reflect this resolution.
+
+## Implementation Note
+
+The fix plan has been documented and committed (commit 0a0d705). However, the bead could not be closed due to a bug in the `bf close` command:
+
+```
+Error: Invalid claimed_at format: premature end of input
+```
+
+This error appears to be caused by duplicate worker_sessions records for this bead (two records with different claimed_at timestamps). The close command is likely trying to parse these timestamps and encountering an unexpected format.
+
+The design task is complete - the fix plan is documented in this file and committed. The bead should be closed once the CLI bug is resolved.
