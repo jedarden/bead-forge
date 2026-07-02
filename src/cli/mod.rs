@@ -1231,7 +1231,7 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    // get_ready_candidates handles limit=0 as unlimited (no LIMIT clause)
+    // --limit 0 means unlimited (get_ready_candidates omits LIMIT clause when limit == 0)
     let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
 
     match format {
