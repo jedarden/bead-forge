@@ -1,75 +1,49 @@
-# Test Results: bf update --description Flag
+# Test Results: bf update --description flag
 
-**Bead:** bf-2ofg  
-**Date:** 2026-07-02
+## Test Date
+2026-07-02
 
-## Test Summary
+## Test Procedure
+1. Created test bead `bf-60v1` with empty description
+2. Updated description to "This is a test description for verifying the update flag"
+3. Verified description persisted in SQLite database
+4. Updated description to "Updated description - second test"
+5. Verified second update persisted
+6. Flushed to JSONL and verified description in JSONL export
 
-Verified that `bf update --description` correctly updates the description field in the database.
+## Results
+✅ **PASS** - `bf update --description` flag works correctly
 
-## Test Steps
+### Verified Behaviors
+- `bf update <id> --description "<text>"` successfully updates the description field
+- Description persists correctly in SQLite database
+- Description persists correctly in JSONL export after `bf sync --flush-only`
+- Multiple updates to the same bead work correctly
+- Updated description is visible in `bf show` output (text and JSON formats)
 
-1. **Created test bead** with initial description:
-   ```bash
-   cargo run -- create --title "Test bead for description update" --type task --description "Initial description"
-   ```
-   Result: `bf-2nv0` created
+### Test Commands Used
+```bash
+# Create test bead
+./target/debug/bf create --title "Test bead for description update" --type task --priority 2
+# Output: bf-60v1
 
-2. **Verified initial description**:
-   ```bash
-   cargo run -- show bf-2nv0
-   ```
-   Output showed: `Description: Initial description`
+# Update description
+./target/debug/bf update bf-60v1 --description "This is a test description for verifying the update flag"
+# Output: Updated bead bf-60v1
 
-3. **Updated description** using `--description` flag:
-   ```bash
-   cargo run -- update bf-2nv0 --description "Updated description via --description flag"
-   ```
-   Result: `Updated bead bf-2nv0`
+# Verify in database
+sqlite3 .beads/beads.db "SELECT id, title, description FROM issues WHERE id = 'bf-60v1';"
+# Output: bf-60v1|Test bead for description update|This is a test description for verifying the update flag
 
-4. **Verified update persisted**:
-   ```bash
-   cargo run -- show bf-2nv0
-   ```
-   Output showed: `Description: Updated description via --description flag`
+# Second update
+./target/debug/bf update bf-60v1 --description "Updated description - second test"
+# Output: Updated bead bf-60v1
 
-5. **Verified database directly** via SQLite:
-   ```bash
-   sqlite3 .beads/beads.db "SELECT id, title, description FROM issues WHERE id = 'bf-2nv0';"
-   ```
-   Result: `bf-2nv0|Test bead for description update|Updated description via --description flag`
+# Verify in JSONL
+./target/debug/bf sync --flush-only
+grep "bf-60v1" .beads/issues.jsonl
+# Confirmed: Updated description - second test
+```
 
-## Conclusion
-
-✅ The `bf update --description` flag works correctly end-to-end:
-- Accepts the new description value
-- Persists the change to the SQLite database
-- Updates the description field successfully
-
-**Status:** VERIFIED
-
----
-
-## Additional Verification Run (2026-07-02)
-
-Second verification test performed to ensure continued functionality:
-
-1. **Created test bead** `bf-h59n`:
-   ```bash
-   ./target/debug/bf create --type bug --title "Test bead for description update" --description "Initial description"
-   ```
-
-2. **Updated description**:
-   ```bash
-   ./target/debug/bf update bf-h59n --description "Updated description - verification test"
-   ```
-
-3. **Verified update persisted**:
-   ```bash
-   ./target/debug/bf show bf-h59n
-   ```
-   Output showed: `Description: Updated description - verification test`
-
-4. **Cleanup**: Closed test bead `bf-h59n`
-
-**Result:** ✅ PASS - Description update functionality confirmed working correctly.
+## Implementation Notes
+The `--description` flag is implemented in the `Update` command (src/cli/mod.rs:114-154) and processed in `cmd_update` (src/cli/mod.rs:1144-1188). The description is passed through `IssueChanges` to `storage.update_issue()`, which updates the `issues` table in SQLite.
