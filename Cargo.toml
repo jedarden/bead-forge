@@ -44,6 +44,11 @@ name = "test_basic_workflow"
 path = "tests/test_basic_workflow.rs"
 required-features = []
 
+[[test]]
+name = "test_version_display"
+path = "tests/test_version_display.rs"
+required-features = []
+
 [[bin]]
 name = "bf"
 path = "src/main.rs"
