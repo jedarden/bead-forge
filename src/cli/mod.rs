@@ -19,7 +19,6 @@ use std::str::FromStr;
 #[command(name = "bf")]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(propagate_version = true)]
 pub struct Cli {
     /// Workspace directory (defaults to current directory's .beads/)
     #[arg(short, long, global = true)]
@@ -699,28 +698,26 @@ pub fn run(cli: Cli) -> Result<()> {
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
 
     // Handle case where no subcommand is provided (e.g., --version, --help)
-    match &cli.command {
+    let command = match cli.command {
         None => {
             // clap handles --version and --help automatically, exiting before this point
             // If we reach here, it means no valid flag was provided
-            Err(anyhow!("No command provided. Use 'bf --help' for usage information."))
+            return Err(anyhow!("No command provided. Use 'bf --help' for usage information."));
         }
-        Some(cmd) => match cmd {
-            Commands::Init { .. } => {
-            let beads_dir = workspace.join(".beads");
-            return match cli.command {
-                Commands::Init { prefix } => cmd_init(&beads_dir, &prefix),
-                _ => unreachable!(),
-            };
-        }
-        _ => {}
+        Some(cmd) => cmd,
+    };
+
+    // Handle Init command specially (doesn't require existing .beads directory)
+    if let Commands::Init { prefix } = &command {
+        let beads_dir = workspace.join(".beads");
+        return cmd_init(&beads_dir, prefix);
     }
 
+    // All other commands require existing .beads directory
     let beads_dir = find_beads_dir(&workspace)
         .ok_or_else(|| anyhow!("No .beads directory found in {:?}", workspace))?;
 
-    match cli.command {
-        Commands::Init { prefix } => cmd_init(&beads_dir, &prefix),
+    match command {
         Commands::Create {
             title,
             type_,
@@ -930,7 +927,7 @@ pub fn run(cli: Cli) -> Result<()> {
             dry_run,
             skip_verify,
         ),
-        },
+        Commands::Init { .. } => unreachable!("Init command handled earlier"),
     }
 }
 
