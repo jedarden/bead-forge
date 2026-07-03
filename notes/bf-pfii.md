@@ -29,3 +29,8 @@ bf 0.2.0
 ## Conclusion
 
 The clap version propagation is correctly configured. The CLI struct properly uses `env!("CARGO_PKG_VERSION")` to pull the version from Cargo.toml and propagates it to all subcommands.
+
+---
+**Verified:** 2026-07-03
+**Build status:** cargo build successful
+**Test result:** bf --version → "bf 0.2.0" ✅
