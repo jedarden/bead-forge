@@ -21,12 +21,12 @@ use std::str::FromStr;
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(propagate_version = true)]
 pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-
     /// Workspace directory (defaults to current directory's .beads/)
     #[arg(short, long, global = true)]
     pub workspace: Option<PathBuf>,
+
+    #[command(subcommand)]
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -698,9 +698,15 @@ pub fn run_cli() -> Result<Cli> {
 pub fn run(cli: Cli) -> Result<()> {
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
 
-    // For init command, we allow the .beads directory to not exist yet
+    // Handle case where no subcommand is provided (e.g., --version, --help)
     match &cli.command {
-        Commands::Init { .. } => {
+        None => {
+            // clap handles --version and --help automatically, exiting before this point
+            // If we reach here, it means no valid flag was provided
+            Err(anyhow!("No command provided. Use 'bf --help' for usage information."))
+        }
+        Some(cmd) => match cmd {
+            Commands::Init { .. } => {
             let beads_dir = workspace.join(".beads");
             return match cli.command {
                 Commands::Init { prefix } => cmd_init(&beads_dir, &prefix),
@@ -924,6 +930,7 @@ pub fn run(cli: Cli) -> Result<()> {
             dry_run,
             skip_verify,
         ),
+        },
     }
 }
 
