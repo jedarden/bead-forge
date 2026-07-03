@@ -1,17 +1,24 @@
-# Task bf-1mz: Add clap version attributes to Cli struct
+# bf-1mz: Verify clap version attributes
 
-## Status: Already Complete
+## Status: COMPLETE
 
-The required clap version attributes were already present on the `Cli` struct in `src/cli/mod.rs`:
+The clap version attributes are already present on the `Cli` struct in `src/cli/mod.rs`:
 
-1. `#[command(version = env!("CARGO_PKG_VERSION"))]` (line 21)
-2. `#[command(propagate_version = true)]` (line 22)
-
-Both attributes are correctly placed on the `Cli` struct definition and the code compiles successfully.
+```rust
+#[derive(Parser)]
+#[command(name = "bf")]
+#[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(propagate_version = true)]
+pub struct Cli {
+```
 
 ## Verification
 
-```bash
-cargo build
-# No errors - attributes are correctly configured
-```
+- ✅ `#[command(version = env!("CARGO_PKG_VERSION"))]` is present (line 21)
+- ✅ `#[command(propagate_version = true)]` is present (line 22)
+- ✅ Cargo builds without errors
+- ✅ Cargo.toml version is set to "0.2.0"
+- ✅ Attributes are correctly placed on the `Cli` struct definition
+
+The attributes were already implemented in a prior commit.
