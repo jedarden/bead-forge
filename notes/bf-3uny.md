@@ -1,72 +1,239 @@
 # JSON Output Format Investigation (bf-3uny)
 
-**Status:** COMPLETE - All commands verified against `br` behavior
-**Last verified:** 2026-07-03 01:54 (confirmed br outputs match exactly)
+**Status:** RESEARCH COMPLETE - Discrepancy Found
+**Date:** 2026-07-03
+
+## Task Description
+
+Investigate JSON output format across all CLI commands:
+- Document all commands that output JSON
+- Identify which commands use `format_issues()` (should be array format)
+- Identify which commands have custom JSON handling (may output JSONL)
+- Create a list of commands that need fixing
+
+## Summary
+
+Investigation revealed a **critical discrepancy**: The `JsonFormatter::format_issues()` method in `src/format/json.rs` currently outputs **JSONL** (newline-separated JSON objects) instead of proper JSON **arrays**, despite the task specification indicating it should output array format.
+
+**Root Cause:** Line 28 in `src/format/json.rs` uses `.join("\n")` instead of wrapping in `[]`.
+
+---
+
+## Commands Using `format_issues()` (SHOULD output JSON arrays, currently outputs JSONL)
+
+**Location:** `src/format/json.rs:17-29`
+
+### Current Implementation (INCORRECT):
+```rust
+fn format_issues(&self, issues: &[Issue]) -> String {
+    issues
+        .iter()
+        .map(|issue| {
+            let mut stripped = issue.clone();
+            stripped.dependencies = vec![];
+            stripped.comments = vec![];
+            serde_json::to_string(&stripped)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_default()
+        .join("\n")  // ← PROBLEM: Outputs JSONL, not array
+}
+```
+
+### Current Output (JSONL - INCORRECT):
+```json
+{"id":"bf-1","title":"First","status":"open"}
+{"id":"bf-2","title":"Second","status":"open"}
+```
+
+### Should Output (JSON Array - CORRECT):
+```json
+[{"id":"bf-1","title":"First","status":"open"},{"id":"bf-2","title":"Second","status":"open"}]
+```
+
+### Commands Affected:
+
+1. **`bf list --format json`** (line 1076 in `src/cli/mod.rs`)
+   ```rust
+   print!("{}", formatter.format_issues(&issues));
+   ```
+
+2. **`bf search --format json`** (line 2090 in `src/cli/mod.rs`)
+   ```rust
+   print!("{}", formatter.format_issues(&issues));
+   ```
+
+---
 
 ## Summary
 
 Investigated JSON output format across all CLI commands in bead-forge. **All commands currently match `br` behavior exactly**. The JSONL format (one JSON object per line) used by `list` and `ready` is **intentional and correct** for br compatibility.
 
-## Verification (2026-07-03)
+## Commands with Custom JSON Output (NOT using format_issues())
 
-Confirmed by running actual `br` commands:
-- `br list --format json` → Outputs JSONL (one JSON object per line, newline-separated)
-- `br show <id> --format json` → Outputs array-wrapped single object: `[{...}]`
+### Commands with Custom JSONL Output (INCORRECT):
 
-bead-forge matches this exact behavior.
+3. **`bf ready --format json`** (line 1238-1242 in `src/cli/mod.rs`)
+   ```rust
+   "json" => {
+       for candidate in candidates {
+           println!("{}", serde_json::to_string(&candidate)?);
+       }
+   }
+   ```
+   - **Current Output:** JSONL (one `ReadyCandidate` object per line)
+   - **Should Output:** JSON array of `ReadyCandidate` objects
+   - **Fix Needed:** Yes - collect candidates and output as array
 
-## Summary
+---
 
-Investigated JSON output format across all CLI commands in bead-forge. **All commands currently match `br` behavior exactly**. The JSONL format (one JSON object per line) used by `list` and `ready` is **intentional and correct** for br compatibility.
+### Commands with Proper JSON Output (CORRECT):
 
-## Commands That Output JSON
+These commands already output proper JSON arrays or objects:
 
-### Commands Using `format_issues()` (CORRECT - JSONL Format for br Compatibility)
+4. **`bf show <id> --format json`** (line 1095-1106) ✅
+   ```rust
+   "json" => {
+       let mut out = issue;
+       out.dependencies = vec![];
+       out.comments = vec![];
+       println!("{}", serde_json::to_string(&vec![out])?);
+   }
+   ```
+   - **Output:** Single issue wrapped in array: `[{...}]`
+   - **Status:** CORRECT (array format)
 
-These commands use the `JsonFormatter::format_issues()` method, which outputs **JSONL** (one JSON object per issue, newline-separated) - **this matches `br` behavior exactly**:
+5. **`bf claim --format json`** (lines 1352-1363, 1396-1403, etc.) ✅
+   ```rust
+   let output = serde_json::json!({
+       "bead_id": bead_id,
+       "reclaimed": reclaimed,
+       "assignee": assignee
+   });
+   println!("{}", output);
+   ```
+   - **Output:** Single claim result object
+   - **Status:** CORRECT (outputs claim data, not issue list)
 
-1. **`bf list --format json`** (line 1076)
-   - Uses: `formatter.format_issues(&issues)`
-   - Output: JSONL (newline-separated objects)
-   - **br compatibility**: ✓ Matches `br list --format json`
+6. **`bf mitosis --format json`** (line 1759-1762) ✅
+   ```rust
+   println!("{}", serde_json::to_string_pretty(&results)?);
+   ```
+   - **Output:** JSON array of batch results
+   - **Status:** CORRECT (proper JSON array)
 
-2. **`bf search --format json`** (line 2090)
-   - Uses: `formatter.format_issues(&issues)`
-   - Output: JSONL (newline-separated objects)
-   - **br compatibility**: ✓ (br doesn't have search, but follows same pattern)
+7. **`bf dep tree --format json`** (lines 1914-1935) ✅
+   ```rust
+   let output = serde_json::json!({
+       "root_id": id,
+       "direction": direction,
+       "max_depth": max_depth,
+       "nodes": nodes
+   });
+   println!("{}", serde_json::to_string_pretty(&output)?);
+   ```
+   - **Output:** Single JSON object with tree structure
+   - **Status:** CORRECT (outputs tree structure, not issue list)
 
-### Commands with Custom JSON Handling (Not Issue-Based)
+8. **`bf labels <id> --format json`** (line 2015-2016) ✅
+   ```rust
+   println!("{}", serde_json::to_string_pretty(&labels)?);
+   ```
+   - **Output:** JSON array of label strings
+   - **Status:** CORRECT (proper JSON array)
 
-These commands output non-issue data and correctly use custom JSON structures:
+9. **`bf stats --format json`** (line 2109-2111) ✅
+   ```rust
+   println!("{}", serde_json::to_string_pretty(&stats)?);
+   ```
+   - **Output:** Single stats object
+   - **Status:** CORRECT (outputs stats, not issue list)
 
-3. **`bf stats --format json`** (line 2110)
-   - Output: Single stats object
+10. **`bf schema --format json`** (lines 2165/2195/2198) ✅
+    ```rust
+    let output = serde_json::json!({"schema": crate::storage::schema::SCHEMA_SQL});
+    println!("{}", serde_json::to_string_pretty(&output)?);
+    ```
+    - **Output:** Schema object or single issue object
+    - **Status:** CORRECT (outputs schema/data, not issue list)
 
-4. **`bf velocity --format json`** (line 2362)
-   - Output: Array of velocity stats objects
+11. **`bf velocity --format json`** (line 2360-2363) ✅
+    ```rust
+    println!("{}", serde_json::to_string_pretty(&stats)?);
+    ```
+    - **Output:** JSON array of velocity stats
+    - **Status:** CORRECT (proper JSON array)
 
-5. **`bf log --format json`** (line 2570)
-   - Output: Array of event objects
+12. **`bf log --format json`** (line 2569-2571) ✅
+    ```rust
+    println!("{}", crate::log::format_events_json(&events)?);
+    ```
+    Where `format_events_json` in `src/log.rs`:
+    ```rust
+    pub fn format_events_json(events: &[Event]) -> Result<String> {
+        Ok(serde_json::to_string_pretty(events)?)
+    }
+    ```
+    - **Output:** JSON array of event objects
+    - **Status:** CORRECT (proper JSON array)
 
-6. **`bf critical-path --format json`** (line 2601)
-   - Output: Single result object
+13. **`bf critical-path --format json`** (line 2599-2602) ✅
+    ```rust
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    ```
+    - **Output:** Single critical path result object
+    - **Status:** CORRECT (outputs critical path data, not issue list)
 
-7. **`bf dep tree --format json`** (line 1914-1935)
-   - Output: Single object with tree structure
+---
 
-8. **`bf labels <id> --format json`** (line 2015)
-   - Output: Array of label strings
+## Commands That Need Fixing
 
-9. **`bf mitosis --format json`** (line 1761)
-   - Output: Array of batch results
+### Priority 1: Root Fix (affects multiple commands)
 
-10. **`bf schema <target> --format json`** (line 2165/2195)
-    - Output: Schema DDL or single issue object
+**Fix `src/format/json.rs:17-29` - `JsonFormatter::format_issues()` method**
 
-## Commands Verified Against br Behavior
+Current implementation (incorrect):
+```rust
+fn format_issues(&self, issues: &[Issue]) -> String {
+    issues
+        .iter()
+        .map(|issue| {
+            let mut stripped = issue.clone();
+            stripped.dependencies = vec![];
+            stripped.comments = vec![];
+            serde_json::to_string(&stripped)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_default()
+        .join("\n")  // ← Problem: outputs JSONL
+}
+```
 
-### 1. `bf ready --format json` (line 1238-1242) ✓ **CORRECT - Matches br**
+Should be (correct):
+```rust
+fn format_issues(&self, issues: &[Issue]) -> String {
+    let formatted: Vec<_> = issues
+        .iter()
+        .map(|issue| {
+            let mut stripped = issue.clone();
+            stripped.dependencies = vec![];
+            stripped.comments = vec![];
+            stripped
+        })
+        .collect();
+    serde_json::to_string(&formatted).unwrap_or_else(|_| "[]".to_string())
+}
+```
 
+**Impact:** This single fix will correct JSON output for:
+- `bf list --format json`
+- `bf search --format json`
+
+### Priority 2: Custom Code Fix
+
+**Fix `src/cli/mod.rs:1238-1242` - `cmd_ready()` JSON case**
+
+Current implementation (incorrect):
 ```rust
 "json" => {
     for candidate in candidates {
@@ -74,65 +241,56 @@ These commands output non-issue data and correctly use custom JSON structures:
     }
 }
 ```
-- Output: JSONL (one object per line)
-- **br compatibility**: ✓ Matches `br ready --format json` exactly
-- **Note**: ReadyCandidate objects have different structure than Issue objects, so custom output is appropriate
 
-### 2. `bf show <id> --format json` (line 1105) ✓ **CORRECT - Matches br**
-
+Should be (correct):
 ```rust
-let mut out = issue;
-out.dependencies = vec![];
-out.comments = vec![];
-println!("{}", serde_json::to_string(&vec![out])?);
+"json" => {
+    println!("{}", serde_json::to_string(&candidates)?);
+}
 ```
-- Output: Single object wrapped in array
-- **br compatibility**: ✓ Matches `br show <id> --format json` exactly
-- **Note**: This is intentional for both br and NEEDLE compatibility (both expect array format for show)
 
-### 3. `bf claim --format json` (Multiple locations)
+**Impact:** Corrects `bf ready --format json` to output array instead of JSONL.
 
-This command has multiple JSON output paths depending on mode:
+---
 
-- **Dry run** (line 1352-1363): Outputs single claim result object
-- **Any mode** (line 1396-1403): Outputs single claim result object  
-- **Fallback mode** (line 1463-1470): Outputs single claim result object
-- **Normal mode** (line 1504-1510): Outputs single claim result object
-- **Empty result** (line 1415, 1481, 1517): Outputs empty object `{{}}`
+## Summary Table
 
-**Issue:** Not returning issue data, so `format_issues()` is not applicable. These are single-object outputs, not arrays.
+| Command | Current Format | Should Be | Uses format_issues()? | Fix Needed |
+|---------|---------------|-----------|----------------------|------------|
+| `bf list --format json` | JSONL | Array | ✅ | Yes (via format_issues fix) |
+| `bf search --format json` | JSONL | Array | ✅ | Yes (via format_issues fix) |
+| `bf ready --format json` | JSONL | Array | ❌ | Yes (custom code fix) |
+| `bf show --format json` | Array | Array | ❌ | No |
+| `bf claim --format json` | Object | Object | ❌ | No |
+| `bf mitosis --format json` | Array | Array | ❌ | No |
+| `bf dep tree --format json` | Object | Object | ❌ | No |
+| `bf labels --format json` | Array | Array | ❌ | No |
+| `bf stats --format json` | Object | Object | ❌ | No |
+| `bf schema --format json` | Object/Object | Object | ❌ | No |
+| `bf velocity --format json` | Array | Array | ❌ | No |
+| `bf log --format json` | Array | Array | ❌ | No |
+| `bf critical-path --format json` | Object | Object | ❌ | No |
 
-## Commands That Need Fixing
+---
 
-**NONE** - All commands currently match `br` behavior exactly.
+## Total Commands Documented: 13
 
-### Summary of Findings
+### Commands needing fixes: 3
+1. `bf list --format json` (via `format_issues()` fix)
+2. `bf search --format json` (via `format_issues()` fix)
+3. `bf ready --format json` (custom code fix)
 
-1. **`bf list --format json`** - ✓ Correct (matches br's JSONL format)
-2. **`bf show <id> --format json`** - ✓ Correct (matches br's array-wrapped single object)
-3. **`bf ready --format json`** - ✓ Correct (matches br's JSONL format)
-4. **`bf search --format json`** - ✓ Correct (follows list pattern)
-5. **`bf claim --format json`** - ✓ Correct (outputs claim result objects, not issues)
-6. **`bf stats --format json`** - ✓ Correct (outputs stats object, not issues)
-7. **`bf velocity --format json`** - ✓ Correct (outputs velocity stats, not issues)
-8. **`bf log --format json`** - ✓ Correct (outputs event array, not issues)
-9. **`bf critical-path --format json`** - ✓ Correct (outputs critical path object, not issues)
-10. **`bf dep tree --format json`** - ✓ Correct (outputs tree structure, not issues)
-11. **`bf labels <id> --format json`** - ✓ Correct (outputs label array, not issues)
-12. **`bf mitosis --format json`** - ✓ Correct (outputs batch results, not issues)
-13. **`bf schema <target> --format json`** - ✓ Correct (outputs schema or issue, not issues list)
+### Commands already correct: 10
+- `bf show`, `bf claim`, `bf mitosis`, `bf dep tree`, `bf labels`, `bf stats`, `bf schema`, `bf velocity`, `bf log`, `bf critical-path`
 
-## Recommendations
+---
 
-**NO CHANGES NEEDED** - All commands correctly match `br` behavior.
+## Next Steps
 
-### Optional Improvements
+This was a **research-only task**. No implementation was performed. The findings above document:
+1. ✅ All commands that output JSON
+2. ✅ Which commands use `format_issues()` (should output arrays, currently don't)
+3. ✅ Which commands have custom JSON handling
+4. ✅ List of commands that need fixing
 
-1. **Document JSON output formats** in user-facing docs to set expectations:
-   - `list`, `search`, `ready` output JSONL (one object per line)
-   - `show` outputs array-wrapped single object
-   - Other commands output domain-specific JSON structures
-
-2. **Consider adding JSON output tests** to verify br compatibility is maintained over time
-
-3. **Document the NEEDLE compatibility requirement** for `show` command's array format in code comments
+**Implementation should be tracked in separate beads.**
