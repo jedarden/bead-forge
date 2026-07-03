@@ -16,6 +16,34 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
+/// Parse datetime string that may be RFC3339 or SQLite native format.
+///
+/// Handles both RFC3339 with timezone (e.g., "2026-05-15T21:10:36+00:00") and
+/// SQLite's native datetime format without timezone (e.g., "2026-05-15 21:10:36").
+/// Assumes UTC for SQLite-native format.
+fn parse_datetime(s: &str) -> Result<DateTime<Utc>> {
+    use chrono::NaiveDateTime;
+    let t = s.trim();
+    // Try RFC3339 first (bf's own format with timezone; optional fractional seconds)
+    match DateTime::parse_from_rfc3339(t) {
+        Ok(dt) => Ok(dt.with_timezone(&Utc)),
+        Err(_) => {
+            // SQLite-native datetime() format: no timezone, space or 'T' separator
+            for fmt in [
+                "%Y-%m-%d %H:%M:%S%.f",
+                "%Y-%m-%dT%H:%M:%S%.f",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S",
+            ] {
+                if let Ok(ndt) = NaiveDateTime::parse_from_str(t, fmt) {
+                    return Ok(ndt.and_utc());
+                }
+            }
+            Err(anyhow::anyhow!("Invalid datetime format: {}", t))
+        }
+    }
+}
+
 /// Velocity statistics for a (model, harness, issue_type) tuple.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VelocityStats {
@@ -92,9 +120,7 @@ pub fn update_session_on_close(
     };
 
     // Parse claimed_at and calculate duration
-    let claimed_at = DateTime::parse_from_rfc3339(&claimed_at_str)
-        .map_err(|e| anyhow::anyhow!("Invalid claimed_at format: {}", e))?
-        .with_timezone(&Utc);
+    let claimed_at = parse_datetime(&claimed_at_str)?;
 
     let duration_seconds = closed_at.signed_duration_since(claimed_at).num_seconds();
 
