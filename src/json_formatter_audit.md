@@ -13,10 +13,10 @@
 
 ### Summary
 
-| Command | Formatter Used | Output Format | Array Wrapper | Implementation |
-|---------|---------------|---------------|---------------|----------------|
-| `list`  | `JsonFormatter.format_issues()` | JSONL (newline-delimited) | NO | Uses formatter system |
-| `ready` | None (bypasses formatter) | JSON array | YES | Custom `serde_json::to_string()` |
+| Command | Formatter Used | Output Format | Array Wrapper | Implementation Pattern |
+|---------|---------------|---------------|---------------|----------------------|
+| `list`  | `JsonFormatter.format_issues()` | JSONL (newline-delimited) | NO | **Formatter system** with custom loop (`.iter().map().join("\n")`) |
+| `ready` | None (bypasses formatter) | JSON array | YES | **Direct serialization** with `serde_json::to_string()` |
 
 ### List Command (`bf list --format json`)
 
