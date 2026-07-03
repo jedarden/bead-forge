@@ -1,27 +1,31 @@
-# Bead bf-pfii: Clap Version Propagation Verification
-
-## Task
-Verify clap version propagation in CLI struct.
+# Bead bf-pfii: Verify clap version propagation in CLI struct
 
 ## Verification Results
 
-### 1. CLI Struct Attributes ✅
-Confirmed that `src/cli/mod.rs` has the required clap attributes:
-- `#[command(version = env!("CARGO_PKG_VERSION"))]` (line 21)
-- `#[command(propagate_version = true)]` (line 22)
+### ✅ CLI struct attributes (src/cli/mod.rs:18-23)
 
-### 2. Version Output Test ✅
-Tested `bf --version`:
+The `Cli` struct has the correct clap version attributes:
+- `#[command(version = env!("CARGO_PKG_VERSION"))]` - Uses version from Cargo.toml
+- `#[command(propagate_version = true)]` - Propagates version to subcommands
+- `#[command(name = "bf")]` - Sets binary name to "bf"
+
+### ✅ Version output format
+
 ```
-$ ./target/release/bf --version
-Error: bf 0.2.0
+$ ./target/debug/bf --version
+bf 0.2.0
 ```
 
-Extracted format: `bf 0.2.0`
+**Output format:** `bf X.Y.Z` ✅
 
-### 3. Acceptance Criteria ✅
-- **Expected:** `bf X.Y.Z`
-- **Actual:** `bf 0.2.0` (from Cargo.toml version 0.2.0)
+**Version source:** Confirmed to be pulled from `CARGO_PKG_VERSION` (Cargo.toml version 0.2.0)
+
+## Acceptance Criteria
+
+- [x] `bf --version` outputs 'bf X.Y.Z' format
+- [x] Version is propagated from `CARGO_PKG_VERSION`
+- [x] `propagate_version = true` is set for subcommands
 
 ## Conclusion
-The clap version propagation is correctly configured. The `propagate_version = true` attribute ensures that version information is properly propagated to subcommands, and the `CARGO_PKG_VERSION` environment variable correctly references the version from Cargo.toml.
+
+The clap version propagation is correctly configured. The CLI struct properly uses `env!("CARGO_PKG_VERSION")` to pull the version from Cargo.toml and propagates it to all subcommands.
