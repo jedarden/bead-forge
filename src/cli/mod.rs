@@ -1236,9 +1236,8 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
 
     match format {
         "json" => {
-            for candidate in candidates {
-                println!("{}", serde_json::to_string(&candidate)?);
-            }
+            // Output as JSON array: [] for empty, [candidate] for single, [c1, c2, ...] for multiple
+            println!("{}", serde_json::to_string(&candidates)?);
         }
         "toon" => {
             for candidate in candidates {

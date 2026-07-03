@@ -39,6 +39,11 @@ name = "comprehensive_cli_update_flags"
 path = "tests/comprehensive_cli_update_flags.rs"
 required-features = []
 
+[[test]]
+name = "test_basic_workflow"
+path = "tests/test_basic_workflow.rs"
+required-features = []
+
 [[bin]]
 name = "bf"
 path = "src/main.rs"
