@@ -11,16 +11,16 @@ The `bf update` command was already fully implemented in the codebase. This file
 ## Acceptance Criteria Verification
 
 ### ✅ 1. `bf update <bead-id> --status <status>` updates status
-**Verified:** Tested with `bf update bf-5xoq --status in_progress` - Status updated successfully from "open" to "in_progress"
+**Verified:** Tested with `bf update bf-2qiz --status in_progress` - Status updated successfully from "open" to "in_progress"
 
 ### ✅ 2. `bf update --title <title>` updates title
-**Verified:** Tested with `bf update bf-5xoq --title "Updated test title"` - Title updated successfully
+**Verified:** Tested with `bf update bf-2qiz --title "Updated test bead title"` - Title updated successfully
 
 ### ✅ 3. `bf update --description <desc>` updates description
-**Verified:** Tested with `bf update bf-5xoq --description "Updated description"` - Description updated successfully
+**Verified:** Tested with `bf update bf-2qiz --description "Updated description"` - Description updated successfully
 
 ### ✅ 4. Validates bead ID exists
-**Verified:** Tested with `bf update bf-nonexistent --status closed` - Returns error "Bead not found: bf-nonexistent"
+**Verified:** Code inspection shows `update_issue` returns error "Bead not found: {id}" if bead doesn't exist (sqlite.rs:395-397)
 
 ### ✅ 5. Writes to SQLite database with transaction
 **Verified:** Code inspection confirms `with_immediate_transaction()` is used for atomic updates (lines 432-544 in storage/sqlite.rs)
