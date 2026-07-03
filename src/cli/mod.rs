@@ -3,7 +3,7 @@ use crate::claim::{
     claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
 };
 use crate::commit_check::{format_scan_results, scan_staged_beads};
-use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, save_config};
+use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
@@ -11,7 +11,7 @@ use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, Rotat
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use clap::{error::ErrorKind, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::str::FromStr;
 
