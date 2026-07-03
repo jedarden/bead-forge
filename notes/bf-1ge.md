@@ -1,58 +1,65 @@
-# bf-1ge: Verify bf show command implementation
+# bf-1ge: Implement bf show command
 
-## Task
-Implement the bf show command that displays bead details.
+## Implementation Status: ✅ COMPLETE
 
-## Finding
-The `bf show` command is **already fully implemented** in `src/cli/mod.rs` (lines 100-112 for CLI structure, lines 750-753 for command dispatch, and lines 1081-1142 for implementation).
+The `bf show` command was already fully implemented in `src/cli/mod.rs` (lines 1081-1142).
 
-## Verification Results
+## Acceptance Criteria Verification
 
-### Acceptance Criteria - All Met ✅
+All acceptance criteria have been met:
 
-1. **`bf show <bead-id>` shows all bead fields**
-   - Verified with `bf show bf-2cnr`
-   - Shows: ID, title, status, priority, type, description, assignee, labels
+1. ✅ **bf show <bead-id> shows all bead fields**
+   - Text format displays: ID, title, status, priority, type, description, assignee, labels
+   - All populated fields are shown in a clean, readable format
 
-2. **`bf show --format json` returns structured JSON**
-   - Verified JSON output includes comprehensive fields:
-   - id, title, description, design, acceptance_criteria, notes, status, priority, issue_type, assignee, created_at, updated_at, source_repo, compaction_level, labels
+2. ✅ **bf show --format json returns structured JSON**
+   - Returns JSON array with complete bead data
+   - Includes all fields: id, title, status, priority, issue_type, description, design, acceptance_criteria, notes, created_at, updated_at, labels, etc.
+   - NEEDLE-compatible: strips dependencies and comments from JSON output
 
-3. **Validates bead ID exists**
-   - Verified with `bf show nonexistent-bead`
-   - Returns proper error: "Bead not found: nonexistent-bead"
+3. ✅ **Validates bead ID exists**
+   - Returns clear error message: "Bead not found: {id}"
+   - Exit code 1 for non-existent beads
+   - Falls back to searching archive files if not in SQLite
 
-4. **Reads from SQLite database**
-   - Implementation uses `storage.get_issue(id)` from `src/storage/sqlite.rs:151`
-   - Falls back to archive search via `find_bead_in_archives()` if not found in database
+4. ✅ **Reads from SQLite database**
+   - Uses `storage.get_issue()` to retrieve from SQLite
+   - Loads all related data: labels, dependencies, comments, annotations
 
-## Implementation Details
+## Testing Results
 
-The `cmd_show()` function (lines 1081-1142):
-- Loads metadata and opens SQLite database
-- Fetches issue by ID (with archive fallback)
-- Supports three formats: text (default), json, toon
-- JSON format strips dependencies/comments for NEEDLE compatibility
-- Returns "Bead not found" error if ID doesn't exist in DB or archives
-
-## Test Results
 ```bash
+# Text format (default)
 $ ./target/debug/bf show bf-2cnr
 ID: bf-2cnr
 Title: Bug test
-Status: in_progress
+Status: open
 Priority: P0
 Type: bug
 Description: Critical bug
-Assignee: echo-test-test-worker
 Labels: phase-1, urgent
 
+# JSON format
 $ ./target/debug/bf show bf-2cnr --format json
 [{"id":"bf-2cnr","title":"Bug test",...}]
 
-$ ./target/debug/bf show nonexistent-bead
-Error: Bead not found: nonexistent-bead
+# Error handling
+$ ./target/debug/bf show nonexistent-bead-123
+Error: Bead not found: nonexistent-bead-123
 ```
 
-## Conclusion
-The bf show command is complete and meets all acceptance criteria. No implementation work was required.
+## Command Implementation
+
+Location: `src/cli/mod.rs:1081-1142`
+
+Key features:
+- Supports three output formats: text (default), json, toon
+- Falls back to archive files if bead not in database
+- NEEDLE compatibility for JSON output (wraps in array, strips deps/comments)
+- Clean, readable text output with field labels
+
+## Related Commands
+
+- `bf list` - Lists beads with filtering options
+- `bf update` - Updates bead fields
+- `bf close` - Closes beads
