@@ -1,27 +1,13 @@
-# Verification: Cargo.toml Version Attribute (bf-2lc)
+# Bead bf-2lc: Verify Cargo.toml version attribute
 
-## Verification Results
+## Task
+Ensure version is properly defined in Cargo.toml so CARGO_PKG_VERSION is available at compile time.
 
-All acceptance criteria met:
+## Findings
+Verified that `Cargo.toml` contains:
+- `version = "0.2.0"` in the [package] section (line 3)
+- Valid semantic version format
+- No conflicting version definitions
 
-1. **Version in [package] section:** ✅
-   - `Cargo.toml:3` contains `version = "0.2.0"`
-
-2. **Valid semantic version:** ✅
-   - "0.2.0" follows MAJOR.MINOR.PATCH format
-
-3. **No conflicting definitions:** ✅
-   - Only one version definition in [package]
-   - Dependencies have separate version specifiers
-
-4. **Compile-time accessibility:** ✅
-   - `src/cli/mod.rs:21` uses `#[command(version = env!("CARGO_PKG_VERSION"))]`
-   - Cargo automatically sets `CARGO_PKG_VERSION` during build
-
-5. **Runtime verification:** ✅
-   - `bf --version` outputs "bf 0.2.0"
-   - Build completes without errors
-
-## Conclusion
-
-The version attribute is properly configured and the `CARGO_PKG_VERSION` environment variable is available at compile time as expected.
+## Result
+All acceptance criteria met. The version attribute is correctly configured.
