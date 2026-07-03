@@ -1,54 +1,39 @@
-# Bead bf-3rwg: CLI Infrastructure Verification
+# bf-3rwg: Verify clap CLI --help support
 
-## Acceptance Criteria Verification
+## Acceptance Criteria Verified
 
-### 1. clap Command Structure
-✅ `src/cli/mod.rs` has proper clap infrastructure:
-- `#[derive(Parser)]` on main `Cli` struct (line 18)
-- `#[derive(Subcommand)]` on `Commands` enum (line 32)
-- `#[derive(Subcommand)]` on all subcommand enums (`DepCommands`, `LabelCommands`, etc.)
-- Proper attribute macros for help generation
+### 1. Clap Command Structure ✅
+- `src/cli/mod.rs` has `#[derive(Parser)]` on the `Cli` struct (line 18)
+- `#[command(name = "bf")]`, `#[command(about = ...)]`, `#[command(version = ...)]` attributes configured
+- `#[command(subcommand)]` on the `Commands` enum field (line 24)
+- All subcommands use `#[derive(Subcommand)]`
 
-### 2. CLI App Instantiation
-✅ CLI can be instantiated without errors:
-- `cargo run -- --help` executes successfully
-- `cargo run -- --version` returns "bf 0.2.0"
-- Subcommand help works: `cargo run -- claim --help` shows all claim options
+### 2. CLI App Instantiation ✅
+- `run_cli()` function (line 694) calls `Cli::try_parse()` 
+- Returns `Result<Cli>` for proper error handling
+- `run()` function (line 698) handles all commands
 
-### 3. clap Derives for Help Generation
-✅ clap derives properly configured:
-- `#[command(name = "bf")]` sets the binary name
-- `#[command(about = "...")]` provides short description
-- `#[command(version = env!("CARGO_PKG_VERSION"))]` enables version display
-- `#[command(propagate_version = true)]` ensures subcommands inherit version
-- All subcommands have proper `#[arg(...)]` attributes for parameters
+### 3. Clap Derives for Help Generation ✅
+- `Parser` derive on main `Cli` struct
+- `Subcommand` derives on: `Commands`, `DepCommands`, `LabelCommands`, `CommentsCommands`, `ConfigCommands`, `AnnotateCommands`
+- Proper attributes: `#[command(name, about, long_about)]`, `#[arg(short, long, global = true)]`, etc.
 
-### 4. Build Success
-✅ cargo build succeeds for CLI module:
-- `cargo build` completes without errors
-- Generated binary at `target/debug/bf` works correctly
-- Only compiler warnings about unused imports/variables (cosmetic)
+### 4. Build Success ✅
+- `cargo build` completes cleanly
+- Only minor linting warnings (unused imports/variables), no errors
+- Binary at `./target/debug/bf` executes correctly
 
-## Test Results
+## Verified Functionality
 
 ```bash
-# Main help
-$ cargo run -- --help
-# Shows all 28 commands with descriptions and global options
+$ ./target/debug/bf --help
+# Shows full help with all commands and options
 
-# Version
-$ cargo run -- --version
+$ ./target/debug/bf create --help
+# Shows create subcommand help with all options
+
+$ ./target/debug/bf --version
 bf 0.2.0
-
-# Subcommand help
-$ cargo run -- claim --help
-# Shows detailed claim command options
 ```
 
-## Conclusion
-
-The clap CLI infrastructure in bead-forge is fully functional and meets all acceptance criteria. The CLI properly supports:
-- `--help` flag for main command and all subcommands
-- `--version` flag with proper version propagation
-- All command-line argument parsing with proper types
-- Global and subcommand-specific options
+All clap CLI infrastructure is properly configured and functional.
