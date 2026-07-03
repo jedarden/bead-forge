@@ -11,7 +11,7 @@ use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, Rotat
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use clap::{Parser, Subcommand};
+use clap::{error::ErrorKind, Parser, Subcommand};
 use std::path::PathBuf;
 use std::str::FromStr;
 
