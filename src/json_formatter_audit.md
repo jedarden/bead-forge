@@ -4,14 +4,128 @@
 **Date:** 2026-07-03  
 **Purpose:** Document current JSON output format for each command with `--format json` flag
 
-## Summary
+---
 
-This audit tracks which commands use standardized `get_formatter().format_issues()` versus custom `println!` with `serde_json`, and identifies consistency issues.
+## Bead bf-5haf: Focused Audit of `list` and `ready` Commands
 
-**Total commands audited:** 13  
-**Commands using `get_formatter().format_issues()`:** 2  
-**Commands using custom JSON serialization:** 11  
-**Commands needing fixes:** 2 (ready for inconsistency, show for NEEDLE compatibility documentation)
+**Date:** 2026-07-03  
+**Purpose:** Detailed audit of JSON output implementations for list and ready commands
+
+### Summary
+
+| Command | Formatter Used | Output Format | Array Wrapper | Implementation |
+|---------|---------------|---------------|---------------|----------------|
+| `list`  | `JsonFormatter.format_issues()` | JSONL (newline-delimited) | NO | Uses formatter system |
+| `ready` | None (bypasses formatter) | JSON array | YES | Custom `serde_json::to_string()` |
+
+### List Command (`bf list --format json`)
+
+**Implementation:** `src/cli/mod.rs:995-1079`
+
+**Uses the Formatter system:**
+```rust
+let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+let formatter = get_formatter(output_format);
+print!("{}", formatter.format_issues(&issues));
+```
+
+**Formatter implementation:** `src/format/json.rs:17-29`
+```rust
+fn format_issues(&self, issues: &[Issue]) -> String {
+    issues
+        .iter()
+        .map(|issue| {
+            let mut stripped = issue.clone();
+            stripped.dependencies = vec![];
+            stripped.comments = vec![];
+            serde_json::to_string(&stripped)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_default()
+        .join("\n")
+}
+```
+
+**Output format:** JSONL (newline-delimited JSON objects)
+```json
+{"id":"bf-123","title":"First bead","status":"open","priority":2,...}
+{"id":"bf-124","title":"Second bead","status":"open","priority":1,...}
+```
+
+**Key characteristics:**
+- Uses `JsonFormatter.format_issues()` method
+- Outputs JSONL format (objects separated by newlines)
+- NO array wrapper
+- Strips `dependencies` and `comments` before serialization
+- Empty result produces no output (empty string)
+
+### Ready Command (`bf ready --format json`)
+
+**Implementation:** `src/cli/mod.rs:1229-1271`
+
+**Bypasses the Formatter system entirely:**
+```rust
+match format {
+    "json" => {
+        // Output as JSON array: [] for empty, [candidate] for single, [c1, c2, ...] for multiple
+        println!("{}", serde_json::to_string(&candidates)?);
+    }
+    "toon" => { /* custom */ }
+    _ => { /* custom */ }
+}
+```
+
+**Output format:** Standard JSON array
+```json
+[
+  {"id":"bf-123","title":"First bead","priority":2,"downstream_impact":5,"critical_float":0.0},
+  {"id":"bf-124","title":"Second bead","priority":1,"downstream_impact":3,"critical_float":1.0}
+]
+```
+
+**Key characteristics:**
+- Does NOT use the formatter system
+- Direct `serde_json::to_string()` call on `Vec<ScoredBead>`
+- Outputs proper JSON array
+- Empty result produces `[]`
+- Returns `ScoredBead` objects (not full `Issue` objects)
+
+### Why Ready Bypasses the Formatter
+
+The `ready` command returns `ScoredBead` objects (from `src/claim.rs`), which differ from `Issue` objects:
+
+**ScoredBead structure:**
+```rust
+pub struct ScoredBead {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub priority: i32,
+    pub downstream_impact: i64,
+    pub critical_float: f64,
+    pub created_at: String,
+}
+```
+
+The `Formatter` trait is designed for `Issue` objects and cannot handle `ScoredBead` directly. A separate formatter would be needed for consistency.
+
+### Inconsistency Issues
+
+1. **Different output formats:**
+   - `list`: JSONL (newline-delimited objects)
+   - `ready`: JSON array
+   
+2. **Empty case handling:**
+   - `list`: No output (empty string)
+   - `ready`: `[]`
+
+3. **Single item handling:**
+   - `list`: Single JSON object (no array)
+   - `ready`: Array with one element `[{...}]`
+
+---
+
+## Original Comprehensive Audit (bf-xmwq)
 
 ---
 
