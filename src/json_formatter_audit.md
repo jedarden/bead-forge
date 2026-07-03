@@ -1,6 +1,6 @@
 # JSON Output Implementation Audit
 
-**Bead:** bf-4h6d  
+**Bead:** bf-xmwq  
 **Date:** 2026-07-03  
 **Purpose:** Document current JSON output format for each command with `--format json` flag
 
