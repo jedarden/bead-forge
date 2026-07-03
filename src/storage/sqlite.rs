@@ -379,6 +379,23 @@ impl Storage {
     }
 
     pub fn update_issue(&self, id: &str, changes: &IssueChanges) -> Result<()> {
+        // Validate that the bead exists
+        let exists = {
+            let conn = self.conn.lock().unwrap();
+            match conn.query_row(
+                "SELECT 1 FROM issues WHERE id = ?1",
+                params![id],
+                |_| Ok(true),
+            ) {
+                Ok(result) => result,
+                Err(rusqlite::Error::QueryReturnedNoRows) => false,
+                Err(e) => return Err(e.into()),
+            }
+        };
+        if !exists {
+            return Err(anyhow!("Bead not found: {}", id));
+        }
+
         // Scan for secrets before updating (only for string fields in changes)
         if let Some(scanner) = &*self.secret_scanner.lock().unwrap() {
             let mut all_matches = Vec::new();
