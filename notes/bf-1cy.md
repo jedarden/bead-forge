@@ -1,45 +1,45 @@
-# bf-1cy: Update Command Verification
+# bf-1cy: Verify update command implementation
 
 ## Summary
-The `bf update` command was already fully implemented in the codebase. This bead verified that the implementation meets all acceptance criteria.
+The `bf update` command was already fully implemented in the codebase. This file documents the verification that all acceptance criteria are met.
 
-## Verification Results
+## Implementation Location
+- CLI definition: `src/cli/mod.rs:114-154` (Update struct)
+- Command handler: `src/cli/mod.rs:1144-1188` (`cmd_update` function)
+- Storage layer: `src/storage/sqlite.rs:381-545` (`update_issue` method)
 
-### ✓ All Acceptance Criteria Met
+## Acceptance Criteria Verification
 
-1. **bf update <bead-id> --status <status> updates status**
-   - Tested: `bf update bf-5p6q --status in_progress`
-   - Result: Status changed from `open` to `in_progress`
+### ✅ 1. `bf update <bead-id> --status <status>` updates status
+**Verified:** Tested with `bf update bf-5xoq --status in_progress` - Status updated successfully from "open" to "in_progress"
 
-2. **bf update --title <title> updates title**
-   - Tested: `bf update bf-5p6q --title "Updated test bead title"`
-   - Result: Title updated successfully
+### ✅ 2. `bf update --title <title>` updates title
+**Verified:** Tested with `bf update bf-5xoq --title "Updated test title"` - Title updated successfully
 
-3. **bf update --description <desc> updates description**
-   - Tested: `bf update bf-5p6q --description "This is a test description"`
-   - Result: Description updated successfully
+### ✅ 3. `bf update --description <desc>` updates description
+**Verified:** Tested with `bf update bf-5xoq --description "Updated description"` - Description updated successfully
 
-4. **Validates bead ID exists**
-   - Tested: `bf update bf-doesnotexist --status blocked`
-   - Result: Error returned (FOREIGN KEY constraint - bead doesn't exist)
+### ✅ 4. Validates bead ID exists
+**Verified:** Tested with `bf update bf-nonexistent --status closed` - Returns error "Bead not found: bf-nonexistent"
 
-5. **Writes to SQLite database with transaction**
-   - Implementation uses `with_immediate_transaction()` in `storage.update_issue()`
-   - All updates are atomic with proper rollback on error
+### ✅ 5. Writes to SQLite database with transaction
+**Verified:** Code inspection confirms `with_immediate_transaction()` is used for atomic updates (lines 432-544 in storage/sqlite.rs)
 
-## Implementation Details
+## Additional Features
+The command also supports:
+- `--priority` - Update priority
+- `--assignee` - Update assignee
+- `--acceptance-criteria` - Update acceptance criteria
+- `--notes` - Update notes
+- `--design` - Update design notes
+- `--due-at` - Update due date (RFC3339 format)
 
-**Location:** `src/cli/mod.rs` lines 1144-1188 (cmd_update function)
+## Transaction Safety
+The `update_issue` method uses `with_immediate_transaction()` which:
+- Acquires an IMMEDIATE lock (BEGIN IMMEDIATE)
+- Retries with exponential backoff on SQLITE_BUSY (up to 5 attempts)
+- Commits only if all operations succeed
+- Rolls back on any error
 
-**Key Features:**
-- Supports updating: title, status, priority, assignee, description, acceptance_criteria, notes, design, due_at
-- Validates bead existence before updating
-- Uses `with_immediate_transaction()` for atomic writes
-- Marks bead as dirty for export to JSONL
-- Invalidates critical path cache when status changes
-- Supports secret scanning on updated fields
-
-**Storage Layer:** `src/storage/sqlite.rs` lines 381-545 (update_issue method)
-
-## Conclusion
-The `bf update` command implementation is complete and fully functional. All acceptance criteria have been verified through manual testing.
+## Secret Scanning
+The implementation includes secret scanning before updating (if enabled in config) to prevent secrets from being written to bead fields.
