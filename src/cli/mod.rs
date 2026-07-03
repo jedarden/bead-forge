@@ -692,7 +692,7 @@ pub enum AnnotateCommands {
 }
 
 pub fn run_cli() -> Result<Cli> {
-    Ok(Cli::try_parse()?)
+    Ok(Cli::parse())
 }
 
 pub fn run(cli: Cli) -> Result<()> {
