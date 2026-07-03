@@ -1,23 +1,39 @@
-# bf-pfii: Verify clap version propagation in CLI struct
+# Verification: clap version propagation in CLI struct
 
-## Verification Results
+## Verified Components
 
-✓ **Cli struct attributes verified** (src/cli/mod.rs:19-22):
-  - `#[command(name = "bf")]`
-  - `#[command(version = env!("CARGO_PKG_VERSION"))]`
-  - `#[command(propagate_version = true)]`
+### 1. CLI Struct Attributes (src/cli/mod.rs:21-22)
+```rust
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(propagate_version = true)]
+```
 
-✓ **Version output tested**:
-  - Command: `bf --version`
-  - Output: `bf 0.2.0`
-  - Format: Correct (binary name + space + version)
+### 2. Test Results
 
-## Acceptance Criteria Met
+**Main command version:**
+```bash
+$ bf --version
+bf 0.2.0
+```
 
-The acceptance criterion was: "bf --version outputs 'bf X.Y.Z'"
+**Subcommand version propagation:**
+```bash
+$ bf list --version
+bf-list 0.2.0
+```
 
-✓ **Confirmed**: Running `./target/release/bf --version` outputs `bf 0.2.0`
+### 3. Version Source (Cargo.toml:3)
+```
+version = "0.2.0"
+```
 
-## Implementation Status
+## Acceptance Criteria
 
-No changes were needed. The clap attributes were already properly configured in the existing code.
+✅ `bf --version` outputs `bf X.Y.Z` format: **PASSED** (outputs "bf 0.2.0")
+✅ Version propagates to subcommands: **PASSED** (subcommands show version 0.2.0)
+✅ Uses `env!("CARGO_PKG_VERSION")`: **PASSED** (line 21)
+✅ Has `propagate_version = true`: **PASSED** (line 22)
+
+## Conclusion
+
+The clap version propagation is correctly implemented and working as expected.
