@@ -525,17 +525,16 @@ pub enum Commands {
 pub enum DepCommands {
     /// Add a dependency
     Add {
+        /// Bead that is blocked (depends on the blocker)
+        #[arg(long)]
+        blocks: Option<String>,
+
+        /// Bead that blocks (the bead being depended on)
+        blocker: String,
+
         /// Dependency type (e.g., blocks, relates_to)
-        #[arg(long)]
+        #[arg(short = 't', long, default_value = "blocks")]
         type_: String,
-
-        /// The bead being depended on (blocks/relation target)
-        #[arg(long)]
-        depends_on: String,
-
-        /// The bead that gets the dependency (what --blocks refers to)
-        #[arg(long)]
-        blocks: String,
     },
 
     /// Remove a dependency
@@ -1126,6 +1125,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
             }
+            if !issue.dependencies.is_empty() {
+                println!("Dependencies:");
+                for dep in &issue.dependencies {
+                    println!("  -> {} ({})", dep.depends_on_id, dep.dep_type);
+                }
+            }
         }
         _ => {
             println!("ID: {}", issue.id);
@@ -1141,6 +1146,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             }
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
+            }
+            if !issue.dependencies.is_empty() {
+                println!("Dependencies:");
+                for dep in &issue.dependencies {
+                    println!("  -> {} ({})", dep.depends_on_id, dep.dep_type);
+                }
             }
         }
     }
@@ -1856,18 +1867,20 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
 fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
     match dep {
         DepCommands::Add {
-            type_,
-            depends_on,
             blocks,
+            blocker,
+            type_,
         } => {
+            let blocks = blocks.ok_or_else(|| anyhow!("Missing --blocks argument. Usage: bf dep add <blocker> --blocks <blocked>"))?;
+
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let dep_type =
                 crate::model::DependencyType::from_str(&type_).map_err(|e| anyhow::anyhow!(e))?;
 
-            // Add the dependency
-            storage.add_dependency(&blocks, &depends_on, &dep_type, "cli")?;
+            // Add the dependency: blocks depends on blocker
+            storage.add_dependency(&blocks, &blocker, &dep_type, "cli")?;
 
             // If this is a blocker dependency, update status to 'blocked'
             if matches!(dep_type, crate::model::DependencyType::Blocks) {
@@ -1880,7 +1893,7 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
 
             println!(
                 "Added dependency: {} depends on {} ({})",
-                blocks, depends_on, type_
+                blocks, blocker, type_
             );
         }
         DepCommands::Remove { issue, depends_on } => {
