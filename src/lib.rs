@@ -17,6 +17,7 @@ pub mod rotate;
 pub mod secrets;
 pub mod storage;
 pub mod sync;
+pub mod validation;
 pub mod velocity;
 
 pub use batch::{execute_batch, mitosis, mitosis_ex, BatchOp, BatchResult, MitosisChild};
