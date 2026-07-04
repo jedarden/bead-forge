@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 #[derive(Parser)]
 #[command(name = "bf")]
-#[command(version = concat!("bf ", env!("CARGO_PKG_VERSION")))]
+#[command(version = None)]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 pub struct Cli {
     /// Workspace directory (defaults to current directory's .beads/)
@@ -524,15 +524,17 @@ pub enum Commands {
 pub enum DepCommands {
     /// Add a dependency
     Add {
-        /// Issue ID (the one that will depend on something)
-        issue: String,
+        /// Dependency type (e.g., blocks, relates_to)
+        #[arg(long)]
+        type_: String,
 
-        /// Target issue ID (the one being depended on)
+        /// The bead being depended on (blocks/relation target)
+        #[arg(long)]
         depends_on: String,
 
-        /// Dependency type
-        #[arg(short, long, default_value = "blocks")]
-        type_: String,
+        /// The bead that gets the dependency (what --blocks refers to)
+        #[arg(long)]
+        blocks: String,
     },
 
     /// Remove a dependency
@@ -1853,19 +1855,31 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
 fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
     match dep {
         DepCommands::Add {
-            issue,
-            depends_on,
             type_,
+            depends_on,
+            blocks,
         } => {
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let dep_type =
                 crate::model::DependencyType::from_str(&type_).map_err(|e| anyhow::anyhow!(e))?;
-            storage.add_dependency(&issue, &depends_on, &dep_type, "cli")?;
+
+            // Add the dependency
+            storage.add_dependency(&blocks, &depends_on, &dep_type, "cli")?;
+
+            // If this is a blocker dependency, update status to 'blocked'
+            if matches!(dep_type, crate::model::DependencyType::Blocks) {
+                let changes = IssueChanges {
+                    status: Some(Status::Blocked),
+                    ..Default::default()
+                };
+                storage.update_issue(&blocks, &changes)?;
+            }
+
             println!(
                 "Added dependency: {} depends on {} ({})",
-                issue, depends_on, type_
+                blocks, depends_on, type_
             );
         }
         DepCommands::Remove { issue, depends_on } => {
