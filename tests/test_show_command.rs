@@ -54,7 +54,7 @@ fn get_bf_binary() -> String {
 /// Create a test bead via CLI
 fn create_test_bead(beads_dir: impl AsRef<std::path::Path>, title: &str) -> String {
     let bf_path = get_bf_binary();
-    let workspace = beads_dir.parent().unwrap();
+    let workspace = beads_dir.as_ref().parent().unwrap();
     let result = std::process::Command::new(&bf_path)
         .arg("create")
         .arg("--title")
