@@ -430,6 +430,26 @@ impl Storage {
         }
 
         self.with_immediate_transaction(|tx| {
+            // Get current status before update (for reopen detection)
+            let current_status: Option<Status> = tx.query_row(
+                "SELECT status FROM issues WHERE id = ?1",
+                params![id],
+                |row| {
+                    let status_str: String = row.get(0)?;
+                    Ok(match status_str.as_str() {
+                        "open" => Status::Open,
+                        "in_progress" => Status::InProgress,
+                        "blocked" => Status::Blocked,
+                        "deferred" => Status::Deferred,
+                        "draft" => Status::Draft,
+                        "closed" => Status::Closed,
+                        "tombstone" => Status::Tombstone,
+                        "pinned" => Status::Pinned,
+                        _ => Status::Custom(status_str),
+                    })
+                },
+            ).ok();
+
             let mut updates = Vec::new();
             let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
             if let Some(ref title) = changes.title {
@@ -504,6 +524,18 @@ impl Storage {
                 let param_refs: Vec<&dyn rusqlite::ToSql> =
                     all_params.iter().map(|p| p.as_ref()).collect();
                 tx.execute(&query, param_refs.as_slice())?;
+
+                // Create a Reopened event if transitioning from closed/tombstone to active status
+                if let (Some(current), Some(new)) = (current_status, changes.status.as_ref()) {
+                    if current.is_terminal() && !new.is_terminal() {
+                        let actor = changes.actor.as_deref().unwrap_or("system");
+                        let now = Utc::now();
+                        tx.execute(
+                            "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'reopened', ?2, ?3, ?4, ?5)",
+                            params![id, actor, current.as_str(), new.as_str(), now.to_rfc3339()],
+                        )?;
+                    }
+                }
             }
             // Handle label updates separately
             if let Some(ref labels) = changes.labels {
