@@ -13,7 +13,11 @@ use bead_forge::model::{Issue, Status, EventType, IssueType, Priority, IssueChan
 use bead_forge::storage::Storage;
 use chrono::{DateTime, Utc};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
+
+// Global counter for unique test IDs
+static TEST_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 /// Create a temporary workspace for testing
 fn setup_test_workspace() -> (TempDir, PathBuf) {
@@ -50,7 +54,7 @@ claim_ttl_minutes: 30
 
 /// Create a test bead
 fn create_test_bead(storage: &Storage, title: &str) -> Issue {
-    let id = format!("bf-{:x}", md5::compute(title));
+    let id = format!("bf-test-{}", TEST_ID_COUNTER.fetch_add(1, Ordering::SeqCst));
     let now = Utc::now();
 
     let issue = Issue {
@@ -266,7 +270,7 @@ fn test_close_preserves_other_fields() {
     let storage = Storage::open(&db_path).unwrap();
 
     // Create a bead with various fields
-    let id = format!("bf-{:x}", md5::compute("preservation test"));
+    let id = format!("bf-test-{}", TEST_ID_COUNTER.fetch_add(1, Ordering::SeqCst));
     let now = Utc::now();
 
     let issue = Issue {
