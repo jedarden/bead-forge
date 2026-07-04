@@ -49,6 +49,11 @@ name = "test_version_display"
 path = "tests/test_version_display.rs"
 required-features = []
 
+[[test]]
+name = "test_close_reopen"
+path = "tests/test_close_reopen.rs"
+required-features = []
+
 [[bin]]
 name = "bf"
 path = "src/main.rs"
