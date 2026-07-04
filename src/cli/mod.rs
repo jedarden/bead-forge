@@ -2,6 +2,7 @@ use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild
 use crate::claim::{
     claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
 };
+use crate::close::close_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
 use crate::critical_path::compute_epic_critical_path;
@@ -15,10 +16,12 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+/// Version of bead-forge, read from Cargo.toml
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Parser)]
 #[command(name = "bf")]
-#[command(version = None)]
-#[command(disable_version_flag = true)]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 pub struct Cli {
     /// Workspace directory (defaults to current directory's .beads/)
@@ -1208,9 +1211,8 @@ fn cmd_update(
 fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
 
-    storage.close_issue(id, reason, "cli")?;
+    close_bead(&db_path, id, reason, "cli")?;
     println!("Closed bead {}", id);
     Ok(())
 }
