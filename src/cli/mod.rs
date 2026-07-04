@@ -10,6 +10,7 @@ use crate::format::{get_formatter, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
+use crate::validation::validate_assignee;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
@@ -988,6 +989,9 @@ fn cmd_create(
     let prefix = get_default_prefix(&config);
     let id = crate::id::generate_id(prefix, count);
 
+    // Validate assignee
+    validate_assignee(assignee.as_deref())?;
+
     let mut issue = Issue::new(id.clone(), title, ".".to_string());
     issue.issue_type = IssueType::from_str(type_.as_str()).map_err(|e| anyhow::anyhow!(e))?;
     issue.priority = Priority(priority);
@@ -1179,6 +1183,11 @@ fn cmd_update(
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open_with_config(&db_path, &config)?;
+
+    // Validate assignee if provided
+    if assignee.is_some() {
+        validate_assignee(assignee.as_deref())?;
+    }
 
     // Parse due_at if provided
     let due_at_parsed = match due_at {
