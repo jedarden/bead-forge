@@ -659,10 +659,37 @@ impl Storage {
 
     pub fn close_issue(&self, id: &str, reason: &str, actor: &str) -> Result<()> {
         self.with_immediate_transaction(|tx| {
+            // Check if bead exists
+            let exists: bool = tx
+                .query_row(
+                    "SELECT 1 FROM issues WHERE id = ?1",
+                    params![id],
+                    |_| Ok(true),
+                )
+                .unwrap_or(false);
+            if !exists {
+                return Err(anyhow!("Bead not found: {}", id));
+            }
+
+            // Check if already closed for idempotence
+            let current_status: Option<String> = tx
+                .query_row(
+                    "SELECT status FROM issues WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if current_status.as_deref() == Some("closed") {
+                // Already closed - idempotent, return success
+                return Ok(());
+            }
+
+            // Close the bead
             let now = Utc::now();
             tx.execute(
-                "UPDATE issues SET status = 'closed', closed_at = ?, close_reason = ?, updated_at = ? WHERE id = ?",
-                params![now.to_rfc3339(), reason, now.to_rfc3339(), id],
+                "UPDATE issues SET status = 'closed', closed_at = ?, close_reason = ?, closed_by_session = ?, updated_at = ? WHERE id = ?",
+                params![now.to_rfc3339(), reason, actor, now.to_rfc3339(), id],
             )?;
             tx.execute(
                 "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'closed', ?2, NULL, ?3, ?4)",
