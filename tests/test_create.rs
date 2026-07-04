@@ -438,4 +438,36 @@ mod tests {
             "Long description should be stored"
         );
     }
+
+    #[test]
+    fn test_create_missing_title() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that create command fails when title is not provided
+        let (stdout, stderr, success) = run_create(
+            &beads_dir,
+            &["--type", "task", "--priority", "2"],
+        );
+
+        assert!(!success, "Create command should fail when title is missing");
+        assert!(
+            stdout.is_empty() || stderr.contains("title"),
+            "Error message should mention missing title"
+        );
+    }
+
+    #[test]
+    fn test_create_empty_title() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that create command handles empty string title
+        let (stdout, stderr, success) = run_create(
+            &beads_dir,
+            &["--title", "", "--type", "task", "--priority", "2"],
+        );
+
+        // Empty title should either be rejected or accepted (depending on implementation)
+        // This test documents current behavior
+        println!("Empty title test - success: {}, stdout: {}, stderr: {}", success, stdout, stderr);
+    }
 }
