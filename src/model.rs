@@ -810,6 +810,20 @@ pub struct Dependency {
     pub thread_id: Option<String>,
 }
 
+impl Default for Dependency {
+    fn default() -> Self {
+        Self {
+            issue_id: String::new(),
+            depends_on_id: String::new(),
+            dep_type: DependencyType::Blocks,
+            created_at: Utc::now(),
+            created_by: None,
+            metadata: None,
+            thread_id: None,
+        }
+    }
+}
+
 /// A comment on an issue.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Comment {
