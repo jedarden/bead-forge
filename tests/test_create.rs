@@ -35,7 +35,7 @@ mod tests {
         let metadata_path = beads_dir.join("metadata.json");
         fs::write(
             &metadata_path,
-            r#"{"database": "beads.db", "version": "1.0"}"#,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
         )
         .unwrap();
 
