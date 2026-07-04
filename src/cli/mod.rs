@@ -18,6 +18,7 @@ use std::str::FromStr;
 #[derive(Parser)]
 #[command(name = "bf")]
 #[command(version = None)]
+#[command(disable_version_flag = true)]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 pub struct Cli {
     /// Workspace directory (defaults to current directory's .beads/)
