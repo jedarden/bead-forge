@@ -1,6 +1,7 @@
 pub mod batch;
 pub mod claim;
 pub mod cli;
+pub mod close;
 pub mod commit_check;
 pub mod config;
 pub mod critical_path;
