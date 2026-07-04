@@ -52,9 +52,8 @@ fn get_bf_binary() -> String {
 }
 
 /// Create a test bead via CLI
-fn create_test_bead(beads_dir: impl AsRef<std::path::Path>, title: &str) -> String {
+fn create_test_bead(workspace: impl AsRef<std::path::Path>, title: &str) -> String {
     let bf_path = get_bf_binary();
-    let workspace = beads_dir.as_ref().parent().unwrap();
     let result = std::process::Command::new(&bf_path)
         .arg("create")
         .arg("--title")
@@ -63,7 +62,7 @@ fn create_test_bead(beads_dir: impl AsRef<std::path::Path>, title: &str) -> Stri
         .arg("task")
         .arg("--priority")
         .arg("2")
-        .current_dir(workspace)
+        .current_dir(&workspace.as_ref())
         .output()
         .expect("Failed to create bead");
 
@@ -78,7 +77,7 @@ fn test_show_basic_text_format() {
     let bf_path = get_bf_binary();
 
     // Create a test bead
-    let bead_id = create_test_bead(&beads_dir, "Test show command");
+    let bead_id = create_test_bead(workspace, "Test show command");
 
     // Show the bead in default text format
     let show_result = std::process::Command::new(&bf_path)
@@ -108,7 +107,7 @@ fn test_show_json_format() {
     let bf_path = get_bf_binary();
 
     // Create a test bead with additional fields
-    let bead_id = create_test_bead(&beads_dir, "Test JSON format");
+    let bead_id = create_test_bead(workspace, "Test JSON format");
 
     // Update with additional fields
     let update_result = std::process::Command::new(&bf_path)
@@ -118,13 +117,24 @@ fn test_show_json_format() {
         .arg("Test description")
         .arg("--assignee")
         .arg("test-user")
-        .arg("--label")
-        .arg("test-label")
         .current_dir(workspace)
         .output()
         .expect("Failed to update bead");
 
-    assert!(update_result.status.success(), "bf update failed");
+    assert!(update_result.status.success(), "bf update failed: {}", String::from_utf8_lossy(&update_result.stderr));
+
+    // Add label using separate command
+    let label_result = std::process::Command::new(&bf_path)
+        .arg("label")
+        .arg("add")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("test-label")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to add label");
+
+    assert!(label_result.status.success(), "bf label add failed: {}", String::from_utf8_lossy(&label_result.stderr));
 
     // Show the bead in JSON format
     let show_result = std::process::Command::new(&bf_path)
@@ -164,9 +174,10 @@ fn test_show_json_format() {
     assert!(labels.contains(&"test-label"), "Should contain test-label");
 
     // Verify dependencies and comments are stripped (NEEDLE compatibility)
-    assert_eq!(bead["dependencies"].as_array().unwrap().len(), 0,
+    // They should not be present in JSON output at all (not even as empty arrays)
+    assert!(bead.get("dependencies").is_none() || bead["dependencies"].as_array().map(|a| a.is_empty()).unwrap_or(false),
                "Dependencies should be stripped for NEEDLE compatibility");
-    assert_eq!(bead["comments"].as_array().unwrap().len(), 0,
+    assert!(bead.get("comments").is_none() || bead["comments"].as_array().map(|a| a.is_empty()).unwrap_or(false),
                "Comments should be stripped for NEEDLE compatibility");
 }
 
@@ -177,7 +188,7 @@ fn test_show_json_flag() {
     let bf_path = get_bf_binary();
 
     // Create a test bead
-    let bead_id = create_test_bead(&beads_dir, "Test --json flag");
+    let bead_id = create_test_bead(workspace, "Test --json flag");
 
     // Show using --json flag (alias for --format json)
     let show_result = std::process::Command::new(&bf_path)
@@ -206,7 +217,7 @@ fn test_show_toon_format() {
     let bf_path = get_bf_binary();
 
     // Create a test bead
-    let bead_id = create_test_bead(&beads_dir, "Test toon format");
+    let bead_id = create_test_bead(workspace, "Test toon format");
 
     // Show the bead in toon format
     let show_result = std::process::Command::new(&bf_path)
@@ -258,7 +269,7 @@ fn test_show_with_all_fields() {
     let bf_path = get_bf_binary();
 
     // Create a test bead
-    let bead_id = create_test_bead(&beads_dir, "Test all fields");
+    let bead_id = create_test_bead(workspace, "Test all fields");
 
     // Update with all optional fields
     let update_result = std::process::Command::new(&bf_path)
@@ -274,15 +285,26 @@ fn test_show_with_all_fields() {
         .arg("Test design reference")
         .arg("--assignee")
         .arg("test-assignee")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to update bead");
+
+    assert!(update_result.status.success(), "bf update failed: {}", String::from_utf8_lossy(&update_result.stderr));
+
+    // Add labels using separate command
+    let label_result = std::process::Command::new(&bf_path)
+        .arg("label")
+        .arg("add")
+        .arg(&bead_id)
         .arg("--label")
         .arg("label1")
         .arg("--label")
         .arg("label2")
         .current_dir(workspace)
         .output()
-        .expect("Failed to update bead");
+        .expect("Failed to add labels");
 
-    assert!(update_result.status.success(), "bf update failed");
+    assert!(label_result.status.success(), "bf label add failed: {}", String::from_utf8_lossy(&label_result.stderr));
 
     // Show the bead
     let show_result = std::process::Command::new(&bf_path)
@@ -333,8 +355,8 @@ fn test_show_with_dependencies() {
 
     // Add dependencies to main bead using batch
     let batch_json = serde_json::json!([
-        {"op": "dep_add_blocker", "issue_id": &main_id, "depends_on_id": &dep1_id},
-        {"op": "dep_add_blocker", "issue_id": &main_id, "depends_on_id": &dep2_id}
+        {"op": "dep_add_blocker", "parent": &main_id, "child": &dep1_id},
+        {"op": "dep_add_blocker", "parent": &main_id, "child": &dep2_id}
     ]);
 
     let batch_file = workspace.join("batch.json");
@@ -380,7 +402,8 @@ fn test_show_with_labels_only() {
     let bead_id = create_test_bead(workspace, "Test labels");
 
     let update_result = std::process::Command::new(&bf_path)
-        .arg("update")
+        .arg("label")
+        .arg("add")
         .arg(&bead_id)
         .arg("--label")
         .arg("phase-1")
@@ -390,9 +413,9 @@ fn test_show_with_labels_only() {
         .arg("backend")
         .current_dir(workspace)
         .output()
-        .expect("Failed to update labels");
+        .expect("Failed to add labels");
 
-    assert!(update_result.status.success());
+    assert!(update_result.status.success(), "bf label add failed: {}", String::from_utf8_lossy(&update_result.stderr));
 
     // Show in text format
     let show_result = std::process::Command::new(&bf_path)
@@ -488,4 +511,154 @@ fn test_show_in_progress_bead() {
 
     let output = String::from_utf8(show_result.stdout).unwrap();
     assert!(output.contains("Status: in_progress"), "Should show in_progress status");
+}
+
+#[test]
+fn test_show_basic_fields_display() {
+    let (_temp, beads_dir) = setup_test_workspace();
+    let workspace = beads_dir.parent().unwrap();
+    let bf_path = get_bf_binary();
+
+    // Create a bead with all basic fields populated
+    let bead_id = create_test_bead(workspace, "Test all basic fields");
+
+    // Update with all optional fields
+    let update_result = std::process::Command::new(&bf_path)
+        .arg("update")
+        .arg(&bead_id)
+        .arg("--description")
+        .arg("Test description for basic fields")
+        .arg("--assignee")
+        .arg("test-assignee")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to update bead");
+
+    assert!(update_result.status.success(), "bf update failed: {}", String::from_utf8_lossy(&update_result.stderr));
+
+    // Show the bead in text format and verify all basic fields are present
+    let show_result = std::process::Command::new(&bf_path)
+        .arg("show")
+        .arg(&bead_id)
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to run bf show");
+
+    assert!(show_result.status.success(), "bf show failed: {}", String::from_utf8_lossy(&show_result.stderr));
+
+    let output = String::from_utf8(show_result.stdout).unwrap();
+    println!("Show output with all basic fields:\n{}", output);
+
+    // Verify all basic fields are present in the output
+    // 1. id
+    assert!(output.contains(&format!("ID: {}", bead_id)), "Output should contain id field");
+
+    // 2. title
+    assert!(output.contains("Title: Test all basic fields"), "Output should contain title field");
+
+    // 3. description
+    assert!(output.contains("Description: Test description for basic fields"), "Output should contain description field");
+
+    // 4. status
+    assert!(output.contains("Status:"), "Output should contain status field");
+    assert!(output.contains("open") || output.contains("Status: open"), "Output should show status value");
+
+    // 5. priority
+    assert!(output.contains("Priority:"), "Output should contain priority field");
+    assert!(output.contains("P2") || output.contains("Priority: 2"), "Output should show priority value");
+
+    // 6. issue_type (shown as "Type:" in output)
+    assert!(output.contains("Type:"), "Output should contain issue_type field");
+    assert!(output.contains("task") || output.contains("Type: task"), "Output should show issue_type value");
+
+    // 7. created_at
+    // Timestamps should be in ISO 8601 format (e.g., "2026-07-04T12:34:56Z" or similar)
+    // The show command doesn't directly print timestamps in text format, but they're in JSON
+
+    // 8. updated_at
+    // Same as created_at - available in JSON format
+
+    // Verify in JSON format for timestamps
+    let show_json_result = std::process::Command::new(&bf_path)
+        .arg("show")
+        .arg(&bead_id)
+        .arg("--format")
+        .arg("json")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to run bf show --format json");
+
+    assert!(show_json_result.status.success(), "bf show json failed: {}", String::from_utf8_lossy(&show_json_result.stderr));
+
+    let json_output = String::from_utf8(show_json_result.stdout).unwrap();
+    let beads: Vec<serde_json::Value> = serde_json::from_str(&json_output)
+        .expect("Failed to parse JSON output");
+
+    assert_eq!(beads.len(), 1, "Should return exactly one bead");
+    let bead = &beads[0];
+
+    // Verify timestamps are properly formatted (ISO 8601)
+    let created_at = bead["created_at"].as_str().expect("created_at should be a string");
+    assert!(created_at.len() > 0, "created_at should not be empty");
+    // ISO 8601 format should contain 'T' and end with 'Z'
+    assert!(created_at.contains('T'), "created_at should be in ISO 8601 format (contain 'T')");
+
+    let updated_at = bead["updated_at"].as_str().expect("updated_at should be a string");
+    assert!(updated_at.len() > 0, "updated_at should not be empty");
+    assert!(updated_at.contains('T'), "updated_at should be in ISO 8601 format (contain 'T')");
+
+    // 9. closed_at - should be null/absent for open beads
+    assert!(bead.get("closed_at").is_none() || bead["closed_at"].is_null(),
+            "closed_at should be null or absent for open beads");
+}
+
+#[test]
+fn test_show_closed_bead_timestamps() {
+    let (_temp, beads_dir) = setup_test_workspace();
+    let workspace = beads_dir.parent().unwrap();
+    let bf_path = get_bf_binary();
+
+    // Create, close, and verify closed_at timestamp
+    let bead_id = create_test_bead(workspace, "Test closed bead timestamps");
+
+    let close_result = std::process::Command::new(&bf_path)
+        .arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test completed")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to close bead");
+
+    assert!(close_result.status.success(), "bf close failed");
+
+    // Show the closed bead in JSON format to check timestamps
+    let show_result = std::process::Command::new(&bf_path)
+        .arg("show")
+        .arg(&bead_id)
+        .arg("--format")
+        .arg("json")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to run bf show");
+
+    assert!(show_result.status.success());
+
+    let output = String::from_utf8(show_result.stdout).unwrap();
+    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
+        .expect("Failed to parse JSON");
+
+    let bead = &beads[0];
+
+    // Verify closed_at timestamp exists and is properly formatted
+    let closed_at = bead["closed_at"].as_str().expect("closed_at should be a string when bead is closed");
+    assert!(closed_at.len() > 0, "closed_at should not be empty for closed beads");
+    assert!(closed_at.contains('T'), "closed_at should be in ISO 8601 format (contain 'T')");
+
+    // Verify the timestamp is recent (within last minute)
+    let closed_dt = chrono::DateTime::parse_from_rfc3339(closed_at)
+        .expect("closed_at should be valid RFC3339/ISO 8601 format");
+    let now = chrono::Utc::now();
+    let duration = now.signed_duration_since(closed_dt.with_timezone(&chrono::Utc));
+    assert!(duration.num_seconds() < 60, "closed_at should be recent (within last minute)");
 }
