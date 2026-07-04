@@ -857,6 +857,8 @@ pub struct IssueChanges {
     pub external_ref: Option<String>,
     pub labels: Option<Vec<String>>,
     pub annotations: Option<BTreeMap<String, String>>,
+    /// Actor performing the change (used for event creation)
+    pub actor: Option<String>,
 }
 
 /// Filter for listing issues (non-Serde, for queries).

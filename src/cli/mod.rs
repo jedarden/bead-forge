@@ -17,8 +17,8 @@ use std::str::FromStr;
 
 #[derive(Parser)]
 #[command(name = "bf")]
+#[command(version = concat!("bf ", env!("CARGO_PKG_VERSION")))]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
-#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     /// Workspace directory (defaults to current directory's .beads/)
     #[arg(short, long, global = true)]
@@ -697,10 +697,10 @@ pub fn run_cli() -> Result<Cli> {
 pub fn run(cli: Cli) -> Result<()> {
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
 
-    // Handle case where no subcommand is provided (e.g., --version, --help)
+    // Handle case where no subcommand is provided
     let command = match cli.command {
         None => {
-            // clap handles --version and --help automatically, exiting before this point
+            // clap handles --help automatically, exiting before this point
             // If we reach here, it means no valid flag was provided
             return Err(anyhow!("No command provided. Use 'bf --help' for usage information."));
         }
