@@ -23,11 +23,11 @@ mod tests {
         let beads_dir = workspace_dir.join(".beads");
         fs::create_dir(&beads_dir).unwrap();
 
-        // Initialize workspace with bf config
+        // Initialize workspace with proper bf config format
         let config_path = beads_dir.join("config.yaml");
         fs::write(
             &config_path,
-            "# Test workspace config\nworkspace:\n  name: test-workspace\nid:\n  prefix: \"test\"\n",
+            "issue_prefixes: [test]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
         )
         .unwrap();
 
