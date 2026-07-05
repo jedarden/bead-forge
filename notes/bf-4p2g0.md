@@ -44,7 +44,41 @@ The label removal functionality exhibits the following behaviors:
 - Labels are stored correctly in the database
 - Events are tracked (label_added/label_removed event types exist in model)
 
-## Test Execution
+## Manual CLI Verification (2026-07-05)
+
+### Test 1: Single Label Removal
+```bash
+$ bf label remove bf-4p2g0 --label deferred
+Removed label 'deferred' from bf-4p2g0
+
+$ bf show bf-4p2g0
+ID: bf-4p2g0
+Title: Test label removal bead
+Status: in_progress
+Priority: P2
+Type: task
+Description:
+Assignee: claude-code-glm47-golf
+```
+✅ Label successfully removed
+
+### Test 2: Round-trip (Add → Remove)
+```bash
+$ bf label add bf-4p2g0 --label deferred
+Added label 'deferred' to bf-4p2g0
+
+$ bf label remove bf-4p2g0 --label deferred
+Removed label 'deferred' from bf-4p2g0
+
+$ bf show bf-4p2g0
+ID: bf-4p2g0
+Title: Test label removal bead
+...
+# (no labels shown)
+```
+✅ Round-trip successful, label persists through add/remove cycle
+
+## Automated Test Execution
 
 ```bash
 $ cargo test --test test_labels
