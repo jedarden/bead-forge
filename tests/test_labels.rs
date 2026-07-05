@@ -23,9 +23,9 @@ fn create_test_bead(title: &str) -> String {
     assert!(output.status.success(), "Failed to create bead: {}", String::from_utf8_lossy(&output.stderr));
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    // Extract bead ID from output (format: "Created bd-xxxx")
-    let id = stdout.split_whitespace().nth(1).expect("No bead ID in output").to_string();
-    id.trim_end_matches(':').to_string()
+    // Extract bead ID from output (format: "bf-xxxx")
+    let id = stdout.trim().to_string();
+    id
 }
 
 #[test]
@@ -38,8 +38,11 @@ fn test_label_add_and_list() {
         .arg("label")
         .arg("add")
         .arg(&bead_id)
+        .arg("--label")
         .arg("urgent")
+        .arg("--label")
         .arg("backend")
+        .arg("--label")
         .arg("phase-1")
         .output()
         .expect("Failed to add labels");
@@ -80,8 +83,11 @@ fn test_label_remove() {
         .arg("label")
         .arg("add")
         .arg(&bead_id)
+        .arg("--label")
         .arg("urgent")
+        .arg("--label")
         .arg("backend")
+        .arg("--label")
         .arg("bug")
         .output()
         .expect("Failed to add labels");
@@ -91,6 +97,7 @@ fn test_label_remove() {
         .arg("label")
         .arg("remove")
         .arg(&bead_id)
+        .arg("--label")
         .arg("urgent")
         .output()
         .expect("Failed to remove label");
@@ -132,7 +139,9 @@ fn test_label_all_unique() {
         .arg("label")
         .arg("add")
         .arg(&bead1)
+        .arg("--label")
         .arg("urgent")
+        .arg("--label")
         .arg("backend")
         .output()
         .expect("Failed to add labels to bead 1");
@@ -141,7 +150,9 @@ fn test_label_all_unique() {
         .arg("label")
         .arg("add")
         .arg(&bead2)
+        .arg("--label")
         .arg("urgent")
+        .arg("--label")
         .arg("frontend")
         .output()
         .expect("Failed to add labels to bead 2");
@@ -150,21 +161,24 @@ fn test_label_all_unique() {
     let output = bf()
         .arg("label")
         .arg("list")
-        .arg("--format")
-        .arg("json")
         .output()
         .expect("Failed to list all unique labels");
 
     assert!(output.status.success(), "Failed to list all labels: {}", String::from_utf8_lossy(&output.stderr));
 
-    let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
+    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    // Output format is "label (count)" per line
+    let labels: Vec<String> = stdout
+        .lines()
+        .filter(|line| !line.is_empty() && !line.contains("All labels:"))
+        .map(|line| line.trim().split('(').next().unwrap().trim().to_string())
+        .collect();
 
     // Should have 3 unique labels: urgent, backend, frontend
-    assert!(labels.len() >= 3, "Expected at least 3 unique labels, got {}", labels.len());
-    assert!(labels.contains(&"urgent".to_string()), "Missing 'urgent' label");
-    assert!(labels.contains(&"backend".to_string()), "Missing 'backend' label");
-    assert!(labels.contains(&"frontend".to_string()), "Missing 'frontend' label");
+    assert!(labels.len() >= 3, "Expected at least 3 unique labels, got {:?}: {}", labels, stdout);
+    assert!(labels.contains(&"urgent".to_string()), "Missing 'urgent' label in {:?}", labels);
+    assert!(labels.contains(&"backend".to_string()), "Missing 'backend' label in {:?}", labels);
+    assert!(labels.contains(&"frontend".to_string()), "Missing 'frontend' label in {:?}", labels);
 
     // Clean up
     bf().arg("close").arg(&bead1).arg("--reason").arg("Test cleanup")
@@ -209,7 +223,9 @@ fn test_label_duplicate_handling() {
         .arg("label")
         .arg("add")
         .arg(&bead_id)
+        .arg("--label")
         .arg("urgent")
+        .arg("--label")
         .arg("urgent")
         .output()
         .expect("Failed to add labels");
