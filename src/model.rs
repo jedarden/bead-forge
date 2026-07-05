@@ -886,6 +886,10 @@ pub struct IssueFilter {
     pub annotation: Option<(String, String)>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+    /// Filter issues updated since this timestamp (inclusive)
+    pub updated_since: Option<DateTime<Utc>>,
+    /// Filter issues updated before this timestamp (exclusive)
+    pub updated_before: Option<DateTime<Utc>>,
 }
 
 #[cfg(test)]
