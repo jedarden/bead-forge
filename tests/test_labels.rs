@@ -251,3 +251,252 @@ fn test_label_duplicate_handling() {
     bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
         .output().expect("Failed to close bead");
 }
+
+#[test]
+fn test_label_remove_multiple() {
+    // Create a test bead
+    let bead_id = create_test_bead("Test multiple label removal bead");
+
+    // Add multiple labels
+    bf()
+        .arg("label")
+        .arg("add")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .arg("--label")
+        .arg("backend")
+        .arg("--label")
+        .arg("bug")
+        .arg("--label")
+        .arg("phase-1")
+        .output()
+        .expect("Failed to add labels");
+
+    // Remove multiple labels at once
+    let output = bf()
+        .arg("label")
+        .arg("remove")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .arg("--label")
+        .arg("bug")
+        .output()
+        .expect("Failed to remove labels");
+
+    assert!(output.status.success(), "Failed to remove labels: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Verify the labels were removed
+    let output = bf()
+        .arg("labels")
+        .arg(&bead_id)
+        .arg("--format")
+        .arg("json")
+        .output()
+        .expect("Failed to list labels");
+
+    assert!(output.status.success(), "Failed to list labels: {}", String::from_utf8_lossy(&output.stderr));
+
+    let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
+
+    assert_eq!(labels.len(), 2, "Expected 2 labels after removal, got {}", labels.len());
+    assert!(!labels.contains(&"urgent".to_string()), "'urgent' label should have been removed");
+    assert!(!labels.contains(&"bug".to_string()), "'bug' label should have been removed");
+    assert!(labels.contains(&"backend".to_string()), "Missing 'backend' label");
+    assert!(labels.contains(&"phase-1".to_string()), "Missing 'phase-1' label");
+
+    // Clean up
+    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
+        .output().expect("Failed to close bead");
+}
+
+#[test]
+fn test_label_remove_nonexistent() {
+    // Create a test bead with labels
+    let bead_id = create_test_bead("Test nonexistent label removal bead");
+
+    // Add one label
+    bf()
+        .arg("label")
+        .arg("add")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("backend")
+        .output()
+        .expect("Failed to add label");
+
+    // Try to remove a label that doesn't exist (should be idempotent)
+    let output = bf()
+        .arg("label")
+        .arg("remove")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .output()
+        .expect("Failed to attempt removal");
+
+    // Should succeed even if label doesn't exist
+    assert!(output.status.success(), "Removing nonexistent label should succeed: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Verify the original label is still there
+    let output = bf()
+        .arg("labels")
+        .arg(&bead_id)
+        .arg("--format")
+        .arg("json")
+        .output()
+        .expect("Failed to list labels");
+
+    let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
+
+    assert_eq!(labels.len(), 1, "Expected 1 label, got {}", labels.len());
+    assert!(labels.contains(&"backend".to_string()), "Missing 'backend' label");
+
+    // Clean up
+    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
+        .output().expect("Failed to close bead");
+}
+
+#[test]
+fn test_label_remove_all_labels() {
+    // Create a test bead
+    let bead_id = create_test_bead("Test remove all labels bead");
+
+    // Add a single label
+    bf()
+        .arg("label")
+        .arg("add")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .output()
+        .expect("Failed to add label");
+
+    // Remove the last label
+    let output = bf()
+        .arg("label")
+        .arg("remove")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .output()
+        .expect("Failed to remove label");
+
+    assert!(output.status.success(), "Failed to remove label: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Verify no labels remain
+    let output = bf()
+        .arg("labels")
+        .arg(&bead_id)
+        .arg("--format")
+        .arg("json")
+        .output()
+        .expect("Failed to list labels");
+
+    let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
+
+    assert_eq!(labels.len(), 0, "Expected 0 labels after removing all, got {}", labels.len());
+
+    // Clean up
+    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
+        .output().expect("Failed to close bead");
+}
+
+#[test]
+fn test_label_remove_idempotent() {
+    // Create a test bead
+    let bead_id = create_test_bead("Test idempotent label removal bead");
+
+    // Add a label
+    bf()
+        .arg("label")
+        .arg("add")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .output()
+        .expect("Failed to add label");
+
+    // Remove the label twice (should be idempotent)
+    let output1 = bf()
+        .arg("label")
+        .arg("remove")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .output()
+        .expect("Failed to remove label first time");
+
+    assert!(output1.status.success(), "First removal failed: {}", String::from_utf8_lossy(&output1.stderr));
+
+    let output2 = bf()
+        .arg("label")
+        .arg("remove")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .output()
+        .expect("Failed to remove label second time");
+
+    // Second removal should also succeed (idempotent)
+    assert!(output2.status.success(), "Second removal should succeed (idempotent): {}", String::from_utf8_lossy(&output2.stderr));
+
+    // Verify no labels remain
+    let output = bf()
+        .arg("labels")
+        .arg(&bead_id)
+        .arg("--format")
+        .arg("json")
+        .output()
+        .expect("Failed to list labels");
+
+    let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
+
+    assert_eq!(labels.len(), 0, "Expected 0 labels, got {}", labels.len());
+
+    // Clean up
+    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
+        .output().expect("Failed to close bead");
+}
+
+#[test]
+fn test_label_remove_empty_label_list() {
+    // Create a test bead
+    let bead_id = create_test_bead("Test remove from empty list bead");
+
+    // Try to remove a label from a bead with no labels
+    let output = bf()
+        .arg("label")
+        .arg("remove")
+        .arg(&bead_id)
+        .arg("--label")
+        .arg("urgent")
+        .output()
+        .expect("Failed to attempt removal");
+
+    // Should succeed (idempotent)
+    assert!(output.status.success(), "Removing from empty label list should succeed: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Verify still no labels
+    let output = bf()
+        .arg("labels")
+        .arg(&bead_id)
+        .arg("--format")
+        .arg("json")
+        .output()
+        .expect("Failed to list labels");
+
+    let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
+
+    assert_eq!(labels.len(), 0, "Expected 0 labels, got {}", labels.len());
+
+    // Clean up
+    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
+        .output().expect("Failed to close bead");
+}
