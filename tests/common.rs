@@ -191,9 +191,396 @@ pub fn assert_jsonl_eq(jsonl1: &str, jsonl2: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+// ============================================================================
+// P0 Epic Test Infrastructure
+// ============================================================================
+
+/// Create a sample P0 epic JSONL line with minimal fields.
+///
+/// P0 (Priority::CRITICAL = 0) is the highest priority level.
+/// This is the minimal viable P0 epic for testing.
+///
+/// # Arguments
+///
+/// * `id` - Epic ID (e.g., "bf-epic-001")
+/// * `title` - Epic title
+///
+/// # Example
+///
+/// ```rust
+/// let jsonl = sample_p0_epic_jsonl("bf-epic-001", "Critical infrastructure migration");
+/// let ws = TempWorkspace::with_jsonl(&jsonl).unwrap();
+/// ```
+pub fn sample_p0_epic_jsonl(id: &str, title: &str) -> String {
+    format!(
+        r#"{{"id":"{}","title":"{}","description":"","design":"","acceptance_criteria":"","notes":"","status":"open","priority":0,"issue_type":"epic","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":".","labels":[],"dependencies":[],"comments":[]}}"#,
+        id, title
+    )
+}
+
+/// Create a P0 epic JSONL line with description.
+///
+/// Use this for testing P0 epics with descriptive text.
+///
+/// # Arguments
+///
+/// * `id` - Epic ID
+/// * `title` - Epic title
+/// * `description` - Epic description text
+///
+/// # Example
+///
+/// ```rust
+/// let jsonl = sample_p0_epic_with_description_jsonl(
+///     "bf-epic-002",
+///     "Security overhaul",
+///     "Complete security audit and fixes"
+/// );
+/// ```
+pub fn sample_p0_epic_with_description_jsonl(id: &str, title: &str, description: &str) -> String {
+    format!(
+        r#"{{"id":"{}","title":"{}","description":"{}","design":"","acceptance_criteria":"","notes":"","status":"open","priority":0,"issue_type":"epic","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":".","labels":[],"dependencies":[],"comments":[]}}"#,
+        id, title, description
+    )
+}
+
+/// Create a P0 epic JSONL line with labels.
+///
+/// Use this for testing P0 epics with categorization labels.
+///
+/// # Arguments
+///
+/// * `id` - Epic ID
+/// * `title` - Epic title
+/// * `labels` - Array of label strings
+///
+/// # Example
+///
+/// ```rust
+/// let jsonl = sample_p0_epic_with_labels_jsonl(
+///     "bf-epic-003",
+///     "Database migration",
+///     &["database", "migration", "critical"]
+/// );
+/// ```
+pub fn sample_p0_epic_with_labels_jsonl(id: &str, title: &str, labels: &[&str]) -> String {
+    let labels_json = serde_json::to_string(labels).unwrap();
+    format!(
+        r#"{{"id":"{}","title":"{}","description":"","design":"","acceptance_criteria":"","notes":"","status":"open","priority":0,"issue_type":"epic","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":".","labels":{},"dependencies":[],"comments":[]}}"#,
+        id, title, labels_json
+    )
+}
+
+/// Create a comprehensive P0 epic JSONL line with all metadata.
+///
+/// Use this for full round-trip testing of P0 epic serialization.
+///
+/// # Arguments
+///
+/// * `id` - Epic ID
+/// * `title` - Epic title
+/// * `description` - Epic description
+/// * `assignee` - Optional assignee
+/// * `labels` - Array of label strings
+///
+/// # Example
+///
+/// ```rust
+/// let jsonl = sample_p0_epic_full_jsonl(
+///     "bf-epic-004",
+///     "API redesign",
+///     "Complete REST API overhaul",
+///     Some("architect-team"),
+///     &["api", "backend", "p0"]
+/// );
+/// ```
+pub fn sample_p0_epic_full_jsonl(
+    id: &str,
+    title: &str,
+    description: &str,
+    assignee: Option<&str>,
+    labels: &[&str],
+) -> String {
+    let assignee_json = assignee.map(|a| serde_json::to_string(a).unwrap()).unwrap_or("null".to_string());
+    let labels_json = serde_json::to_string(labels).unwrap();
+    format!(
+        r#"{{"id":"{}","title":"{}","description":"{}","design":"","acceptance_criteria":"","notes":"","status":"open","priority":0,"issue_type":"epic","assignee":{},"created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":".","labels":{},"dependencies":[],"comments":[]}}"#,
+        id, title, description, assignee_json, labels_json
+    )
+}
+
+/// Assert that an issue is a P0 epic.
+///
+/// Verifies:
+/// - issue_type is Epic
+/// - priority is CRITICAL (0)
+/// - title is non-empty
+///
+/// # Arguments
+///
+/// * `issue` - The issue to verify
+/// * `context` - Optional context string for error messages
+///
+/// # Example
+///
+/// ```rust
+/// let epic = storage.get_issue("bf-epic-001").unwrap().unwrap();
+/// assert_p0_epic(&epic, Some("Retrieved epic"));
+/// ```
+pub fn assert_p0_epic(issue: &bead_forge::Issue, context: Option<&str>) {
+    let ctx = context.unwrap_or("Issue");
+
+    assert_eq!(
+        issue.issue_type,
+        bead_forge::IssueType::Epic,
+        "{}: must be epic type, got {:?}",
+        ctx, issue.issue_type
+    );
+
+    assert_eq!(
+        issue.priority,
+        bead_forge::Priority::CRITICAL,
+        "{}: must be P0 (CRITICAL), got P{}",
+        ctx, issue.priority.0
+    );
+
+    assert_eq!(
+        issue.priority.0,
+        0,
+        "{}: priority value must be 0, got {}",
+        ctx, issue.priority.0
+    );
+
+    assert!(
+        !issue.title.is_empty(),
+        "{}: title must not be empty",
+        ctx
+    );
+}
+
+/// Assert P0 epic display formatting.
+///
+/// Verifies that the epic's priority displays as "P0".
+///
+/// # Arguments
+///
+/// * `issue` - The issue to verify
+///
+/// # Example
+///
+/// ```rust
+/// let epic = storage.get_issue("bf-epic-001").unwrap().unwrap();
+/// assert_p0_epic_display(&epic);
+/// ```
+pub fn assert_p0_epic_display(issue: &bead_forge::Issue) {
+    let display = format!("{}", issue.priority);
+    assert_eq!(
+        display, "P0",
+        "Priority must display as 'P0', got '{}'",
+        display
+    );
+}
+
+/// Assert P0 epic JSON serialization.
+///
+/// Verifies that a P0 epic serializes to JSON with correct field values.
+///
+/// # Arguments
+///
+/// * `issue` - The issue to serialize and verify
+///
+/// # Example
+///
+/// ```rust
+/// let epic = create_test_p0_epic();
+/// assert_p0_epic_json_serialization(&epic);
+/// ```
+pub fn assert_p0_epic_json_serialization(issue: &bead_forge::Issue) {
+    let json = serde_json::to_string(issue).unwrap();
+
+    // Verify epic type
+    assert!(
+        json.contains(r#""issue_type":"epic""#),
+        "JSON must contain epic type, got: {}",
+        json
+    );
+
+    // Verify P0 priority
+    assert!(
+        json.contains(r#""priority":0"#),
+        "JSON must contain priority 0, got: {}",
+        json
+    );
+
+    // Verify no "P0" string (priority serializes as integer)
+    assert!(
+        !json.contains(r#""priority":"P0""#),
+        "JSON must not contain string 'P0' for priority, got: {}",
+        json
+    );
+}
+
+/// Seed a workspace with P0 epic test data.
+///
+/// Creates multiple P0 epics for testing list operations and filtering.
+///
+/// # Arguments
+///
+/// * `workspace` - The TempWorkspace to seed
+/// * `count` - Number of P0 epics to create
+///
+/// # Returns
+///
+/// Vector of created epic IDs
+///
+/// # Example
+///
+/// ```rust
+/// let ws = TempWorkspace::new().unwrap();
+/// let epic_ids = seed_p0_epics(&ws, 5);
+/// assert_eq!(epic_ids.len(), 5);
+/// ```
+pub fn seed_p0_epics(workspace: &TempWorkspace, count: usize) -> anyhow::Result<Vec<String>> {
+    let mut epic_ids = Vec::new();
+
+    for i in 0..count {
+        let id = format!("bf-p0-epic-{:03}", i);
+        let title = format!("P0 Test Epic #{}", i);
+
+        let epic = bead_forge::Issue {
+            id: id.clone(),
+            title,
+            issue_type: bead_forge::IssueType::Epic,
+            priority: bead_forge::Priority::CRITICAL,
+            description: Some(format!("Test epic number {} with P0 priority", i)),
+            ..Default::default()
+        };
+
+        workspace.create_bead(&id, &epic.title)?;
+        epic_ids.push(id);
+    }
+
+    Ok(epic_ids)
+}
+
+/// Count P0 epics in a workspace.
+///
+/// Queries the workspace and returns the count of issues that are:
+/// - issue_type: Epic
+/// - priority: CRITICAL (0)
+///
+/// # Arguments
+///
+/// * `workspace` - The TempWorkspace to query
+///
+/// # Returns
+///
+/// Number of P0 epics found
+///
+/// # Example
+///
+/// ```rust
+/// let ws = TempWorkspace::new().unwrap();
+/// seed_p0_epics(&ws, 3).unwrap();
+/// assert_eq!(count_p0_epics(&ws).unwrap(), 3);
+/// ```
+pub fn count_p0_epics(workspace: &TempWorkspace) -> anyhow::Result<usize> {
+    let all_issues = workspace.list_beads()?;
+    let p0_epics = all_issues
+        .iter()
+        .filter(|i| {
+            i.issue_type == bead_forge::IssueType::Epic
+                && i.priority == bead_forge::Priority::CRITICAL
+        })
+        .count();
+
+    Ok(p0_epics)
+}
+
+/// P0 Epic fixture builder.
+///
+/// Builder pattern for creating P0 epic test fixtures with varying configurations.
+///
+/// # Example
+///
+/// ```rust
+/// let epic = P0EpicBuilder::new("bf-epic-001", "Test epic")
+///     .with_description("Critical infrastructure update")
+///     .with_labels(&["backend", "database"])
+///     .with_assignee("team-lead")
+///     .build();
+/// ```
+pub struct P0EpicBuilder {
+    id: String,
+    title: String,
+    description: Option<String>,
+    assignee: Option<String>,
+    labels: Vec<String>,
+    status: bead_forge::Status,
+}
+
+impl P0EpicBuilder {
+    /// Create a new P0 epic builder.
+    ///
+    /// # Arguments
+///
+    /// * `id` - Epic ID
+    /// * `title` - Epic title
+    pub fn new(id: impl Into<String>, title: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            description: None,
+            assignee: None,
+            labels: Vec::new(),
+            status: bead_forge::Status::Open,
+        }
+    }
+
+    /// Add a description to the epic.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    /// Add an assignee to the epic.
+    pub fn with_assignee(mut self, assignee: impl Into<String>) -> Self {
+        self.assignee = Some(assignee.into());
+        self
+    }
+
+    /// Add labels to the epic.
+    pub fn with_labels(mut self, labels: &[&str]) -> Self {
+        self.labels = labels.iter().map(|s| s.to_string()).collect();
+        self
+    }
+
+    /// Set the epic status.
+    pub fn with_status(mut self, status: bead_forge::Status) -> Self {
+        self.status = status;
+        self
+    }
+
+    /// Build the P0 epic Issue.
+    pub fn build(self) -> bead_forge::Issue {
+        bead_forge::Issue {
+            id: self.id,
+            title: self.title,
+            description: self.description,
+            assignee: self.assignee,
+            labels: self.labels,
+            issue_type: bead_forge::IssueType::Epic,
+            priority: bead_forge::Priority::CRITICAL,
+            status: self.status,
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bead_forge::{IssueType, Status, Priority};
 
     #[test]
     fn test_temp_workspace_creation() {
@@ -225,5 +612,219 @@ mod tests {
         let bead = ws.get_bead("bf-test").unwrap().unwrap();
         assert_eq!(bead.id, "bf-test");
         assert_eq!(bead.title, "Test bead");
+    }
+
+    // P0 Epic Infrastructure Tests
+
+    #[test]
+    fn test_sample_p0_epic_jsonl() {
+        let jsonl = sample_p0_epic_jsonl("bf-epic-001", "Test Epic");
+
+        let issue: bead_forge::Issue = serde_json::from_str(&jsonl).unwrap();
+
+        assert_eq!(issue.id, "bf-epic-001");
+        assert_eq!(issue.title, "Test Epic");
+        assert_eq!(issue.issue_type, IssueType::Epic);
+        assert_eq!(issue.priority, Priority::CRITICAL);
+        assert_eq!(issue.priority.0, 0);
+    }
+
+    #[test]
+    fn test_sample_p0_epic_with_description_jsonl() {
+        let jsonl = sample_p0_epic_with_description_jsonl(
+            "bf-epic-002",
+            "Security Epic",
+            "Complete security audit"
+        );
+
+        let issue: bead_forge::Issue = serde_json::from_str(&jsonl).unwrap();
+
+        assert_eq!(issue.id, "bf-epic-002");
+        assert_eq!(issue.title, "Security Epic");
+        assert_eq!(issue.description, Some("Complete security audit".to_string()));
+        assert_eq!(issue.issue_type, IssueType::Epic);
+        assert_eq!(issue.priority, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_sample_p0_epic_with_labels_jsonl() {
+        let jsonl = sample_p0_epic_with_labels_jsonl(
+            "bf-epic-003",
+            "Database Epic",
+            &["database", "migration", "critical"]
+        );
+
+        let issue: bead_forge::Issue = serde_json::from_str(&jsonl).unwrap();
+
+        assert_eq!(issue.id, "bf-epic-003");
+        assert_eq!(issue.labels, vec!["database", "migration", "critical"]);
+        assert_eq!(issue.issue_type, IssueType::Epic);
+        assert_eq!(issue.priority, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_sample_p0_epic_full_jsonl() {
+        let jsonl = sample_p0_epic_full_jsonl(
+            "bf-epic-004",
+            "API Redesign",
+            "Complete REST API overhaul",
+            Some("architect-team"),
+            &["api", "backend", "p0"]
+        );
+
+        let issue: bead_forge::Issue = serde_json::from_str(&jsonl).unwrap();
+
+        assert_eq!(issue.id, "bf-epic-004");
+        assert_eq!(issue.title, "API Redesign");
+        assert_eq!(issue.description, Some("Complete REST API overhaul".to_string()));
+        assert_eq!(issue.assignee, Some("architect-team".to_string()));
+        assert_eq!(issue.labels, vec!["api", "backend", "p0"]);
+        assert_eq!(issue.issue_type, IssueType::Epic);
+        assert_eq!(issue.priority, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_assert_p0_epic() {
+        let epic = bead_forge::Issue {
+            id: "bf-epic-test".to_string(),
+            title: "Test Epic".to_string(),
+            issue_type: IssueType::Epic,
+            priority: Priority::CRITICAL,
+            ..Default::default()
+        };
+
+        assert_p0_epic(&epic, Some("Test epic"));
+
+        // Test non-epic fails
+        let task = bead_forge::Issue {
+            id: "bf-task".to_string(),
+            title: "Task".to_string(),
+            issue_type: IssueType::Task,
+            priority: Priority::CRITICAL,
+            ..Default::default()
+        };
+
+        let result = std::panic::catch_unwind(|| {
+            assert_p0_epic(&task, Some("Should fail"));
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_assert_p0_epic_display() {
+        let epic = bead_forge::Issue {
+            id: "bf-epic-display".to_string(),
+            title: "Display Test".to_string(),
+            issue_type: IssueType::Epic,
+            priority: Priority::CRITICAL,
+            ..Default::default()
+        };
+
+        assert_p0_epic_display(&epic);
+    }
+
+    #[test]
+    fn test_assert_p0_epic_json_serialization() {
+        let epic = bead_forge::Issue {
+            id: "bf-epic-json".to_string(),
+            title: "JSON Test".to_string(),
+            issue_type: IssueType::Epic,
+            priority: Priority::CRITICAL,
+            ..Default::default()
+        };
+
+        assert_p0_epic_json_serialization(&epic);
+    }
+
+    #[test]
+    fn test_p0_epic_builder_minimal() {
+        let epic = P0EpicBuilder::new("bf-epic-builder-001", "Builder Test Epic").build();
+
+        assert_eq!(epic.id, "bf-epic-builder-001");
+        assert_eq!(epic.title, "Builder Test Epic");
+        assert_eq!(epic.issue_type, IssueType::Epic);
+        assert_eq!(epic.priority, Priority::CRITICAL);
+        assert_eq!(epic.description, None);
+        assert!(epic.labels.is_empty());
+    }
+
+    #[test]
+    fn test_p0_epic_builder_full() {
+        let epic = P0EpicBuilder::new("bf-epic-builder-002", "Full Builder Epic")
+            .with_description("Complete infrastructure migration")
+            .with_assignee("platform-team")
+            .with_labels(&["backend", "database", "p0"])
+            .with_status(Status::InProgress)
+            .build();
+
+        assert_eq!(epic.id, "bf-epic-builder-002");
+        assert_eq!(epic.title, "Full Builder Epic");
+        assert_eq!(epic.description, Some("Complete infrastructure migration".to_string()));
+        assert_eq!(epic.assignee, Some("platform-team".to_string()));
+        assert_eq!(epic.labels, vec!["backend", "database", "p0"]);
+        assert_eq!(epic.status, Status::InProgress);
+        assert_eq!(epic.issue_type, IssueType::Epic);
+        assert_eq!(epic.priority, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_seed_p0_epics() {
+        let ws = TempWorkspace::new().unwrap();
+        let epic_ids = seed_p0_epics(&ws, 5).unwrap();
+
+        assert_eq!(epic_ids.len(), 5);
+
+        // Verify all were created
+        for id in &epic_ids {
+            let epic = ws.get_bead(id).unwrap().unwrap();
+            assert_eq!(epic.issue_type, IssueType::Epic);
+            assert_eq!(epic.priority, Priority::CRITICAL);
+        }
+    }
+
+    #[test]
+    fn test_count_p0_epics() {
+        let ws = TempWorkspace::new().unwrap();
+
+        // Initially zero
+        assert_eq!(count_p0_epics(&ws).unwrap(), 0);
+
+        // Add some P0 epics
+        seed_p0_epics(&ws, 3).unwrap();
+        assert_eq!(count_p0_epics(&ws).unwrap(), 3);
+
+        // Add a non-epic (should not count)
+        ws.create_bead("bf-task-001", "Regular task").unwrap();
+        assert_eq!(count_p0_epics(&ws).unwrap(), 3);
+
+        // Add a P1 epic (should not count)
+        let p1_epic = bead_forge::Issue {
+            id: "bf-epic-p1".to_string(),
+            title: "P1 Epic".to_string(),
+            issue_type: IssueType::Epic,
+            priority: Priority::HIGH,
+            ..Default::default()
+        };
+        ws.create_bead(&p1_epic.id, &p1_epic.title).unwrap();
+        assert_eq!(count_p0_epics(&ws).unwrap(), 3);
+    }
+
+    #[test]
+    fn test_p0_epic_roundtrip_through_workspace() {
+        let ws = TempWorkspace::new().unwrap();
+
+        // Create P0 epic
+        let epic = P0EpicBuilder::new("bf-epic-roundtrip", "Roundtrip Test")
+            .with_description("Testing P0 epic roundtrip")
+            .with_labels(&["test", "p0"])
+            .build();
+
+        ws.create_bead(&epic.id, &epic.title).unwrap();
+
+        // Retrieve and verify
+        let retrieved = ws.get_bead("bf-epic-roundtrip").unwrap().unwrap();
+        assert_p0_epic(&retrieved, Some("Retrieved epic"));
+        assert_p0_epic_display(&retrieved);
+        assert_p0_epic_json_serialization(&retrieved);
     }
 }
