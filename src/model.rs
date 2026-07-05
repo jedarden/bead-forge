@@ -1365,4 +1365,69 @@ mod tests {
         issue.deleted_at = Some(Utc::now() - chrono::Duration::days(40));
         assert!(issue.is_expired_tombstone(Some(30)));
     }
+
+    #[test]
+    fn test_epic_issue_type_serialization() {
+        // Test Epic serializes to "epic"
+        let epic = IssueType::Epic;
+        let serialized = serde_json::to_string(&epic).unwrap();
+        assert_eq!(serialized, "\"epic\"");
+
+        // Test "epic" deserializes to Epic
+        let deserialized: IssueType = serde_json::from_str("\"epic\"").unwrap();
+        assert_eq!(deserialized, IssueType::Epic);
+
+        // Test epic.as_str() returns "epic"
+        assert_eq!(epic.as_str(), "epic");
+    }
+
+    #[test]
+    fn test_all_standard_issue_types_roundtrip() {
+        // Test all standard issue types serialize and deserialize correctly
+        let types = vec![
+            ("task", IssueType::Task),
+            ("bug", IssueType::Bug),
+            ("feature", IssueType::Feature),
+            ("epic", IssueType::Epic),
+            ("chore", IssueType::Chore),
+            ("docs", IssueType::Docs),
+            ("question", IssueType::Question),
+        ];
+
+        for (json_str, expected) in types {
+            let json = format!("\"{}\"", json_str);
+            let deserialized: IssueType = serde_json::from_str(&json).unwrap();
+            let serialized = serde_json::to_string(&deserialized).unwrap();
+            assert_eq!(deserialized, expected);
+            assert_eq!(serialized, json);
+        }
+    }
+
+    #[test]
+    fn test_default_issue_type_is_task() {
+        // Verify default IssueType is Task (not Epic)
+        let default: IssueType = Default::default();
+        assert_eq!(default, IssueType::Task);
+        assert_ne!(default, IssueType::Epic);
+    }
+
+    #[test]
+    fn test_issue_with_epic_type_serialization() {
+        // Test an Issue with Epic type serializes correctly
+        let issue = Issue {
+            id: "bd-epic".to_string(),
+            title: "Epic Issue".to_string(),
+            issue_type: IssueType::Epic,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&issue).unwrap();
+        assert!(json.contains(r#""issue_type":"epic""#));
+
+        // Deserialize and verify
+        let deserialized: Issue = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.issue_type, IssueType::Epic);
+    }
 }
