@@ -523,6 +523,49 @@ pub enum Commands {
         #[arg(long)]
         skip_verify: bool,
     },
+
+    /// Show recently modified beads
+    Recent {
+        /// Filter by status
+        #[arg(long)]
+        status: Option<String>,
+
+        /// Filter by type
+        #[arg(long)]
+        type_: Option<String>,
+
+        /// Filter by assignee
+        #[arg(long)]
+        assignee: Option<String>,
+
+        /// Filter by priority
+        #[arg(long)]
+        priority: Option<i32>,
+
+        /// Show beads updated since this date (RFC3339 format, e.g., 2026-07-01T00:00:00Z)
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Show beads updated before this date (RFC3339 format, e.g., 2026-07-01T00:00:00Z)
+        #[arg(long)]
+        before: Option<String>,
+
+        /// Show beads modified in the last time period (e.g., 1h, 24h, 7d, 4w)
+        #[arg(short, long)]
+        time_period: Option<String>,
+
+        /// Limit results (0 = unlimited)
+        #[arg(short = 'n', long)]
+        limit: Option<usize>,
+
+        /// Output format (text, json, toon)
+        #[arg(long, default_value = "text")]
+        format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -933,6 +976,32 @@ pub fn run(cli: Cli) -> Result<()> {
             dry_run,
             skip_verify,
         ),
+        Commands::Recent {
+            status,
+            type_,
+            assignee,
+            priority,
+            since,
+            before,
+            time_period,
+            limit,
+            format,
+            json,
+        } => {
+            let format = if json { "json".to_string() } else { format };
+            cmd_recent(
+                &beads_dir,
+                status,
+                type_,
+                assignee,
+                priority,
+                since,
+                before,
+                time_period,
+                limit,
+                &format,
+            )
+        }
         Commands::Init { .. } => unreachable!("Init command handled earlier"),
     }
 }
@@ -2744,6 +2813,115 @@ fn cmd_migrate(
             }
         }
     }
+
+    Ok(())
+}
+
+/// Parse a time period shorthand (e.g., "1h", "24h", "7d", "4w") into a DateTime<Utc>.
+///
+/// Returns the timestamp that represents the cutoff point (now minus the period).
+/// Units:
+/// - "s" or "sec": seconds
+/// - "m" or "min": minutes
+/// - "h" or "hour": hours
+/// - "d" or "day": days
+/// - "w" or "week": weeks
+fn parse_time_period(period: &str) -> Result<DateTime<Utc>> {
+    let period = period.trim().to_lowercase();
+
+    // Parse the numeric prefix and unit suffix
+    let (num_str, unit) = period.split_at(
+        period.chars().position(|c| !c.is_ascii_digit()).unwrap_or(period.len())
+    );
+
+    if num_str.is_empty() {
+        return Err(anyhow!("Invalid time period format: '{}'. Expected format like '1h', '24h', '7d', '4w'", period));
+    }
+
+    let value: i64 = num_str.parse()
+        .map_err(|_| anyhow!("Invalid number in time period: '{}'", period))?;
+
+    if value <= 0 {
+        return Err(anyhow!("Time period must be positive: '{}'", period));
+    }
+
+    let duration = match unit {
+        "s" | "sec" | "secs" | "second" | "seconds" => chrono::Duration::seconds(value),
+        "m" | "min" | "mins" | "minute" | "minutes" => chrono::Duration::minutes(value),
+        "h" | "hour" | "hours" => chrono::Duration::hours(value),
+        "d" | "day" | "days" => chrono::Duration::days(value),
+        "w" | "week" | "weeks" => chrono::Duration::weeks(value),
+        _ => return Err(anyhow!("Unknown time unit in '{}'. Supported: s/sec/seconds, m/min/minutes, h/hours, d/days, w/weeks", period)),
+    };
+
+    Ok(Utc::now() - duration)
+}
+
+fn cmd_recent(
+    beads_dir: &PathBuf,
+    status: Option<String>,
+    type_: Option<String>,
+    assignee: Option<String>,
+    priority: Option<i32>,
+    since: Option<String>,
+    before: Option<String>,
+    time_period: Option<String>,
+    limit: Option<usize>,
+    format: &str,
+) -> Result<()> {
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let storage = Storage::open(&db_path)?;
+
+    // Build the filter
+    let mut filter = IssueFilter::default();
+
+    // Parse status filter
+    if let Some(ref s) = status {
+        filter.status = Some(Status::from_str(s.as_str()).map_err(|e| anyhow::anyhow!(e))?);
+    }
+
+    // Parse type filter
+    if let Some(ref t) = type_ {
+        filter.issue_type = Some(IssueType::from_str(t.as_str()).map_err(|e| anyhow::anyhow!(e))?);
+    }
+
+    // Parse assignee filter
+    filter.assignee = assignee;
+
+    // Parse priority filter
+    filter.priority = priority;
+
+    // Parse time filters ( precedence: time_period > since/before )
+    if let Some(period) = time_period {
+        // Parse shorthand like "1h", "24h", "7d", "4w"
+        let cutoff = parse_time_period(&period)?;
+        filter.updated_since = Some(cutoff);
+    } else {
+        // Parse explicit --since and --before dates (RFC3339 format)
+        if let Some(ref since_str) = since {
+            let dt = DateTime::parse_from_rfc3339(since_str)
+                .map_err(|_| anyhow!("Invalid --since format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z"))?;
+            filter.updated_since = Some(dt.with_timezone(&Utc));
+        }
+
+        if let Some(ref before_str) = before {
+            let dt = DateTime::parse_from_rfc3339(before_str)
+                .map_err(|_| anyhow!("Invalid --before format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z"))?;
+            filter.updated_before = Some(dt.with_timezone(&Utc));
+        }
+    }
+
+    // Apply limit (0 means unlimited in IssueFilter)
+    filter.limit = limit.and_then(|l| if l == 0 { None } else { Some(l) });
+
+    // Query beads
+    let issues = storage.list_issues(&filter)?;
+
+    // Format output
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    print!("{}", formatter.format_issues(&issues));
 
     Ok(())
 }

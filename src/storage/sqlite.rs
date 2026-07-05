@@ -219,7 +219,17 @@ impl Storage {
             params.push(value.clone());
             param_idx += 1;
         }
-        query.push_str(" ORDER BY i.priority ASC, i.created_at ASC");
+        if let Some(ref updated_since) = filter.updated_since {
+            query.push_str(&format!(" AND i.updated_at >= ?{}", param_idx));
+            params.push(updated_since.to_rfc3339());
+            param_idx += 1;
+        }
+        if let Some(ref updated_before) = filter.updated_before {
+            query.push_str(&format!(" AND i.updated_at < ?{}", param_idx));
+            params.push(updated_before.to_rfc3339());
+            param_idx += 1;
+        }
+        query.push_str(" ORDER BY i.updated_at DESC, i.id ASC");
         if let Some(limit) = filter.limit {
             query.push_str(&format!(" LIMIT {}", limit));
         }
