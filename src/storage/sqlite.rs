@@ -36,7 +36,8 @@ pub struct DepTreeNode {
 }
 
 pub struct Storage {
-    conn: Mutex<Connection>,
+    /// The database connection. Made public for testing purposes.
+    pub conn: Mutex<Connection>,
     secret_scanner: Mutex<Option<SecretScanner>>,
 }
 
