@@ -1,7 +1,7 @@
 // Comprehensive epic bead type tests
 // Tests epic creation, parent-child relationships, epic status computation, and critical path
 
-use bead_forge::model::{Issue, IssueType, Status, DependencyType, EpicStatus, Priority, IssueChanges};
+use bead_forge::model::{Issue, IssueType, Status, DependencyType, EpicStatus, Priority};
 use bead_forge::storage::Storage;
 use chrono::{Utc, Duration};
 
@@ -158,14 +158,18 @@ fn test_epic_status_computation_partial_closed() {
 
     // Create 5 children, close 2 of them
     for i in 1..=5 {
-        let status = if i <= 2 { Status::Closed } else { Status::Open };
-        let child = Issue {
+        let is_closed = i <= 2;
+        let status = if is_closed { Status::Closed } else { Status::Open };
+        let mut child = Issue {
             id: format!("child-partial-{}", i),
             title: format!("Child {}", i),
             issue_type: IssueType::Task,
             status,
             ..Default::default()
         };
+        if is_closed {
+            child.closed_at = Some(Utc::now());
+        }
         storage.create_issue(&child).unwrap();
         storage.add_dependency("epic-status-2", &child.id, &DependencyType::ParentChild, "test").unwrap();
     }
@@ -554,11 +558,7 @@ fn test_epic_children_closure_affects_eligibility() {
     assert!(!(closed_count == children.len() && children.len() > 0));
 
     // Close first child
-    let changes = IssueChanges {
-        status: Some(Status::Closed),
-        ..Default::default()
-    };
-    storage.update_issue("child-closure-1", &changes).unwrap();
+    storage.close_issue("child-closure-1", "Test closure", "test").unwrap();
 
     // Still not eligible (only 1 of 2 closed)
     let children = storage.get_dependencies("epic-closure").unwrap();
@@ -571,11 +571,7 @@ fn test_epic_children_closure_affects_eligibility() {
     assert!(!(closed_count == children.len() && children.len() > 0));
 
     // Close second child
-    let changes = IssueChanges {
-        status: Some(Status::Closed),
-        ..Default::default()
-    };
-    storage.update_issue("child-closure-2", &changes).unwrap();
+    storage.close_issue("child-closure-2", "Test closure", "test").unwrap();
 
     // Now eligible
     let children = storage.get_dependencies("epic-closure").unwrap();
