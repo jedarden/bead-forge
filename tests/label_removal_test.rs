@@ -7,7 +7,7 @@
 //! - Handles the bead_annotations table correctly
 //! - Foreign key ON DELETE CASCADE works when bead is deleted
 
-use bead_forge::model::{Issue, IssueType, Status};
+use bead_forge::model::{Issue, IssueType, Status, Priority};
 use bead_forge::storage::Storage;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -23,13 +23,13 @@ fn create_test_issue(id: &str, labels: Vec<&str>) -> Issue {
         acceptance_criteria: None,
         notes: None,
         status: Status::Open,
-        priority: 2,
+        priority: Priority::MEDIUM,
         issue_type: IssueType::Task,
         assignee: None,
-        owner: String::new(),
+        owner: None,
         estimated_minutes: None,
         created_at: chrono::Utc::now(),
-        created_by: String::new(),
+        created_by: None,
         updated_at: chrono::Utc::now(),
         closed_at: None,
         close_reason: None,
@@ -43,7 +43,7 @@ fn create_test_issue(id: &str, labels: Vec<&str>) -> Issue {
         deleted_by: None,
         delete_reason: None,
         original_type: None,
-        compaction_level: 0,
+        compaction_level: None,
         compacted_at: None,
         compacted_at_commit: None,
         original_size: None,
