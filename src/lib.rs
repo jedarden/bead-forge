@@ -32,7 +32,7 @@ pub use migrate::{
     migrate, migrate_from_jsonl, migrate_workspace_from_jsonl, migrate_workspace_path_b,
     MigrateOptions, MigrateResult, VerificationResult,
 };
-pub use model::{Event, Issue, IssueChanges, IssueFilter, IssueType, Status};
+pub use model::{Event, Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 pub use rotate::{
     find_bead_in_archives, list_all_with_archives, list_archives, rotate, RotateOptions,
     RotateResult,
