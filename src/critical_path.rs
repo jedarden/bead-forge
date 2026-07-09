@@ -138,7 +138,7 @@ pub fn compute_all_critical_paths(tx: &Connection) -> Result<CriticalPathResult>
             INNER JOIN issues i ON i.id = d.issue_id
             WHERE d.depends_on_id = f.bead_id
               AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-              AND i.status NOT IN ('closed', 'tombstone')
+              AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
         )
         "#,
         [],
@@ -301,7 +301,7 @@ fn find_longest_chain(tx: &Connection, critical_beads: &[String]) -> Result<Vec<
                 INNER JOIN issues i ON i.id = d.issue_id
                 WHERE d.depends_on_id = ?1
                   AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                  AND i.status NOT IN ('closed', 'tombstone')
+                  AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
             )
             "#,
             params![bead_id],
