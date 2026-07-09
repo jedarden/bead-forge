@@ -232,7 +232,7 @@ pub fn claim(
                    INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                    WHERE blocker_dep.issue_id = i.id
                    AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status != 'closed'
+                   AND blocker.status NOT IN ('closed', 'done', 'completed')
                )
              GROUP BY i.id
              ORDER BY (
@@ -319,7 +319,7 @@ pub fn claim(
                    INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                    WHERE blocker_dep.issue_id = i.id
                    AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status != 'closed'
+                   AND blocker.status NOT IN ('closed', 'done', 'completed')
                )
              GROUP BY i.id
              ORDER BY
