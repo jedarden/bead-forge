@@ -1,6 +1,7 @@
 pub mod batch;
 pub mod claim;
 pub mod cli;
+pub mod close;
 pub mod commit_check;
 pub mod config;
 pub mod critical_path;
@@ -16,6 +17,7 @@ pub mod rotate;
 pub mod secrets;
 pub mod storage;
 pub mod sync;
+pub mod validation;
 pub mod velocity;
 
 pub use batch::{execute_batch, mitosis, mitosis_ex, BatchOp, BatchResult, MitosisChild};
@@ -30,7 +32,7 @@ pub use migrate::{
     migrate, migrate_from_jsonl, migrate_workspace_from_jsonl, migrate_workspace_path_b,
     MigrateOptions, MigrateResult, VerificationResult,
 };
-pub use model::{Issue, IssueChanges, IssueFilter, IssueType, Status};
+pub use model::{Event, Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 pub use rotate::{
     find_bead_in_archives, list_all_with_archives, list_archives, rotate, RotateOptions,
     RotateResult,

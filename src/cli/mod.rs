@@ -2,31 +2,35 @@ use crate::batch::{execute_batch, mitosis_ex, parse_stdin, BatchOp, MitosisChild
 use crate::claim::{
     claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
 };
+use crate::close::close_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
-use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, save_config};
+use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
+use crate::validation::validate_assignee;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+/// Version of bead-forge, read from Cargo.toml
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Parser)]
 #[command(name = "bf")]
-#[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(propagate_version = true)]
+#[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-
     /// Workspace directory (defaults to current directory's .beads/)
     #[arg(short, long, global = true)]
     pub workspace: Option<PathBuf>,
+
+    #[command(subcommand)]
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -519,20 +523,64 @@ pub enum Commands {
         #[arg(long)]
         skip_verify: bool,
     },
+
+    /// Show recently modified beads
+    Recent {
+        /// Filter by status
+        #[arg(long)]
+        status: Option<String>,
+
+        /// Filter by type
+        #[arg(long)]
+        type_: Option<String>,
+
+        /// Filter by assignee
+        #[arg(long)]
+        assignee: Option<String>,
+
+        /// Filter by priority
+        #[arg(long)]
+        priority: Option<i32>,
+
+        /// Show beads updated since this date (RFC3339 format, e.g., 2026-07-01T00:00:00Z)
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Show beads updated before this date (RFC3339 format, e.g., 2026-07-01T00:00:00Z)
+        #[arg(long)]
+        before: Option<String>,
+
+        /// Show beads modified in the last time period (e.g., 1h, 24h, 7d, 4w)
+        #[arg(short, long)]
+        time_period: Option<String>,
+
+        /// Limit results (0 = unlimited)
+        #[arg(short = 'n', long)]
+        limit: Option<usize>,
+
+        /// Output format (text, json, toon)
+        #[arg(long, default_value = "text")]
+        format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
 pub enum DepCommands {
     /// Add a dependency
     Add {
-        /// Issue ID (the one that will depend on something)
-        issue: String,
+        /// Bead that is blocked (depends on the blocker)
+        #[arg(long)]
+        blocks: Option<String>,
 
-        /// Target issue ID (the one being depended on)
-        depends_on: String,
+        /// Bead that blocks (the bead being depended on)
+        blocker: String,
 
-        /// Dependency type
-        #[arg(short, long, default_value = "blocks")]
+        /// Dependency type (e.g., blocks, relates_to)
+        #[arg(short = 't', long, default_value = "blocks")]
         type_: String,
     },
 
@@ -692,29 +740,33 @@ pub enum AnnotateCommands {
 }
 
 pub fn run_cli() -> Result<Cli> {
-    Ok(Cli::try_parse()?)
+    Ok(Cli::parse())
 }
 
 pub fn run(cli: Cli) -> Result<()> {
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
 
-    // For init command, we allow the .beads directory to not exist yet
-    match &cli.command {
-        Commands::Init { .. } => {
-            let beads_dir = workspace.join(".beads");
-            return match cli.command {
-                Commands::Init { prefix } => cmd_init(&beads_dir, &prefix),
-                _ => unreachable!(),
-            };
+    // Handle case where no subcommand is provided
+    let command = match cli.command {
+        None => {
+            // clap handles --help automatically, exiting before this point
+            // If we reach here, it means no valid flag was provided
+            return Err(anyhow!("No command provided. Use 'bf --help' for usage information."));
         }
-        _ => {}
+        Some(cmd) => cmd,
+    };
+
+    // Handle Init command specially (doesn't require existing .beads directory)
+    if let Commands::Init { prefix } = &command {
+        let beads_dir = workspace.join(".beads");
+        return cmd_init(&beads_dir, prefix);
     }
 
+    // All other commands require existing .beads directory
     let beads_dir = find_beads_dir(&workspace)
         .ok_or_else(|| anyhow!("No .beads directory found in {:?}", workspace))?;
 
-    match cli.command {
-        Commands::Init { prefix } => cmd_init(&beads_dir, &prefix),
+    match command {
         Commands::Create {
             title,
             type_,
@@ -924,6 +976,33 @@ pub fn run(cli: Cli) -> Result<()> {
             dry_run,
             skip_verify,
         ),
+        Commands::Recent {
+            status,
+            type_,
+            assignee,
+            priority,
+            since,
+            before,
+            time_period,
+            limit,
+            format,
+            json,
+        } => {
+            let format = if json { "json".to_string() } else { format };
+            cmd_recent(
+                &beads_dir,
+                status,
+                type_,
+                assignee,
+                priority,
+                since,
+                before,
+                time_period,
+                limit,
+                &format,
+            )
+        }
+        Commands::Init { .. } => unreachable!("Init command handled earlier"),
     }
 }
 
@@ -978,6 +1057,9 @@ fn cmd_create(
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
     let id = crate::id::generate_id(prefix, count);
+
+    // Validate assignee
+    validate_assignee(assignee.as_deref())?;
 
     let mut issue = Issue::new(id.clone(), title, ".".to_string());
     issue.issue_type = IssueType::from_str(type_.as_str()).map_err(|e| anyhow::anyhow!(e))?;
@@ -1119,6 +1201,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
             }
+            if !issue.dependencies.is_empty() {
+                println!("Dependencies:");
+                for dep in &issue.dependencies {
+                    println!("  -> {} ({})", dep.depends_on_id, dep.dep_type);
+                }
+            }
         }
         _ => {
             println!("ID: {}", issue.id);
@@ -1134,6 +1222,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             }
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
+            }
+            if !issue.dependencies.is_empty() {
+                println!("Dependencies:");
+                for dep in &issue.dependencies {
+                    println!("  -> {} ({})", dep.depends_on_id, dep.dep_type);
+                }
             }
         }
     }
@@ -1158,6 +1252,11 @@ fn cmd_update(
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open_with_config(&db_path, &config)?;
+
+    // Validate assignee if provided
+    if assignee.is_some() {
+        validate_assignee(assignee.as_deref())?;
+    }
 
     // Parse due_at if provided
     let due_at_parsed = match due_at {
@@ -1190,9 +1289,8 @@ fn cmd_update(
 fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
 
-    storage.close_issue(id, reason, "cli")?;
+    close_bead(&db_path, id, reason, "cli")?;
     println!("Closed bead {}", id);
     Ok(())
 }
@@ -1231,14 +1329,13 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    // get_ready_candidates handles limit=0 as unlimited (no LIMIT clause)
+    // --limit 0 means unlimited (get_ready_candidates omits LIMIT clause when limit == 0)
     let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
 
     match format {
         "json" => {
-            for candidate in candidates {
-                println!("{}", serde_json::to_string(&candidate)?);
-            }
+            // Output as JSON array: [] for empty, [candidate] for single, [c1, c2, ...] for multiple
+            println!("{}", serde_json::to_string(&candidates)?);
         }
         "toon" => {
             for candidate in candidates {
@@ -1850,19 +1947,33 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
 fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
     match dep {
         DepCommands::Add {
-            issue,
-            depends_on,
+            blocks,
+            blocker,
             type_,
         } => {
+            let blocks = blocks.ok_or_else(|| anyhow!("Missing --blocks argument. Usage: bf dep add <blocker> --blocks <blocked>"))?;
+
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let dep_type =
                 crate::model::DependencyType::from_str(&type_).map_err(|e| anyhow::anyhow!(e))?;
-            storage.add_dependency(&issue, &depends_on, &dep_type, "cli")?;
+
+            // Add the dependency: blocks depends on blocker
+            storage.add_dependency(&blocks, &blocker, &dep_type, "cli")?;
+
+            // If this is a blocker dependency, update status to 'blocked'
+            if matches!(dep_type, crate::model::DependencyType::Blocks) {
+                let changes = IssueChanges {
+                    status: Some(Status::Blocked),
+                    ..Default::default()
+                };
+                storage.update_issue(&blocks, &changes)?;
+            }
+
             println!(
                 "Added dependency: {} depends on {} ({})",
-                issue, depends_on, type_
+                blocks, blocker, type_
             );
         }
         DepCommands::Remove { issue, depends_on } => {
@@ -2702,6 +2813,115 @@ fn cmd_migrate(
             }
         }
     }
+
+    Ok(())
+}
+
+/// Parse a time period shorthand (e.g., "1h", "24h", "7d", "4w") into a DateTime<Utc>.
+///
+/// Returns the timestamp that represents the cutoff point (now minus the period).
+/// Units:
+/// - "s" or "sec": seconds
+/// - "m" or "min": minutes
+/// - "h" or "hour": hours
+/// - "d" or "day": days
+/// - "w" or "week": weeks
+fn parse_time_period(period: &str) -> Result<DateTime<Utc>> {
+    let period = period.trim().to_lowercase();
+
+    // Parse the numeric prefix and unit suffix
+    let (num_str, unit) = period.split_at(
+        period.chars().position(|c| !c.is_ascii_digit()).unwrap_or(period.len())
+    );
+
+    if num_str.is_empty() {
+        return Err(anyhow!("Invalid time period format: '{}'. Expected format like '1h', '24h', '7d', '4w'", period));
+    }
+
+    let value: i64 = num_str.parse()
+        .map_err(|_| anyhow!("Invalid number in time period: '{}'", period))?;
+
+    if value <= 0 {
+        return Err(anyhow!("Time period must be positive: '{}'", period));
+    }
+
+    let duration = match unit {
+        "s" | "sec" | "secs" | "second" | "seconds" => chrono::Duration::seconds(value),
+        "m" | "min" | "mins" | "minute" | "minutes" => chrono::Duration::minutes(value),
+        "h" | "hour" | "hours" => chrono::Duration::hours(value),
+        "d" | "day" | "days" => chrono::Duration::days(value),
+        "w" | "week" | "weeks" => chrono::Duration::weeks(value),
+        _ => return Err(anyhow!("Unknown time unit in '{}'. Supported: s/sec/seconds, m/min/minutes, h/hours, d/days, w/weeks", period)),
+    };
+
+    Ok(Utc::now() - duration)
+}
+
+fn cmd_recent(
+    beads_dir: &PathBuf,
+    status: Option<String>,
+    type_: Option<String>,
+    assignee: Option<String>,
+    priority: Option<i32>,
+    since: Option<String>,
+    before: Option<String>,
+    time_period: Option<String>,
+    limit: Option<usize>,
+    format: &str,
+) -> Result<()> {
+    let metadata = load_metadata(beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let storage = Storage::open(&db_path)?;
+
+    // Build the filter
+    let mut filter = IssueFilter::default();
+
+    // Parse status filter
+    if let Some(ref s) = status {
+        filter.status = Some(Status::from_str(s.as_str()).map_err(|e| anyhow::anyhow!(e))?);
+    }
+
+    // Parse type filter
+    if let Some(ref t) = type_ {
+        filter.issue_type = Some(IssueType::from_str(t.as_str()).map_err(|e| anyhow::anyhow!(e))?);
+    }
+
+    // Parse assignee filter
+    filter.assignee = assignee;
+
+    // Parse priority filter
+    filter.priority = priority;
+
+    // Parse time filters ( precedence: time_period > since/before )
+    if let Some(period) = time_period {
+        // Parse shorthand like "1h", "24h", "7d", "4w"
+        let cutoff = parse_time_period(&period)?;
+        filter.updated_since = Some(cutoff);
+    } else {
+        // Parse explicit --since and --before dates (RFC3339 format)
+        if let Some(ref since_str) = since {
+            let dt = DateTime::parse_from_rfc3339(since_str)
+                .map_err(|_| anyhow!("Invalid --since format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z"))?;
+            filter.updated_since = Some(dt.with_timezone(&Utc));
+        }
+
+        if let Some(ref before_str) = before {
+            let dt = DateTime::parse_from_rfc3339(before_str)
+                .map_err(|_| anyhow!("Invalid --before format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z"))?;
+            filter.updated_before = Some(dt.with_timezone(&Utc));
+        }
+    }
+
+    // Apply limit (0 means unlimited in IssueFilter)
+    filter.limit = limit.and_then(|l| if l == 0 { None } else { Some(l) });
+
+    // Query beads
+    let issues = storage.list_issues(&filter)?;
+
+    // Format output
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    print!("{}", formatter.format_issues(&issues));
 
     Ok(())
 }
