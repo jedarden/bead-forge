@@ -36,7 +36,8 @@ pub struct DepTreeNode {
 }
 
 pub struct Storage {
-    conn: Mutex<Connection>,
+    /// The database connection. Made public for testing purposes.
+    pub conn: Mutex<Connection>,
     secret_scanner: Mutex<Option<SecretScanner>>,
 }
 
@@ -219,7 +220,17 @@ impl Storage {
             params.push(value.clone());
             param_idx += 1;
         }
-        query.push_str(" ORDER BY i.priority ASC, i.created_at ASC");
+        if let Some(ref updated_since) = filter.updated_since {
+            query.push_str(&format!(" AND i.updated_at >= ?{}", param_idx));
+            params.push(updated_since.to_rfc3339());
+            param_idx += 1;
+        }
+        if let Some(ref updated_before) = filter.updated_before {
+            query.push_str(&format!(" AND i.updated_at < ?{}", param_idx));
+            params.push(updated_before.to_rfc3339());
+            param_idx += 1;
+        }
+        query.push_str(" ORDER BY i.updated_at DESC, i.id ASC");
         if let Some(limit) = filter.limit {
             query.push_str(&format!(" LIMIT {}", limit));
         }
@@ -379,6 +390,23 @@ impl Storage {
     }
 
     pub fn update_issue(&self, id: &str, changes: &IssueChanges) -> Result<()> {
+        // Validate that the bead exists
+        let exists = {
+            let conn = self.conn.lock().unwrap();
+            match conn.query_row(
+                "SELECT 1 FROM issues WHERE id = ?1",
+                params![id],
+                |_| Ok(true),
+            ) {
+                Ok(result) => result,
+                Err(rusqlite::Error::QueryReturnedNoRows) => false,
+                Err(e) => return Err(e.into()),
+            }
+        };
+        if !exists {
+            return Err(anyhow!("Bead not found: {}", id));
+        }
+
         // Scan for secrets before updating (only for string fields in changes)
         if let Some(scanner) = &*self.secret_scanner.lock().unwrap() {
             let mut all_matches = Vec::new();
@@ -413,6 +441,26 @@ impl Storage {
         }
 
         self.with_immediate_transaction(|tx| {
+            // Get current status before update (for reopen detection)
+            let current_status: Option<Status> = tx.query_row(
+                "SELECT status FROM issues WHERE id = ?1",
+                params![id],
+                |row| {
+                    let status_str: String = row.get(0)?;
+                    Ok(match status_str.as_str() {
+                        "open" => Status::Open,
+                        "in_progress" => Status::InProgress,
+                        "blocked" => Status::Blocked,
+                        "deferred" => Status::Deferred,
+                        "draft" => Status::Draft,
+                        "closed" => Status::Closed,
+                        "tombstone" => Status::Tombstone,
+                        "pinned" => Status::Pinned,
+                        _ => Status::Custom(status_str),
+                    })
+                },
+            ).ok();
+
             let mut updates = Vec::new();
             let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
             if let Some(ref title) = changes.title {
@@ -487,6 +535,18 @@ impl Storage {
                 let param_refs: Vec<&dyn rusqlite::ToSql> =
                     all_params.iter().map(|p| p.as_ref()).collect();
                 tx.execute(&query, param_refs.as_slice())?;
+
+                // Create a Reopened event if transitioning from closed/tombstone to active status
+                if let (Some(current), Some(new)) = (current_status, changes.status.as_ref()) {
+                    if current.is_terminal() && !new.is_terminal() {
+                        let actor = changes.actor.as_deref().unwrap_or("system");
+                        let now = Utc::now();
+                        tx.execute(
+                            "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'reopened', ?2, ?3, ?4, ?5)",
+                            params![id, actor, current.as_str(), new.as_str(), now.to_rfc3339()],
+                        )?;
+                    }
+                }
             }
             // Handle label updates separately
             if let Some(ref labels) = changes.labels {
@@ -610,10 +670,37 @@ impl Storage {
 
     pub fn close_issue(&self, id: &str, reason: &str, actor: &str) -> Result<()> {
         self.with_immediate_transaction(|tx| {
+            // Check if bead exists
+            let exists: bool = tx
+                .query_row(
+                    "SELECT 1 FROM issues WHERE id = ?1",
+                    params![id],
+                    |_| Ok(true),
+                )
+                .unwrap_or(false);
+            if !exists {
+                return Err(anyhow!("Bead not found: {}", id));
+            }
+
+            // Check if already closed for idempotence
+            let current_status: Option<String> = tx
+                .query_row(
+                    "SELECT status FROM issues WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if current_status.as_deref() == Some("closed") {
+                // Already closed - idempotent, return success
+                return Ok(());
+            }
+
+            // Close the bead
             let now = Utc::now();
             tx.execute(
-                "UPDATE issues SET status = 'closed', closed_at = ?, close_reason = ?, updated_at = ? WHERE id = ?",
-                params![now.to_rfc3339(), reason, now.to_rfc3339(), id],
+                "UPDATE issues SET status = 'closed', closed_at = ?, close_reason = ?, closed_by_session = ?, updated_at = ? WHERE id = ?",
+                params![now.to_rfc3339(), reason, actor, now.to_rfc3339(), id],
             )?;
             tx.execute(
                 "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'closed', ?2, NULL, ?3, ?4)",

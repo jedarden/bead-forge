@@ -16,6 +16,38 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
+/// Parse datetime string that may be RFC3339 or SQLite native format.
+///
+/// Handles both RFC3339 with timezone (e.g., "2026-05-15T21:10:36+00:00") and
+/// SQLite's native datetime format without timezone (e.g., "2026-05-15 21:10:36").
+/// Assumes UTC for SQLite-native format.
+///
+/// Returns an error for empty or malformed datetime strings.
+fn parse_datetime(s: &str) -> Result<DateTime<Utc>> {
+    use chrono::NaiveDateTime;
+    let t = s.trim();
+    // Early reject of empty strings (these should be NULL in the database, not empty strings)
+    if t.is_empty() {
+        return Err(anyhow::anyhow!("Invalid claimed_at format: empty string"));
+    }
+    // Try RFC3339 first (bf's own format with timezone; optional fractional seconds)
+    match DateTime::parse_from_rfc3339(t) {
+        Ok(dt) => Ok(dt.with_timezone(&Utc)),
+        Err(_) => {
+            // SQLite-native datetime() format: no timezone, space or 'T' separator
+            for fmt in [
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S",
+            ] {
+                if let Ok(ndt) = NaiveDateTime::parse_from_str(t, fmt) {
+                    return Ok(ndt.and_utc());
+                }
+            }
+            Err(anyhow::anyhow!("Invalid claimed_at format: {}", t))
+        }
+    }
+}
+
 /// Velocity statistics for a (model, harness, issue_type) tuple.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VelocityStats {
@@ -61,13 +93,16 @@ pub fn update_session_on_close(
     bead_id: &str,
     closed_at: DateTime<Utc>,
 ) -> Result<bool> {
-    // Find the most recent session for this bead
+    // Find the most recent session for this bead with a valid claimed_at timestamp
+    // Filter out empty strings and NULL values to avoid parse errors
     let session = tx
         .query_row(
             "SELECT ws.claimed_at, ws.model, ws.harness, i.issue_type
              FROM worker_sessions ws
              INNER JOIN issues i ON i.id = ws.bead_id
              WHERE ws.bead_id = ?1
+             AND ws.claimed_at IS NOT NULL
+             AND ws.claimed_at != ''
              ORDER BY ws.claimed_at DESC
              LIMIT 1",
             params![bead_id],
@@ -94,14 +129,12 @@ pub fn update_session_on_close(
     // Parse claimed_at and calculate duration. Sessions recorded via claim.rs's
     // INSERT column list previously omitted claimed_at, silently falling back to
     // SQLite's non-RFC3339 CURRENT_TIMESTAMP default ("YYYY-MM-DD HH:MM:SS"); accept
-    // that legacy format too, and skip velocity tracking for this row (instead of
-    // erroring the whole close) if neither format parses.
-    let claimed_at = match DateTime::parse_from_rfc3339(&claimed_at_str) {
-        Ok(dt) => dt.with_timezone(&Utc),
-        Err(_) => match NaiveDateTime::parse_from_str(&claimed_at_str, "%Y-%m-%d %H:%M:%S") {
-            Ok(naive) => naive.and_utc(),
-            Err(_) => return Ok(false),
-        },
+    // that legacy format too (parse_datetime already does), and skip velocity
+    // tracking for this row -- instead of erroring the whole close -- if it's
+    // still unparseable (e.g. empty/corrupt).
+    let claimed_at = match parse_datetime(&claimed_at_str) {
+        Ok(dt) => dt,
+        Err(_) => return Ok(false),
     };
 
     let duration_seconds = closed_at.signed_duration_since(claimed_at).num_seconds();
@@ -365,6 +398,8 @@ mod tests {
     use super::*;
     use crate::model::{Issue, IssueType, Status};
     use crate::storage::schema::apply_schema;
+    use chrono::Datelike;
+    use chrono::Timelike;
 
     fn setup_test_db() -> tempfile::NamedTempFile {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -482,5 +517,99 @@ mod tests {
         assert_eq!(count, 10);
         assert!(p50.is_some());
         assert!(avg.is_some());
+    }
+
+    #[test]
+    fn test_parse_datetime_rfc3339_with_timezone() {
+        // Test RFC3339 format with timezone
+        let result = parse_datetime("2026-05-15T21:10:36+00:00").unwrap();
+        // Verify it's a valid datetime by checking year and month
+        assert_eq!(result.year(), 2026);
+        assert_eq!(result.month(), 5);
+        assert_eq!(result.day(), 15);
+        assert_eq!(result.hour(), 21);
+        assert_eq!(result.minute(), 10);
+        assert_eq!(result.second(), 36);
+
+        // Test RFC3339 format with fractional seconds
+        let result = parse_datetime("2026-05-15T21:10:36.123+00:00").unwrap();
+        assert_eq!(result.year(), 2026);
+        assert_eq!(result.month(), 5);
+        assert_eq!(result.day(), 15);
+
+        // Test RFC3339 format with non-UTC timezone
+        let result = parse_datetime("2026-05-15T17:10:36-04:00").unwrap();
+        // Should be converted to UTC (17:10-04:00 = 21:10+00:00)
+        assert_eq!(result.hour(), 21);
+        assert_eq!(result.minute(), 10);
+    }
+
+    #[test]
+    fn test_parse_datetime_sqlite_native_without_timezone() {
+        // Test SQLite native format with space separator
+        let result = parse_datetime("2026-05-15 21:10:36").unwrap();
+        assert_eq!(result.year(), 2026);
+        assert_eq!(result.month(), 5);
+        assert_eq!(result.day(), 15);
+        assert_eq!(result.hour(), 21);
+        assert_eq!(result.minute(), 10);
+        assert_eq!(result.second(), 36);
+
+        // Test SQLite native format with T separator
+        let result = parse_datetime("2026-05-15T21:10:36").unwrap();
+        assert_eq!(result.year(), 2026);
+        assert_eq!(result.month(), 5);
+        assert_eq!(result.day(), 15);
+
+        // Test edge case: different valid datetime
+        let result = parse_datetime("2024-01-01 12:00:00").unwrap();
+        assert_eq!(result.year(), 2024);
+        assert_eq!(result.month(), 1);
+        assert_eq!(result.day(), 1);
+        assert_eq!(result.hour(), 12);
+    }
+
+    #[test]
+    fn test_parse_datetime_empty_string_rejection() {
+        // Test empty string
+        let result = parse_datetime("");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("empty string"));
+
+        // Test whitespace-only string (trimmed to empty)
+        let result = parse_datetime("   ");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("empty string"));
+    }
+
+    #[test]
+    fn test_parse_datetime_malformed_datetime_rejection() {
+        // Test completely invalid format
+        let result = parse_datetime("not-a-date");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid claimed_at format"));
+
+        // Test partial date (missing time)
+        let result = parse_datetime("2026-05-15");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid claimed_at format"));
+
+        // Test invalid date values
+        let result = parse_datetime("2026-13-01 12:00:00"); // Invalid month
+        assert!(result.is_err());
+
+        // Test invalid time values
+        let result = parse_datetime("2026-05-15 25:00:00"); // Invalid hour
+        assert!(result.is_err());
+
+        // Test format with invalid separator
+        let result = parse_datetime("2026/05/15 21:10:36"); // Wrong separator
+        assert!(result.is_err());
+
+        // Test RFC3339-like but missing timezone
+        let result = parse_datetime("2026-05-15T21:10:36"); // Missing timezone
+        // This should fall through to SQLite format parsing
+        // and succeed since SQLite format accepts this
+        assert!(result.is_ok());
     }
 }

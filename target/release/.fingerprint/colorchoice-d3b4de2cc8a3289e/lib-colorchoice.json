@@ -1,1 +1,0 @@
-{"rustc":16696009966390864400,"features":"[]","declared_features":"[]","target":11187303652147478063,"profile":9935722674736056754,"path":11847893470610230838,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"release/.fingerprint/colorchoice-d3b4de2cc8a3289e/dep-lib-colorchoice","checksum":false}}],"rustflags":["-C","codegen-units=1"],"config":8247474407144887393,"compile_kind":0}

@@ -835,6 +835,20 @@ pub struct Dependency {
     pub thread_id: Option<String>,
 }
 
+impl Default for Dependency {
+    fn default() -> Self {
+        Self {
+            issue_id: String::new(),
+            depends_on_id: String::new(),
+            dep_type: DependencyType::Blocks,
+            created_at: Utc::now(),
+            created_by: None,
+            metadata: None,
+            thread_id: None,
+        }
+    }
+}
+
 /// A comment on an issue.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Comment {
@@ -882,6 +896,8 @@ pub struct IssueChanges {
     pub external_ref: Option<String>,
     pub labels: Option<Vec<String>>,
     pub annotations: Option<BTreeMap<String, String>>,
+    /// Actor performing the change (used for event creation)
+    pub actor: Option<String>,
 }
 
 /// Filter for listing issues (non-Serde, for queries).
@@ -895,6 +911,10 @@ pub struct IssueFilter {
     pub annotation: Option<(String, String)>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+    /// Filter issues updated since this timestamp (inclusive)
+    pub updated_since: Option<DateTime<Utc>>,
+    /// Filter issues updated before this timestamp (exclusive)
+    pub updated_before: Option<DateTime<Utc>>,
 }
 
 #[cfg(test)]
@@ -1373,5 +1393,243 @@ mod tests {
         };
         issue.deleted_at = Some(Utc::now() - chrono::Duration::days(40));
         assert!(issue.is_expired_tombstone(Some(30)));
+    }
+
+    #[test]
+    fn test_epic_issue_type_serialization() {
+        // Test Epic serializes to "epic"
+        let epic = IssueType::Epic;
+        let serialized = serde_json::to_string(&epic).unwrap();
+        assert_eq!(serialized, "\"epic\"");
+
+        // Test "epic" deserializes to Epic
+        let deserialized: IssueType = serde_json::from_str("\"epic\"").unwrap();
+        assert_eq!(deserialized, IssueType::Epic);
+
+        // Test epic.as_str() returns "epic"
+        assert_eq!(epic.as_str(), "epic");
+    }
+
+    #[test]
+    fn test_all_standard_issue_types_roundtrip() {
+        // Test all standard issue types serialize and deserialize correctly
+        let types = vec![
+            ("task", IssueType::Task),
+            ("bug", IssueType::Bug),
+            ("feature", IssueType::Feature),
+            ("epic", IssueType::Epic),
+            ("chore", IssueType::Chore),
+            ("docs", IssueType::Docs),
+            ("question", IssueType::Question),
+        ];
+
+        for (json_str, expected) in types {
+            let json = format!("\"{}\"", json_str);
+            let deserialized: IssueType = serde_json::from_str(&json).unwrap();
+            let serialized = serde_json::to_string(&deserialized).unwrap();
+            assert_eq!(deserialized, expected);
+            assert_eq!(serialized, json);
+        }
+    }
+
+    #[test]
+    fn test_default_issue_type_is_task() {
+        // Verify default IssueType is Task (not Epic)
+        let default: IssueType = Default::default();
+        assert_eq!(default, IssueType::Task);
+        assert_ne!(default, IssueType::Epic);
+    }
+
+    #[test]
+    fn test_issue_with_epic_type_serialization() {
+        // Test an Issue with Epic type serializes correctly
+        let issue = Issue {
+            id: "bd-epic".to_string(),
+            title: "Epic Issue".to_string(),
+            issue_type: IssueType::Epic,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&issue).unwrap();
+        assert!(json.contains(r#""issue_type":"epic""#));
+
+        // Deserialize and verify
+        let deserialized: Issue = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.issue_type, IssueType::Epic);
+    }
+
+    // P0 Priority Enum Validation Tests
+
+    #[test]
+    fn test_p0_critical_exists_in_priority_enum() {
+        // Test that P0 (CRITICAL) priority exists as a constant in the Priority enum
+        assert_eq!(Priority::CRITICAL, Priority(0));
+        assert_eq!(Priority::CRITICAL.0, 0);
+    }
+
+    #[test]
+    fn test_p0_priority_displays_as_p0() {
+        // Test that P0 priority displays as "P0" using the Display trait
+        let p0 = Priority::CRITICAL;
+        let display = format!("{}", p0);
+        assert_eq!(display, "P0");
+    }
+
+    #[test]
+    fn test_p0_priority_from_str_parsing() {
+        // Test that "P0" string parses to Priority::CRITICAL
+        let p0_from_str = Priority::from_str("P0").unwrap();
+        assert_eq!(p0_from_str, Priority::CRITICAL);
+        assert_eq!(p0_from_str.0, 0);
+
+        // Test that "0" string also parses to Priority::CRITICAL
+        let zero_from_str = Priority::from_str("0").unwrap();
+        assert_eq!(zero_from_str, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_p0_priority_from_str_case_insensitive() {
+        // Test that parsing is case-insensitive
+        let uppercase = Priority::from_str("P0").unwrap();
+        let lowercase = Priority::from_str("p0").unwrap();
+        let mixed_case = Priority::from_str("P0").unwrap();
+
+        assert_eq!(uppercase, Priority::CRITICAL);
+        assert_eq!(lowercase, Priority::CRITICAL);
+        assert_eq!(mixed_case, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_p0_priority_from_str_with_whitespace() {
+        // Test that parsing handles leading/trailing whitespace
+        let p0_with_spaces = Priority::from_str("  P0  ").unwrap();
+        assert_eq!(p0_with_spaces, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_p0_priority_from_str_invalid_formats() {
+        // Test that invalid priority strings return errors
+        let neg_one = Priority::from_str("-1");
+        assert!(neg_one.is_err());
+        assert!(neg_one.unwrap_err().contains("Invalid priority"));
+
+        let five = Priority::from_str("5");
+        assert!(five.is_err());
+        assert!(five.unwrap_err().contains("Invalid priority"));
+
+        let garbage = Priority::from_str("garbage");
+        assert!(garbage.is_err());
+        assert!(garbage.unwrap_err().contains("Invalid priority"));
+    }
+
+    #[test]
+    fn test_p0_priority_compares_as_highest_priority() {
+        // Test that P0 (CRITICAL) compares as the highest priority
+        // Note: With numerical ordering where 0 < 1 < 2, CRITICAL has the lowest value
+        // but represents the highest priority in human terms
+        assert!(Priority::CRITICAL < Priority::HIGH);
+        assert!(Priority::CRITICAL < Priority::MEDIUM);
+        assert!(Priority::CRITICAL < Priority::LOW);
+        assert!(Priority::CRITICAL < Priority::BACKLOG);
+    }
+
+    #[test]
+    fn test_p0_priority_total_ordering() {
+        // Test that Priority enum has correct total ordering
+        let priorities = vec![
+            Priority::CRITICAL,  // P0
+            Priority::HIGH,      // P1
+            Priority::MEDIUM,    // P2
+            Priority::LOW,       // P3
+            Priority::BACKLOG,   // P4
+        ];
+
+        // Verify each priority is less than the next one
+        for i in 1..priorities.len() {
+            assert!(
+                priorities[i - 1] < priorities[i],
+                "Priority ordering failed: {:?} should be < {:?}",
+                priorities[i - 1],
+                priorities[i]
+            );
+        }
+
+        // Verify P0 is the minimum value (numerically lowest, highest priority)
+        assert_eq!(priorities.iter().min(), Some(&Priority::CRITICAL));
+
+        // Verify BACKLOG is the maximum value (numerically highest, lowest priority)
+        assert_eq!(priorities.iter().max(), Some(&Priority::BACKLOG));
+    }
+
+    #[test]
+    fn test_p0_priority_equality() {
+        // Test that P0 priority equals itself
+        assert_eq!(Priority::CRITICAL, Priority::CRITICAL);
+        assert_eq!(Priority::CRITICAL, Priority(0));
+
+        // Test that P0 does not equal other priorities
+        assert_ne!(Priority::CRITICAL, Priority::HIGH);
+        assert_ne!(Priority::CRITICAL, Priority::MEDIUM);
+    }
+
+    #[test]
+    fn test_p0_priority_serialization_roundtrip() {
+        // Test that P0 priority serializes and deserializes correctly
+        let p0 = Priority::CRITICAL;
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&p0).unwrap();
+        assert_eq!(json, "0");
+
+        // Deserialize from JSON
+        let deserialized: Priority = serde_json::from_str("0").unwrap();
+        assert_eq!(deserialized, Priority::CRITICAL);
+    }
+
+    #[test]
+    fn test_all_priority_constants_exist() {
+        // Test that all priority constants exist and have correct values
+        assert_eq!(Priority::CRITICAL, Priority(0));
+        assert_eq!(Priority::HIGH, Priority(1));
+        assert_eq!(Priority::MEDIUM, Priority(2));
+        assert_eq!(Priority::LOW, Priority(3));
+        assert_eq!(Priority::BACKLOG, Priority(4));
+    }
+
+    #[test]
+    fn test_all_priority_display_formats() {
+        // Test that all priorities display correctly
+        assert_eq!(format!("{}", Priority::CRITICAL), "P0");
+        assert_eq!(format!("{}", Priority::HIGH), "P1");
+        assert_eq!(format!("{}", Priority::MEDIUM), "P2");
+        assert_eq!(format!("{}", Priority::LOW), "P3");
+        assert_eq!(format!("{}", Priority::BACKLOG), "P4");
+    }
+
+    #[test]
+    fn test_all_priority_from_str_parsing() {
+        // Test that all priority strings parse correctly
+        assert_eq!(Priority::from_str("P0").unwrap(), Priority::CRITICAL);
+        assert_eq!(Priority::from_str("P1").unwrap(), Priority::HIGH);
+        assert_eq!(Priority::from_str("P2").unwrap(), Priority::MEDIUM);
+        assert_eq!(Priority::from_str("P3").unwrap(), Priority::LOW);
+        assert_eq!(Priority::from_str("P4").unwrap(), Priority::BACKLOG);
+
+        // Also test numeric format
+        assert_eq!(Priority::from_str("0").unwrap(), Priority::CRITICAL);
+        assert_eq!(Priority::from_str("1").unwrap(), Priority::HIGH);
+        assert_eq!(Priority::from_str("2").unwrap(), Priority::MEDIUM);
+        assert_eq!(Priority::from_str("3").unwrap(), Priority::LOW);
+        assert_eq!(Priority::from_str("4").unwrap(), Priority::BACKLOG);
+    }
+
+    #[test]
+    fn test_p0_priority_default_is_medium() {
+        // Test that the default priority is MEDIUM (P2), not P0
+        let default: Priority = Default::default();
+        assert_eq!(default, Priority::MEDIUM);
+        assert_ne!(default, Priority::CRITICAL);
     }
 }
