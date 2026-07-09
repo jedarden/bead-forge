@@ -263,8 +263,8 @@ pub fn claim(
             // Step 4: Record worker session if metadata provided
             if let Some(meta) = worker_metadata {
                 tx.execute(
-                    "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path, claimed_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                     params![
                         &meta.worker_id,
                         meta.model.as_deref(),
@@ -272,6 +272,7 @@ pub fn claim(
                         meta.harness_version.as_deref(),
                         &bead_id,
                         "",
+                        now.to_rfc3339(),
                     ],
                 )?;
             }
@@ -352,8 +353,8 @@ pub fn claim(
             // Step 4: Record worker session if metadata provided
             if let Some(meta) = worker_metadata {
                 tx.execute(
-                    "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    "INSERT INTO worker_sessions (worker_id, model, harness, harness_version, bead_id, workspace_path, claimed_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                     params![
                         &meta.worker_id,
                         meta.model.as_deref(),
@@ -361,6 +362,7 @@ pub fn claim(
                         meta.harness_version.as_deref(),
                         &bead_id,
                         "", // workspace_path not available in transaction context
+                        now.to_rfc3339(),
                     ],
                 )?;
             }
