@@ -12,7 +12,7 @@
 //! 4. Claim scoring uses expected_seconds from velocity_stats: score = impact / expected_seconds
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
@@ -91,10 +91,18 @@ pub fn update_session_on_close(
         Some(s) => s,
     };
 
-    // Parse claimed_at and calculate duration
-    let claimed_at = DateTime::parse_from_rfc3339(&claimed_at_str)
-        .map_err(|e| anyhow::anyhow!("Invalid claimed_at format: {}", e))?
-        .with_timezone(&Utc);
+    // Parse claimed_at and calculate duration. Sessions recorded via claim.rs's
+    // INSERT column list previously omitted claimed_at, silently falling back to
+    // SQLite's non-RFC3339 CURRENT_TIMESTAMP default ("YYYY-MM-DD HH:MM:SS"); accept
+    // that legacy format too, and skip velocity tracking for this row (instead of
+    // erroring the whole close) if neither format parses.
+    let claimed_at = match DateTime::parse_from_rfc3339(&claimed_at_str) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(_) => match NaiveDateTime::parse_from_str(&claimed_at_str, "%Y-%m-%d %H:%M:%S") {
+            Ok(naive) => naive.and_utc(),
+            Err(_) => return Ok(false),
+        },
+    };
 
     let duration_seconds = closed_at.signed_duration_since(claimed_at).num_seconds();
 
