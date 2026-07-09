@@ -24,6 +24,11 @@ pub struct DoctorResult {
     pub hash_mismatch: Vec<String>,
     // Unflushed bead tracking (db-only or db-newer beads that haven't been flushed to JSONL)
     pub unflushed_count: usize,
+    // Beads with a custom status (e.g. "completed") that reads as done but isn't the
+    // canonical "closed"/"tombstone" -- see bf-wre. Status::is_terminal() now treats
+    // these as terminal for blocking/scheduling purposes, but they still display as
+    // non-terminal everywhere else, so this check surfaces them for manual `bf close`.
+    pub pseudo_terminal_status_ids: Vec<String>,
 }
 
 /// Perform a health check on the bead database and JSONL file.
@@ -94,11 +99,46 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
         }
     }
 
+    // Check for beads stuck in a done-sounding custom status instead of closed/tombstone
+    // (bf-wre). Independent of db_ok/jsonl_ok since it only needs the sqlite db to be
+    // openable, not a full consistency check.
+    let pseudo_terminal_ids = check_pseudo_terminal_statuses(&db_path)?;
+    if !pseudo_terminal_ids.is_empty() {
+        issues.push(format!(
+            "{} bead(s) have a done-sounding status (e.g. \"completed\") instead of \"closed\" \
+             -- run `bf close <id>` on each to fully close them: {}",
+            pseudo_terminal_ids.len(),
+            pseudo_terminal_ids.join(", ")
+        ));
+    }
+    result.pseudo_terminal_status_ids = pseudo_terminal_ids;
+
     result.db_ok = db_ok;
     result.jsonl_ok = jsonl_ok;
     result.issues = issues;
 
     Ok(result)
+}
+
+/// Find beads whose status is a `TERMINAL_STATUS_ALIASES` value (e.g. "completed",
+/// "done") rather than the canonical "closed"/"tombstone". These beads are functionally
+/// terminal (see `Status::is_terminal()`) but weren't actually closed, so `bf show`/`bf
+/// list` still displays them as active and `closed_at`/`close_reason` are never set.
+fn check_pseudo_terminal_statuses(db_path: &Path) -> Result<Vec<String>> {
+    let conn = Connection::open(db_path)?;
+    let placeholders = crate::model::TERMINAL_STATUS_ALIASES
+        .iter()
+        .map(|s| format!("'{s}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let query = format!(
+        "SELECT id FROM issues WHERE LOWER(status) IN ({placeholders}) AND deleted_at IS NULL ORDER BY id"
+    );
+    let mut stmt = conn.prepare(&query)?;
+    let ids = stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(ids)
 }
 
 /// Check database integrity.
@@ -231,7 +271,7 @@ fn check_consistency_with_hash(db_path: &Path, jsonl_path: &Path) -> Result<Cons
 ///
 /// Returns the count of beads that exist in SQLite but have been marked as dirty
 /// (modified or created since the last flush to JSONL).
-fn count_unflushed(db_path: &Path) -> Result<usize> {
+pub fn count_unflushed(db_path: &Path) -> Result<usize> {
     use rusqlite::Connection;
 
     let conn = Connection::open(db_path)?;
@@ -1047,5 +1087,63 @@ mod tests {
         // Run doctor to verify
         let result = check(workspace).unwrap();
         assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed after import");
+    }
+
+    /// Regression test for bf-wre: `bf doctor` must surface beads stuck with a
+    /// done-sounding custom status (e.g. "completed") instead of "closed", since those
+    /// never get closed_at/close_reason set and were previously invisible to any check.
+    #[test]
+    fn test_check_reports_pseudo_terminal_statuses() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+
+        let storage = Storage::open(&db_path).unwrap();
+
+        let normal = Issue {
+            id: "bf-normal".to_string(),
+            title: "Normal open bead".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&normal).unwrap();
+
+        let pseudo_done = Issue {
+            id: "bf-pseudo-done".to_string(),
+            title: "Bead marked completed instead of closed".to_string(),
+            status: Status::Custom("completed".to_string()),
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&pseudo_done).unwrap();
+
+        let properly_closed = Issue {
+            id: "bf-properly-closed".to_string(),
+            title: "Bead closed the right way".to_string(),
+            status: Status::Closed,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            closed_at: Some(chrono::Utc::now()),
+            ..Default::default()
+        };
+        storage.create_issue(&properly_closed).unwrap();
+
+        let result = check(workspace).unwrap();
+        assert_eq!(
+            result.pseudo_terminal_status_ids,
+            vec!["bf-pseudo-done".to_string()],
+            "only the status=completed bead should be flagged, not the open or properly-closed ones"
+        );
+        assert!(result.issues.iter().any(|i| i.contains("bf-pseudo-done")));
     }
 }

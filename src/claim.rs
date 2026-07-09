@@ -232,7 +232,7 @@ pub fn claim(
                    INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                    WHERE blocker_dep.issue_id = i.id
                    AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status != 'closed'
+                   AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                )
              GROUP BY i.id
              ORDER BY (
@@ -320,7 +320,7 @@ pub fn claim(
                    INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                    WHERE blocker_dep.issue_id = i.id
                    AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status != 'closed'
+                   AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                )
              GROUP BY i.id
              ORDER BY
@@ -445,7 +445,7 @@ pub fn get_ready_candidates(
                        INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                        WHERE blocker_dep.issue_id = i.id
                        AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status != 'closed'
+                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                    )
                  GROUP BY i.id
                  ORDER BY (
@@ -481,7 +481,7 @@ pub fn get_ready_candidates(
                        INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                        WHERE blocker_dep.issue_id = i.id
                        AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status != 'closed'
+                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                    )
                  GROUP BY i.id
                  ORDER BY (
@@ -517,7 +517,7 @@ pub fn get_ready_candidates(
                        INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                        WHERE blocker_dep.issue_id = i.id
                        AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status != 'closed'
+                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                    )
                  GROUP BY i.id
                  ORDER BY
@@ -545,7 +545,7 @@ pub fn get_ready_candidates(
                        INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                        WHERE blocker_dep.issue_id = i.id
                        AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status != 'closed'
+                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                    )
                  GROUP BY i.id
                  ORDER BY
@@ -1068,5 +1068,69 @@ mod tests {
 
         // Only 5 beads should be returned
         assert_eq!(candidates.len(), 5, "Expected exactly 5 beads with limit=5");
+    }
+
+    /// Regression test for bf-wre: a blocker with status="completed" (a Custom status
+    /// someone wrote via `bf update` instead of running `bf close`) must satisfy a
+    /// dependency the same way "closed" does, since is_terminal() now recognizes it.
+    /// Before the fix, this blocker's status wasn't in the blocking-check's NOT IN
+    /// list, so bf-dependent stayed permanently unready despite the underlying work
+    /// being done.
+    #[test]
+    fn test_completed_status_blocker_unblocks_dependent() {
+        let (_temp, mut storage) = setup_test_db();
+
+        let blocker = Issue::new(
+            "bf-blocker".to_string(),
+            "Blocker bead".to_string(),
+            ".".to_string(),
+        );
+        storage.create_issue(&blocker).unwrap();
+
+        let dependent = Issue::new(
+            "bf-dependent".to_string(),
+            "Dependent bead".to_string(),
+            ".".to_string(),
+        );
+        storage.create_issue(&dependent).unwrap();
+
+        storage
+            .add_dependency(
+                "bf-dependent",
+                "bf-blocker",
+                &crate::model::DependencyType::Blocks,
+                "test",
+            )
+            .unwrap();
+
+        // Sanity check: while the blocker is still open, the dependent is NOT ready.
+        let candidates_before = storage
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None))
+            .unwrap();
+        assert!(
+            !candidates_before.iter().any(|c| c.id == "bf-dependent"),
+            "dependent should not be ready while blocker is open"
+        );
+
+        // Mark the blocker "completed" (not "closed") -- the exact real-world pattern
+        // that caused bf-wre.
+        storage
+            .update_issue(
+                "bf-blocker",
+                &crate::model::IssueChanges {
+                    status: Some(Status::Custom("completed".to_string())),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let candidates_after = storage
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None))
+            .unwrap();
+        assert!(
+            candidates_after.iter().any(|c| c.id == "bf-dependent"),
+            "dependent should become ready once its blocker is status=completed, \
+             the same way it would if the blocker were status=closed"
+        );
     }
 }

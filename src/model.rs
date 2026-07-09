@@ -53,6 +53,25 @@ pub enum Status {
     Custom(String),
 }
 
+/// Custom (non-canonical) status strings treated as terminal for dependency-blocking
+/// and scheduling purposes -- e.g. a bead someone marked "completed" via `bf update`
+/// instead of running `bf close`. `Status::from_str` intentionally accepts any custom
+/// string without validation (matches upstream br/beads_rust behavior -- see bf-wre),
+/// so this doesn't change what statuses are *writable*, only whether a blocker in one
+/// of these states is treated as satisfied. Single source of truth for `is_terminal()`;
+/// kept in sync with `TERMINAL_STATUS_SQL_LIST` below.
+pub const TERMINAL_STATUS_ALIASES: &[&str] = &["done", "completed"];
+
+/// Comma-separated, quoted SQL literal of every terminal status (canonical + aliases).
+/// Every blocking-check query (`... status NOT IN ('closed', 'tombstone', 'done', 'completed')`
+/// / `... status != ...`) in claim.rs, sqlite.rs, and critical_path.rs is written out with
+/// this exact literal (grep for "TERMINAL_STATUS_SQL_LIST" in comments to find every call
+/// site) rather than interpolating this constant at runtime, since several of those sites
+/// are raw (`r#"..."#`) SQL strings where format!-style interpolation isn't worth the risk.
+/// If you change the value here, grep and update every call site to match, and update
+/// `Status::is_terminal()`'s TERMINAL_STATUS_ALIASES above. See bf-wre for the bug this fixes.
+pub const TERMINAL_STATUS_SQL_LIST: &str = "'closed', 'tombstone', 'done', 'completed'";
+
 impl Status {
     #[must_use]
     pub fn as_str(&self) -> &str {
@@ -70,8 +89,14 @@ impl Status {
     }
 
     #[must_use]
-    pub const fn is_terminal(&self) -> bool {
-        matches!(self, Self::Closed | Self::Tombstone)
+    pub fn is_terminal(&self) -> bool {
+        match self {
+            Self::Closed | Self::Tombstone => true,
+            Self::Custom(value) => {
+                TERMINAL_STATUS_ALIASES.contains(&value.to_lowercase().as_str())
+            }
+            _ => false,
+        }
     }
 
     #[must_use]

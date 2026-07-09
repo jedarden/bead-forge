@@ -652,7 +652,7 @@ impl Storage {
                  FROM dependencies d
                  INNER JOIN issues i ON i.id = d.depends_on_id
                  WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                 AND i.status NOT IN ('closed', 'tombstone')
+                 AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                  GROUP BY d.issue_id",
                 params![Utc::now().to_rfc3339()],
             )?;
@@ -1388,7 +1388,7 @@ impl Storage {
                        INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                        WHERE blocker_dep.issue_id = i.id
                        AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status != 'closed'
+                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                    )
                  GROUP BY i.id
                  ORDER BY
@@ -1433,7 +1433,7 @@ impl Storage {
                        INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
                        WHERE blocker_dep.issue_id = i.id
                        AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status != 'closed'
+                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
                    )
                  GROUP BY i.id
                  ORDER BY
