@@ -35,8 +35,8 @@ path = "tests/test_jsonl.rs"
 required-features = []
 
 [[test]]
-name = "comprehensive_cli_update_flags"
-path = "tests/comprehensive_cli_update_flags.rs"
+name = "update_flags"
+path = "tests/update_flags.rs"
 required-features = []
 
 [[test]]
