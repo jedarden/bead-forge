@@ -3,6 +3,7 @@
 *.db-journal
 *.db-shm
 *.db-wal
+*.db.backup.*
 
 # Lock files
 *.lock
