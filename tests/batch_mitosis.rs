@@ -57,12 +57,12 @@ fn test_mitosis_atomic_batch() {
         // Use placeholder references @0 and @1 for the created children
         // For mitosis: children block the parent (parent depends on children)
         BatchOp::DepAddBlocker {
-            parent: "@0".to_string(), // first created child (blocks)
-            child: parent_id.clone(), // parent is blocked
+            id: parent_id.clone(),    // parent is blocked
+            blocker: "@0".to_string(), // first created child (blocks)
         },
         BatchOp::DepAddBlocker {
-            parent: "@1".to_string(), // second created child (blocks)
-            child: parent_id.clone(), // parent is blocked
+            id: parent_id.clone(),    // parent is blocked
+            blocker: "@1".to_string(), // second created child (blocks)
         },
         BatchOp::Close {
             id: parent_id.clone(),
@@ -140,8 +140,8 @@ fn test_batch_rollback_on_error() {
             labels: vec![],
         },
         BatchOp::DepAddBlocker {
-            parent: "@0".to_string(),                 // first created child (blocks)
-            child: "non-existent-parent".to_string(), // This will fail
+            id: "non-existent-parent".to_string(), // This will fail
+            blocker: "@0".to_string(),              // first created child (blocks)
         },
     ];
 
@@ -180,16 +180,16 @@ fn test_mitosis_helper_produces_at_references() {
 
     // Dep ops use @0 and @1 as blockers (children block the parent)
     match &ops[2] {
-        BatchOp::DepAddBlocker { parent, child } => {
-            assert_eq!(parent, "@0", "first child should be referenced by @0");
-            assert_eq!(child, "bf-parent");
+        BatchOp::DepAddBlocker { id, blocker } => {
+            assert_eq!(id, "bf-parent", "parent should be the blocked bead");
+            assert_eq!(blocker, "@0", "first child should be referenced by @0");
         }
         _ => panic!("expected DepAddBlocker at op[2]"),
     }
     match &ops[3] {
-        BatchOp::DepAddBlocker { parent, child } => {
-            assert_eq!(parent, "@1", "second child should be referenced by @1");
-            assert_eq!(child, "bf-parent");
+        BatchOp::DepAddBlocker { id, blocker } => {
+            assert_eq!(id, "bf-parent", "parent should be the blocked bead");
+            assert_eq!(blocker, "@1", "second child should be referenced by @1");
         }
         _ => panic!("expected DepAddBlocker at op[3]"),
     }
@@ -232,8 +232,8 @@ fn test_cli_batch_json_at_references() {
     let json_payload = serde_json::json!([
         {"op": "create", "title": "Child Alpha", "type_": "task", "priority": 2},
         {"op": "create", "title": "Child Beta",  "type_": "bug",  "priority": 1},
-        {"op": "dep_add_blocker", "parent": "@0", "child": "bf-parent"},
-        {"op": "dep_add_blocker", "parent": "@1", "child": "bf-parent"},
+        {"op": "dep_add_blocker", "id": "bf-parent", "blocker": "@0"},
+        {"op": "dep_add_blocker", "id": "bf-parent", "blocker": "@1"},
         {"op": "close", "id": "bf-parent", "reason": "Split via CLI batch"}
     ])
     .to_string();

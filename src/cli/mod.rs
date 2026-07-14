@@ -289,6 +289,41 @@ pub enum Commands {
     },
 
     /// Batch operations (atomic)
+    ///
+    /// Operations:
+    ///
+    /// 1. create: Create a new bead
+    ///    {
+    ///      "op": "create",
+    ///      "title": "<string>",           // required
+    ///      "type": "<string>",             // optional, default "task"
+    ///      "priority": <int>,              // optional, default 2 (0=Critical, 4=Backlog)
+    ///      "description": "<string>",      // optional
+    ///      "assignee": "<string>",        // optional
+    ///      "labels": ["<string>", ...]    // optional
+    ///    }
+    ///
+    /// 2. dep_add_blocker: Add a blocking dependency
+    ///    {
+    ///      "op": "dep_add_blocker",
+    ///      "id": "<string>",               // required: bead being blocked
+    ///      "blocker": "<string>"          // required: bead that blocks id (must close before id)
+    ///    }
+    ///    Direction: blocker blocks id (blocker must close before id can close)
+    ///    Aliases: parent -> blocker, child -> id (deprecated but supported)
+    ///
+    /// 3. close: Close a bead
+    ///    {
+    ///      "op": "close",
+    ///      "id": "<string>",               // required: bead ID to close
+    ///      "reason": "<string>"            // optional, default "Completed"
+    ///    }
+    ///
+    /// Placeholder references: Use @0, @1, @2... to reference beads created earlier in the batch
+    ///
+    /// Examples:
+    ///   echo '{"op":"create","title":"Fix bug"}' | bf batch --stdin
+    ///   echo '[{"op":"dep_add_blocker","id":"bf-task","blocker":"bf-blocker"}]' | bf batch --stdin
     Batch {
         /// JSON file containing operations
         #[arg(long)]
