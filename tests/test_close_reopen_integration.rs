@@ -25,7 +25,7 @@ mod tests {
         let config_path = beads_dir.join("config.yaml");
         fs::write(
             &config_path,
-            "# Test workspace config\nworkspace:\n  name: test-workspace\nid:\n  prefix: \"test\"\n",
+            "# Test workspace config\nissue_prefixes:\n- test\n",
         )
         .unwrap();
 

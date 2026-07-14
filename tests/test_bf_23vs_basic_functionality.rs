@@ -8,6 +8,11 @@ mod tests {
     use std::path::PathBuf;
     use std::process::Command;
 
+/// Resolve the freshly-built bf binary — never the system-installed one.
+fn bf_binary() -> String {
+    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+}
+
     fn setup_test_workspace() -> TempDir {
         let temp_dir = TempDir::new().unwrap();
         let beads_dir = temp_dir.path().join(".beads");
@@ -46,7 +51,7 @@ default_type: task
         let workspace = temp_dir.path();
 
         // Test 1: Create a bead
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Test bead for basic functionality")
@@ -81,7 +86,7 @@ default_type: task
         println!("Created bead: {}", bead_id);
 
         // Test 2: List beads
-        let list_output = Command::new("bf")
+        let list_output = Command::new(bf_binary())
             .arg("list")
             .arg("--format")
             .arg("json")
@@ -106,7 +111,7 @@ default_type: task
         );
 
         // Test 3: Show specific bead
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -130,7 +135,7 @@ default_type: task
         );
 
         // Test 4: Update bead status
-        let update_output = Command::new("bf")
+        let update_output = Command::new(bf_binary())
             .arg("update")
             .arg(&bead_id)
             .arg("--status")
@@ -146,7 +151,7 @@ default_type: task
         );
 
         // Verify the status change
-        let show_after_update = Command::new("bf")
+        let show_after_update = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -160,7 +165,7 @@ default_type: task
         );
 
         // Test 5: Close bead
-        let close_output = Command::new("bf")
+        let close_output = Command::new(bf_binary())
             .arg("close")
             .arg(&bead_id)
             .arg("--reason")
@@ -176,7 +181,7 @@ default_type: task
         );
 
         // Verify the bead is closed
-        let show_after_close = Command::new("bf")
+        let show_after_close = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -202,7 +207,7 @@ default_type: task
         let workspace = temp_dir.path();
 
         // Create a bead with labels
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Labeled test bead")
@@ -229,7 +234,7 @@ default_type: task
             .expect("Could not extract bead ID");
 
         // Show the bead to verify labels
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -255,7 +260,7 @@ default_type: task
         let workspace = temp_dir.path();
 
         // List should work even on empty workspace
-        let list_output = Command::new("bf")
+        let list_output = Command::new(bf_binary())
             .arg("list")
             .current_dir(workspace)
             .output()

@@ -1233,6 +1233,9 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             if let Some(assignee) = &issue.assignee {
                 println!("Assignee: {}", assignee);
             }
+            if let Some(reason) = &issue.close_reason {
+                println!("Close reason: {}", reason);
+            }
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
             }
@@ -1254,6 +1257,9 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             }
             if let Some(assignee) = &issue.assignee {
                 println!("Assignee: {}", assignee);
+            }
+            if let Some(reason) = &issue.close_reason {
+                println!("Close reason: {}", reason);
             }
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));

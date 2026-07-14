@@ -355,8 +355,8 @@ fn test_show_with_dependencies() {
 
     // Add dependencies to main bead using batch
     let batch_json = serde_json::json!([
-        {"op": "dep_add_blocker", "parent": &main_id, "child": &dep1_id},
-        {"op": "dep_add_blocker", "parent": &main_id, "child": &dep2_id}
+        {"op": "dep_add_blocker", "id": &main_id, "blocker": &dep1_id},
+        {"op": "dep_add_blocker", "id": &main_id, "blocker": &dep2_id}
     ]);
 
     let batch_file = workspace.join("batch.json");
