@@ -203,9 +203,14 @@ impl Storage {
             param_idx += 1;
         }
         if let Some(ref assignee) = filter.assignee {
-            query.push_str(&format!(" AND i.assignee = ?{}", param_idx));
-            params.push(assignee.clone());
-            param_idx += 1;
+            if assignee.is_empty() {
+                // Empty-string filter selects unassigned beads.
+                query.push_str(" AND (i.assignee IS NULL OR i.assignee = '')");
+            } else {
+                query.push_str(&format!(" AND i.assignee = ?{}", param_idx));
+                params.push(assignee.clone());
+                param_idx += 1;
+            }
         }
         if let Some(priority) = filter.priority {
             query.push_str(&format!(" AND i.priority = ?{}", param_idx));
@@ -348,8 +353,18 @@ impl Storage {
                     if issue.is_template { 1 } else { 0 },
                 ],
             )?;
+            // br parity: record a 'created' event for the new issue
+            // (beads_rust storage/events.rs insert_created_event)
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, created_at) VALUES (?1, 'created', ?2, ?3)",
+                params![
+                    &issue.id,
+                    issue.created_by.as_deref().unwrap_or(""),
+                    &issue.created_at.to_rfc3339(),
+                ],
+            )?;
             for label in &issue.labels {
-                tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+                tx.execute("INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
             }
             for dep in &issue.dependencies {
                 tx.execute(
@@ -461,6 +476,16 @@ impl Storage {
                 },
             ).ok();
 
+            // Current assignee before update (for assignee-change events)
+            let current_assignee: Option<String> = tx
+                .query_row(
+                    "SELECT assignee FROM issues WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .ok()
+                .flatten();
+
             let mut updates = Vec::new();
             let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
             if let Some(ref title) = changes.title {
@@ -502,8 +527,14 @@ impl Storage {
                 params.push(Box::new(issue_type.to_string()));
             }
             if let Some(ref assignee) = changes.assignee {
-                updates.push("assignee = ?");
-                params.push(Box::new(assignee.clone()));
+                if assignee.trim().is_empty() {
+                    // Clearing stores NULL, never an empty string that would
+                    // read back as "assigned" and hide the bead from claiming.
+                    updates.push("assignee = NULL");
+                } else {
+                    updates.push("assignee = ?");
+                    params.push(Box::new(assignee.clone()));
+                }
             }
             if let Some(ref owner) = changes.owner {
                 updates.push("owner = ?");
@@ -547,13 +578,29 @@ impl Storage {
                         )?;
                     }
                 }
+
+                // br parity: record an assignee_changed event when the assignee changes
+                if let Some(ref new_assignee) = changes.assignee {
+                    let new_val = if new_assignee.trim().is_empty() {
+                        None
+                    } else {
+                        Some(new_assignee.as_str())
+                    };
+                    if current_assignee.as_deref() != new_val {
+                        let actor = changes.actor.as_deref().unwrap_or("cli");
+                        tx.execute(
+                            "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'assignee_changed', ?2, ?3, ?4, ?5)",
+                            params![id, actor, current_assignee.as_deref(), new_val, Utc::now().to_rfc3339()],
+                        )?;
+                    }
+                }
             }
             // Handle label updates separately
             if let Some(ref labels) = changes.labels {
                 tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![id])?;
                 for label in labels {
                     tx.execute(
-                        "INSERT INTO labels (issue_id, label) VALUES (?1, ?2)",
+                        "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
                         params![id, label],
                     )?;
                 }
@@ -637,7 +684,7 @@ impl Storage {
 
             // Re-insert labels, dependencies, and comments
             for label in &issue.labels {
-                tx.execute("INSERT INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+                tx.execute("INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
             }
             for dep in &issue.dependencies {
                 tx.execute(
@@ -1419,7 +1466,7 @@ impl Storage {
 
     pub fn get_stats_by_assignee(&self) -> Result<Vec<(Option<String>, i64)>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT assignee, COUNT(*) as count FROM issues WHERE assignee IS NOT NULL AND deleted_at IS NULL GROUP BY assignee ORDER BY count DESC")?;
+        let mut stmt = conn.prepare("SELECT NULLIF(assignee, '') AS assignee_group, COUNT(*) as count FROM issues WHERE deleted_at IS NULL GROUP BY assignee_group ORDER BY count DESC")?;
         let mut rows = stmt.query([])?;
         let mut result = Vec::new();
         while let Some(row) = rows.next()? {
@@ -1672,7 +1719,7 @@ impl Storage {
         )?;
         for label in &issue.labels {
             tx.execute(
-                "INSERT INTO labels (issue_id, label) VALUES (?1, ?2)",
+                "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
                 params![&issue.id, label],
             )?;
         }
@@ -1782,7 +1829,7 @@ impl Storage {
 
         for label in &issue.labels {
             tx.execute(
-                "INSERT INTO labels (issue_id, label) VALUES (?1, ?2)",
+                "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
                 params![&issue.id, label],
             )?;
         }

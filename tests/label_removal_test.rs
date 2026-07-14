@@ -248,7 +248,7 @@ fn test_labels_table_structure() {
         .unwrap();
 
     assert!(
-        fk_info.contains("FOREIGN KEY") && fk_info.contains("ON DELETE CASCADE"),
+        fk_info.contains("REFERENCES") && fk_info.contains("ON DELETE CASCADE"),
         "labels table should have FOREIGN KEY with ON DELETE CASCADE"
     );
 
@@ -290,8 +290,8 @@ fn test_bead_annotations_table_structure() {
         .unwrap();
 
     assert!(
-        fk_info.contains("FOREIGN KEY") && fk_info.contains("ON DELETE CASCADE"),
-        "bead_annotations table should have FOREIGN KEY with ON DELETE CASCADE"
+        fk_info.contains("REFERENCES") && fk_info.contains("ON DELETE CASCADE"),
+        "bead_annotations table should reference issues with ON DELETE CASCADE"
     );
 
     // Check that the PRIMARY KEY is (bead_id, key)
