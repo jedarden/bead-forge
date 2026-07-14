@@ -121,6 +121,16 @@ impl TempWorkspace {
         storage.create_issue(&bead)
     }
 
+    /// Create a test bead from a fully-specified Issue, preserving issue_type,
+    /// priority, description, labels, and all other fields.
+    ///
+    /// Use this instead of `create_bead` whenever the test asserts on any field
+    /// beyond id/title — `create_bead` persists a default (task-type) Issue.
+    pub fn create_issue(&self, issue: &bead_forge::Issue) -> anyhow::Result<()> {
+        let storage = self.storage()?;
+        storage.create_issue(issue)
+    }
+
     /// Get a bead by ID.
     pub fn get_bead(&self, id: &str) -> anyhow::Result<Option<bead_forge::Issue>> {
         let storage = self.storage()?;
@@ -456,7 +466,7 @@ pub fn seed_p0_epics(workspace: &TempWorkspace, count: usize) -> anyhow::Result<
             ..Default::default()
         };
 
-        workspace.create_bead(&id, &epic.title)?;
+        workspace.create_issue(&epic)?;
         epic_ids.push(id);
     }
 
@@ -819,7 +829,7 @@ mod tests {
             .with_labels(&["test", "p0"])
             .build();
 
-        ws.create_bead(&epic.id, &epic.title).unwrap();
+        ws.create_issue(&epic).unwrap();
 
         // Retrieve and verify
         let retrieved = ws.get_bead("bf-epic-roundtrip").unwrap().unwrap();
