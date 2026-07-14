@@ -67,8 +67,8 @@ fn test_batch_rollback_on_invalid_dependency() {
             labels: vec![],
         },
         BatchOp::DepAddBlocker {
-            parent: "non-existent-bead".to_string(),
-            child: "@0".to_string(),
+            id: "@0".to_string(),                     // blocked bead (created child)
+            blocker: "non-existent-bead".to_string(), // blocker (doesn't exist - should fail)
         },
     ];
 
@@ -176,12 +176,12 @@ fn test_batch_placeholder_resolution_multiple_references() {
         },
         // Reference @0 twice - both should resolve to Child 1
         BatchOp::DepAddBlocker {
-            parent: "@0".to_string(),
-            child: parent_id.clone(),
+            id: parent_id.clone(),    // parent is blocked
+            blocker: "@0".to_string(), // Child 1 blocks parent
         },
         BatchOp::DepAddBlocker {
-            parent: "@0".to_string(),
-            child: "@1".to_string(), // Child 1 also blocks Child 2
+            id: "@1".to_string(),      // Child 2 is blocked
+            blocker: "@0".to_string(), // Child 1 blocks Child 2
         },
     ];
 
@@ -233,8 +233,8 @@ fn test_batch_placeholder_out_of_bounds_fails_gracefully() {
             labels: vec![],
         },
         BatchOp::DepAddBlocker {
-            parent: "@5".to_string(), // Out of bounds
-            child: "bf-parent".to_string(),
+            id: "bf-parent".to_string(), // parent is blocked
+            blocker: "@5".to_string(),    // Out of bounds
         },
     ];
 
@@ -476,8 +476,8 @@ fn test_sqlite_rollback_on_database_reopen() {
             labels: vec![],
         },
         BatchOp::DepAddBlocker {
-            parent: "non-existent".to_string(),
-            child: "@0".to_string(),
+            id: "@0".to_string(),               // blocked bead (created child)
+            blocker: "non-existent".to_string(), // blocker (doesn't exist)
         },
     ];
 
@@ -583,8 +583,8 @@ fn test_batch_literal_id_references() {
             labels: vec![],
         },
         BatchOp::DepAddBlocker {
-            parent: parent_id.clone(),
-            child: parent2_id.clone(),
+            id: parent2_id.clone(),      // parent2 is blocked
+            blocker: parent_id.clone(), // parent blocks parent2
         },
     ];
 

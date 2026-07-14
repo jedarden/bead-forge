@@ -26,7 +26,14 @@ pub enum BatchOp {
         labels: Vec<String>,
     },
     #[serde(rename = "dep_add_blocker")]
-    DepAddBlocker { parent: String, child: String },
+    DepAddBlocker {
+        /// The bead being blocked (must close after blocker closes)
+        #[serde(alias = "child")]
+        id: String,
+        /// The bead that blocks (must close before id can close)
+        #[serde(alias = "parent")]
+        blocker: String,
+    },
     #[serde(rename = "close")]
     Close {
         id: String,
@@ -55,6 +62,49 @@ pub struct BatchResult {
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Allowed field names for each operation type (for validation)
+fn get_allowed_fields(op_name: &str) -> &'static [&'static str] {
+    match op_name {
+        "create" => &["op", "title", "type", "priority", "description", "assignee", "labels"],
+        "dep_add_blocker" => &["op", "id", "blocker", "parent", "child"],
+        "close" => &["op", "id", "reason"],
+        _ => &[],
+    }
+}
+
+/// Validate operation object keys before parsing (loud validation for unknown fields)
+///
+/// This pre-validation step catches typos and unknown fields early with clear error messages.
+/// serde's `deny_unknown_fields` doesn't work with internally tagged enums, so we validate
+/// at the Value level before typed parsing.
+fn validate_op_fields(value: &serde_json::Value) -> Result<()> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| anyhow!("Operation must be a JSON object"))?;
+
+    let op_name = obj
+        .get("op")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("Operation must have an 'op' field"))?;
+
+    let allowed = get_allowed_fields(op_name);
+
+    for key in obj.keys() {
+        if !allowed.contains(&key.as_str()) {
+            return Err(anyhow!(
+                "Unknown field '{}' in operation '{}'. Allowed fields: {}",
+                key,
+                op_name,
+                allowed.join(", ")
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 pub fn execute_batch(
@@ -96,30 +146,37 @@ pub fn execute_batch(
                             status: "ok".to_string(),
                             id: Some(id.clone()),
                             error: None,
+                            message: Some(format!("Created bead {}", id)),
                         },
                         Err(e) => BatchResult {
                             op: idx,
                             status: "error".to_string(),
                             id: None,
                             error: Some(e.to_string()),
+                            message: None,
                         },
                     }
                 }
-                BatchOp::DepAddBlocker { parent, child } => {
-                    let parent_resolved = resolve_reference(parent, &created_ids);
-                    let child_resolved = resolve_reference(child, &created_ids);
-                    match execute_dep_add_blocker(tx, &parent_resolved, &child_resolved) {
+                BatchOp::DepAddBlocker { id, blocker } => {
+                    let id_resolved = resolve_reference(id, &created_ids);
+                    let blocker_resolved = resolve_reference(blocker, &created_ids);
+                    match execute_dep_add_blocker(tx, &id_resolved, &blocker_resolved) {
                         Ok(_) => BatchResult {
                             op: idx,
                             status: "ok".to_string(),
                             id: None,
                             error: None,
+                            message: Some(format!(
+                                "ok: {} blocked by {}",
+                                id_resolved, blocker_resolved
+                            )),
                         },
                         Err(e) => BatchResult {
                             op: idx,
                             status: "error".to_string(),
                             id: None,
                             error: Some(e.to_string()),
+                            message: None,
                         },
                     }
                 }
@@ -131,12 +188,14 @@ pub fn execute_batch(
                             status: "ok".to_string(),
                             id: None,
                             error: None,
+                            message: Some(format!("Closed bead {}", id_resolved)),
                         },
                         Err(e) => BatchResult {
                             op: idx,
                             status: "error".to_string(),
                             id: None,
                             error: Some(e.to_string()),
+                            message: None,
                         },
                     }
                 }
@@ -213,7 +272,7 @@ fn execute_create(
             issue.notes.as_deref().unwrap_or(""),
             issue.status.to_string(),
             &issue.priority,
-            issue.issue_type.to_string(),
+            &issue.issue_type.to_string(),
             &issue.assignee,
             &issue.owner,
             &issue.estimated_minutes,
@@ -255,35 +314,78 @@ fn execute_create(
     Ok(id)
 }
 
-fn execute_dep_add_blocker(tx: &Connection, parent: &str, child: &str) -> Result<()> {
+/// Execute a dep_add_blocker operation (unified with CLI dep add command)
+///
+/// # Arguments
+/// * `id` - The bead being blocked (must close after blocker closes)
+/// * `blocker` - The bead that blocks (must close before id can close)
+///
+/// # Returns
+/// * `Ok(())` if the dependency was added successfully
+/// * `Err(...)` if validation fails (cycle, duplicate, missing beads)
+///
+/// # Direction
+/// Creates: id depends on blocker (blocker blocks id)
+/// This matches: `bf dep add <blocker> --blocks <id>`
+fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<()> {
     // Verify both beads exist
-    let parent_exists: bool = tx.query_row(
+    let id_exists: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-        &[parent],
+        &[id],
         |row| row.get(0),
     )?;
 
-    let child_exists: bool = tx.query_row(
+    let blocker_exists: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-        &[child],
+        &[blocker],
         |row| row.get(0),
     )?;
 
-    if !parent_exists {
-        return Err(anyhow!("Parent bead not found: {}", parent));
+    if !id_exists {
+        return Err(anyhow!("Bead not found: {}", id));
     }
-    if !child_exists {
-        return Err(anyhow!("Child bead not found: {}", child));
+    if !blocker_exists {
+        return Err(anyhow!("Bead not found: {}", blocker));
     }
 
-    // Add dependency (parent blocks child)
+    // Check for duplicate dependency
+    let exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2)",
+        &[id, blocker],
+        |row| row.get(0),
+    )?;
+
+    if exists {
+        return Err(anyhow!(
+            "Dependency already exists: {} depends on {}",
+            id,
+            blocker
+        ));
+    }
+
+    // Check for circular dependency (id -> blocker and blocker -> id)
+    let reverse_exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2)",
+        &[blocker, id],
+        |row| row.get(0),
+    )?;
+
+    if reverse_exists {
+        return Err(anyhow!(
+            "Circular dependency detected: {} <-> {}",
+            id,
+            blocker
+        ));
+    }
+
+    // Add dependency (id depends on blocker, so blocker blocks id)
     let now = Utc::now();
     tx.execute(
         "INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         rusqlite::params![
-            child,
-            parent,
+            id,
+            blocker,
             DependencyType::Blocks.to_string(),
             now.to_rfc3339(),
             "batch",
@@ -325,7 +427,7 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
 ///
 /// This function constructs a batch of operations that:
 /// 1. Creates N child beads
-/// 2. Adds dependencies (child blocks parent) for each child
+/// 2. Adds dependencies (each child blocks the parent) for each child
 /// 3. Closes the parent bead
 ///
 /// All operations run in a single BEGIN IMMEDIATE transaction, so there's no
@@ -370,8 +472,8 @@ pub fn mitosis(
     // Reference children by placeholder (@0, @1, etc.)
     for (idx, _) in children.iter().enumerate() {
         ops.push(BatchOp::DepAddBlocker {
-            parent: format!("@{}", idx),
-            child: parent_id.to_string(),
+            id: parent_id.to_string(),    // parent is blocked
+            blocker: format!("@{}", idx), // child blocks parent
         });
     }
 
@@ -407,8 +509,8 @@ pub fn mitosis_ex(
 
     for (idx, _) in children.iter().enumerate() {
         ops.push(BatchOp::DepAddBlocker {
-            parent: format!("@{}", idx),
-            child: parent_id.to_string(),
+            id: parent_id.to_string(),    // parent is blocked
+            blocker: format!("@{}", idx), // child blocks parent
         });
     }
 
@@ -440,9 +542,15 @@ pub fn parse_stdin() -> Result<Vec<BatchOp>> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
 
-    // Try JSON first
-    if let Ok(ops) = serde_json::from_str::<Vec<BatchOp>>(&input) {
-        return Ok(ops);
+    // Try JSON first with validation
+    if let Ok(json_values) = serde_json::from_str::<Vec<serde_json::Value>>(&input) {
+        // Validate each operation's fields before parsing
+        for value in &json_values {
+            validate_op_fields(value)?;
+        }
+        // Now parse the validated JSON
+        return serde_json::from_str::<Vec<BatchOp>>(&input)
+            .map_err(|e| anyhow!("JSON parse error: {}", e));
     }
 
     // Fall back to CLI-style parsing (one op per line)
@@ -526,11 +634,13 @@ fn parse_create(input: &str) -> Result<BatchOp> {
 fn parse_dep_add(input: &str) -> Result<BatchOp> {
     let parts: Vec<&str> = input.split_whitespace().collect();
     if parts.len() != 2 {
-        return Err(anyhow!("dep add-blocker requires parent and child IDs"));
+        return Err(anyhow!(
+            "dep add-blocker requires <id> <blocker>. Usage: dep add-blocker <blocked-bead> <blocking-bead>"
+        ));
     }
     Ok(BatchOp::DepAddBlocker {
-        parent: parts[0].to_string(),
-        child: parts[1].to_string(),
+        id: parts[0].to_string(),    // bead being blocked
+        blocker: parts[1].to_string(), // bead that blocks
     })
 }
 
@@ -588,6 +698,218 @@ mod tests {
     fn test_resolve_reference_empty_created_ids() {
         let created_ids: Vec<String> = vec![];
         assert_eq!(resolve_reference("@0", &created_ids), "@0");
+    }
+
+    #[test]
+    fn test_serde_alias_compatibility() {
+        // Test that old {parent, child} syntax maps to {blocker, id}
+        // parent -> blocker (the bead that blocks)
+        // child -> id (the bead being blocked)
+
+        // Old syntax (deprecated but still supported via alias)
+        let old_json = r#"{"op":"dep_add_blocker","parent":"bf-blocker","child":"bf-blocked"}"#;
+        let op_old: BatchOp = serde_json::from_str(old_json).unwrap();
+
+        // New canonical syntax
+        let new_json = r#"{"op":"dep_add_blocker","id":"bf-blocked","blocker":"bf-blocker"}"#;
+        let op_new: BatchOp = serde_json::from_str(new_json).unwrap();
+
+        // Both should parse to the same struct
+        match (op_old, op_new) {
+            (BatchOp::DepAddBlocker { id: id1, blocker: blocker1 }, BatchOp::DepAddBlocker { id: id2, blocker: blocker2 }) => {
+                assert_eq!(id1, "bf-blocked");
+                assert_eq!(blocker1, "bf-blocker");
+                assert_eq!(id1, id2);
+                assert_eq!(blocker1, blocker2);
+            }
+            _ => panic!("Both should parse to DepAddBlocker"),
+        }
+    }
+
+    #[test]
+    fn test_validate_op_fields_rejects_unknown_field() {
+        let bad_json = serde_json::json!({"op": "dep_add_blocker", "id": "bf-1", "typo": "value"});
+        let result = validate_op_fields(&bad_json);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Unknown field 'typo'"));
+        assert!(err.to_string().contains("Allowed fields"));
+    }
+
+    #[test]
+    fn test_validate_op_fields_accepts_aliases() {
+        // Both old and new syntax should validate
+        let new_json = serde_json::json!({"op": "dep_add_blocker", "id": "bf-1", "blocker": "bf-2"});
+        assert!(validate_op_fields(&new_json).is_ok());
+
+        let old_json = serde_json::json!({"op": "dep_add_blocker", "parent": "bf-2", "child": "bf-1"});
+        assert!(validate_op_fields(&old_json).is_ok());
+    }
+
+    #[test]
+    fn test_validate_op_fields_allows_all_create_fields() {
+        let valid_json = serde_json::json!({
+            "op": "create",
+            "title": "Test",
+            "type": "bug",
+            "priority": 0,
+            "description": "A test bead",
+            "assignee": "worker-1",
+            "labels": ["urgent", "bug"]
+        });
+        assert!(validate_op_fields(&valid_json).is_ok());
+    }
+
+    #[test]
+    fn test_execute_dep_add_blocker_direction_parity_with_cli() {
+        // Create a temporary workspace
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        // Initialize storage
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create two beads
+        storage.with_immediate_transaction(|tx| {
+            // Create blocker bead
+            tx.execute(
+                "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    "bf-blocker", "hash1", "Blocker", "open", 2, "task", Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                ],
+            )?;
+
+            // Create blocked bead
+            tx.execute(
+                "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    "bf-blocked", "hash2", "Blocked", "open", 2, "task", Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                ],
+            )?;
+
+            Ok(())
+        }).unwrap();
+
+        // Add dependency via batch function (should match CLI direction)
+        storage.with_immediate_transaction(|tx| {
+            execute_dep_add_blocker(tx, "bf-blocked", "bf-blocker").unwrap();
+            Ok(())
+        }).unwrap();
+
+        // Verify the dependency row matches what CLI would create
+        let deps = storage.with_immediate_transaction(|tx| {
+            let mut stmt = tx.prepare(
+                "SELECT issue_id, depends_on_id, type FROM dependencies WHERE issue_id = ?1"
+            ).unwrap();
+            let deps: Vec<(String, String, String)> = stmt
+                .query_map(["bf-blocked"], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                })
+                .unwrap()
+                .filter_map(|r| r.ok())
+                .collect();
+            Ok(deps)
+        }).unwrap();
+
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].0, "bf-blocked");   // issue_id
+        assert_eq!(deps[0].1, "bf-blocker");   // depends_on_id
+        assert_eq!(deps[0].2, "blocks");      // type
+
+        // This matches: storage.add_dependency("bf-blocked", "bf-blocker", ...)
+        // which CLI uses via: bf dep add bf-blocker --blocks bf-blocked
+    }
+
+    #[test]
+    fn test_execute_dep_add_blocker_detects_cycles() {
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create two beads and a dependency
+        storage.with_immediate_transaction(|tx| {
+            tx.execute(
+                "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    "bf-a", "hash1", "A", "open", 2, "task", Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                ],
+            )?;
+            tx.execute(
+                "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    "bf-b", "hash2", "B", "open", 2, "task", Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                ],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        // Add dependency: B blocks A
+        storage.with_immediate_transaction(|tx| {
+            execute_dep_add_blocker(tx, "bf-a", "bf-b").unwrap();
+            Ok(())
+        }).unwrap();
+
+        // Attempting to add reverse dependency should fail (cycle detection)
+        let result = storage.with_immediate_transaction(|tx| {
+            execute_dep_add_blocker(tx, "bf-b", "bf-a")
+        });
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Circular dependency"));
+    }
+
+    #[test]
+    fn test_execute_dep_add_blocker_detects_duplicates() {
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create two beads
+        storage.with_immediate_transaction(|tx| {
+            tx.execute(
+                "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    "bf-a", "hash1", "A", "open", 2, "task", Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                ],
+            )?;
+            tx.execute(
+                "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    "bf-b", "hash2", "B", "open", 2, "task", Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                ],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        // Add dependency once
+        storage.with_immediate_transaction(|tx| {
+            execute_dep_add_blocker(tx, "bf-a", "bf-b").unwrap();
+            Ok(())
+        }).unwrap();
+
+        // Attempting to add same dependency again should fail
+        let result = storage.with_immediate_transaction(|tx| {
+            execute_dep_add_blocker(tx, "bf-a", "bf-b")
+        });
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Dependency already exists"));
     }
 
     #[test]
@@ -701,12 +1023,12 @@ mod tests {
             // Add dependencies using placeholder references
             // Each child blocks the parent
             BatchOp::DepAddBlocker {
-                parent: "@0".to_string(), // References first created child
-                child: parent_id.clone(),
+                id: parent_id.clone(),    // parent is blocked
+                blocker: "@0".to_string(), // first child blocks parent
             },
             BatchOp::DepAddBlocker {
-                parent: "@1".to_string(), // References second created child
-                child: parent_id.clone(),
+                id: parent_id.clone(),    // parent is blocked
+                blocker: "@1".to_string(), // second child blocks parent
             },
             // Close the parent
             BatchOp::Close {
@@ -735,7 +1057,7 @@ mod tests {
         assert_eq!(child_1.title, "Child 2");
 
         // Verify dependencies were created correctly
-        // Parent should depend on both children (child blocks parent)
+        // Parent should depend on both children (children block parent)
         let parent_deps = storage
             .with_immediate_transaction(|tx| {
                 let mut stmt = tx.prepare(
@@ -788,17 +1110,17 @@ mod tests {
         assert!(matches!(ops[3], BatchOp::DepAddBlocker { .. }));
         assert!(matches!(ops[4], BatchOp::Close { .. }));
 
-        // Verify placeholder references
-        if let BatchOp::DepAddBlocker { parent, child } = &ops[2] {
-            assert_eq!(parent, "@0");
-            assert_eq!(child, parent_id);
+        // Verify placeholder references (new canonical schema)
+        if let BatchOp::DepAddBlocker { id, blocker } = &ops[2] {
+            assert_eq!(id, parent_id);    // parent is blocked
+            assert_eq!(blocker, "@0");    // first child blocks parent
         } else {
             panic!("Expected DepAddBlocker");
         }
 
-        if let BatchOp::DepAddBlocker { parent, child } = &ops[3] {
-            assert_eq!(parent, "@1");
-            assert_eq!(child, parent_id);
+        if let BatchOp::DepAddBlocker { id, blocker } = &ops[3] {
+            assert_eq!(id, parent_id);    // parent is blocked
+            assert_eq!(blocker, "@1");    // second child blocks parent
         } else {
             panic!("Expected DepAddBlocker");
         }
