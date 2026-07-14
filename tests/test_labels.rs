@@ -2,8 +2,13 @@
 
 use std::process::Command;
 
+/// Resolve the freshly-built bf binary — never the system-installed one.
+fn bf_binary() -> String {
+    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+}
+
 fn bf() -> Command {
-    let mut cmd = Command::new("bf");
+    let mut cmd = Command::new(bf_binary());
     cmd.arg("-w").arg(".beads").current_dir(".");
     cmd
 }

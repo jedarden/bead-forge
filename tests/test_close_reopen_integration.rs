@@ -116,6 +116,8 @@ mod tests {
         // Parse JSON to check status and closed_at
         let json: serde_json::Value = serde_json::from_str(&stdout)
             .expect("Failed to parse show output as JSON");
+        // bf show --json emits an array (NEEDLE contract); unwrap the first element.
+        let json = json.get(0).cloned().unwrap_or(json);
 
         assert_eq!(json["status"], "closed", "Bead should be closed");
         assert!(json["closed_at"].is_string(), "closed_at should be set");
@@ -136,6 +138,8 @@ mod tests {
 
         let json: serde_json::Value = serde_json::from_str(&stdout)
             .expect("Failed to parse show output after reopen");
+        // bf show --json emits an array (NEEDLE contract); unwrap the first element.
+        let json = json.get(0).cloned().unwrap_or(json);
 
         assert_eq!(json["status"], "open", "Bead should be open after reopen");
         // In current implementation, closed_at and close_reason are NOT cleared on reopen
@@ -167,6 +171,8 @@ mod tests {
 
         let json: serde_json::Value = serde_json::from_str(&stdout)
             .expect("Failed to parse show output");
+        // bf show --json emits an array (NEEDLE contract); unwrap the first element.
+        let json = json.get(0).cloned().unwrap_or(json);
 
         assert_eq!(json["status"], "closed");
         // Reason should be "Completed" when not provided
@@ -218,6 +224,7 @@ mod tests {
             let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
             assert!(success);
             let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+            let json = json.get(0).cloned().unwrap_or(json);
             assert_eq!(json["status"], "closed");
 
             // Reopen
@@ -232,6 +239,7 @@ mod tests {
             let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
             assert!(success);
             let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+            let json = json.get(0).cloned().unwrap_or(json);
             assert_eq!(json["status"], "open");
         }
 
@@ -239,6 +247,7 @@ mod tests {
         let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
         assert!(success);
         let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+            let json = json.get(0).cloned().unwrap_or(json);
         assert_eq!(json["status"], "open");
     }
 
@@ -278,6 +287,7 @@ mod tests {
         let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
         assert!(success);
         let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+            let json = json.get(0).cloned().unwrap_or(json);
         assert_eq!(json["status"], "in_progress");
     }
 }
