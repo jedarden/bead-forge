@@ -14,6 +14,11 @@ mod tests {
     use tempfile::TempDir;
 
     /// Create a temporary test workspace with bf configuration
+    /// Resolve the freshly-built bf binary — never the system-installed one.
+    fn bf_binary() -> String {
+        std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+    }
+
     fn setup_test_workspace() -> (TempDir, PathBuf) {
         let temp_dir = TempDir::new().unwrap();
         let workspace_dir = temp_dir.path();
@@ -45,7 +50,7 @@ mod tests {
 
     /// Run bf create command with the given arguments
     fn run_create(beads_dir: &PathBuf, args: &[&str]) -> (String, String, bool) {
-        let mut cmd = Command::new("bf");
+        let mut cmd = Command::new(bf_binary());
         cmd.arg("--workspace").arg(beads_dir);
         cmd.arg("create");
         for arg in args {
@@ -62,7 +67,7 @@ mod tests {
 
     /// Run bf show command to get bead details
     fn run_show(beads_dir: &PathBuf, bead_id: &str) -> String {
-        let output = Command::new("bf")
+        let output = Command::new(bf_binary())
             .arg("--workspace")
             .arg(beads_dir)
             .arg("show")
@@ -75,7 +80,7 @@ mod tests {
 
     /// Run bf show command with JSON output
     fn run_show_json(beads_dir: &PathBuf, bead_id: &str) -> String {
-        let output = Command::new("bf")
+        let output = Command::new(bf_binary())
             .arg("--workspace")
             .arg(beads_dir)
             .arg("show")
@@ -218,7 +223,7 @@ mod tests {
         );
 
         // Export to JSONL
-        let export_output = Command::new("bf")
+        let export_output = Command::new(bf_binary())
             .arg("--workspace")
             .arg(&beads_dir)
             .arg("sync")

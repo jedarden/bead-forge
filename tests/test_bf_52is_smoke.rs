@@ -7,6 +7,11 @@ mod tests {
     use std::fs;
     use std::process::Command;
 
+    /// Resolve the freshly-built bf binary — never the system-installed one.
+    fn bf_binary() -> String {
+        std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+    }
+
     fn setup_test_workspace() -> TempDir {
         let temp_dir = TempDir::new().unwrap();
         let beads_dir = temp_dir.path().join(".beads");
@@ -46,7 +51,7 @@ default_type: task
         let workspace = temp_dir.path();
 
         // Step 1: Create a bead
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Smoke test bead")
@@ -79,7 +84,7 @@ default_type: task
         println!("Created bead: {}", bead_id);
 
         // Step 2: Show the bead
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -99,7 +104,7 @@ default_type: task
         );
 
         // Step 3: Update bead status
-        let update_output = Command::new("bf")
+        let update_output = Command::new(bf_binary())
             .arg("update")
             .arg(&bead_id)
             .arg("--status")
@@ -115,7 +120,7 @@ default_type: task
         );
 
         // Step 4: List beads
-        let list_output = Command::new("bf")
+        let list_output = Command::new(bf_binary())
             .arg("list")
             .arg("--format")
             .arg("json")
@@ -136,7 +141,7 @@ default_type: task
         );
 
         // Step 5: Close the bead
-        let close_output = Command::new("bf")
+        let close_output = Command::new(bf_binary())
             .arg("close")
             .arg(&bead_id)
             .arg("--reason")
@@ -157,12 +162,16 @@ default_type: task
     #[test]
     fn test_bead_forge_cli_help() {
         // Verify bf CLI help works
-        let help_output = Command::new("bf")
+        let help_output = Command::new(bf_binary())
             .arg("--help")
             .output()
             .expect("Failed to execute bf --help");
 
-        let help_text = String::from_utf8_lossy(&help_output.stderr);
+        let help_text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&help_output.stdout),
+            String::from_utf8_lossy(&help_output.stderr)
+        );
         assert!(
             help_text.contains("bead-forge") || help_text.contains("beads"),
             "Help should mention bead-forge or beads"
@@ -174,14 +183,18 @@ default_type: task
     #[test]
     fn test_bead_forge_version() {
         // Verify bf version output
-        let version_output = Command::new("bf")
+        let version_output = Command::new(bf_binary())
             .arg("--version")
             .output()
             .expect("Failed to execute bf --version");
 
         // --version might output to stdout or stderr depending on clap
         let version_text = String::from_utf8_lossy(&version_output.stdout);
-        let version_text_err = String::from_utf8_lossy(&version_output.stderr);
+        let version_text_err = format!(
+            "{}{}",
+            String::from_utf8_lossy(&version_output.stdout),
+            String::from_utf8_lossy(&version_output.stderr)
+        );
         let combined = format!("{}{}", version_text, version_text_err);
 
         assert!(

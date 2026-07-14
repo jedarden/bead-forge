@@ -7,6 +7,11 @@ mod tests {
     use std::fs;
     use std::process::Command;
 
+    /// Resolve the freshly-built bf binary — never the system-installed one.
+    fn bf_binary() -> String {
+        std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+    }
+
     fn setup_test_workspace() -> TempDir {
         let temp_dir = TempDir::new().unwrap();
         let beads_dir = temp_dir.path().join(".beads");
@@ -54,7 +59,7 @@ claim_ttl_minutes: 30
         let temp_dir = setup_test_workspace();
         let workspace = temp_dir.path();
 
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Basic test bead")
@@ -82,7 +87,7 @@ claim_ttl_minutes: 30
         );
 
         // Verify bead exists in database
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -119,7 +124,7 @@ claim_ttl_minutes: 30
         let temp_dir = setup_test_workspace();
         let workspace = temp_dir.path();
 
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Complete test bead with all parameters")
@@ -151,7 +156,7 @@ claim_ttl_minutes: 30
         let bead_id = extract_bead_id(&create_text);
 
         // Verify all fields are correctly set
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -202,7 +207,7 @@ claim_ttl_minutes: 30
         let types = vec!["task", "bug", "feature", "epic", "chore", "docs", "question"];
 
         for issue_type in types {
-            let create_output = Command::new("bf")
+            let create_output = Command::new(bf_binary())
                 .arg("create")
                 .arg("--title")
                 .arg(&format!("Test bead for type: {}", issue_type))
@@ -223,7 +228,7 @@ claim_ttl_minutes: 30
             let bead_id = extract_bead_id(&create_text);
 
             // Verify the type was set correctly
-            let show_output = Command::new("bf")
+            let show_output = Command::new(bf_binary())
                 .arg("show")
                 .arg(&bead_id)
                 .current_dir(workspace)
@@ -248,7 +253,7 @@ claim_ttl_minutes: 30
         let priorities = vec![("0", "P0"), ("1", "P1"), ("2", "P2"), ("3", "P3"), ("4", "P4")];
 
         for (priority_value, priority_display) in priorities {
-            let create_output = Command::new("bf")
+            let create_output = Command::new(bf_binary())
                 .arg("create")
                 .arg("--title")
                 .arg(&format!("Test bead for priority: {}", priority_value))
@@ -269,7 +274,7 @@ claim_ttl_minutes: 30
             let bead_id = extract_bead_id(&create_text);
 
             // Verify the priority was set correctly
-            let show_output = Command::new("bf")
+            let show_output = Command::new(bf_binary())
                 .arg("show")
                 .arg(&bead_id)
                 .current_dir(workspace)
@@ -291,7 +296,7 @@ claim_ttl_minutes: 30
         let temp_dir = setup_test_workspace();
         let workspace = temp_dir.path();
 
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Bead with single label")
@@ -311,7 +316,7 @@ claim_ttl_minutes: 30
         let bead_id = extract_bead_id(&create_text);
 
         // Verify label is present
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -332,7 +337,7 @@ claim_ttl_minutes: 30
 
         let labels = vec!["label1", "label2", "label3", "label4", "label5"];
 
-        let mut cmd = Command::new("bf");
+        let mut cmd = Command::new(bf_binary());
         cmd.arg("create")
             .arg("--title")
             .arg("Bead with multiple labels")
@@ -356,7 +361,7 @@ claim_ttl_minutes: 30
         let bead_id = extract_bead_id(&create_text);
 
         // Verify all labels are present
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -386,7 +391,7 @@ claim_ttl_minutes: 30
         ];
 
         for assignee in assignees {
-            let create_output = Command::new("bf")
+            let create_output = Command::new(bf_binary())
                 .arg("create")
                 .arg("--title")
                 .arg(&format!("Bead assigned to {}", assignee))
@@ -407,7 +412,7 @@ claim_ttl_minutes: 30
             let bead_id = extract_bead_id(&create_text);
 
             // Verify assignee is set
-            let show_output = Command::new("bf")
+            let show_output = Command::new(bf_binary())
                 .arg("show")
                 .arg(&bead_id)
                 .current_dir(workspace)
@@ -437,7 +442,7 @@ claim_ttl_minutes: 30
         ];
 
         for description in descriptions {
-            let create_output = Command::new("bf")
+            let create_output = Command::new(bf_binary())
                 .arg("create")
                 .arg("--title")
                 .arg("Bead with description")
@@ -457,7 +462,7 @@ claim_ttl_minutes: 30
             let bead_id = extract_bead_id(&create_text);
 
             // Verify description is set
-            let show_output = Command::new("bf")
+            let show_output = Command::new(bf_binary())
                 .arg("show")
                 .arg(&bead_id)
                 .current_dir(workspace)
@@ -486,7 +491,7 @@ claim_ttl_minutes: 30
         let custom_types = vec!["spike", "spike-triage", "custom-workflow", "investigation"];
 
         for custom_type in custom_types {
-            let create_output = Command::new("bf")
+            let create_output = Command::new(bf_binary())
                 .arg("create")
                 .arg("--title")
                 .arg(&format!("Bead with custom type: {}", custom_type))
@@ -507,7 +512,7 @@ claim_ttl_minutes: 30
             let bead_id = extract_bead_id(&create_text);
 
             // Verify custom type is preserved
-            let show_output = Command::new("bf")
+            let show_output = Command::new(bf_binary())
                 .arg("show")
                 .arg(&bead_id)
                 .current_dir(workspace)
@@ -533,7 +538,7 @@ claim_ttl_minutes: 30
         let mut bead_ids = Vec::new();
 
         for i in 0..5 {
-            let create_output = Command::new("bf")
+            let create_output = Command::new(bf_binary())
                 .arg("create")
                 .arg("--title")
                 .arg(&format!("Sequential bead {}", i))
@@ -561,7 +566,7 @@ claim_ttl_minutes: 30
         );
 
         // List beads to verify they all exist
-        let list_output = Command::new("bf")
+        let list_output = Command::new(bf_binary())
             .arg("list")
             .arg("--format")
             .arg("json")
@@ -591,7 +596,7 @@ claim_ttl_minutes: 30
         let workspace = temp_dir.path();
 
         // Create bead with minimal parameters (only title)
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Bead with defaults")
@@ -609,7 +614,7 @@ claim_ttl_minutes: 30
         let bead_id = extract_bead_id(&create_text);
 
         // Verify default values
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -638,7 +643,7 @@ claim_ttl_minutes: 30
         let temp_dir = setup_test_workspace();
         let workspace = temp_dir.path();
 
-        let create_output = Command::new("bf")
+        let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
             .arg("Persistence test bead")
@@ -660,7 +665,7 @@ claim_ttl_minutes: 30
         let bead_id = extract_bead_id(&create_text);
 
         // Verify bead is in list
-        let list_output = Command::new("bf")
+        let list_output = Command::new(bf_binary())
             .arg("list")
             .arg("--format")
             .arg("json")
@@ -679,7 +684,7 @@ claim_ttl_minutes: 30
         );
 
         // Show specific bead
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)
@@ -711,7 +716,7 @@ claim_ttl_minutes: 30
         ];
 
         for title in titles {
-            let create_output = Command::new("bf")
+            let create_output = Command::new(bf_binary())
                 .arg("create")
                 .arg("--title")
                 .arg(title)
@@ -729,7 +734,7 @@ claim_ttl_minutes: 30
             let bead_id = extract_bead_id(&create_text);
 
             // Verify title is preserved
-            let show_output = Command::new("bf")
+            let show_output = Command::new(bf_binary())
                 .arg("show")
                 .arg(&bead_id)
                 .current_dir(workspace)
@@ -758,7 +763,7 @@ claim_ttl_minutes: 30
             "high-priority",
         ];
 
-        let mut cmd = Command::new("bf");
+        let mut cmd = Command::new(bf_binary());
         cmd.arg("create")
             .arg("--title")
             .arg("Bead with hyphenated labels")
@@ -782,7 +787,7 @@ claim_ttl_minutes: 30
         let bead_id = extract_bead_id(&create_text);
 
         // Verify all labels are present
-        let show_output = Command::new("bf")
+        let show_output = Command::new(bf_binary())
             .arg("show")
             .arg(&bead_id)
             .current_dir(workspace)

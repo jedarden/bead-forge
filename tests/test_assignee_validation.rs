@@ -13,13 +13,18 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Create a temporary workspace for testing
+/// Resolve the freshly-built bf binary — never the system-installed one.
+fn bf_binary() -> String {
+    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+}
+
 fn setup_test_workspace() -> TempDir {
     let temp_dir = TempDir::new().unwrap();
     let workspace_dir = temp_dir.path().join("test-workspace");
     std::fs::create_dir_all(&workspace_dir).unwrap();
 
     // Initialize bead-forge workspace
-    let output = Command::new("bf")
+    let output = Command::new(bf_binary())
         .arg("init")
         .arg("--prefix")
         .arg("bf")
@@ -36,7 +41,7 @@ fn setup_test_workspace() -> TempDir {
 
 /// Run bf create command and return the result
 fn run_bf_create(workspace_dir: &PathBuf, title: &str, assignee: Option<&str>) -> (bool, String, String) {
-    let mut cmd = Command::new("bf");
+    let mut cmd = Command::new(bf_binary());
     cmd.arg("create")
         .arg("--title")
         .arg(title)
@@ -56,7 +61,7 @@ fn run_bf_create(workspace_dir: &PathBuf, title: &str, assignee: Option<&str>) -
 
 /// Run bf update command and return the result
 fn run_bf_update(workspace_dir: &PathBuf, id: &str, assignee: Option<&str>) -> (bool, String, String) {
-    let mut cmd = Command::new("bf");
+    let mut cmd = Command::new(bf_binary());
     cmd.arg("update")
         .arg(id)
         .current_dir(workspace_dir);
@@ -225,7 +230,7 @@ fn test_update_bead_without_assignee_accepted() {
     assert!(success, "bf update should succeed without specifying assignee");
 
     // Verify the assignee is still set (not cleared)
-    let output = Command::new("bf")
+    let output = Command::new(bf_binary())
         .arg("show")
         .arg(bead_id)
         .current_dir(&workspace_dir)
@@ -272,7 +277,7 @@ fn test_update_assignee_from_valid_to_valid() {
     assert!(success, "bf update should succeed when changing assignee from alice to bob");
 
     // Verify the assignee was updated
-    let output = Command::new("bf")
+    let output = Command::new(bf_binary())
         .arg("show")
         .arg(bead_id)
         .current_dir(&workspace_dir)

@@ -8,6 +8,11 @@ mod tests {
     use std::path::PathBuf;
     use std::process::Command;
 
+    /// Resolve the freshly-built bf binary — never the system-installed one.
+    fn bf_binary() -> String {
+        std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+    }
+
     fn setup_test_workspace() -> TempDir {
         let temp_dir = TempDir::new().unwrap();
         let beads_dir = temp_dir.path().join(".beads");
@@ -48,14 +53,18 @@ mod tests {
     #[test]
     fn test_bead_forge_version() {
         // Verify bf --help works (note: outputs help text to stderr due to clap behavior)
-        let output = Command::new("bf")
+        let output = Command::new(bf_binary())
             .arg("--help")
             .output()
             .expect("Failed to run 'bf --help'");
 
-        // Note: bf --help returns exit code 1 and outputs to stderr
-        // (clap treats missing subcommand as error)
-        let help_text = String::from_utf8_lossy(&output.stderr);
+        // Help may land on stdout (clap --help, exit 0) or stderr depending
+        // on invocation; accept either stream.
+        let help_text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
         assert!(
             help_text.contains("bead-forge") || help_text.contains("beads"),
             "Help output should mention bead-forge or beads"
@@ -73,7 +82,7 @@ mod tests {
     #[test]
     fn test_current_workspace_accessible() {
         // Verify we can read the current workspace
-        let output = Command::new("bf")
+        let output = Command::new(bf_binary())
             .arg("list")
             .arg("--format")
             .arg("json")
@@ -110,7 +119,7 @@ mod tests {
     #[test]
     fn test_bead_show_by_id() {
         // Test showing a specific bead (bf-2atz should exist as the current bead)
-        let output = Command::new("bf")
+        let output = Command::new(bf_binary())
             .args(["show", "bf-2atz"])
             .current_dir("/home/coding/bead-forge")
             .output()
