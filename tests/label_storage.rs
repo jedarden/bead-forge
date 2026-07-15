@@ -1,7 +1,7 @@
 // Label storage tests - duplicate of label_list.rs
 // Tests label creation, listing, aggregation, counting, and ordering
 
-use bead_forge::model::{Issue, IssueType, Status, IssueChanges};
+use bead_forge::model::{Issue, IssueChanges, IssueType, Status};
 use bead_forge::storage::Storage;
 
 #[test]
@@ -68,8 +68,16 @@ fn test_label_all_unique() {
     let label_names: Vec<&String> = labels.iter().map(|(name, _)| name).collect();
     let unique_labels: std::collections::HashSet<_> = label_names.iter().collect();
 
-    assert_eq!(label_names.len(), unique_labels.len(), "All labels should be unique");
-    assert_eq!(labels.len(), 3, "Should have 3 unique labels: bug, urgent, feature");
+    assert_eq!(
+        label_names.len(),
+        unique_labels.len(),
+        "All labels should be unique"
+    );
+    assert_eq!(
+        labels.len(),
+        3,
+        "Should have 3 unique labels: bug, urgent, feature"
+    );
 }
 
 #[test]
@@ -96,14 +104,24 @@ fn test_label_duplicate_handling() {
     let issue_labels = storage.get_labels("dup-test").unwrap();
 
     // Count occurrences of "urgent"
-    let urgent_count = issue_labels.iter().filter(|l| l.as_str() == "urgent").count();
-    assert_eq!(urgent_count, 1, "Label 'urgent' should appear only once (no duplicates)");
+    let urgent_count = issue_labels
+        .iter()
+        .filter(|l| l.as_str() == "urgent")
+        .count();
+    assert_eq!(
+        urgent_count, 1,
+        "Label 'urgent' should appear only once (no duplicates)"
+    );
 
     // List all labels globally - count should be 1 for urgent
     let all_labels = storage.list_all_labels().unwrap();
     let urgent_entry = all_labels.iter().find(|(name, _)| name == "urgent");
     assert!(urgent_entry.is_some(), "Urgent label should exist");
-    assert_eq!(urgent_entry.unwrap().1, 1, "Urgent label count should be 1 (not duplicated)");
+    assert_eq!(
+        urgent_entry.unwrap().1,
+        1,
+        "Urgent label count should be 1 (not duplicated)"
+    );
 }
 
 #[test]
@@ -124,7 +142,11 @@ fn test_label_empty_bead() {
 
     // Get labels for bead with no labels
     let labels = storage.get_labels("empty-bead").unwrap();
-    assert_eq!(labels.len(), 0, "Bead with no labels should return empty list");
+    assert_eq!(
+        labels.len(),
+        0,
+        "Bead with no labels should return empty list"
+    );
 
     // List all labels globally - should not include anything from this bead
     let all_labels = storage.list_all_labels().unwrap();
@@ -213,7 +235,11 @@ fn test_label_list_multiple_labels_same_issue() {
         title: "Multi Label Issue".to_string(),
         issue_type: IssueType::Task,
         status: Status::Open,
-        labels: vec!["bug".to_string(), "urgent".to_string(), "frontend".to_string()],
+        labels: vec![
+            "bug".to_string(),
+            "urgent".to_string(),
+            "frontend".to_string(),
+        ],
         ..Default::default()
     };
     storage.create_issue(&issue).unwrap();
@@ -369,7 +395,11 @@ fn test_label_list_after_remove() {
         title: "Remove Test".to_string(),
         issue_type: IssueType::Task,
         status: Status::Open,
-        labels: vec!["bug".to_string(), "urgent".to_string(), "frontend".to_string()],
+        labels: vec![
+            "bug".to_string(),
+            "urgent".to_string(),
+            "frontend".to_string(),
+        ],
         ..Default::default()
     };
     storage.create_issue(&issue).unwrap();
@@ -431,7 +461,7 @@ fn test_label_list_after_issue_close() {
     let labels = storage.list_all_labels().unwrap();
     assert_eq!(labels.len(), 2);
     let label_map: std::collections::HashMap<String, i64> = labels.into_iter().collect();
-    assert_eq!(label_map.get("bug"), Some(&2));  // Still 2
+    assert_eq!(label_map.get("bug"), Some(&2)); // Still 2
     assert_eq!(label_map.get("urgent"), Some(&1));
 }
 

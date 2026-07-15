@@ -972,7 +972,11 @@ mod tests {
         let (_temp, mut storage) = setup_test_db();
 
         // Create a zero-float bead with low priority (4=Backlog)
-        let mut zero_float = Issue::new("bf-zero".to_string(), "Zero float".to_string(), ".".to_string());
+        let mut zero_float = Issue::new(
+            "bf-zero".to_string(),
+            "Zero float".to_string(),
+            ".".to_string(),
+        );
         zero_float.priority = crate::model::Priority(4);
         storage.create_issue(&zero_float).unwrap();
 
@@ -989,13 +993,23 @@ mod tests {
         storage
             .with_immediate_transaction(|tx| {
                 // Clear any existing entries first
-                tx.execute("DELETE FROM critical_path_cache WHERE bead_id IN ('bf-zero', 'bf-high')", [])?;
+                tx.execute(
+                    "DELETE FROM critical_path_cache WHERE bead_id IN ('bf-zero', 'bf-high')",
+                    [],
+                )?;
 
                 // bf-zero has float=0, priority=4
                 tx.execute(
                     "INSERT INTO critical_path_cache (bead_id, epic_id, es, ls, float, updated_at)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                    params!["bf-zero", "bf-zero", 0i64, 0i64, 0i64, Utc::now().to_rfc3339()],
+                    params![
+                        "bf-zero",
+                        "bf-zero",
+                        0i64,
+                        0i64,
+                        0i64,
+                        Utc::now().to_rfc3339()
+                    ],
                 )?;
 
                 // bf-high has no critical path entry (float defaults to 999)
@@ -1037,7 +1051,11 @@ mod tests {
             .unwrap();
 
         // All 15 beads should be returned (unlimited behavior)
-        assert_eq!(candidates.len(), 15, "Expected all 15 beads to be returned with limit=0");
+        assert_eq!(
+            candidates.len(),
+            15,
+            "Expected all 15 beads to be returned with limit=0"
+        );
     }
 
     #[test]

@@ -2,8 +2,8 @@
 // Test JSON output formatting for all bf commands
 // Bead: bf-634y
 
-use bead_forge::model::{Issue, Status, Priority, IssueType, Dependency, DependencyType, Comment};
-use bead_forge::format::{Formatter, JsonFormatter, OutputFormat, get_formatter};
+use bead_forge::format::{get_formatter, Formatter, JsonFormatter, OutputFormat};
+use bead_forge::model::{Comment, Dependency, DependencyType, Issue, IssueType, Priority, Status};
 use chrono::{DateTime, Utc};
 
 #[test]
@@ -24,9 +24,13 @@ fn test_json_formatter_single_issue() {
         assignee: None,
         owner: None,
         estimated_minutes: None,
-        created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         created_by: None,
-        updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         closed_at: None,
         close_reason: None,
         closed_by_session: None,
@@ -97,9 +101,13 @@ fn test_json_formatter_multiple_issues() {
             assignee: None,
             owner: None,
             estimated_minutes: None,
-            created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             created_by: None,
-            updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+            updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             closed_at: None,
             close_reason: None,
             closed_by_session: None,
@@ -139,9 +147,13 @@ fn test_json_formatter_multiple_issues() {
             assignee: Some("worker-1".to_string()),
             owner: None,
             estimated_minutes: None,
-            created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             created_by: None,
-            updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+            updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             closed_at: None,
             close_reason: None,
             closed_by_session: None,
@@ -176,8 +188,10 @@ fn test_json_formatter_multiple_issues() {
     assert_eq!(lines.len(), 2);
 
     // Parse each line as JSON
-    let first: serde_json::Value = serde_json::from_str(lines[0]).expect("Invalid JSON on first line");
-    let second: serde_json::Value = serde_json::from_str(lines[1]).expect("Invalid JSON on second line");
+    let first: serde_json::Value =
+        serde_json::from_str(lines[0]).expect("Invalid JSON on first line");
+    let second: serde_json::Value =
+        serde_json::from_str(lines[1]).expect("Invalid JSON on second line");
 
     assert_eq!(first["id"], "bf-test1");
     assert_eq!(first["status"], "open");
@@ -218,9 +232,13 @@ fn test_json_formatter_strips_dependencies_and_comments() {
         assignee: None,
         owner: None,
         estimated_minutes: None,
-        created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         created_by: None,
-        updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         closed_at: None,
         close_reason: None,
         closed_by_session: None,
@@ -243,26 +261,26 @@ fn test_json_formatter_strips_dependencies_and_comments() {
         is_template: false,
         labels: vec![],
         // These should be stripped in JSON output
-        dependencies: vec![
-            Dependency {
-                issue_id: "bf-test1".to_string(),
-                depends_on_id: "bf-blocker".to_string(),
-                dep_type: DependencyType::Blocks,
-                created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
-                created_by: None,
-                metadata: None,
-                thread_id: None,
-            }
-        ],
-        comments: vec![
-            Comment {
-                id: 1,
-                issue_id: "bf-test1".to_string(),
-                author: "test-user".to_string(),
-                body: "Test comment".to_string(),
-                created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
-            }
-        ],
+        dependencies: vec![Dependency {
+            issue_id: "bf-test1".to_string(),
+            depends_on_id: "bf-blocker".to_string(),
+            dep_type: DependencyType::Blocks,
+            created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            created_by: None,
+            metadata: None,
+            thread_id: None,
+        }],
+        comments: vec![Comment {
+            id: 1,
+            issue_id: "bf-test1".to_string(),
+            author: "test-user".to_string(),
+            body: "Test comment".to_string(),
+            created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+        }],
         annotations: Default::default(),
     };
 
@@ -294,7 +312,8 @@ fn test_json_formatter_error_formatting() {
     let error_msg = "Test error message";
     let output = formatter.format_error(error_msg);
 
-    let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON error output");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&output).expect("Invalid JSON error output");
 
     assert_eq!(parsed["error"], "Test error message");
 }
@@ -338,9 +357,13 @@ fn test_get_formatter() {
         assignee: None,
         owner: None,
         estimated_minutes: None,
-        created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         created_by: None,
-        updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z").unwrap().with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-03T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         closed_at: None,
         close_reason: None,
         closed_by_session: None,
@@ -368,7 +391,8 @@ fn test_get_formatter() {
     };
 
     let json_output = json_formatter.format_issue(&issue);
-    let parsed_json: serde_json::Value = serde_json::from_str(&json_output).expect("JSON formatter should produce valid JSON");
+    let parsed_json: serde_json::Value =
+        serde_json::from_str(&json_output).expect("JSON formatter should produce valid JSON");
     assert_eq!(parsed_json["id"], "bf-test");
 
     let text_output = text_formatter.format_issue(&issue);

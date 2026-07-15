@@ -73,7 +73,10 @@ fn test_repair_cycle_leaves_zero_unflushed() {
 
     // After repair, unflushed count should still be 0 (db was rebuilt from JSONL)
     let unflushed_after = get_unflushed_count(&temp_dir);
-    assert_eq!(unflushed_after, 0, "Repair should not leave unflushed beads");
+    assert_eq!(
+        unflushed_after, 0,
+        "Repair should not leave unflushed beads"
+    );
 }
 
 /// Test that after an import cycle with no subsequent mutations, count_unflushed == 0
@@ -108,12 +111,18 @@ fn test_import_cycle_leaves_zero_unflushed() {
 
     // Run import (simulates sync --import scenario)
     let result = bead_forge::sync::import(workspace).unwrap();
-    assert_eq!(result.imported, 0, "Should import 0 new beads (already in sync)");
+    assert_eq!(
+        result.imported, 0,
+        "Should import 0 new beads (already in sync)"
+    );
     assert_eq!(result.skipped, 1, "Should skip 1 unchanged bead");
 
     // After import, unflushed count should still be 0
     let unflushed_after = get_unflushed_count(&temp_dir);
-    assert_eq!(unflushed_after, 0, "Import should not leave unflushed beads");
+    assert_eq!(
+        unflushed_after, 0,
+        "Import should not leave unflushed beads"
+    );
 }
 
 /// Test that after a full repair cycle (delete DB, repair), count_unflushed == 0
@@ -147,7 +156,10 @@ fn test_delete_db_then_repair_leaves_zero_unflushed() {
     // Verify JSONL exists and contains the bead
     assert!(jsonl_path.exists(), "JSONL should exist after flush");
     let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
-    assert!(jsonl_content.contains("bf-test1"), "JSONL should contain the bead");
+    assert!(
+        jsonl_content.contains("bf-test1"),
+        "JSONL should contain the bead"
+    );
 
     // Delete the database (simulates a repair scenario where DB is corrupted/missing)
     fs::remove_file(&db_path).unwrap();
@@ -158,7 +170,10 @@ fn test_delete_db_then_repair_leaves_zero_unflushed() {
 
     // After repair, unflushed count should be 0
     let unflushed_after = get_unflushed_count(&temp_dir);
-    assert_eq!(unflushed_after, 0, "Repair after DB deletion should not leave unflushed beads");
+    assert_eq!(
+        unflushed_after, 0,
+        "Repair after DB deletion should not leave unflushed beads"
+    );
 }
 
 /// Test the exact scenario: recently flushed JSONL -> repair -> count_unflushed should be 0
@@ -188,7 +203,10 @@ fn test_recent_flush_then_repair_unflushed_zero() {
 
     // Verify flush completed successfully
     let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
-    assert!(jsonl_content.contains("bf-recent"), "JSONL should contain the recently flushed bead");
+    assert!(
+        jsonl_content.contains("bf-recent"),
+        "JSONL should contain the recently flushed bead"
+    );
 
     // Run repair
     let imported = bead_forge::doctor::repair(workspace, false, false).unwrap();
@@ -196,5 +214,8 @@ fn test_recent_flush_then_repair_unflushed_zero() {
 
     // Verify count_unflushed is 0
     let unflushed = get_unflushed_count(&temp_dir);
-    assert_eq!(unflushed, 0, "After repair of recently flushed JSONL, count_unflushed should be 0");
+    assert_eq!(
+        unflushed, 0,
+        "After repair of recently flushed JSONL, count_unflushed should be 0"
+    );
 }

@@ -3,9 +3,11 @@
 // and descriptions, and that both are correctly preserved through serialization,
 // storage, retrieval, and all operations
 
-use bead_forge::model::{Issue, IssueType, Status, Priority, DependencyType, EpicStatus, IssueChanges};
+use bead_forge::model::{
+    DependencyType, EpicStatus, Issue, IssueChanges, IssueType, Priority, Status,
+};
 use bead_forge::storage::Storage;
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
 
 #[test]
 fn test_epic_p1_with_basic_description() {
@@ -23,7 +25,10 @@ fn test_epic_p1_with_basic_description() {
     // Verify P1 priority and description
     assert_eq!(epic.priority, Priority::HIGH);
     assert_eq!(epic.priority.0, 1);
-    assert_eq!(epic.description, Some("This is a P1 epic with a description".to_string()));
+    assert_eq!(
+        epic.description,
+        Some("This is a P1 epic with a description".to_string())
+    );
 
     // Test JSON serialization preserves both
     let json = serde_json::to_string(&epic).unwrap();
@@ -60,7 +65,10 @@ fn test_epic_p1_with_description_serialization_roundtrip() {
     assert_eq!(deserialized.issue_type, IssueType::Epic);
     assert_eq!(deserialized.priority, Priority::HIGH);
     assert_eq!(deserialized.priority.0, 1);
-    assert_eq!(deserialized.description, Some("Testing P1 epic with description serialization".to_string()));
+    assert_eq!(
+        deserialized.description,
+        Some("Testing P1 epic with description serialization".to_string())
+    );
 }
 
 #[test]
@@ -92,7 +100,10 @@ fn test_epic_p1_with_description_storage_and_retrieval() {
     assert_eq!(retrieved.status, Status::Open);
     assert_eq!(retrieved.priority, Priority::HIGH);
     assert_eq!(retrieved.priority.0, 1);
-    assert_eq!(retrieved.description, Some("P1 epic with description for storage test".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("P1 epic with description for storage test".to_string())
+    );
 }
 
 #[test]
@@ -132,7 +143,10 @@ This is a high priority epic implementing a critical feature.
     let json = serde_json::to_string(&epic).unwrap();
     let deserialized: Issue = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.priority, Priority::HIGH);
-    assert_eq!(deserialized.description, Some(markdown_description.to_string()));
+    assert_eq!(
+        deserialized.description,
+        Some(markdown_description.to_string())
+    );
 }
 
 #[test]
@@ -170,14 +184,24 @@ fn test_epic_p1_with_description_and_children() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-p1-desc-children", id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-p1-desc-children",
+                id,
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Verify epic P1 priority and description are preserved
     let retrieved_epic = storage.get_issue("epic-p1-desc-children").unwrap().unwrap();
     assert_eq!(retrieved_epic.priority, Priority::HIGH);
     assert_eq!(retrieved_epic.priority.0, 1);
-    assert_eq!(retrieved_epic.description, Some("High priority epic with description and child tasks".to_string()));
+    assert_eq!(
+        retrieved_epic.description,
+        Some("High priority epic with description and child tasks".to_string())
+    );
 
     // Verify epic has all children
     let epic_children = storage.get_dependencies("epic-p1-desc-children").unwrap();
@@ -186,7 +210,10 @@ fn test_epic_p1_with_description_and_children() {
     // Verify children descriptions are preserved
     for (id, _priority, title) in &children {
         let child = storage.get_issue(id).unwrap().unwrap();
-        assert_eq!(child.description, Some(format!("{}: Child task description", title)));
+        assert_eq!(
+            child.description,
+            Some(format!("{}: Child task description", title))
+        );
     }
 }
 
@@ -210,7 +237,10 @@ fn test_epic_p1_description_persistence_with_update() {
     // Verify initial P1 priority and description
     let retrieved = storage.get_issue("epic-p1-desc-update").unwrap().unwrap();
     assert_eq!(retrieved.priority, Priority::HIGH);
-    assert_eq!(retrieved.description, Some("Initial P1 epic description".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("Initial P1 epic description".to_string())
+    );
 
     // Update epic with new description using IssueChanges
     let changes = IssueChanges {
@@ -218,20 +248,24 @@ fn test_epic_p1_description_persistence_with_update() {
         status: Some(Status::InProgress),
         ..Default::default()
     };
-    storage.update_issue("epic-p1-desc-update", &changes).unwrap();
+    storage
+        .update_issue("epic-p1-desc-update", &changes)
+        .unwrap();
 
     // Verify updated description while P1 priority is preserved
     let updated_retrieved = storage.get_issue("epic-p1-desc-update").unwrap().unwrap();
     assert_eq!(updated_retrieved.priority, Priority::HIGH); // Priority unchanged
     assert_eq!(updated_retrieved.status, Status::InProgress);
-    assert_eq!(updated_retrieved.description, Some("Updated P1 epic description with more details".to_string()));
+    assert_eq!(
+        updated_retrieved.description,
+        Some("Updated P1 epic description with more details".to_string())
+    );
 }
 
 #[test]
 fn test_epic_p1_with_long_description() {
     // Test P1 epic with very long description
-    let long_description = "This is a very long description for a P1 epic. "
-        .repeat(100); // ~5000 character description
+    let long_description = "This is a very long description for a P1 epic. ".repeat(100); // ~5000 character description
 
     let epic = Issue {
         id: "epic-p1-long-desc".to_string(),
@@ -310,7 +344,8 @@ fn test_epic_p1_with_unicode_in_description() {
 #[test]
 fn test_epic_p1_with_multiline_description() {
     // Test P1 epic with multiline description
-    let multiline_desc = "P1 epic details:\nLine 1: Critical feature\nLine 2: High priority\nLine 3: Important work";
+    let multiline_desc =
+        "P1 epic details:\nLine 1: Critical feature\nLine 2: High priority\nLine 3: Important work";
 
     let epic = Issue {
         id: "epic-p1-multiline-desc".to_string(),
@@ -353,7 +388,11 @@ fn test_epic_p1_status_computation_with_description() {
     // Create 3 children, close 2 of them
     for i in 1..=3 {
         let is_closed = i <= 2;
-        let status = if is_closed { Status::Closed } else { Status::Open };
+        let status = if is_closed {
+            Status::Closed
+        } else {
+            Status::Open
+        };
         let mut child = Issue {
             id: format!("child-p1-status-{}", i),
             title: format!("Child {}", i),
@@ -366,22 +405,33 @@ fn test_epic_p1_status_computation_with_description() {
             child.closed_at = Some(Utc::now());
         }
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-p1-status-desc", &child.id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-p1-status-desc",
+                &child.id,
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Verify P1 priority and description are preserved
     let epic_issue = storage.get_issue("epic-p1-status-desc").unwrap().unwrap();
     assert_eq!(epic_issue.priority, Priority::HIGH);
-    assert_eq!(epic_issue.description, Some("P1 epic for testing status computation with description".to_string()));
+    assert_eq!(
+        epic_issue.description,
+        Some("P1 epic for testing status computation with description".to_string())
+    );
 
     // Verify epic status computation
     let children = storage.get_dependencies("epic-p1-status-desc").unwrap();
-    let closed_children = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_children = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     let epic_status = EpicStatus {
         epic: epic_issue,
@@ -468,7 +518,10 @@ fn test_epic_p1_with_all_statuses_and_description() {
 
         // Verify P1 priority and description regardless of status
         assert_eq!(epic.priority, Priority::HIGH);
-        assert_eq!(epic.description, Some(format!("Description for {} status P1 epic", status_str)));
+        assert_eq!(
+            epic.description,
+            Some(format!("Description for {} status P1 epic", status_str))
+        );
 
         // Verify JSON serialization preserves all three
         let json = serde_json::to_string(&epic).unwrap();

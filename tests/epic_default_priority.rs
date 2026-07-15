@@ -18,7 +18,11 @@ fn test_epic_default_priority_is_p2() {
     };
 
     // Verify the default priority is P2 (Medium)
-    assert_eq!(epic.priority, Priority::MEDIUM, "Epic should have P2 (Medium) priority by default");
+    assert_eq!(
+        epic.priority,
+        Priority::MEDIUM,
+        "Epic should have P2 (Medium) priority by default"
+    );
     assert_eq!(epic.priority.0, 2, "Epic priority value should be 2");
 }
 
@@ -42,9 +46,20 @@ fn test_epic_default_priority_storage() {
     // Retrieve and verify the default priority was preserved
     let retrieved = storage.get_issue("epic-storage-default").unwrap().unwrap();
 
-    assert_eq!(retrieved.issue_type, IssueType::Epic, "Issue type should be Epic");
-    assert_eq!(retrieved.priority, Priority::MEDIUM, "Retrieved epic should have P2 priority");
-    assert_eq!(retrieved.priority.0, 2, "Retrieved epic priority value should be 2");
+    assert_eq!(
+        retrieved.issue_type,
+        IssueType::Epic,
+        "Issue type should be Epic"
+    );
+    assert_eq!(
+        retrieved.priority,
+        Priority::MEDIUM,
+        "Retrieved epic should have P2 priority"
+    );
+    assert_eq!(
+        retrieved.priority.0, 2,
+        "Retrieved epic priority value should be 2"
+    );
 }
 
 #[test]
@@ -63,10 +78,16 @@ fn test_epic_default_priority_serialization() {
     let json = serde_json::to_string(&epic).unwrap();
 
     // Verify epic type is serialized correctly
-    assert!(json.contains(r#""issue_type":"epic""#), "JSON should contain epic type");
+    assert!(
+        json.contains(r#""issue_type":"epic""#),
+        "JSON should contain epic type"
+    );
 
     // Verify default P2 priority is serialized as 2
-    assert!(json.contains(r#""priority":2"#), "JSON should contain priority: 2");
+    assert!(
+        json.contains(r#""priority":2"#),
+        "JSON should contain priority: 2"
+    );
 
     // Deserialize and verify
     let deserialized: Issue = serde_json::from_str(&json).unwrap();
@@ -80,9 +101,17 @@ fn test_priority_default_impl_returns_p2() {
     // Test that Priority::default() returns P2 (Medium)
     let default_priority = Priority::default();
 
-    assert_eq!(default_priority, Priority::MEDIUM, "Priority::default() should return MEDIUM");
+    assert_eq!(
+        default_priority,
+        Priority::MEDIUM,
+        "Priority::default() should return MEDIUM"
+    );
     assert_eq!(default_priority.0, 2, "Default priority value should be 2");
-    assert_eq!(format!("{}", default_priority), "P2", "Default priority should display as P2");
+    assert_eq!(
+        format!("{}", default_priority),
+        "P2",
+        "Default priority should display as P2"
+    );
 }
 
 #[test]
@@ -120,7 +149,11 @@ fn test_multiple_epics_with_default_priority() {
             "Epic {} should have P2 priority",
             epic.id
         );
-        assert_eq!(epic.priority.0, 2, "Epic {} priority value should be 2", epic.id);
+        assert_eq!(
+            epic.priority.0, 2,
+            "Epic {} priority value should be 2",
+            epic.id
+        );
     }
 }
 
@@ -155,7 +188,8 @@ fn test_epic_default_vs_explicit_priorities() {
             format!("{}", epic.priority),
             label,
             "{} epic should display as {}",
-            label, label
+            label,
+            label
         );
     }
 }

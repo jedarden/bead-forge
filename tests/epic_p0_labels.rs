@@ -1,7 +1,7 @@
 // Epic P0 Priority with Labels Tests
 // Tests that epics can have P0 (Critical) priority and labels together
 
-use bead_forge::model::{Issue, IssueType, Status, DependencyType, Priority};
+use bead_forge::model::{DependencyType, Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 
@@ -17,7 +17,11 @@ fn test_epic_p0_creation_with_labels() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::CRITICAL,
-        labels: vec!["critical".to_string(), "high-priority".to_string(), "security".to_string()],
+        labels: vec![
+            "critical".to_string(),
+            "high-priority".to_string(),
+            "security".to_string(),
+        ],
         created_at: Utc::now(),
         updated_at: Utc::now(),
         ..Default::default()
@@ -158,7 +162,14 @@ fn test_epic_p0_with_children_labels() {
         ..Default::default()
     };
     storage.create_issue(&child1).unwrap();
-    storage.add_dependency("epic-p0-children", "p0-child-1", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-children",
+            "p0-child-1",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     let child2 = Issue {
         id: "p0-child-2".to_string(),
@@ -172,7 +183,14 @@ fn test_epic_p0_with_children_labels() {
         ..Default::default()
     };
     storage.create_issue(&child2).unwrap();
-    storage.add_dependency("epic-p0-children", "p0-child-2", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-children",
+            "p0-child-2",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Verify epic has P0 priority and correct labels
     let epic_retrieved = storage.get_issue("epic-p0-children").unwrap().unwrap();
@@ -198,9 +216,18 @@ fn test_multiple_epics_p0_with_different_labels() {
 
     // Create multiple P0 epics with different labels
     let epics = vec![
-        ("epic-p0-1", vec!["critical".to_string(), "security".to_string()]),
-        ("epic-p0-2", vec!["hotfix".to_string(), "production".to_string()]),
-        ("epic-p0-3", vec!["blocking".to_string(), "data-loss".to_string()]),
+        (
+            "epic-p0-1",
+            vec!["critical".to_string(), "security".to_string()],
+        ),
+        (
+            "epic-p0-2",
+            vec!["hotfix".to_string(), "production".to_string()],
+        ),
+        (
+            "epic-p0-3",
+            vec!["blocking".to_string(), "data-loss".to_string()],
+        ),
     ];
 
     for (id, labels) in &epics {
@@ -375,7 +402,11 @@ fn test_epic_p0_json_roundtrip() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::CRITICAL,
-        labels: vec!["critical".to_string(), "hotfix".to_string(), "blocking".to_string()],
+        labels: vec![
+            "critical".to_string(),
+            "hotfix".to_string(),
+            "blocking".to_string(),
+        ],
         created_at: Utc::now(),
         updated_at: Utc::now(),
         ..Default::default()

@@ -23,15 +23,22 @@ fn test_doctor_repair_refuses_unflushed_beads() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Verify JSONL has one bead
     let jsonl_content = fs::read_to_string(&ws.jsonl_path).expect("Failed to read JSONL");
-    assert_eq!(jsonl_content.lines().count(), 1, "Initial JSONL should have 1 bead");
+    assert_eq!(
+        jsonl_content.lines().count(),
+        1,
+        "Initial JSONL should have 1 bead"
+    );
 
     // Create another bead WITHOUT flushing (this is now db-only)
-    ws.create_bead("bf-002", "Unflushed bead").expect("Failed to create unflushed bead");
+    ws.create_bead("bf-002", "Unflushed bead")
+        .expect("Failed to create unflushed bead");
 
     // Verify bead exists in db
     let bead = ws.get_bead("bf-002").expect("Failed to get unflushed bead");
@@ -39,8 +46,15 @@ fn test_doctor_repair_refuses_unflushed_beads() {
 
     // Verify JSONL still has only one bead (bf-002 is not in JSONL)
     let jsonl_content = fs::read_to_string(&ws.jsonl_path).expect("Failed to read JSONL");
-    assert_eq!(jsonl_content.lines().count(), 1, "JSONL should still have 1 bead");
-    assert!(!jsonl_content.contains("bf-002"), "JSONL should not contain bf-002");
+    assert_eq!(
+        jsonl_content.lines().count(),
+        1,
+        "JSONL should still have 1 bead"
+    );
+    assert!(
+        !jsonl_content.contains("bf-002"),
+        "JSONL should not contain bf-002"
+    );
 
     // Try to repair without flags - should refuse
     let result = doctor::repair(ws.workspace_path(), false, false);
@@ -84,11 +98,14 @@ fn test_doctor_repair_flush_first_preserves_unflushed() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Create another bead WITHOUT flushing (db-only)
-    ws.create_bead("bf-002", "Unflushed bead").expect("Failed to create unflushed bead");
+    ws.create_bead("bf-002", "Unflushed bead")
+        .expect("Failed to create unflushed bead");
 
     // Verify both beads are in db
     let beads = ws.list_beads().expect("Failed to list beads");
@@ -109,13 +126,26 @@ fn test_doctor_repair_flush_first_preserves_unflushed() {
     assert!(bf_001.is_some(), "bf-001 should exist after repair");
 
     let bf_002 = ws.get_bead("bf-002").expect("Failed to get bf-002");
-    assert!(bf_002.is_some(), "bf-002 should exist after repair (was unflushed)");
+    assert!(
+        bf_002.is_some(),
+        "bf-002 should exist after repair (was unflushed)"
+    );
 
     // Verify JSONL now contains both beads
     let jsonl_content = fs::read_to_string(&ws.jsonl_path).expect("Failed to read JSONL");
-    assert_eq!(jsonl_content.lines().count(), 2, "JSONL should have 2 beads");
-    assert!(jsonl_content.contains("bf-001"), "JSONL should contain bf-001");
-    assert!(jsonl_content.contains("bf-002"), "JSONL should contain bf-002");
+    assert_eq!(
+        jsonl_content.lines().count(),
+        2,
+        "JSONL should have 2 beads"
+    );
+    assert!(
+        jsonl_content.contains("bf-001"),
+        "JSONL should contain bf-001"
+    );
+    assert!(
+        jsonl_content.contains("bf-002"),
+        "JSONL should contain bf-002"
+    );
 }
 
 /// Test that doctor --repair --force proceeds with unflushed beads (data loss).
@@ -127,11 +157,14 @@ fn test_doctor_repair_force_loses_unflushed_beads() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Create another bead WITHOUT flushing (db-only)
-    ws.create_bead("bf-002", "Unflushed bead").expect("Failed to create unflushed bead");
+    ws.create_bead("bf-002", "Unflushed bead")
+        .expect("Failed to create unflushed bead");
 
     // Verify both beads are in db
     let beads = ws.list_beads().expect("Failed to list beads");
@@ -146,13 +179,20 @@ fn test_doctor_repair_force_loses_unflushed_beads() {
 
     // Verify only bf-001 exists (bf-002 was lost)
     let beads = ws.list_beads().expect("Failed to list beads after repair");
-    assert_eq!(beads.len(), 1, "Should have 1 bead after repair (bf-002 lost)");
+    assert_eq!(
+        beads.len(),
+        1,
+        "Should have 1 bead after repair (bf-002 lost)"
+    );
 
     let bf_001 = ws.get_bead("bf-001").expect("Failed to get bf-001");
     assert!(bf_001.is_some(), "bf-001 should exist after repair");
 
     let bf_002 = ws.get_bead("bf-002").expect("Failed to get bf-002");
-    assert!(bf_002.is_none(), "bf-002 should be lost (was unflushed, repair with --force)");
+    assert!(
+        bf_002.is_none(),
+        "bf-002 should be lost (was unflushed, repair with --force)"
+    );
 }
 
 /// Test that multiple unflushed beads are all reported.
@@ -164,14 +204,17 @@ fn test_doctor_repair_multiple_unflushed_reported() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Create multiple unflushed beads (like the ARMOR incident)
     for i in 2..=5 {
         let id = format!("bf-00{}", i);
         let title = format!("Unflushed bead {}", i);
-        ws.create_bead(&id, &title).expect("Failed to create unflushed bead");
+        ws.create_bead(&id, &title)
+            .expect("Failed to create unflushed bead");
     }
 
     // Try to repair - should refuse and list all 4 unflushed beads
@@ -189,11 +232,7 @@ fn test_doctor_repair_multiple_unflushed_reported() {
     // Verify all bead IDs are listed
     for i in 2..=5 {
         let id = format!("bf-00{}", i);
-        assert!(
-            err_msg.contains(&id),
-            "Error should list bead {}",
-            id
-        );
+        assert!(err_msg.contains(&id), "Error should list bead {}", id);
     }
 }
 
@@ -206,8 +245,10 @@ fn test_doctor_repair_detects_modified_beads() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Modify the bead (update title)
     let storage = ws.storage().expect("Failed to open storage");
@@ -243,11 +284,14 @@ fn test_doctor_repair_corrupt_db_with_unflushed() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Create unflushed bead
-    ws.create_bead("bf-002", "Unflushed bead").expect("Failed to create unflushed bead");
+    ws.create_bead("bf-002", "Unflushed bead")
+        .expect("Failed to create unflushed bead");
 
     // Corrupt the database by writing garbage
     fs::write(&ws.db_path, "corrupt database data").expect("Failed to corrupt db");
@@ -270,7 +314,10 @@ fn test_doctor_repair_corrupt_db_with_unflushed() {
     assert!(bf_001.is_some(), "bf-001 should exist after repair");
 
     let bf_002 = ws.get_bead("bf-002").expect("Failed to get bf-002");
-    assert!(bf_002.is_none(), "bf-002 should be lost (was unflushed, db corrupted)");
+    assert!(
+        bf_002.is_none(),
+        "bf-002 should be lost (was unflushed, db corrupted)"
+    );
 }
 
 /// Test that count_unflushed is zero after doctor --repair.
@@ -282,17 +329,22 @@ fn test_count_unflushed_zero_after_repair() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Run doctor --repair (rebuilds db from JSONL)
-    let imported = doctor::repair(ws.workspace_path(), false, false)
-        .expect("Repair should succeed");
+    let imported =
+        doctor::repair(ws.workspace_path(), false, false).expect("Repair should succeed");
     assert_eq!(imported, 1, "Should import 1 bead from JSONL");
 
     // Check that count_unflushed returns 0
     let result = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
-    assert_eq!(result.unflushed_count, 0, "count_unflushed should be 0 after repair");
+    assert_eq!(
+        result.unflushed_count, 0,
+        "count_unflushed should be 0 after repair"
+    );
 }
 
 /// Test that count_unflushed is zero after sync --import.
@@ -305,18 +357,26 @@ fn test_count_unflushed_zero_after_sync_import() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Run sync --import
-    let sync_result = bead_forge::sync::import(ws.workspace_path())
-        .expect("Sync import should succeed");
-    assert_eq!(sync_result.imported, 0, "Should import 0 new beads (already in db)");
+    let sync_result =
+        bead_forge::sync::import(ws.workspace_path()).expect("Sync import should succeed");
+    assert_eq!(
+        sync_result.imported, 0,
+        "Should import 0 new beads (already in db)"
+    );
     assert_eq!(sync_result.skipped, 1, "Should skip 1 unchanged bead");
 
     // Check that count_unflushed returns 0
     let result = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
-    assert_eq!(result.unflushed_count, 0, "count_unflushed should be 0 after sync import");
+    assert_eq!(
+        result.unflushed_count, 0,
+        "count_unflushed should be 0 after sync import"
+    );
 }
 
 /// Test that count_unflushed correctly reports after repair with unflushed.
@@ -328,15 +388,21 @@ fn test_count_unflushed_zero_after_repair_with_flush_first() {
     let ws = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create initial bead and flush to JSONL
-    ws.create_bead("bf-001", "Initial bead").expect("Failed to create initial bead");
-    ws.export_jsonl(false).expect("Failed to export initial bead");
+    ws.create_bead("bf-001", "Initial bead")
+        .expect("Failed to create initial bead");
+    ws.export_jsonl(false)
+        .expect("Failed to export initial bead");
 
     // Create another bead WITHOUT flushing (db-only)
-    ws.create_bead("bf-002", "Unflushed bead").expect("Failed to create unflushed bead");
+    ws.create_bead("bf-002", "Unflushed bead")
+        .expect("Failed to create unflushed bead");
 
     // Verify unflushed count is 1 before repair
     let result_before = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
-    assert_eq!(result_before.unflushed_count, 1, "Should have 1 unflushed bead before repair");
+    assert_eq!(
+        result_before.unflushed_count, 1,
+        "Should have 1 unflushed bead before repair"
+    );
 
     // Run repair with --flush-first
     let imported = doctor::repair(ws.workspace_path(), true, false)
@@ -345,5 +411,8 @@ fn test_count_unflushed_zero_after_repair_with_flush_first() {
 
     // After repair with flush, unflushed count should be 0
     let result_after = doctor::check(ws.workspace_path()).expect("Doctor check should succeed");
-    assert_eq!(result_after.unflushed_count, 0, "count_unflushed should be 0 after repair with flush");
+    assert_eq!(
+        result_after.unflushed_count, 0,
+        "count_unflushed should be 0 after repair with flush"
+    );
 }

@@ -126,6 +126,7 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
 /// list` still displays them as active and `closed_at`/`close_reason` are never set.
 fn check_pseudo_terminal_statuses(db_path: &Path) -> Result<Vec<String>> {
     let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
     let placeholders = crate::model::TERMINAL_STATUS_ALIASES
         .iter()
         .map(|s| format!("'{s}'"))
@@ -144,6 +145,7 @@ fn check_pseudo_terminal_statuses(db_path: &Path) -> Result<Vec<String>> {
 /// Check database integrity.
 fn check_database(db_path: &Path) -> Result<(usize, bool)> {
     let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
 
     // Apply schema if database is new (no tables yet)
     let needs_schema: bool = conn
@@ -275,6 +277,7 @@ pub fn count_unflushed(db_path: &Path) -> Result<usize> {
     use rusqlite::Connection;
 
     let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
 
     // Check if dirty_issues table exists
     let table_exists: i64 = conn.query_row(
@@ -287,11 +290,7 @@ pub fn count_unflushed(db_path: &Path) -> Result<usize> {
         return Ok(0);
     }
 
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM dirty_issues",
-        [],
-        |row| row.get(0),
-    )?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM dirty_issues", [], |row| row.get(0))?;
 
     Ok(count as usize)
 }
@@ -304,6 +303,7 @@ fn get_unflushed_ids(db_path: &Path) -> Result<Vec<String>> {
     use rusqlite::Connection;
 
     let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
 
     // Check if dirty_issues table exists
     let table_exists: i64 = conn.query_row(
@@ -388,7 +388,10 @@ pub fn repair(workspace_dir: &Path, flush_first: bool, force: bool) -> Result<us
         if flush_first {
             // Flush ALL beads to JSONL first (not just dirty ones)
             // We must export everything because repair will rebuild db from JSONL
-            eprintln!("Flushing all beads to JSONL before repair (including {} unflushed)...", unflushed_ids.len());
+            eprintln!(
+                "Flushing all beads to JSONL before repair (including {} unflushed)...",
+                unflushed_ids.len()
+            );
             let storage = Storage::open(&db_path)?;
             let flushed = storage.sync_to_jsonl(&jsonl_path, false)?;
             eprintln!("Flushed {} bead(s) to JSONL", flushed);
@@ -567,6 +570,7 @@ pub fn verify_schema(workspace_dir: &Path) -> Result<bool> {
     let db_path = beads_dir.join(&metadata.database);
 
     let conn = Connection::open(&db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
 
     // Check for critical tables
     let tables = [
@@ -927,11 +931,17 @@ mod tests {
 
         // After repair, unflushed count should still be 0
         let unflushed_after = count_unflushed(&db_path).unwrap();
-        assert_eq!(unflushed_after, 0, "Repair should not leave unflushed beads");
+        assert_eq!(
+            unflushed_after, 0,
+            "Repair should not leave unflushed beads"
+        );
 
         // Run doctor check to verify no unflushed issues
         let result = check(workspace).unwrap();
-        assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed after repair");
+        assert_eq!(
+            result.unflushed_count, 0,
+            "Doctor should report 0 unflushed after repair"
+        );
     }
 
     #[test]
@@ -976,11 +986,17 @@ mod tests {
 
         // After import, unflushed count should still be 0 (beads came from JSONL)
         let unflushed_after = count_unflushed(&db_path).unwrap();
-        assert_eq!(unflushed_after, 0, "Import should not leave unflushed beads");
+        assert_eq!(
+            unflushed_after, 0,
+            "Import should not leave unflushed beads"
+        );
 
         // Run doctor check to verify no unflushed issues
         let doctor_result = check(workspace).unwrap();
-        assert_eq!(doctor_result.unflushed_count, 0, "Doctor should report 0 unflushed after import");
+        assert_eq!(
+            doctor_result.unflushed_count, 0,
+            "Doctor should report 0 unflushed after import"
+        );
     }
 
     #[test]
@@ -1026,7 +1042,10 @@ mod tests {
 
         // Run doctor to verify
         let result = check(workspace).unwrap();
-        assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed");
+        assert_eq!(
+            result.unflushed_count, 0,
+            "Doctor should report 0 unflushed"
+        );
     }
 
     #[test]
@@ -1082,11 +1101,17 @@ mod tests {
 
         // After import, all dirty marks should be cleared (db is now in sync with JSONL)
         let unflushed_after = count_unflushed(&db_path).unwrap();
-        assert_eq!(unflushed_after, 0, "Import should clear all dirty marks, leaving 0");
+        assert_eq!(
+            unflushed_after, 0,
+            "Import should clear all dirty marks, leaving 0"
+        );
 
         // Run doctor to verify
         let result = check(workspace).unwrap();
-        assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed after import");
+        assert_eq!(
+            result.unflushed_count, 0,
+            "Doctor should report 0 unflushed after import"
+        );
     }
 
     /// Regression test for bf-wre: `bf doctor` must surface beads stuck with a

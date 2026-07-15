@@ -176,7 +176,7 @@ fn test_batch_placeholder_resolution_multiple_references() {
         },
         // Reference @0 twice - both should resolve to Child 1
         BatchOp::DepAddBlocker {
-            id: parent_id.clone(),    // parent is blocked
+            id: parent_id.clone(),     // parent is blocked
             blocker: "@0".to_string(), // Child 1 blocks parent
         },
         BatchOp::DepAddBlocker {
@@ -234,7 +234,7 @@ fn test_batch_placeholder_out_of_bounds_fails_gracefully() {
         },
         BatchOp::DepAddBlocker {
             id: "bf-parent".to_string(), // parent is blocked
-            blocker: "@5".to_string(),    // Out of bounds
+            blocker: "@5".to_string(),   // Out of bounds
         },
     ];
 
@@ -476,7 +476,7 @@ fn test_sqlite_rollback_on_database_reopen() {
             labels: vec![],
         },
         BatchOp::DepAddBlocker {
-            id: "@0".to_string(),               // blocked bead (created child)
+            id: "@0".to_string(),                // blocked bead (created child)
             blocker: "non-existent".to_string(), // blocker (doesn't exist)
         },
     ];
@@ -583,7 +583,7 @@ fn test_batch_literal_id_references() {
             labels: vec![],
         },
         BatchOp::DepAddBlocker {
-            id: parent2_id.clone(),      // parent2 is blocked
+            id: parent2_id.clone(),     // parent2 is blocked
             blocker: parent_id.clone(), // parent blocks parent2
         },
     ];

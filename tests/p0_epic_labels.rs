@@ -1,7 +1,7 @@
 // P0 Epic with Labels Tests
 // Tests creating P0 (Critical Priority) epics with labels, verifying storage and serialization
 
-use bead_forge::model::{Issue, IssueType, Status, DependencyType, EpicStatus, Priority};
+use bead_forge::model::{DependencyType, EpicStatus, Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 
@@ -17,7 +17,11 @@ fn test_p0_epic_creation_with_labels() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::CRITICAL, // P0 = 0
-        labels: vec!["critical".to_string(), "urgent".to_string(), "security".to_string()],
+        labels: vec![
+            "critical".to_string(),
+            "urgent".to_string(),
+            "security".to_string(),
+        ],
         description: Some("This is a critical priority epic with labels".to_string()),
         ..Default::default()
     };
@@ -47,7 +51,10 @@ fn test_p0_epic_creation_with_labels() {
     assert!(retrieved.labels.contains(&"security".to_string()));
 
     // Test 6: Verify description
-    assert_eq!(retrieved.description, Some("This is a critical priority epic with labels".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("This is a critical priority epic with labels".to_string())
+    );
 }
 
 #[test]
@@ -113,7 +120,14 @@ fn test_p0_epic_children_with_labels() {
         ..Default::default()
     };
     storage.create_issue(&child1).unwrap();
-    storage.add_dependency("epic-p0-children", "p0-child-1", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-children",
+            "p0-child-1",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     let child2 = Issue {
         id: "p0-child-2".to_string(),
@@ -125,7 +139,14 @@ fn test_p0_epic_children_with_labels() {
         ..Default::default()
     };
     storage.create_issue(&child2).unwrap();
-    storage.add_dependency("epic-p0-children", "p0-child-2", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-children",
+            "p0-child-2",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Verify epic and children have their own labels
     let epic_retrieved = storage.get_issue("epic-p0-children").unwrap().unwrap();
@@ -174,7 +195,14 @@ fn test_p0_epic_with_labels_aggregation() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-p0-aggregation", &format!("p0-agg-{}", i), &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-p0-aggregation",
+                &format!("p0-agg-{}", i),
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // List all labels globally
@@ -219,19 +247,27 @@ fn test_p0_epic_status_computation_with_labels() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-p0-status-labels", &format!("p0-status-child-{}", i), &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-p0-status-labels",
+                &format!("p0-status-child-{}", i),
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Compute epic status
     let epic_issue = storage.get_issue("epic-p0-status-labels").unwrap().unwrap();
     let children = storage.get_dependencies("epic-p0-status-labels").unwrap();
 
-    let closed_children = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_children = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     let epic_status = EpicStatus {
         epic: epic_issue,
@@ -262,9 +298,26 @@ fn test_multiple_p0_epics_with_distinct_labels() {
 
     // Create multiple P0 epics with different labels
     let epics = vec![
-        ("epic-p0-1", vec!["critical".to_string(), "frontend".to_string()]),
-        ("epic-p0-2", vec!["critical".to_string(), "urgent".to_string(), "bug".to_string()]),
-        ("epic-p0-3", vec!["critical".to_string(), "refactor".to_string(), "tech-debt".to_string()]),
+        (
+            "epic-p0-1",
+            vec!["critical".to_string(), "frontend".to_string()],
+        ),
+        (
+            "epic-p0-2",
+            vec![
+                "critical".to_string(),
+                "urgent".to_string(),
+                "bug".to_string(),
+            ],
+        ),
+        (
+            "epic-p0-3",
+            vec![
+                "critical".to_string(),
+                "refactor".to_string(),
+                "tech-debt".to_string(),
+            ],
+        ),
     ];
 
     for (id, labels) in &epics {
@@ -340,8 +393,12 @@ fn test_p0_epic_labels_update() {
     storage.create_issue(&epic).unwrap();
 
     // Update epic labels
-    storage.add_label("epic-p0-update-labels", "urgent").unwrap();
-    storage.add_label("epic-p0-update-labels", "backend").unwrap();
+    storage
+        .add_label("epic-p0-update-labels", "urgent")
+        .unwrap();
+    storage
+        .add_label("epic-p0-update-labels", "backend")
+        .unwrap();
 
     // Verify labels were added
     let retrieved = storage.get_issue("epic-p0-update-labels").unwrap().unwrap();
@@ -354,7 +411,9 @@ fn test_p0_epic_labels_update() {
     assert_eq!(retrieved.priority, Priority::CRITICAL);
 
     // Remove a label
-    storage.remove_label("epic-p0-update-labels", "critical").unwrap();
+    storage
+        .remove_label("epic-p0-update-labels", "critical")
+        .unwrap();
 
     // Verify label was removed
     let retrieved = storage.get_issue("epic-p0-update-labels").unwrap().unwrap();
@@ -390,7 +449,14 @@ fn test_p0_epic_hierarchy_with_label_propagation() {
         ..Default::default()
     };
     storage.create_issue(&child1).unwrap();
-    storage.add_dependency("epic-p0-hierarchy", "p0-hierarchy-child-1", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-hierarchy",
+            "p0-hierarchy-child-1",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     let child2 = Issue {
         id: "p0-hierarchy-child-2".to_string(),
@@ -402,7 +468,14 @@ fn test_p0_epic_hierarchy_with_label_propagation() {
         ..Default::default()
     };
     storage.create_issue(&child2).unwrap();
-    storage.add_dependency("epic-p0-hierarchy", "p0-hierarchy-child-2", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-hierarchy",
+            "p0-hierarchy-child-2",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Verify labels don't propagate (each issue has its own labels)
     let epic_retrieved = storage.get_issue("epic-p0-hierarchy").unwrap().unwrap();
@@ -451,7 +524,14 @@ fn test_p0_epic_labels_with_closed_children() {
     };
     child.closed_at = Some(Utc::now());
     storage.create_issue(&child).unwrap();
-    storage.add_dependency("epic-p0-closed-labels", "p0-closed-child-labels", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-closed-labels",
+            "p0-closed-child-labels",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Verify labels persist on closed issues
     let all_labels = storage.list_all_labels().unwrap();
@@ -476,7 +556,11 @@ fn test_p0_epic_with_full_metadata() {
         priority: Priority::CRITICAL,
         description: Some("Full metadata test with labels".to_string()),
         assignee: Some("test-worker".to_string()),
-        labels: vec!["critical".to_string(), "feature".to_string(), "backend".to_string()],
+        labels: vec![
+            "critical".to_string(),
+            "feature".to_string(),
+            "backend".to_string(),
+        ],
         ..Default::default()
     };
     epic.created_at = Utc::now();
@@ -491,7 +575,10 @@ fn test_p0_epic_with_full_metadata() {
     assert_eq!(retrieved.issue_type, IssueType::Epic);
     assert_eq!(retrieved.priority, Priority::CRITICAL);
     assert_eq!(retrieved.priority.0, 0);
-    assert_eq!(retrieved.description, Some("Full metadata test with labels".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("Full metadata test with labels".to_string())
+    );
     assert_eq!(retrieved.assignee, Some("test-worker".to_string()));
     assert_eq!(retrieved.labels.len(), 3);
     assert!(retrieved.labels.contains(&"critical".to_string()));
@@ -534,7 +621,11 @@ fn test_p0_epic_json_roundtrip_with_labels() {
         status: Status::Open,
         priority: Priority::CRITICAL,
         description: Some("Test description with labels".to_string()),
-        labels: vec!["critical".to_string(), "infrastructure".to_string(), "database".to_string()],
+        labels: vec![
+            "critical".to_string(),
+            "infrastructure".to_string(),
+            "database".to_string(),
+        ],
         ..Default::default()
     };
 
@@ -594,7 +685,14 @@ fn test_p0_epic_get_labels_with_children() {
         ..Default::default()
     };
     storage.create_issue(&child).unwrap();
-    storage.add_dependency("epic-p0-get-labels", "p0-get-labels-child", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-p0-get-labels",
+            "p0-get-labels-child",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Get labels specifically for epic
     let epic_labels = storage.get_labels("epic-p0-get-labels").unwrap();

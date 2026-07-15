@@ -1,9 +1,9 @@
 //! Test for dirty bead tracking after repair
 use bead_forge::config::init_workspace;
 use bead_forge::doctor::{check, count_unflushed, repair};
-use bead_forge::sync::flush;
-use bead_forge::storage::Storage;
 use bead_forge::model::{Issue, IssueType, Priority, Status};
+use bead_forge::storage::Storage;
+use bead_forge::sync::flush;
 use tempfile::TempDir;
 
 #[test]
@@ -44,10 +44,16 @@ fn test_dirty_after_repair_cycle() {
     // Check dirty_issues table after repair
     let unflushed_after = count_unflushed(&db_path).unwrap();
     println!("After repair: count_unflushed = {}", unflushed_after);
-    assert_eq!(unflushed_after, 0, "Should be 0 after repair (beads came from JSONL)");
+    assert_eq!(
+        unflushed_after, 0,
+        "Should be 0 after repair (beads came from JSONL)"
+    );
 
     // Run doctor check to verify
     let result = check(workspace).unwrap();
     println!("Doctor check unflushed_count = {}", result.unflushed_count);
-    assert_eq!(result.unflushed_count, 0, "Doctor should report 0 unflushed after repair");
+    assert_eq!(
+        result.unflushed_count, 0,
+        "Doctor should report 0 unflushed after repair"
+    );
 }

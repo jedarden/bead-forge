@@ -44,6 +44,12 @@ pub struct Storage {
 impl Storage {
     pub fn open(db_path: &Path) -> Result<Self> {
         let conn = Connection::open(db_path)?;
+        // Wait out short-lived locks from concurrent processes (fleet workers,
+        // flushes, CLI invocations) instead of failing instantly with
+        // SQLITE_BUSY. with_immediate_transaction adds its own backoff on top
+        // for write transactions; this covers everything else, including the
+        // schema apply below.
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         ensure_wal_mode(&conn)?;
         // Apply schema on every open - all tables use CREATE TABLE IF NOT EXISTS
         // which is a no-op for existing tables and avoids DDL lock contention

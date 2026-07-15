@@ -29,8 +29,8 @@ use std::path::PathBuf;
 fn test_e2e_bf_vs_br_output_parity_forge_snapshot() {
     // Load the fixture
     let fixture_path = PathBuf::from("tests/fixtures/forge-snapshot.jsonl");
-    let fixture_jsonl = fs::read_to_string(&fixture_path)
-        .expect("Failed to read forge-snapshot.jsonl fixture");
+    let fixture_jsonl =
+        fs::read_to_string(&fixture_path).expect("Failed to read forge-snapshot.jsonl fixture");
 
     // Parse fixture to count beads and collect IDs
     let fixture_lines: Vec<&str> = fixture_jsonl.lines().collect();
@@ -40,13 +40,20 @@ fn test_e2e_bf_vs_br_output_parity_forge_snapshot() {
         .filter_map(|line| {
             serde_json::from_str::<serde_json::Value>(line)
                 .ok()
-                .and_then(|v| v.get("id").and_then(|id| id.as_str()).map(|s| s.to_string()))
+                .and_then(|v| {
+                    v.get("id")
+                        .and_then(|id| id.as_str())
+                        .map(|s| s.to_string())
+                })
         })
         .collect();
 
     println!("Fixture: forge-snapshot.jsonl");
     println!("  Total beads: {}", fixture_count);
-    println!("  Sample IDs: {:?}", &fixture_ids.iter().take(5).cloned().collect::<Vec<_>>());
+    println!(
+        "  Sample IDs: {:?}",
+        &fixture_ids.iter().take(5).cloned().collect::<Vec<_>>()
+    );
 
     // Import into bf workspace
     let ws = common::TempWorkspace::from_fixture("forge-snapshot.jsonl")
@@ -171,12 +178,18 @@ fn test_e2e_bf_vs_br_output_parity_forge_snapshot() {
 
         // Verify dependencies and comments are stripped (br compatibility)
         assert!(
-            bf_value.get("dependencies").and_then(|d| d.as_array()).map_or(true, |arr| arr.is_empty()),
+            bf_value
+                .get("dependencies")
+                .and_then(|d| d.as_array())
+                .map_or(true, |arr| arr.is_empty()),
             "Dependencies should be stripped for br compatibility (bead {})",
             id
         );
         assert!(
-            bf_value.get("comments").and_then(|c| c.as_array()).map_or(true, |arr| arr.is_empty()),
+            bf_value
+                .get("comments")
+                .and_then(|c| c.as_array())
+                .map_or(true, |arr| arr.is_empty()),
             "Comments should be stripped for br compatibility (bead {})",
             id
         );
@@ -191,15 +204,18 @@ fn test_e2e_bf_vs_br_output_parity_forge_snapshot() {
         "Not all beads from fixture were in bf output"
     );
 
-    println!("E2E parity test passed: {} beads validated", matched_ids.len());
+    println!(
+        "E2E parity test passed: {} beads validated",
+        matched_ids.len()
+    );
 }
 
 /// Test E2E parity with needle-snapshot.jsonl (another real workspace).
 #[test]
 fn test_e2e_bf_vs_br_output_parity_needle_snapshot() {
     let fixture_path = PathBuf::from("tests/fixtures/needle-snapshot.jsonl");
-    let fixture_jsonl = fs::read_to_string(&fixture_path)
-        .expect("Failed to read needle-snapshot.jsonl fixture");
+    let fixture_jsonl =
+        fs::read_to_string(&fixture_path).expect("Failed to read needle-snapshot.jsonl fixture");
 
     let fixture_lines: Vec<&str> = fixture_jsonl.lines().collect();
     let fixture_count = fixture_lines.len();
@@ -216,8 +232,10 @@ fn test_e2e_bf_vs_br_output_parity_needle_snapshot() {
     // We expect: imported + skipped >= fixture_count (some lines may be duplicates)
     // but the actual bead count should be <= fixture_count.
     let expected_beads = import_result.imported;
-    println!("  Imported: {}, Skipped: {}, Total expected beads: {}",
-        import_result.imported, import_result.skipped, expected_beads);
+    println!(
+        "  Imported: {}, Skipped: {}, Total expected beads: {}",
+        import_result.imported, import_result.skipped, expected_beads
+    );
 
     let beads = ws.list_beads().expect("Failed to list beads");
     assert_eq!(
@@ -246,17 +264,32 @@ fn test_e2e_bf_vs_br_output_parity_needle_snapshot() {
         assert!(bf_value.get("title").is_some(), "Missing title field");
         assert!(bf_value.get("status").is_some(), "Missing status field");
         assert!(bf_value.get("priority").is_some(), "Missing priority field");
-        assert!(bf_value.get("issue_type").is_some(), "Missing issue_type field");
-        assert!(bf_value.get("created_at").is_some(), "Missing created_at field");
-        assert!(bf_value.get("updated_at").is_some(), "Missing updated_at field");
+        assert!(
+            bf_value.get("issue_type").is_some(),
+            "Missing issue_type field"
+        );
+        assert!(
+            bf_value.get("created_at").is_some(),
+            "Missing created_at field"
+        );
+        assert!(
+            bf_value.get("updated_at").is_some(),
+            "Missing updated_at field"
+        );
 
         // Verify dependencies/comments are stripped
         assert!(
-            bf_value.get("dependencies").and_then(|d| d.as_array()).map_or(true, |arr| arr.is_empty()),
+            bf_value
+                .get("dependencies")
+                .and_then(|d| d.as_array())
+                .map_or(true, |arr| arr.is_empty()),
             "Dependencies should be stripped for br compatibility"
         );
         assert!(
-            bf_value.get("comments").and_then(|c| c.as_array()).map_or(true, |arr| arr.is_empty()),
+            bf_value
+                .get("comments")
+                .and_then(|c| c.as_array())
+                .map_or(true, |arr| arr.is_empty()),
             "Comments should be stripped for br compatibility"
         );
     }
@@ -295,8 +328,8 @@ fn test_e2e_bf_vs_br_output_parity_simple_bead() {
 #[test]
 fn test_e2e_jsonl_round_trip_output_parity() {
     let fixture_path = PathBuf::from("tests/fixtures/forge-snapshot.jsonl");
-    let fixture_jsonl = fs::read_to_string(&fixture_path)
-        .expect("Failed to read forge-snapshot.jsonl fixture");
+    let fixture_jsonl =
+        fs::read_to_string(&fixture_path).expect("Failed to read forge-snapshot.jsonl fixture");
 
     // Import into workspace
     let ws = common::TempWorkspace::from_fixture("forge-snapshot.jsonl")
@@ -313,8 +346,7 @@ fn test_e2e_jsonl_round_trip_output_parity() {
     );
 
     // Read exported JSONL
-    let exported_jsonl = fs::read_to_string(&ws.jsonl_path)
-        .expect("Failed to read exported JSONL");
+    let exported_jsonl = fs::read_to_string(&ws.jsonl_path).expect("Failed to read exported JSONL");
 
     // Parse and compare counts
     let fixture_lines: Vec<&str> = fixture_jsonl.lines().collect();
@@ -330,7 +362,9 @@ fn test_e2e_jsonl_round_trip_output_parity() {
     let ws2 = common::TempWorkspace::new().expect("Failed to create second workspace");
     fs::write(&ws2.jsonl_path, &exported_jsonl).expect("Failed to write exported JSONL");
 
-    let reimport_result = ws2.import_jsonl().expect("Failed to re-import exported JSONL");
+    let reimport_result = ws2
+        .import_jsonl()
+        .expect("Failed to re-import exported JSONL");
     assert_eq!(
         reimport_result.imported + reimport_result.skipped,
         fixture_lines.len(),
@@ -358,7 +392,14 @@ fn test_e2e_br_vs_bf_list_output_parity() {
 
     // Run bf list --format json --all (actual bf command)
     let bf_output = Command::new(env!("CARGO_BIN_EXE_bf"))
-        .args(["list", "--format", "json", "--all", "--workspace", ws.workspace_path().to_str().unwrap()])
+        .args([
+            "list",
+            "--format",
+            "json",
+            "--all",
+            "--workspace",
+            ws.workspace_path().to_str().unwrap(),
+        ])
         .output()
         .expect("Failed to run bf list");
 
@@ -372,7 +413,14 @@ fn test_e2e_br_vs_bf_list_output_parity() {
 
     // Run br list --format json --all (actual br command)
     let br_output = Command::new("/home/coding/.local/bin/br")
-        .args(["list", "--format", "json", "--all", "--workspace", ws.workspace_path().to_str().unwrap()])
+        .args([
+            "list",
+            "--format",
+            "json",
+            "--all",
+            "--workspace",
+            ws.workspace_path().to_str().unwrap(),
+        ])
         .output()
         .expect("Failed to run br list");
 
@@ -416,7 +464,9 @@ fn test_e2e_br_vs_bf_list_output_parity() {
 
     // Verify all beads from bf are in br output with matching fields
     for (id, bf_value) in &bf_beads {
-        let br_value = br_beads.get(id).unwrap_or_else(|| panic!("Bead {} missing from br output", id));
+        let br_value = br_beads
+            .get(id)
+            .unwrap_or_else(|| panic!("Bead {} missing from br output", id));
 
         // Compare critical fields
         assert_eq!(

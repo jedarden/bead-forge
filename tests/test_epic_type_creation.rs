@@ -2,7 +2,7 @@
 // This test verifies that epics can be created with the correct type
 // and that the epic type is correctly preserved through serialization, storage, and retrieval
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 
 #[test]
@@ -220,7 +220,10 @@ fn test_multiple_epics_creation() {
 
     // Verify all epics have correct type
     for i in 1..=5 {
-        let retrieved = storage.get_issue(&format!("epic-multi-{}", i)).unwrap().unwrap();
+        let retrieved = storage
+            .get_issue(&format!("epic-multi-{}", i))
+            .unwrap()
+            .unwrap();
         assert_eq!(retrieved.issue_type, IssueType::Epic);
         assert_eq!(retrieved.title, format!("Multi Epic {}", i));
     }

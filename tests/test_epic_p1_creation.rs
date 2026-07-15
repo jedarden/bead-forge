@@ -2,7 +2,7 @@
 // This test verifies that epics can be created with P1 (high) priority
 // and that the priority is correctly preserved through serialization, storage, and retrieval
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 
 #[test]
@@ -129,7 +129,9 @@ fn test_epic_p1_with_children() {
         storage.create_issue(&child).unwrap();
 
         use bead_forge::model::DependencyType;
-        storage.add_dependency("epic-p1-children", id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency("epic-p1-children", id, &DependencyType::ParentChild, "test")
+            .unwrap();
     }
 
     // Verify epic has all children

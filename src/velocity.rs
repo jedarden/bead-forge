@@ -35,10 +35,7 @@ fn parse_datetime(s: &str) -> Result<DateTime<Utc>> {
         Ok(dt) => Ok(dt.with_timezone(&Utc)),
         Err(_) => {
             // SQLite-native datetime() format: no timezone, space or 'T' separator
-            for fmt in [
-                "%Y-%m-%d %H:%M:%S",
-                "%Y-%m-%dT%H:%M:%S",
-            ] {
+            for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"] {
                 if let Ok(ndt) = NaiveDateTime::parse_from_str(t, fmt) {
                     return Ok(ndt.and_utc());
                 }
@@ -587,12 +584,18 @@ mod tests {
         // Test completely invalid format
         let result = parse_datetime("not-a-date");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid claimed_at format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid claimed_at format"));
 
         // Test partial date (missing time)
         let result = parse_datetime("2026-05-15");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid claimed_at format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid claimed_at format"));
 
         // Test invalid date values
         let result = parse_datetime("2026-13-01 12:00:00"); // Invalid month
@@ -608,8 +611,8 @@ mod tests {
 
         // Test RFC3339-like but missing timezone
         let result = parse_datetime("2026-05-15T21:10:36"); // Missing timezone
-        // This should fall through to SQLite format parsing
-        // and succeed since SQLite format accepts this
+                                                            // This should fall through to SQLite format parsing
+                                                            // and succeed since SQLite format accepts this
         assert!(result.is_ok());
     }
 }

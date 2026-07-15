@@ -1,7 +1,7 @@
 // Epic 4: Single Label Tests
 // Tests that epics work correctly with exactly one label
 
-use bead_forge::model::{Issue, IssueType, Status, DependencyType, EpicStatus, Priority};
+use bead_forge::model::{DependencyType, EpicStatus, Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 
@@ -83,7 +83,14 @@ fn test_epic_single_label_with_children() {
         ..Default::default()
     };
     storage.create_issue(&child1).unwrap();
-    storage.add_dependency("epic-single-with-children", "child-with-label", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-single-with-children",
+            "child-with-label",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     let child2 = Issue {
         id: "child-no-label".to_string(),
@@ -94,10 +101,20 @@ fn test_epic_single_label_with_children() {
         ..Default::default()
     };
     storage.create_issue(&child2).unwrap();
-    storage.add_dependency("epic-single-with-children", "child-no-label", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-single-with-children",
+            "child-no-label",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Verify epic still has only its single label
-    let epic_retrieved = storage.get_issue("epic-single-with-children").unwrap().unwrap();
+    let epic_retrieved = storage
+        .get_issue("epic-single-with-children")
+        .unwrap()
+        .unwrap();
     assert_eq!(epic_retrieved.labels.len(), 1);
     assert_eq!(epic_retrieved.labels[0], "backend");
 
@@ -137,18 +154,26 @@ fn test_epic_single_label_status_computation() {
     };
     child.closed_at = Some(Utc::now());
     storage.create_issue(&child).unwrap();
-    storage.add_dependency("epic-single-status", "single-status-child", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-single-status",
+            "single-status-child",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Compute epic status
     let epic_issue = storage.get_issue("epic-single-status").unwrap().unwrap();
     let children = storage.get_dependencies("epic-single-status").unwrap();
 
-    let closed_children = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_children = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     let epic_status = EpicStatus {
         epic: epic_issue,
@@ -183,24 +208,37 @@ fn test_epic_single_label_add_and_remove() {
     storage.create_issue(&epic).unwrap();
 
     // Verify initial single label
-    let retrieved = storage.get_issue("epic-single-add-remove").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("epic-single-add-remove")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.labels.len(), 1);
     assert_eq!(retrieved.labels[0], "initial");
 
     // Add another label
-    storage.add_label("epic-single-add-remove", "second").unwrap();
+    storage
+        .add_label("epic-single-add-remove", "second")
+        .unwrap();
 
     // Verify now has two labels
-    let retrieved = storage.get_issue("epic-single-add-remove").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("epic-single-add-remove")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.labels.len(), 2);
     assert!(retrieved.labels.contains(&"initial".to_string()));
     assert!(retrieved.labels.contains(&"second".to_string()));
 
     // Remove the initial label
-    storage.remove_label("epic-single-add-remove", "initial").unwrap();
+    storage
+        .remove_label("epic-single-add-remove", "initial")
+        .unwrap();
 
     // Verify back to single label
-    let retrieved = storage.get_issue("epic-single-add-remove").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("epic-single-add-remove")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.labels.len(), 1);
     assert_eq!(retrieved.labels[0], "second");
 }
@@ -310,7 +348,10 @@ fn test_epic_single_label_json_roundtrip() {
     assert_eq!(deserialized.labels.len(), 1);
     assert_eq!(deserialized.labels[0], "roundtrip-test");
     assert_eq!(deserialized.priority, Priority::HIGH);
-    assert_eq!(deserialized.description, Some("Testing single label roundtrip".to_string()));
+    assert_eq!(
+        deserialized.description,
+        Some("Testing single label roundtrip".to_string())
+    );
 }
 
 #[test]
@@ -341,7 +382,14 @@ fn test_epic_single_label_with_closed_children() {
         };
         child.closed_at = Some(Utc::now());
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-single-closed", &format!("closed-child-{}", i), &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-single-closed",
+                &format!("closed-child-{}", i),
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Verify epic still has only single label
@@ -353,12 +401,13 @@ fn test_epic_single_label_with_closed_children() {
     let children = storage.get_dependencies("epic-single-closed").unwrap();
     assert_eq!(children.len(), 3);
 
-    let closed_count = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_count = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     assert_eq!(closed_count, 3);
 }
@@ -420,7 +469,14 @@ fn test_epic_single_label_various_types() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-single-various", id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-single-various",
+                id,
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Verify epic still has only its single label

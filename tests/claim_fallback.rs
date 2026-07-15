@@ -15,7 +15,9 @@ fn test_claim_fallback_any_exhausted_primary_workspace() {
     // Workspace A: no beads (exhausted)
     // Workspace B: 2 beads available
     workspace_b.create_bead("bf-b1", "Bead in B").unwrap();
-    workspace_b.create_bead("bf-b2", "Another bead in B").unwrap();
+    workspace_b
+        .create_bead("bf-b2", "Another bead in B")
+        .unwrap();
 
     // Set up worker metadata
     let worker_metadata = bead_forge::claim::WorkerMetadata {
@@ -31,18 +33,17 @@ fn test_claim_fallback_any_exhausted_primary_workspace() {
         workspace_b.workspace_path().to_path_buf(),
     ];
 
-    let result = bead_forge::claim::claim_any(
-        &workspace_paths,
-        "worker-1",
-        30,
-        Some(&worker_metadata),
-    );
+    let result =
+        bead_forge::claim::claim_any(&workspace_paths, "worker-1", 30, Some(&worker_metadata));
 
     assert!(result.is_ok());
     let claim_result = result.unwrap();
 
     // Should claim a bead from workspace B
-    assert!(claim_result.is_some(), "Should claim a bead from workspace B");
+    assert!(
+        claim_result.is_some(),
+        "Should claim a bead from workspace B"
+    );
 
     let claimed = claim_result.unwrap();
 
@@ -67,7 +68,9 @@ fn test_claim_fallback_any_primary_has_beads_no_fallback() {
 
     // Workspace B: 2 beads (should NOT be claimed from)
     workspace_b.create_bead("bf-b1", "Bead in B").unwrap();
-    workspace_b.create_bead("bf-b2", "Another bead in B").unwrap();
+    workspace_b
+        .create_bead("bf-b2", "Another bead in B")
+        .unwrap();
 
     let worker_metadata = bead_forge::claim::WorkerMetadata {
         worker_id: "worker-1".to_string(),
@@ -81,12 +84,7 @@ fn test_claim_fallback_any_primary_has_beads_no_fallback() {
         workspace_b.workspace_path().to_path_buf(),
     ];
 
-    let result = bead_forge::claim_any(
-        &workspace_paths,
-        "worker-1",
-        30,
-        Some(&worker_metadata),
-    );
+    let result = bead_forge::claim_any(&workspace_paths, "worker-1", 30, Some(&worker_metadata));
 
     assert!(result.is_ok());
     let claim_result = result.unwrap();
@@ -126,18 +124,16 @@ fn test_claim_fallback_any_empty_all_workspaces() {
         workspace_b.workspace_path().to_path_buf(),
     ];
 
-    let result = bead_forge::claim_any(
-        &workspace_paths,
-        "worker-1",
-        30,
-        Some(&worker_metadata),
-    );
+    let result = bead_forge::claim_any(&workspace_paths, "worker-1", 30, Some(&worker_metadata));
 
     assert!(result.is_ok());
     let claim_result = result.unwrap();
 
     // No beads available in any workspace
-    assert!(claim_result.is_none(), "Should return None when all workspaces empty");
+    assert!(
+        claim_result.is_none(),
+        "Should return None when all workspaces empty"
+    );
 }
 
 #[test]
@@ -164,12 +160,7 @@ fn test_claim_fallback_any_selects_from_available_workspace() {
         workspace_b.workspace_path().to_path_buf(),
     ];
 
-    let result = bead_forge::claim_any(
-        &workspace_paths,
-        "worker-1",
-        30,
-        Some(&worker_metadata),
-    );
+    let result = bead_forge::claim_any(&workspace_paths, "worker-1", 30, Some(&worker_metadata));
 
     assert!(result.is_ok());
     let claim_result = result.unwrap();
@@ -221,30 +212,23 @@ fn test_claim_fallback_any_with_dependencies() {
     ];
 
     // First claim: should get bf-parent (child is blocked)
-    let result1 = bead_forge::claim_any(
-        &workspace_paths,
-        "worker-1",
-        30,
-        Some(&worker_metadata),
-    );
+    let result1 = bead_forge::claim_any(&workspace_paths, "worker-1", 30, Some(&worker_metadata));
 
     assert!(result1.is_ok());
     let claim_result1 = result1.unwrap().unwrap();
     assert_eq!(claim_result1.bead_id, "bf-parent");
 
     // Second claim: should get None (child still blocked)
-    let result2 = bead_forge::claim_any(
-        &workspace_paths,
-        "worker-2",
-        30,
-        Some(&worker_metadata),
-    );
+    let result2 = bead_forge::claim_any(&workspace_paths, "worker-2", 30, Some(&worker_metadata));
 
     assert!(result2.is_ok());
     let claim_result2 = result2.unwrap();
 
     // Child should not be claimable (blocked by parent)
-    assert!(claim_result2.is_none(), "Child bead should not be claimed (blocked by parent)");
+    assert!(
+        claim_result2.is_none(),
+        "Child bead should not be claimed (blocked by parent)"
+    );
 }
 
 #[test]
@@ -256,9 +240,17 @@ fn test_claim_fallback_any_pinned_beads_respected() {
     // Workspace A: empty
 
     // Workspace B: mix of pinned and unpinned
-    let mut pinned = bead_forge::Issue::new("bf-pinned".to_string(), "Pinned bead".to_string(), ".".to_string());
+    let mut pinned = bead_forge::Issue::new(
+        "bf-pinned".to_string(),
+        "Pinned bead".to_string(),
+        ".".to_string(),
+    );
     pinned.pinned = true;
-    workspace_b.storage().unwrap().create_issue(&pinned).unwrap();
+    workspace_b
+        .storage()
+        .unwrap()
+        .create_issue(&pinned)
+        .unwrap();
 
     workspace_b.create_bead("bf-open", "Open bead").unwrap();
 
@@ -274,12 +266,7 @@ fn test_claim_fallback_any_pinned_beads_respected() {
         workspace_b.workspace_path().to_path_buf(),
     ];
 
-    let result = bead_forge::claim_any(
-        &workspace_paths,
-        "worker-1",
-        30,
-        Some(&worker_metadata),
-    );
+    let result = bead_forge::claim_any(&workspace_paths, "worker-1", 30, Some(&worker_metadata));
 
     assert!(result.is_ok());
     let claim_result = result.unwrap();
@@ -323,12 +310,7 @@ fn test_claim_fallback_any_multiple_workspaces() {
         workspace_c.workspace_path().to_path_buf(),
     ];
 
-    let result = bead_forge::claim_any(
-        &workspace_paths,
-        "worker-1",
-        30,
-        Some(&worker_metadata),
-    );
+    let result = bead_forge::claim_any(&workspace_paths, "worker-1", 30, Some(&worker_metadata));
 
     assert!(result.is_ok());
     let claim_result = result.unwrap();
@@ -349,8 +331,8 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
     // Creates two workspaces, exhausts workspace A, verifies that
     // `bf claim --workspace A --fallback any` returns a bead from workspace B.
 
-    use std::process::Command;
     use std::path::PathBuf;
+    use std::process::Command;
 
     let workspace_a = common::TempWorkspace::new().unwrap();
     let workspace_b = common::TempWorkspace::new().unwrap();
@@ -358,7 +340,9 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
     // Workspace A: no beads (exhausted)
     // Workspace B: 2 beads available
     workspace_b.create_bead("bf-b1", "Bead in B").unwrap();
-    workspace_b.create_bead("bf-b2", "Another bead in B").unwrap();
+    workspace_b
+        .create_bead("bf-b2", "Another bead in B")
+        .unwrap();
 
     // Build the bf binary if it doesn't exist
     // Note: cargo tests run with cwd = project root, but we change current_dir for the command
@@ -372,7 +356,10 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
 
     // If binary doesn't exist, skip this test (requires cargo build)
     if !bf_binary.exists() {
-        println!("CLI binary not found at {:?}, skipping CLI test. Run 'cargo build' first.", bf_binary);
+        println!(
+            "CLI binary not found at {:?}, skipping CLI test. Run 'cargo build' first.",
+            bf_binary
+        );
         return;
     }
 
@@ -407,8 +394,8 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
 
             // Parse JSON output
             let stdout = String::from_utf8(output.stdout).unwrap();
-            let json: serde_json::Value = serde_json::from_str(&stdout)
-                .expect("Output should be valid JSON");
+            let json: serde_json::Value =
+                serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
             // Verify a bead was claimed
             let bead_id = json["bead_id"].as_str();
@@ -471,13 +458,7 @@ fn test_claim_fallback_to_1800s_when_velocity_stats_empty() {
     let storage = workspace.storage().unwrap();
     let claim_result = storage
         .with_immediate_transaction(|tx| {
-            bead_forge::claim::claim(
-                tx,
-                "test-worker",
-                30,
-                Utc::now(),
-                Some(&worker_metadata),
-            )
+            bead_forge::claim::claim(tx, "test-worker", 30, Utc::now(), Some(&worker_metadata))
         })
         .unwrap();
 

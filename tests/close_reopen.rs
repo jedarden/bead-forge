@@ -9,7 +9,7 @@
 //! 6. Status transitions are tracked correctly
 
 use bead_forge::config::load_config;
-use bead_forge::model::{Issue, Status, EventType, IssueType, Priority, IssueChanges};
+use bead_forge::model::{EventType, Issue, IssueChanges, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::{DateTime, Utc};
 use std::path::PathBuf;
@@ -115,7 +115,9 @@ fn test_close_bead_creates_close_event() {
 
     // Close the bead
     let close_reason = "Task completed successfully";
-    storage.close_issue(&bead.id, close_reason, "test-user").unwrap();
+    storage
+        .close_issue(&bead.id, close_reason, "test-user")
+        .unwrap();
 
     // Verify the bead is closed
     let closed_bead = storage.get_issue(&bead.id).unwrap().unwrap();
@@ -127,7 +129,10 @@ fn test_close_bead_creates_close_event() {
     let events = storage.list_events(&bead.id).unwrap();
     assert_eq!(events.len(), 2); // Created + Closed events
 
-    let close_event = events.iter().find(|e| matches!(e.event_type, EventType::Closed)).unwrap();
+    let close_event = events
+        .iter()
+        .find(|e| matches!(e.event_type, EventType::Closed))
+        .unwrap();
     assert_eq!(close_event.actor, "test-user");
     assert_eq!(close_event.new_value.as_ref().unwrap(), close_reason);
     assert!(close_event.old_value.is_none()); // Close events have no old_value
@@ -141,7 +146,9 @@ fn test_reopen_bead_changes_status_to_open() {
 
     // Create and close a bead
     let bead = create_test_bead(&storage, "Test bead for reopen");
-    storage.close_issue(&bead.id, "Initial close", "test-user").unwrap();
+    storage
+        .close_issue(&bead.id, "Initial close", "test-user")
+        .unwrap();
 
     // Reopen the bead
     use bead_forge::model::IssueChanges;
@@ -170,7 +177,9 @@ fn test_close_then_reopen_creates_reopened_event() {
 
     // Create and close a bead
     let bead = create_test_bead(&storage, "Test bead for reopen event");
-    storage.close_issue(&bead.id, "Initial close", "test-user").unwrap();
+    storage
+        .close_issue(&bead.id, "Initial close", "test-user")
+        .unwrap();
 
     // Reopen the bead
     use bead_forge::model::IssueChanges;
@@ -186,16 +195,31 @@ fn test_close_then_reopen_creates_reopened_event() {
     println!("Events after reopen: {:?}", events);
 
     // Count events by type
-    let created_events = events.iter().filter(|e| matches!(e.event_type, EventType::Created)).count();
-    let closed_events = events.iter().filter(|e| matches!(e.event_type, EventType::Closed)).count();
-    let reopened_events = events.iter().filter(|e| matches!(e.event_type, EventType::Reopened)).count();
+    let created_events = events
+        .iter()
+        .filter(|e| matches!(e.event_type, EventType::Created))
+        .count();
+    let closed_events = events
+        .iter()
+        .filter(|e| matches!(e.event_type, EventType::Closed))
+        .count();
+    let reopened_events = events
+        .iter()
+        .filter(|e| matches!(e.event_type, EventType::Reopened))
+        .count();
 
     assert_eq!(created_events, 1, "Should have 1 Created event");
     assert_eq!(closed_events, 1, "Should have 1 Closed event");
-    assert_eq!(reopened_events, 1, "Should have 1 Reopened event after reopening");
+    assert_eq!(
+        reopened_events, 1,
+        "Should have 1 Reopened event after reopening"
+    );
 
     // Verify the reopened event has the correct actor
-    let reopened_event = events.iter().find(|e| matches!(e.event_type, EventType::Reopened)).unwrap();
+    let reopened_event = events
+        .iter()
+        .find(|e| matches!(e.event_type, EventType::Reopened))
+        .unwrap();
     assert_eq!(reopened_event.actor, "test-user");
     assert_eq!(reopened_event.old_value.as_ref().unwrap(), "closed");
     assert_eq!(reopened_event.new_value.as_ref().unwrap(), "open");
@@ -211,7 +235,9 @@ fn test_multiple_close_reopen_cycles() {
     let bead = create_test_bead(&storage, "Test bead for multiple cycles");
 
     // Close -> Reopen -> Close -> Reopen
-    storage.close_issue(&bead.id, "First close", "user1").unwrap();
+    storage
+        .close_issue(&bead.id, "First close", "user1")
+        .unwrap();
 
     use bead_forge::model::IssueChanges;
     let changes1 = IssueChanges {
@@ -221,7 +247,9 @@ fn test_multiple_close_reopen_cycles() {
     };
     storage.update_issue(&bead.id, &changes1).unwrap();
 
-    storage.close_issue(&bead.id, "Second close", "user2").unwrap();
+    storage
+        .close_issue(&bead.id, "Second close", "user2")
+        .unwrap();
     let changes2 = IssueChanges {
         status: Some(Status::Open),
         actor: Some("user2".to_string()),
@@ -239,8 +267,14 @@ fn test_multiple_close_reopen_cycles() {
     let events = storage.list_events(&bead.id).unwrap();
     println!("Events after multiple cycles: {:?}", events);
 
-    let created_events = events.iter().filter(|e| matches!(e.event_type, EventType::Created)).count();
-    let closed_events = events.iter().filter(|e| matches!(e.event_type, EventType::Closed)).count();
+    let created_events = events
+        .iter()
+        .filter(|e| matches!(e.event_type, EventType::Created))
+        .count();
+    let closed_events = events
+        .iter()
+        .filter(|e| matches!(e.event_type, EventType::Closed))
+        .count();
 
     assert_eq!(created_events, 1, "Should have 1 Created event");
     assert_eq!(closed_events, 2, "Should have 2 Closed events");
@@ -254,11 +288,17 @@ fn test_close_reason_preserved_in_event() {
 
     let bead = create_test_bead(&storage, "Test bead for close reason");
 
-    let close_reason = "This is a detailed close reason with context: task completed, tested, and verified";
-    storage.close_issue(&bead.id, close_reason, "tester").unwrap();
+    let close_reason =
+        "This is a detailed close reason with context: task completed, tested, and verified";
+    storage
+        .close_issue(&bead.id, close_reason, "tester")
+        .unwrap();
 
     let events = storage.list_events(&bead.id).unwrap();
-    let close_event = events.iter().find(|e| matches!(e.event_type, EventType::Closed)).unwrap();
+    let close_event = events
+        .iter()
+        .find(|e| matches!(e.event_type, EventType::Closed))
+        .unwrap();
 
     assert_eq!(close_event.new_value.as_ref().unwrap(), close_reason);
 }
@@ -321,8 +361,14 @@ fn test_close_preserves_other_fields() {
 
     let closed_bead = storage.get_issue(&id).unwrap().unwrap();
     assert_eq!(closed_bead.title, "Test bead preservation");
-    assert_eq!(closed_bead.description.as_ref().unwrap(), "Original description");
-    assert_eq!(closed_bead.acceptance_criteria.as_ref().unwrap(), "Original AC");
+    assert_eq!(
+        closed_bead.description.as_ref().unwrap(),
+        "Original description"
+    );
+    assert_eq!(
+        closed_bead.acceptance_criteria.as_ref().unwrap(),
+        "Original AC"
+    );
     assert_eq!(closed_bead.design.as_ref().unwrap(), "Original design");
     assert_eq!(closed_bead.notes.as_ref().unwrap(), "Original notes");
     assert_eq!(closed_bead.priority, Priority(3));
