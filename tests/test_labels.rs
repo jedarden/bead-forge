@@ -7,9 +7,34 @@ fn bf_binary() -> String {
     std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
 }
 
+use std::sync::OnceLock;
+
+static WORKSPACE: OnceLock<tempfile::TempDir> = OnceLock::new();
+
+/// Per-binary isolated workspace — these tests previously ran against the
+/// repo's own tracked .beads workspace, polluting it with test beads and
+/// contending on its database under parallel test threads.
+fn workspace_dir() -> &'static std::path::Path {
+    WORKSPACE
+        .get_or_init(|| {
+            let dir = tempfile::tempdir().unwrap();
+            let beads = dir.path().join(".beads");
+            std::fs::create_dir(&beads).unwrap();
+            bead_forge::config::init_workspace(&beads, "bf").unwrap();
+            // Create the database up front (WAL mode, schema applied) so
+            // parallel test threads never stampede a cold-start conversion.
+            let metadata = bead_forge::config::load_metadata(&beads).unwrap();
+            let _ = bead_forge::Storage::open(&beads.join(&metadata.database)).unwrap();
+            dir
+        })
+        .path()
+}
+
 fn bf() -> Command {
     let mut cmd = Command::new(bf_binary());
-    cmd.arg("-w").arg(".beads").current_dir(".");
+    cmd.arg("-w")
+        .arg(workspace_dir().join(".beads"))
+        .current_dir(workspace_dir());
     cmd
 }
 
