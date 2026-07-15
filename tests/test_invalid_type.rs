@@ -147,8 +147,7 @@ mod tests {
             assert!(
                 success,
                 "Create command should succeed for type '{}'. stderr: {}",
-                custom_type,
-                stderr
+                custom_type, stderr
             );
 
             let bead_id = stdout.trim();
@@ -239,8 +238,7 @@ mod tests {
 
         // Read the JSONL file
         let jsonl_path = beads_dir.join("issues.jsonl");
-        let jsonl_content = fs::read_to_string(&jsonl_path)
-            .expect("Failed to read JSONL file");
+        let jsonl_content = fs::read_to_string(&jsonl_path).expect("Failed to read JSONL file");
 
         assert!(
             jsonl_content.contains(custom_type),
@@ -264,21 +262,13 @@ mod tests {
         for (issue_type, title) in types_and_titles {
             let (stdout, stderr, success) = run_create(
                 &beads_dir,
-                &[
-                    "--title",
-                    title,
-                    "--type",
-                    issue_type,
-                    "--priority",
-                    "2",
-                ],
+                &["--title", title, "--type", issue_type, "--priority", "2"],
             );
 
             assert!(
                 success,
                 "Create command should succeed for type '{}'. stderr: {}",
-                issue_type,
-                stderr
+                issue_type, stderr
             );
 
             let bead_id = stdout.trim();

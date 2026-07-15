@@ -66,7 +66,11 @@ fn create_test_bead(workspace: impl AsRef<std::path::Path>, title: &str) -> Stri
         .output()
         .expect("Failed to create bead");
 
-    assert!(result.status.success(), "bf create failed: {}", String::from_utf8_lossy(&result.stderr));
+    assert!(
+        result.status.success(),
+        "bf create failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
     String::from_utf8(result.stdout).unwrap().trim().to_string()
 }
 
@@ -87,16 +91,29 @@ fn test_show_basic_text_format() {
         .output()
         .expect("Failed to run bf show");
 
-    assert!(show_result.status.success(), "bf show failed: {}", String::from_utf8_lossy(&show_result.stderr));
+    assert!(
+        show_result.status.success(),
+        "bf show failed: {}",
+        String::from_utf8_lossy(&show_result.stderr)
+    );
 
     let output = String::from_utf8(show_result.stdout).unwrap();
     println!("Show output:\n{}", output);
 
     // Verify basic fields are present
-    assert!(output.contains(&format!("ID: {}", bead_id)), "Output should contain bead ID");
-    assert!(output.contains("Title: Test show command"), "Output should contain title");
+    assert!(
+        output.contains(&format!("ID: {}", bead_id)),
+        "Output should contain bead ID"
+    );
+    assert!(
+        output.contains("Title: Test show command"),
+        "Output should contain title"
+    );
     assert!(output.contains("Status:"), "Output should contain status");
-    assert!(output.contains("Priority:"), "Output should contain priority");
+    assert!(
+        output.contains("Priority:"),
+        "Output should contain priority"
+    );
     assert!(output.contains("Type:"), "Output should contain type");
 }
 
@@ -121,7 +138,11 @@ fn test_show_json_format() {
         .output()
         .expect("Failed to update bead");
 
-    assert!(update_result.status.success(), "bf update failed: {}", String::from_utf8_lossy(&update_result.stderr));
+    assert!(
+        update_result.status.success(),
+        "bf update failed: {}",
+        String::from_utf8_lossy(&update_result.stderr)
+    );
 
     // Add label using separate command
     let label_result = std::process::Command::new(&bf_path)
@@ -134,7 +155,11 @@ fn test_show_json_format() {
         .output()
         .expect("Failed to add label");
 
-    assert!(label_result.status.success(), "bf label add failed: {}", String::from_utf8_lossy(&label_result.stderr));
+    assert!(
+        label_result.status.success(),
+        "bf label add failed: {}",
+        String::from_utf8_lossy(&label_result.stderr)
+    );
 
     // Show the bead in JSON format
     let show_result = std::process::Command::new(&bf_path)
@@ -146,16 +171,24 @@ fn test_show_json_format() {
         .output()
         .expect("Failed to run bf show");
 
-    assert!(show_result.status.success(), "bf show failed: {}", String::from_utf8_lossy(&show_result.stderr));
+    assert!(
+        show_result.status.success(),
+        "bf show failed: {}",
+        String::from_utf8_lossy(&show_result.stderr)
+    );
 
     let output = String::from_utf8(show_result.stdout).unwrap();
     println!("JSON output:\n{}", output);
 
     // Parse JSON and verify structure
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Failed to parse JSON output");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Failed to parse JSON output");
 
-    assert_eq!(beads.len(), 1, "Should return exactly one bead wrapped in array");
+    assert_eq!(
+        beads.len(),
+        1,
+        "Should return exactly one bead wrapped in array"
+    );
 
     let bead = &beads[0];
     assert_eq!(bead["id"], bead_id);
@@ -175,10 +208,22 @@ fn test_show_json_format() {
 
     // Verify dependencies and comments are stripped (NEEDLE compatibility)
     // They should not be present in JSON output at all (not even as empty arrays)
-    assert!(bead.get("dependencies").is_none() || bead["dependencies"].as_array().map(|a| a.is_empty()).unwrap_or(false),
-               "Dependencies should be stripped for NEEDLE compatibility");
-    assert!(bead.get("comments").is_none() || bead["comments"].as_array().map(|a| a.is_empty()).unwrap_or(false),
-               "Comments should be stripped for NEEDLE compatibility");
+    assert!(
+        bead.get("dependencies").is_none()
+            || bead["dependencies"]
+                .as_array()
+                .map(|a| a.is_empty())
+                .unwrap_or(false),
+        "Dependencies should be stripped for NEEDLE compatibility"
+    );
+    assert!(
+        bead.get("comments").is_none()
+            || bead["comments"]
+                .as_array()
+                .map(|a| a.is_empty())
+                .unwrap_or(false),
+        "Comments should be stripped for NEEDLE compatibility"
+    );
 }
 
 #[test]
@@ -199,13 +244,17 @@ fn test_show_json_flag() {
         .output()
         .expect("Failed to run bf show");
 
-    assert!(show_result.status.success(), "bf show --json failed: {}", String::from_utf8_lossy(&show_result.stderr));
+    assert!(
+        show_result.status.success(),
+        "bf show --json failed: {}",
+        String::from_utf8_lossy(&show_result.stderr)
+    );
 
     let output = String::from_utf8(show_result.stdout).unwrap();
 
     // Should parse as JSON array
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Failed to parse JSON output");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Failed to parse JSON output");
     assert_eq!(beads.len(), 1);
     assert_eq!(beads[0]["id"], bead_id);
 }
@@ -229,7 +278,11 @@ fn test_show_toon_format() {
         .output()
         .expect("Failed to run bf show");
 
-    assert!(show_result.status.success(), "bf show --format toon failed: {}", String::from_utf8_lossy(&show_result.stderr));
+    assert!(
+        show_result.status.success(),
+        "bf show --format toon failed: {}",
+        String::from_utf8_lossy(&show_result.stderr)
+    );
 
     let output = String::from_utf8(show_result.stdout).unwrap();
     println!("Toon output:\n{}", output);
@@ -255,11 +308,16 @@ fn test_show_missing_bead() {
         .output()
         .expect("Failed to run bf show");
 
-    assert!(!show_result.status.success(), "bf show should fail for non-existent bead");
+    assert!(
+        !show_result.status.success(),
+        "bf show should fail for non-existent bead"
+    );
 
     let stderr = String::from_utf8(show_result.stderr).unwrap();
-    assert!(stderr.contains("Bead not found") || stderr.contains("not found"),
-           "Error message should indicate bead not found");
+    assert!(
+        stderr.contains("Bead not found") || stderr.contains("not found"),
+        "Error message should indicate bead not found"
+    );
 }
 
 #[test]
@@ -289,7 +347,11 @@ fn test_show_with_all_fields() {
         .output()
         .expect("Failed to update bead");
 
-    assert!(update_result.status.success(), "bf update failed: {}", String::from_utf8_lossy(&update_result.stderr));
+    assert!(
+        update_result.status.success(),
+        "bf update failed: {}",
+        String::from_utf8_lossy(&update_result.stderr)
+    );
 
     // Add labels using separate command
     let label_result = std::process::Command::new(&bf_path)
@@ -304,7 +366,11 @@ fn test_show_with_all_fields() {
         .output()
         .expect("Failed to add labels");
 
-    assert!(label_result.status.success(), "bf label add failed: {}", String::from_utf8_lossy(&label_result.stderr));
+    assert!(
+        label_result.status.success(),
+        "bf label add failed: {}",
+        String::from_utf8_lossy(&label_result.stderr)
+    );
 
     // Show the bead
     let show_result = std::process::Command::new(&bf_path)
@@ -319,8 +385,8 @@ fn test_show_with_all_fields() {
     assert!(show_result.status.success(), "bf show failed");
 
     let output = String::from_utf8(show_result.stdout).unwrap();
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Failed to parse JSON");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Failed to parse JSON");
 
     let bead = &beads[0];
     assert_eq!(bead["id"], bead_id);
@@ -386,7 +452,10 @@ fn test_show_with_dependencies() {
     println!("Show with dependencies:\n{}", output);
 
     // Verify dependencies are shown
-    assert!(output.contains("Dependencies:"), "Should show Dependencies section");
+    assert!(
+        output.contains("Dependencies:"),
+        "Should show Dependencies section"
+    );
     assert!(output.contains(&dep1_id), "Should show dependency 1");
     assert!(output.contains(&dep2_id), "Should show dependency 2");
     assert!(output.contains("(blocks)"), "Should show dependency type");
@@ -415,7 +484,11 @@ fn test_show_with_labels_only() {
         .output()
         .expect("Failed to add labels");
 
-    assert!(update_result.status.success(), "bf label add failed: {}", String::from_utf8_lossy(&update_result.stderr));
+    assert!(
+        update_result.status.success(),
+        "bf label add failed: {}",
+        String::from_utf8_lossy(&update_result.stderr)
+    );
 
     // Show in text format
     let show_result = std::process::Command::new(&bf_path)
@@ -433,7 +506,10 @@ fn test_show_with_labels_only() {
     // Verify labels are shown as comma-separated list
     assert!(output.contains("Labels:"), "Should show Labels section");
     assert!(output.contains("phase-1"), "Should show phase-1 label");
-    assert!(output.contains("priority-high"), "Should show priority-high label");
+    assert!(
+        output.contains("priority-high"),
+        "Should show priority-high label"
+    );
     assert!(output.contains("backend"), "Should show backend label");
 }
 
@@ -470,13 +546,16 @@ fn test_show_closed_bead() {
     assert!(show_result.status.success());
 
     let output = String::from_utf8(show_result.stdout).unwrap();
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Failed to parse JSON");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Failed to parse JSON");
 
     let bead = &beads[0];
     assert_eq!(bead["status"], "closed");
     assert_eq!(bead["close_reason"], "Test completed");
-    assert!(bead["closed_at"].is_string(), "Should have closed_at timestamp");
+    assert!(
+        bead["closed_at"].is_string(),
+        "Should have closed_at timestamp"
+    );
 }
 
 #[test]
@@ -510,7 +589,10 @@ fn test_show_in_progress_bead() {
     assert!(show_result.status.success());
 
     let output = String::from_utf8(show_result.stdout).unwrap();
-    assert!(output.contains("Status: in_progress"), "Should show in_progress status");
+    assert!(
+        output.contains("Status: in_progress"),
+        "Should show in_progress status"
+    );
 }
 
 #[test]
@@ -534,7 +616,11 @@ fn test_show_basic_fields_display() {
         .output()
         .expect("Failed to update bead");
 
-    assert!(update_result.status.success(), "bf update failed: {}", String::from_utf8_lossy(&update_result.stderr));
+    assert!(
+        update_result.status.success(),
+        "bf update failed: {}",
+        String::from_utf8_lossy(&update_result.stderr)
+    );
 
     // Show the bead in text format and verify all basic fields are present
     let show_result = std::process::Command::new(&bf_path)
@@ -544,32 +630,63 @@ fn test_show_basic_fields_display() {
         .output()
         .expect("Failed to run bf show");
 
-    assert!(show_result.status.success(), "bf show failed: {}", String::from_utf8_lossy(&show_result.stderr));
+    assert!(
+        show_result.status.success(),
+        "bf show failed: {}",
+        String::from_utf8_lossy(&show_result.stderr)
+    );
 
     let output = String::from_utf8(show_result.stdout).unwrap();
     println!("Show output with all basic fields:\n{}", output);
 
     // Verify all basic fields are present in the output
     // 1. id
-    assert!(output.contains(&format!("ID: {}", bead_id)), "Output should contain id field");
+    assert!(
+        output.contains(&format!("ID: {}", bead_id)),
+        "Output should contain id field"
+    );
 
     // 2. title
-    assert!(output.contains("Title: Test all basic fields"), "Output should contain title field");
+    assert!(
+        output.contains("Title: Test all basic fields"),
+        "Output should contain title field"
+    );
 
     // 3. description
-    assert!(output.contains("Description: Test description for basic fields"), "Output should contain description field");
+    assert!(
+        output.contains("Description: Test description for basic fields"),
+        "Output should contain description field"
+    );
 
     // 4. status
-    assert!(output.contains("Status:"), "Output should contain status field");
-    assert!(output.contains("open") || output.contains("Status: open"), "Output should show status value");
+    assert!(
+        output.contains("Status:"),
+        "Output should contain status field"
+    );
+    assert!(
+        output.contains("open") || output.contains("Status: open"),
+        "Output should show status value"
+    );
 
     // 5. priority
-    assert!(output.contains("Priority:"), "Output should contain priority field");
-    assert!(output.contains("P2") || output.contains("Priority: 2"), "Output should show priority value");
+    assert!(
+        output.contains("Priority:"),
+        "Output should contain priority field"
+    );
+    assert!(
+        output.contains("P2") || output.contains("Priority: 2"),
+        "Output should show priority value"
+    );
 
     // 6. issue_type (shown as "Type:" in output)
-    assert!(output.contains("Type:"), "Output should contain issue_type field");
-    assert!(output.contains("task") || output.contains("Type: task"), "Output should show issue_type value");
+    assert!(
+        output.contains("Type:"),
+        "Output should contain issue_type field"
+    );
+    assert!(
+        output.contains("task") || output.contains("Type: task"),
+        "Output should show issue_type value"
+    );
 
     // 7. created_at
     // Timestamps should be in ISO 8601 format (e.g., "2026-07-04T12:34:56Z" or similar)
@@ -588,28 +705,44 @@ fn test_show_basic_fields_display() {
         .output()
         .expect("Failed to run bf show --format json");
 
-    assert!(show_json_result.status.success(), "bf show json failed: {}", String::from_utf8_lossy(&show_json_result.stderr));
+    assert!(
+        show_json_result.status.success(),
+        "bf show json failed: {}",
+        String::from_utf8_lossy(&show_json_result.stderr)
+    );
 
     let json_output = String::from_utf8(show_json_result.stdout).unwrap();
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&json_output)
-        .expect("Failed to parse JSON output");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&json_output).expect("Failed to parse JSON output");
 
     assert_eq!(beads.len(), 1, "Should return exactly one bead");
     let bead = &beads[0];
 
     // Verify timestamps are properly formatted (ISO 8601)
-    let created_at = bead["created_at"].as_str().expect("created_at should be a string");
+    let created_at = bead["created_at"]
+        .as_str()
+        .expect("created_at should be a string");
     assert!(created_at.len() > 0, "created_at should not be empty");
     // ISO 8601 format should contain 'T' and end with 'Z'
-    assert!(created_at.contains('T'), "created_at should be in ISO 8601 format (contain 'T')");
+    assert!(
+        created_at.contains('T'),
+        "created_at should be in ISO 8601 format (contain 'T')"
+    );
 
-    let updated_at = bead["updated_at"].as_str().expect("updated_at should be a string");
+    let updated_at = bead["updated_at"]
+        .as_str()
+        .expect("updated_at should be a string");
     assert!(updated_at.len() > 0, "updated_at should not be empty");
-    assert!(updated_at.contains('T'), "updated_at should be in ISO 8601 format (contain 'T')");
+    assert!(
+        updated_at.contains('T'),
+        "updated_at should be in ISO 8601 format (contain 'T')"
+    );
 
     // 9. closed_at - should be null/absent for open beads
-    assert!(bead.get("closed_at").is_none() || bead["closed_at"].is_null(),
-            "closed_at should be null or absent for open beads");
+    assert!(
+        bead.get("closed_at").is_none() || bead["closed_at"].is_null(),
+        "closed_at should be null or absent for open beads"
+    );
 }
 
 #[test]
@@ -645,20 +778,31 @@ fn test_show_closed_bead_timestamps() {
     assert!(show_result.status.success());
 
     let output = String::from_utf8(show_result.stdout).unwrap();
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Failed to parse JSON");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Failed to parse JSON");
 
     let bead = &beads[0];
 
     // Verify closed_at timestamp exists and is properly formatted
-    let closed_at = bead["closed_at"].as_str().expect("closed_at should be a string when bead is closed");
-    assert!(closed_at.len() > 0, "closed_at should not be empty for closed beads");
-    assert!(closed_at.contains('T'), "closed_at should be in ISO 8601 format (contain 'T')");
+    let closed_at = bead["closed_at"]
+        .as_str()
+        .expect("closed_at should be a string when bead is closed");
+    assert!(
+        closed_at.len() > 0,
+        "closed_at should not be empty for closed beads"
+    );
+    assert!(
+        closed_at.contains('T'),
+        "closed_at should be in ISO 8601 format (contain 'T')"
+    );
 
     // Verify the timestamp is recent (within last minute)
     let closed_dt = chrono::DateTime::parse_from_rfc3339(closed_at)
         .expect("closed_at should be valid RFC3339/ISO 8601 format");
     let now = chrono::Utc::now();
     let duration = now.signed_duration_since(closed_dt.with_timezone(&chrono::Utc));
-    assert!(duration.num_seconds() < 60, "closed_at should be recent (within last minute)");
+    assert!(
+        duration.num_seconds() < 60,
+        "closed_at should be recent (within last minute)"
+    );
 }

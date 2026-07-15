@@ -101,14 +101,7 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &[
-                "--title",
-                "Test Epic",
-                "--type",
-                "epic",
-                "--priority",
-                "2",
-            ],
+            &["--title", "Test Epic", "--type", "epic", "--priority", "2"],
         );
 
         assert!(success, "Epic creation should succeed. stderr: {}", stderr);
@@ -145,7 +138,11 @@ mod tests {
         );
 
         // Assert the creation succeeds
-        assert!(success, "Valid epic type creation should succeed. stderr: {}", stderr);
+        assert!(
+            success,
+            "Valid epic type creation should succeed. stderr: {}",
+            stderr
+        );
 
         let bead_id = stdout.trim();
         assert!(!bead_id.is_empty(), "Bead ID should be returned");
@@ -158,8 +155,7 @@ mod tests {
         // Output is wrapped in an array: [{issue}]
         let issue = &parsed[0];
         assert_eq!(
-            issue["issue_type"],
-            "epic",
+            issue["issue_type"], "epic",
             "Type field should be set to 'epic'"
         );
         assert_eq!(issue["title"], "Valid Epic Creation Test");
@@ -198,14 +194,12 @@ mod tests {
         // Output is wrapped in an array: [{issue}]
         let issue = &parsed[0];
         assert_eq!(
-            issue["issue_type"],
-            "epic",
+            issue["issue_type"], "epic",
             "Issue type should be 'epic' in storage"
         );
         assert_eq!(issue["id"], bead_id, "ID should match created bead");
         assert_eq!(
-            issue["title"],
-            "Storage Validation Epic",
+            issue["title"], "Storage Validation Epic",
             "Title should be preserved"
         );
         assert_eq!(issue["priority"], 1, "Priority should be preserved");
@@ -250,8 +244,7 @@ mod tests {
 
         // Read the JSONL file
         let jsonl_path = beads_dir.join("issues.jsonl");
-        let jsonl_content =
-            fs::read_to_string(&jsonl_path).expect("Failed to read JSONL file");
+        let jsonl_content = fs::read_to_string(&jsonl_path).expect("Failed to read JSONL file");
 
         assert!(
             jsonl_content.contains("\"issue_type\":\"epic\""),
@@ -282,7 +275,11 @@ mod tests {
 
         // Empty type is accepted as a Custom type (IssueType::Custom(""))
         // This is by design - the system allows custom types
-        assert!(success, "Empty type should be accepted as Custom type. stderr: {}", stderr);
+        assert!(
+            success,
+            "Empty type should be accepted as Custom type. stderr: {}",
+            stderr
+        );
 
         // Verify the bead was created
         let bead_id = _stdout.trim();
@@ -294,8 +291,8 @@ mod tests {
         // Test creating beads with type strings containing control characters
         // The system accepts custom types, so these should succeed
         let test_cases = vec![
-            ("", "Empty Type"),           // Empty string
-            ("   ", "Whitespace Type"),   // All whitespace
+            ("", "Empty Type"),                       // Empty string
+            ("   ", "Whitespace Type"),               // All whitespace
             ("custom-type", "Custom Type with Dash"), // Custom type with dash
         ];
 
@@ -304,25 +301,21 @@ mod tests {
 
             let (stdout, stderr, success) = run_create(
                 &beads_dir,
-                &[
-                    "--title",
-                    title,
-                    "--type",
-                    type_val,
-                    "--priority",
-                    "2",
-                ],
+                &["--title", title, "--type", type_val, "--priority", "2"],
             );
 
             assert!(
                 success,
                 "Type '{}' should be accepted as Custom type. stderr: {}",
-                type_val,
-                stderr
+                type_val, stderr
             );
 
             let bead_id = stdout.trim();
-            assert!(!bead_id.is_empty(), "Bead ID should be returned for type: {}", type_val);
+            assert!(
+                !bead_id.is_empty(),
+                "Bead ID should be returned for type: {}",
+                type_val
+            );
         }
     }
 
@@ -408,14 +401,13 @@ mod tests {
         for (issue_type, title) in &type_tests {
             let (stdout, stderr, success) = run_create(
                 &beads_dir,
-                &[ "--title", title, "--type", issue_type, "--priority", "2", ],
+                &["--title", title, "--type", issue_type, "--priority", "2"],
             );
 
             assert!(
                 success,
                 "Type '{}' should succeed. stderr: {}",
-                issue_type,
-                stderr
+                issue_type, stderr
             );
 
             let bead_id = stdout.trim();
@@ -455,8 +447,7 @@ mod tests {
             assert!(
                 success,
                 "Epic with priority {} should succeed. stderr: {}",
-                priority,
-                stderr
+                priority, stderr
             );
 
             let bead_id = stdout.trim();
@@ -473,7 +464,8 @@ mod tests {
                 priority
             );
             assert_eq!(
-                issue["priority"], priority.parse::<i32>().unwrap(),
+                issue["priority"],
+                priority.parse::<i32>().unwrap(),
                 "Priority should be preserved"
             );
         }
@@ -503,8 +495,7 @@ mod tests {
             assert!(
                 success,
                 "Epic {} creation should succeed. stderr: {}",
-                i,
-                stderr
+                i, stderr
             );
 
             let bead_id = stdout.trim();
@@ -527,10 +518,12 @@ mod tests {
             epic_count
         );
 
-        let unique_count = bead_ids.iter().collect::<std::collections::HashSet<_>>().len();
+        let unique_count = bead_ids
+            .iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len();
         assert_eq!(
-            unique_count,
-            epic_count,
+            unique_count, epic_count,
             "All epic bead IDs should be unique"
         );
     }
@@ -554,7 +547,11 @@ mod tests {
             ],
         );
 
-        assert!(success, "Epic with description should succeed. stderr: {}", stderr);
+        assert!(
+            success,
+            "Epic with description should succeed. stderr: {}",
+            stderr
+        );
 
         let bead_id = stdout.trim();
         let json_output = run_show_json(&beads_dir, bead_id);

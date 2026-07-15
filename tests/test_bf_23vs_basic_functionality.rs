@@ -3,15 +3,15 @@
 
 #[cfg(test)]
 mod tests {
-    use tempfile::TempDir;
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
+    use tempfile::TempDir;
 
-/// Resolve the freshly-built bf binary — never the system-installed one.
-fn bf_binary() -> String {
-    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
-}
+    /// Resolve the freshly-built bf binary — never the system-installed one.
+    fn bf_binary() -> String {
+        std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+    }
 
     fn setup_test_workspace() -> TempDir {
         let temp_dir = TempDir::new().unwrap();

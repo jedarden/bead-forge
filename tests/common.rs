@@ -311,7 +311,9 @@ pub fn sample_p0_epic_full_jsonl(
     assignee: Option<&str>,
     labels: &[&str],
 ) -> String {
-    let assignee_json = assignee.map(|a| serde_json::to_string(a).unwrap()).unwrap_or("null".to_string());
+    let assignee_json = assignee
+        .map(|a| serde_json::to_string(a).unwrap())
+        .unwrap_or("null".to_string());
     let labels_json = serde_json::to_string(labels).unwrap();
     format!(
         r#"{{"id":"{}","title":"{}","description":"{}","design":"","acceptance_criteria":"","notes":"","status":"open","priority":0,"issue_type":"epic","assignee":{},"created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":".","labels":{},"dependencies":[],"comments":[]}}"#,
@@ -344,28 +346,25 @@ pub fn assert_p0_epic(issue: &bead_forge::Issue, context: Option<&str>) {
         issue.issue_type,
         bead_forge::IssueType::Epic,
         "{}: must be epic type, got {:?}",
-        ctx, issue.issue_type
+        ctx,
+        issue.issue_type
     );
 
     assert_eq!(
         issue.priority,
         bead_forge::Priority::CRITICAL,
         "{}: must be P0 (CRITICAL), got P{}",
-        ctx, issue.priority.0
+        ctx,
+        issue.priority.0
     );
 
     assert_eq!(
-        issue.priority.0,
-        0,
+        issue.priority.0, 0,
         "{}: priority value must be 0, got {}",
         ctx, issue.priority.0
     );
 
-    assert!(
-        !issue.title.is_empty(),
-        "{}: title must not be empty",
-        ctx
-    );
+    assert!(!issue.title.is_empty(), "{}: title must not be empty", ctx);
 }
 
 /// Assert P0 epic display formatting.
@@ -533,7 +532,7 @@ impl P0EpicBuilder {
     /// Create a new P0 epic builder.
     ///
     /// # Arguments
-///
+    ///
     /// * `id` - Epic ID
     /// * `title` - Epic title
     pub fn new(id: impl Into<String>, title: impl Into<String>) -> Self {
@@ -590,7 +589,7 @@ impl P0EpicBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bead_forge::{IssueType, Status, Priority};
+    use bead_forge::{IssueType, Priority, Status};
 
     #[test]
     fn test_temp_workspace_creation() {
@@ -644,14 +643,17 @@ mod tests {
         let jsonl = sample_p0_epic_with_description_jsonl(
             "bf-epic-002",
             "Security Epic",
-            "Complete security audit"
+            "Complete security audit",
         );
 
         let issue: bead_forge::Issue = serde_json::from_str(&jsonl).unwrap();
 
         assert_eq!(issue.id, "bf-epic-002");
         assert_eq!(issue.title, "Security Epic");
-        assert_eq!(issue.description, Some("Complete security audit".to_string()));
+        assert_eq!(
+            issue.description,
+            Some("Complete security audit".to_string())
+        );
         assert_eq!(issue.issue_type, IssueType::Epic);
         assert_eq!(issue.priority, Priority::CRITICAL);
     }
@@ -661,7 +663,7 @@ mod tests {
         let jsonl = sample_p0_epic_with_labels_jsonl(
             "bf-epic-003",
             "Database Epic",
-            &["database", "migration", "critical"]
+            &["database", "migration", "critical"],
         );
 
         let issue: bead_forge::Issue = serde_json::from_str(&jsonl).unwrap();
@@ -679,14 +681,17 @@ mod tests {
             "API Redesign",
             "Complete REST API overhaul",
             Some("architect-team"),
-            &["api", "backend", "p0"]
+            &["api", "backend", "p0"],
         );
 
         let issue: bead_forge::Issue = serde_json::from_str(&jsonl).unwrap();
 
         assert_eq!(issue.id, "bf-epic-004");
         assert_eq!(issue.title, "API Redesign");
-        assert_eq!(issue.description, Some("Complete REST API overhaul".to_string()));
+        assert_eq!(
+            issue.description,
+            Some("Complete REST API overhaul".to_string())
+        );
         assert_eq!(issue.assignee, Some("architect-team".to_string()));
         assert_eq!(issue.labels, vec!["api", "backend", "p0"]);
         assert_eq!(issue.issue_type, IssueType::Epic);
@@ -769,7 +774,10 @@ mod tests {
 
         assert_eq!(epic.id, "bf-epic-builder-002");
         assert_eq!(epic.title, "Full Builder Epic");
-        assert_eq!(epic.description, Some("Complete infrastructure migration".to_string()));
+        assert_eq!(
+            epic.description,
+            Some("Complete infrastructure migration".to_string())
+        );
         assert_eq!(epic.assignee, Some("platform-team".to_string()));
         assert_eq!(epic.labels, vec!["backend", "database", "p0"]);
         assert_eq!(epic.status, Status::InProgress);

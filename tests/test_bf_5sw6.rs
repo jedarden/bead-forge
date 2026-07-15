@@ -1,7 +1,7 @@
 // Integration test for bf-5sw6: bf ready --limit 0 should return unlimited beads
 
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
 
 fn bf_cmd() -> Command {
     let mut cmd = Command::new("target/debug/bf");
@@ -12,7 +12,10 @@ fn bf_cmd() -> Command {
 fn bf_absolute_cmd() -> Command {
     let bf_path = if let Ok(exe) = std::env::current_exe() {
         // Get the cargo target directory from the test executable path
-        let target_dir = exe.parent().and_then(|p| p.parent()).unwrap_or_else(|| exe.parent().unwrap());
+        let target_dir = exe
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap_or_else(|| exe.parent().unwrap());
         target_dir.join("bf").to_str().unwrap().to_string()
     } else {
         "target/debug/bf".to_string()
@@ -44,7 +47,8 @@ fn test_ready_limit_zero_returns_unlimited() {
             .args([
                 "create",
                 &format!("--title=Bead {}", i),
-                "--type", "task",
+                "--type",
+                "task",
                 &format!("--priority={}", i % 5),
             ])
             .output()
@@ -63,7 +67,10 @@ fn test_ready_limit_zero_returns_unlimited() {
     assert!(output.status.success(), "bf ready --limit 0 should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     let bead_count = stdout.lines().filter(|line| line.contains("[bf-")).count();
-    assert_eq!(bead_count, 15, "Expected all 15 beads with --limit 0 (unlimited)");
+    assert_eq!(
+        bead_count, 15,
+        "Expected all 15 beads with --limit 0 (unlimited)"
+    );
 
     // Test with --limit 5 (should return exactly 5 beads)
     let mut bf_cmd = bf_absolute_cmd();
@@ -98,13 +105,9 @@ fn test_ready_default_limit() {
         let mut bf_cmd = bf_absolute_cmd();
         let output = bf_cmd
             .current_dir(workspace)
-            .args([
-                "create",
-                &format!("--title=Bead {}", i),
-                "--type", "task",
-            ])
+            .args(["create", &format!("--title=Bead {}", i), "--type", "task"])
             .output()
-        .unwrap();
+            .unwrap();
         assert!(output.status.success());
     }
 
@@ -116,7 +119,10 @@ fn test_ready_default_limit() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "bf ready should succeed with default limit");
+    assert!(
+        output.status.success(),
+        "bf ready should succeed with default limit"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let bead_count = stdout.lines().filter(|line| line.contains("[bf-")).count();
     assert_eq!(bead_count, 10, "Expected default limit of 10 beads");
@@ -141,13 +147,9 @@ fn test_list_limit_zero_returns_unlimited() {
         let mut bf_cmd = bf_absolute_cmd();
         let output = bf_cmd
             .current_dir(workspace)
-            .args([
-                "create",
-                &format!("--title=Bead {}", i),
-                "--type", "task",
-            ])
+            .args(["create", &format!("--title=Bead {}", i), "--type", "task"])
             .output()
-        .unwrap();
+            .unwrap();
         assert!(output.status.success());
     }
 

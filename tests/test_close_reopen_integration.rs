@@ -81,63 +81,91 @@ mod tests {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
         // Create a bead
-        let (stdout, stderr, success) = run_bf(&beads_dir, &[
-            "create",
-            "--title", "Test Close Reopen",
-            "--description", "Testing close and reopen functionality",
-            "--type", "task",
-            "--priority", "2",
-        ]);
+        let (stdout, stderr, success) = run_bf(
+            &beads_dir,
+            &[
+                "create",
+                "--title",
+                "Test Close Reopen",
+                "--description",
+                "Testing close and reopen functionality",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
+        );
 
-        assert!(success, "Create failed: stdout={}, stderr={}", stdout, stderr);
+        assert!(
+            success,
+            "Create failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
 
-        let bead_id = extract_bead_id(&stdout).expect("Could not extract bead ID from create output");
+        let bead_id =
+            extract_bead_id(&stdout).expect("Could not extract bead ID from create output");
         println!("Created bead: {}", bead_id);
 
         // Verify bead is open
         let (stdout, stderr, success) = run_bf(&beads_dir, &["show", &bead_id]);
         assert!(success, "Show failed: stdout={}, stderr={}", stdout, stderr);
-        assert!(stdout.contains("open") || stdout.contains("Open"), "Bead should be open initially");
+        assert!(
+            stdout.contains("open") || stdout.contains("Open"),
+            "Bead should be open initially"
+        );
 
         // Close the bead
         let close_reason = "Task completed successfully - all tests passing";
-        let (stdout, stderr, success) = run_bf(&beads_dir, &[
-            "close",
-            &bead_id,
-            "--reason", close_reason,
-        ]);
+        let (stdout, stderr, success) =
+            run_bf(&beads_dir, &["close", &bead_id, "--reason", close_reason]);
 
-        assert!(success, "Close failed: stdout={}, stderr={}", stdout, stderr);
+        assert!(
+            success,
+            "Close failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
 
         // Verify bead is closed
         let (stdout, stderr, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
-        assert!(success, "Show after close failed: stdout={}, stderr={}", stdout, stderr);
+        assert!(
+            success,
+            "Show after close failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
 
         // Parse JSON to check status and closed_at
-        let json: serde_json::Value = serde_json::from_str(&stdout)
-            .expect("Failed to parse show output as JSON");
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Failed to parse show output as JSON");
         // bf show --json emits an array (NEEDLE contract); unwrap the first element.
         let json = json.get(0).cloned().unwrap_or(json);
 
         assert_eq!(json["status"], "closed", "Bead should be closed");
         assert!(json["closed_at"].is_string(), "closed_at should be set");
-        assert_eq!(json["close_reason"], close_reason, "close_reason should match");
+        assert_eq!(
+            json["close_reason"], close_reason,
+            "close_reason should match"
+        );
 
         // Reopen the bead using bf update
-        let (stdout, stderr, success) = run_bf(&beads_dir, &[
-            "update",
-            &bead_id,
-            "--status", "open",
-        ]);
+        let (stdout, stderr, success) =
+            run_bf(&beads_dir, &["update", &bead_id, "--status", "open"]);
 
-        assert!(success, "Update (reopen) failed: stdout={}, stderr={}", stdout, stderr);
+        assert!(
+            success,
+            "Update (reopen) failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
 
         // Verify bead is open again
         let (stdout, stderr, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
-        assert!(success, "Show after reopen failed: stdout={}, stderr={}", stdout, stderr);
+        assert!(
+            success,
+            "Show after reopen failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
 
-        let json: serde_json::Value = serde_json::from_str(&stdout)
-            .expect("Failed to parse show output after reopen");
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Failed to parse show output after reopen");
         // bf show --json emits an array (NEEDLE contract); unwrap the first element.
         let json = json.get(0).cloned().unwrap_or(json);
 
@@ -151,11 +179,16 @@ mod tests {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
         // Create a bead
-        let (stdout, _, success) = run_bf(&beads_dir, &[
-            "create",
-            "--title", "Test Close No Reason",
-            "--type", "task",
-        ]);
+        let (stdout, _, success) = run_bf(
+            &beads_dir,
+            &[
+                "create",
+                "--title",
+                "Test Close No Reason",
+                "--type",
+                "task",
+            ],
+        );
 
         assert!(success, "Create failed");
 
@@ -163,14 +196,18 @@ mod tests {
 
         // Close without reason
         let (stdout, stderr, success) = run_bf(&beads_dir, &["close", &bead_id]);
-        assert!(success, "Close without reason failed: stdout={}, stderr={}", stdout, stderr);
+        assert!(
+            success,
+            "Close without reason failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
 
         // Verify close_reason defaults to "Completed"
         let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
         assert!(success, "Show failed");
 
-        let json: serde_json::Value = serde_json::from_str(&stdout)
-            .expect("Failed to parse show output");
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Failed to parse show output");
         // bf show --json emits an array (NEEDLE contract); unwrap the first element.
         let json = json.get(0).cloned().unwrap_or(json);
 
@@ -184,15 +221,18 @@ mod tests {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
         // Try to close a bead that doesn't exist
-        let (stdout, stderr, success) = run_bf(&beads_dir, &[
-            "close",
-            "nonexistent-bead",
-            "--reason", "Test",
-        ]);
+        let (stdout, stderr, success) = run_bf(
+            &beads_dir,
+            &["close", "nonexistent-bead", "--reason", "Test"],
+        );
 
         assert!(!success, "Close should fail for nonexistent bead");
-        assert!(stderr.contains("not found") || stderr.contains("not exist") || stdout.contains("not found"),
-            "Error should mention bead not found");
+        assert!(
+            stderr.contains("not found")
+                || stderr.contains("not exist")
+                || stdout.contains("not found"),
+            "Error should mention bead not found"
+        );
     }
 
     #[test]
@@ -200,11 +240,16 @@ mod tests {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
         // Create a bead
-        let (stdout, _, success) = run_bf(&beads_dir, &[
-            "create",
-            "--title", "Test Multiple Cycles",
-            "--type", "task",
-        ]);
+        let (stdout, _, success) = run_bf(
+            &beads_dir,
+            &[
+                "create",
+                "--title",
+                "Test Multiple Cycles",
+                "--type",
+                "task",
+            ],
+        );
 
         assert!(success, "Create failed");
 
@@ -213,11 +258,10 @@ mod tests {
         // Close -> Reopen -> Close -> Reopen
         for i in 1..=2 {
             // Close
-            let (stdout, stderr, success) = run_bf(&beads_dir, &[
-                "close",
-                &bead_id,
-                "--reason", &format!("Close cycle {}", i),
-            ]);
+            let (stdout, stderr, success) = run_bf(
+                &beads_dir,
+                &["close", &bead_id, "--reason", &format!("Close cycle {}", i)],
+            );
             assert!(success, "Close cycle {} failed: {}", i, stderr);
 
             // Verify closed
@@ -228,11 +272,8 @@ mod tests {
             assert_eq!(json["status"], "closed");
 
             // Reopen
-            let (stdout, stderr, success) = run_bf(&beads_dir, &[
-                "update",
-                &bead_id,
-                "--status", "open",
-            ]);
+            let (stdout, stderr, success) =
+                run_bf(&beads_dir, &["update", &bead_id, "--status", "open"]);
             assert!(success, "Reopen cycle {} failed: {}", i, stderr);
 
             // Verify open
@@ -247,7 +288,7 @@ mod tests {
         let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
         assert!(success);
         let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-            let json = json.get(0).cloned().unwrap_or(json);
+        let json = json.get(0).cloned().unwrap_or(json);
         assert_eq!(json["status"], "open");
     }
 
@@ -256,30 +297,31 @@ mod tests {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
         // Create a bead
-        let (stdout, _, success) = run_bf(&beads_dir, &[
-            "create",
-            "--title", "Test Reopen to InProgress",
-            "--type", "task",
-        ]);
+        let (stdout, _, success) = run_bf(
+            &beads_dir,
+            &[
+                "create",
+                "--title",
+                "Test Reopen to InProgress",
+                "--type",
+                "task",
+            ],
+        );
 
         assert!(success, "Create failed");
 
         let bead_id = extract_bead_id(&stdout).expect("Could not extract bead ID");
 
         // Close it
-        let (_, _, success) = run_bf(&beads_dir, &[
-            "close",
-            &bead_id,
-            "--reason", "First attempt complete",
-        ]);
+        let (_, _, success) = run_bf(
+            &beads_dir,
+            &["close", &bead_id, "--reason", "First attempt complete"],
+        );
         assert!(success, "Close failed");
 
         // Reopen to in_progress (not just open)
-        let (stdout, stderr, success) = run_bf(&beads_dir, &[
-            "update",
-            &bead_id,
-            "--status", "in_progress",
-        ]);
+        let (stdout, stderr, success) =
+            run_bf(&beads_dir, &["update", &bead_id, "--status", "in_progress"]);
 
         assert!(success, "Reopen to in_progress failed: {}", stderr);
 
@@ -287,7 +329,7 @@ mod tests {
         let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
         assert!(success);
         let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-            let json = json.get(0).cloned().unwrap_or(json);
+        let json = json.get(0).cloned().unwrap_or(json);
         assert_eq!(json["status"], "in_progress");
     }
 }

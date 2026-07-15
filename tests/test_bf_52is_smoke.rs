@@ -3,9 +3,9 @@
 
 #[cfg(test)]
 mod tests {
-    use tempfile::TempDir;
     use std::fs;
     use std::process::Command;
+    use tempfile::TempDir;
 
     /// Resolve the freshly-built bf binary — never the system-installed one.
     fn bf_binary() -> String {

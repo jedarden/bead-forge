@@ -786,7 +786,9 @@ pub fn run(cli: Cli) -> Result<()> {
         None => {
             // clap handles --help automatically, exiting before this point
             // If we reach here, it means no valid flag was provided
-            return Err(anyhow!("No command provided. Use 'bf --help' for usage information."));
+            return Err(anyhow!(
+                "No command provided. Use 'bf --help' for usage information."
+            ));
         }
         Some(cmd) => cmd,
     };
@@ -1091,19 +1093,43 @@ fn cmd_create(
 
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
-    let id = crate::id::generate_id(prefix, count);
 
     // Validate assignee
     validate_assignee(assignee.as_deref())?;
 
-    let mut issue = Issue::new(id.clone(), title, ".".to_string());
+    let mut issue = Issue::new(String::new(), title, ".".to_string());
     issue.issue_type = IssueType::from_str(type_.as_str()).map_err(|e| anyhow::anyhow!(e))?;
     issue.priority = Priority(priority);
     issue.description = description;
     issue.assignee = assignee;
     issue.labels = labels;
 
-    storage.create_issue(&issue)?;
+    // Short IDs are sized for ~1% collision probability by design
+    // (id::optimal_hash_length), so a colliding INSERT is an expected
+    // event: re-roll the ID instead of failing the create.
+    let mut id = String::new();
+    let mut created = false;
+    let mut last_err = None;
+    for _ in 0..5 {
+        id = crate::id::generate_id(prefix, count);
+        issue.id = id.clone();
+        match storage.create_issue(&issue) {
+            Ok(()) => {
+                created = true;
+                break;
+            }
+            Err(e)
+                if e.to_string()
+                    .contains("UNIQUE constraint failed: issues.id") =>
+            {
+                last_err = Some(e);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    if !created {
+        return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted")));
+    }
 
     println!("{}", id);
     Ok(())
@@ -1174,11 +1200,7 @@ fn cmd_list(
             issues.retain(|i| i.priority.0 == p);
         }
         if let Some((ref key, ref value)) = annotation_filter {
-            issues.retain(|i| {
-                i.annotations
-                    .get(key)
-                    .map_or(false, |v| v == value)
-            });
+            issues.retain(|i| i.annotations.get(key).map_or(false, |v| v == value));
         }
         // Apply limit
         if let Some(l) = limit {
@@ -1302,8 +1324,9 @@ fn cmd_update(
     // Parse due_at if provided
     let due_at_parsed = match due_at {
         Some(date_str) => {
-            let dt = DateTime::parse_from_rfc3339(&date_str)
-                .map_err(|_| anyhow!("Invalid --due-at format. Use RFC3339 format, e.g., 2025-01-01T00:00:00Z"))?;
+            let dt = DateTime::parse_from_rfc3339(&date_str).map_err(|_| {
+                anyhow!("Invalid --due-at format. Use RFC3339 format, e.g., 2025-01-01T00:00:00Z")
+            })?;
             Some(dt.with_timezone(&Utc))
         }
         None => None,
@@ -1371,7 +1394,8 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
     let storage = Storage::open(&db_path)?;
 
     // --limit 0 means unlimited (get_ready_candidates omits LIMIT clause when limit == 0)
-    let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
+    let candidates =
+        storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
 
     match format {
         "json" => {
@@ -1454,8 +1478,10 @@ fn cmd_claim(
                     };
                     let local_db_path = local_beads_dir.join(&local_metadata.database);
                     if let Ok(local_storage) = Storage::open(&local_db_path) {
-                        if let Ok(local_candidates) = local_storage
-                            .with_immediate_transaction(|tx| get_ready_candidates(tx, 1, None, None))
+                        if let Ok(local_candidates) =
+                            local_storage.with_immediate_transaction(|tx| {
+                                get_ready_candidates(tx, 1, None, None)
+                            })
                         {
                             for c in local_candidates {
                                 all_candidates.push((path.clone(), c));
@@ -1711,10 +1737,7 @@ fn cmd_doctor(
     if repair {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let imported = crate::doctor::repair(workspace_dir, flush_first, force)?;
-        println!(
-            "Repaired database: imported {} beads from JSONL",
-            imported
-        );
+        println!("Repaired database: imported {} beads from JSONL", imported);
     } else if reclaim_stale {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let config = load_config(beads_dir)?;
@@ -1992,7 +2015,9 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
             blocker,
             type_,
         } => {
-            let blocks = blocks.ok_or_else(|| anyhow!("Missing --blocks argument. Usage: bf dep add <blocker> --blocks <blocked>"))?;
+            let blocks = blocks.ok_or_else(|| {
+                anyhow!("Missing --blocks argument. Usage: bf dep add <blocker> --blocks <blocked>")
+            })?;
 
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
@@ -2415,21 +2440,21 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
                     Ok(())
                 }
                 ["claim_ttl_minutes"] => {
-                    cfg.claim_ttl_minutes = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid TTL minutes: {}. Must be an integer", value))?;
+                    cfg.claim_ttl_minutes = value.parse().map_err(|_| {
+                        anyhow!("Invalid TTL minutes: {}. Must be an integer", value)
+                    })?;
                     Ok(())
                 }
                 ["scoring", "priority_weight"] => {
-                    cfg.scoring.priority_weight = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid priority_weight: {}. Must be a number", value))?;
+                    cfg.scoring.priority_weight = value.parse().map_err(|_| {
+                        anyhow!("Invalid priority_weight: {}. Must be a number", value)
+                    })?;
                     Ok(())
                 }
                 ["scoring", "blockers_weight"] => {
-                    cfg.scoring.blockers_weight = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid blockers_weight: {}. Must be a number", value))?;
+                    cfg.scoring.blockers_weight = value.parse().map_err(|_| {
+                        anyhow!("Invalid blockers_weight: {}. Must be a number", value)
+                    })?;
                     Ok(())
                 }
                 ["scoring", "age_weight"] => {
@@ -2439,39 +2464,39 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
                     Ok(())
                 }
                 ["scoring", "labels_weight"] => {
-                    cfg.scoring.labels_weight = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid labels_weight: {}. Must be a number", value))?;
+                    cfg.scoring.labels_weight = value.parse().map_err(|_| {
+                        anyhow!("Invalid labels_weight: {}. Must be a number", value)
+                    })?;
                     Ok(())
                 }
                 ["scoring", "max_age_hours"] => {
-                    cfg.scoring.max_age_hours = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid max_age_hours: {}. Must be an integer", value))?;
+                    cfg.scoring.max_age_hours = value.parse().map_err(|_| {
+                        anyhow!("Invalid max_age_hours: {}. Must be an integer", value)
+                    })?;
                     Ok(())
                 }
                 ["scoring", "max_blockers"] => {
-                    cfg.scoring.max_blockers = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid max_blockers: {}. Must be an integer", value))?;
+                    cfg.scoring.max_blockers = value.parse().map_err(|_| {
+                        anyhow!("Invalid max_blockers: {}. Must be an integer", value)
+                    })?;
                     Ok(())
                 }
                 ["rotate", "rotate_age_days"] => {
-                    cfg.rotate.rotate_age_days = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid rotate_age_days: {}. Must be an integer", value))?;
+                    cfg.rotate.rotate_age_days = value.parse().map_err(|_| {
+                        anyhow!("Invalid rotate_age_days: {}. Must be an integer", value)
+                    })?;
                     Ok(())
                 }
                 ["rotate", "rotate_max_size_mb"] => {
-                    cfg.rotate.rotate_max_size_mb = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid rotate_max_size_mb: {}. Must be an integer", value))?;
+                    cfg.rotate.rotate_max_size_mb = value.parse().map_err(|_| {
+                        anyhow!("Invalid rotate_max_size_mb: {}. Must be an integer", value)
+                    })?;
                     Ok(())
                 }
                 ["rotate", "rotate_max_archives"] => {
-                    cfg.rotate.rotate_max_archives = value
-                        .parse()
-                        .map_err(|_| anyhow!("Invalid rotate_max_archives: {}. Must be an integer", value))?;
+                    cfg.rotate.rotate_max_archives = value.parse().map_err(|_| {
+                        anyhow!("Invalid rotate_max_archives: {}. Must be an integer", value)
+                    })?;
                     Ok(())
                 }
                 ["secret_protection", "enabled"] => {
@@ -2872,14 +2897,21 @@ fn parse_time_period(period: &str) -> Result<DateTime<Utc>> {
 
     // Parse the numeric prefix and unit suffix
     let (num_str, unit) = period.split_at(
-        period.chars().position(|c| !c.is_ascii_digit()).unwrap_or(period.len())
+        period
+            .chars()
+            .position(|c| !c.is_ascii_digit())
+            .unwrap_or(period.len()),
     );
 
     if num_str.is_empty() {
-        return Err(anyhow!("Invalid time period format: '{}'. Expected format like '1h', '24h', '7d', '4w'", period));
+        return Err(anyhow!(
+            "Invalid time period format: '{}'. Expected format like '1h', '24h', '7d', '4w'",
+            period
+        ));
     }
 
-    let value: i64 = num_str.parse()
+    let value: i64 = num_str
+        .parse()
         .map_err(|_| anyhow!("Invalid number in time period: '{}'", period))?;
 
     if value <= 0 {
@@ -2941,14 +2973,16 @@ fn cmd_recent(
     } else {
         // Parse explicit --since and --before dates (RFC3339 format)
         if let Some(ref since_str) = since {
-            let dt = DateTime::parse_from_rfc3339(since_str)
-                .map_err(|_| anyhow!("Invalid --since format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z"))?;
+            let dt = DateTime::parse_from_rfc3339(since_str).map_err(|_| {
+                anyhow!("Invalid --since format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z")
+            })?;
             filter.updated_since = Some(dt.with_timezone(&Utc));
         }
 
         if let Some(ref before_str) = before {
-            let dt = DateTime::parse_from_rfc3339(before_str)
-                .map_err(|_| anyhow!("Invalid --before format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z"))?;
+            let dt = DateTime::parse_from_rfc3339(before_str).map_err(|_| {
+                anyhow!("Invalid --before format. Use RFC3339 format, e.g., 2026-07-01T00:00:00Z")
+            })?;
             filter.updated_before = Some(dt.with_timezone(&Utc));
         }
     }
