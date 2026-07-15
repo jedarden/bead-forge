@@ -92,9 +92,7 @@ impl Status {
     pub fn is_terminal(&self) -> bool {
         match self {
             Self::Closed | Self::Tombstone => true,
-            Self::Custom(value) => {
-                TERMINAL_STATUS_ALIASES.contains(&value.to_lowercase().as_str())
-            }
+            Self::Custom(value) => TERMINAL_STATUS_ALIASES.contains(&value.to_lowercase().as_str()),
             _ => false,
         }
     }
@@ -1539,11 +1537,11 @@ mod tests {
     fn test_p0_priority_total_ordering() {
         // Test that Priority enum has correct total ordering
         let priorities = vec![
-            Priority::CRITICAL,  // P0
-            Priority::HIGH,      // P1
-            Priority::MEDIUM,    // P2
-            Priority::LOW,       // P3
-            Priority::BACKLOG,   // P4
+            Priority::CRITICAL, // P0
+            Priority::HIGH,     // P1
+            Priority::MEDIUM,   // P2
+            Priority::LOW,      // P3
+            Priority::BACKLOG,  // P4
         ];
 
         // Verify each priority is less than the next one
