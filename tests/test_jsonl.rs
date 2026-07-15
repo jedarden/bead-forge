@@ -412,7 +412,16 @@ fn test_e2e_br_vs_bf_list_output_parity() {
     let bf_json = String::from_utf8(bf_output.stdout).expect("bf output not valid UTF-8");
 
     // Run br list --format json --all (actual br command)
-    let br_output = Command::new("/home/coding/.local/bin/br")
+    // Upstream-parity comparison requires a separately installed br binary.
+    // Resolve via BR_PARITY_BIN or the conventional install path; skip
+    // gracefully on machines (e.g. CI containers) that don't have one.
+    let br_bin =
+        std::env::var("BR_PARITY_BIN").unwrap_or_else(|_| "/home/coding/.local/bin/br".to_string());
+    if !std::path::Path::new(&br_bin).exists() {
+        eprintln!("skipping br/bf parity test: {} not present", br_bin);
+        return;
+    }
+    let br_output = Command::new(&br_bin)
         .args([
             "list",
             "--format",
