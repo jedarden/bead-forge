@@ -283,7 +283,7 @@ ln -sf ~/.local/bin/bf ~/.local/bin/br   # drop-in replace br
 
 ```bash
 cd /path/to/repo
-bf migrate .beads/
+bf migrate --workspace .beads/
 ```
 
 Migration primes the bf-only tables (`bead_annotations`, `worker_sessions`, `velocity_stats`, `critical_path_cache`, `operation_log`) from the existing JSONL data. The workspace continues to work with `br` after migration — bf-only tables are ignored by `br`.
@@ -298,11 +298,11 @@ All `br` commands plus:
 | `bf mitosis <id> --children '[...]'` | Crash-safe split: create children + wire deps + close parent atomically |
 | `bf batch --json '[...]'` | Run multiple operations in one transaction |
 | `bf velocity` | Show p50/p90 close times per model + issue type |
-| `bf annotate <id> --key k --value v` | Attach arbitrary metadata to a bead |
+| `bf annotate set <id> <key> <value>` | Attach arbitrary metadata to a bead |
 | `bf log <id>` | Show full event history for a bead |
-| `bf critical-path` | Show longest blocking dependency chain |
-| `bf rotate --older-than 30d` | Archive closed beads older than threshold |
-| `bf migrate .beads/` | Migrate existing br workspace to bf |
+| `bf critical-path <id>` | Show longest blocking dependency chain |
+| `bf rotate --days 30` | Archive closed beads older than threshold |
+| `bf migrate --workspace .beads/` | Migrate existing br workspace to bf |
 | `bf commit-check` | Pre-commit hook: scan staged .beads/ changes for secrets |
 
 ## References
