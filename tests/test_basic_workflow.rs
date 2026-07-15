@@ -1,12 +1,13 @@
 // Basic workflow test for bead-forge
-// This test verifies the fundamental claim-and-close workflow
+// This test verifies the fundamental create/list/show workflow against the
+// freshly-built binary in an isolated temp workspace — never against the
+// developer machine's installed bf or real workspaces.
 
 #[cfg(test)]
 mod tests {
-    use tempfile::TempDir;
     use std::fs;
-    use std::path::PathBuf;
     use std::process::Command;
+    use tempfile::TempDir;
 
     /// Resolve the freshly-built bf binary — never the system-installed one.
     fn bf_binary() -> String {
@@ -22,37 +23,55 @@ mod tests {
         let issues_path = beads_dir.join("issues.jsonl");
         fs::write(&issues_path, "").unwrap();
 
-        // Create minimal config
+        // Create minimal config (real schema: issue_prefixes)
         let config_path = beads_dir.join("config.yaml");
         fs::write(
             &config_path,
-            "# Test workspace config\nworkspace:\n  name: test-workspace\n",
+            "# Test workspace config\nissue_prefixes:\n- test\n",
         )
         .unwrap();
 
         temp_dir
     }
 
+    /// Create a bead in the workspace and return its ID (create prints the bare ID).
+    fn create_bead(workspace: &TempDir, title: &str) -> String {
+        let output = Command::new(bf_binary())
+            .args(["create", "--title", title])
+            .current_dir(workspace.path())
+            .output()
+            .expect("Failed to run bf create");
+        assert!(
+            output.status.success(),
+            "bf create failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
     #[test]
     fn test_bead_forge_cli_exists() {
-        // Verify the bf binary exists and is executable
-        let output = Command::new("which")
-            .arg("bf")
+        // Verify the built bf binary exists and is executable.
+        let output = Command::new(bf_binary())
+            .arg("--version")
             .output()
-            .expect("Failed to run 'which bf'");
+            .expect("Failed to execute the built bf binary");
 
         assert!(
             output.status.success(),
-            "bf binary not found. Make sure it's installed and in PATH"
+            "bf --version failed: {}",
+            String::from_utf8_lossy(&output.stderr)
         );
 
-        let path = String::from_utf8_lossy(&output.stdout);
-        println!("bf binary found at: {}", path.trim());
+        println!(
+            "bf binary runs: {}",
+            String::from_utf8_lossy(&output.stdout).trim()
+        );
     }
 
     #[test]
     fn test_bead_forge_version() {
-        // Verify bf --help works (note: outputs help text to stderr due to clap behavior)
+        // Verify bf --help works.
         let output = Command::new(bf_binary())
             .arg("--help")
             .output()
@@ -81,12 +100,15 @@ mod tests {
 
     #[test]
     fn test_current_workspace_accessible() {
-        // Verify we can read the current workspace
+        // Create an isolated workspace with one bead, then list it as JSON.
+        let workspace = setup_test_workspace();
+        let bead_id = create_bead(&workspace, "Workspace list smoke bead");
+
         let output = Command::new(bf_binary())
             .arg("list")
             .arg("--format")
             .arg("json")
-            .current_dir("/home/coding/bead-forge")
+            .current_dir(workspace.path())
             .output()
             .expect("Failed to run 'bf list'");
 
@@ -99,48 +121,55 @@ mod tests {
         let json_output = String::from_utf8_lossy(&output.stdout);
 
         // bf list --format json outputs JSONL (one JSON object per line)
-        // Parse each line separately
-        if !json_output.trim().is_empty() {
-            let mut bead_count = 0;
-            for line in json_output.lines() {
-                if line.trim().is_empty() {
-                    continue;
-                }
-                let parsed: serde_json::Value =
-                    serde_json::from_str(line).expect(&format!("Invalid JSON on line: {}", line));
-                assert!(parsed.is_object(), "Each line should be a JSON object");
-                bead_count += 1;
+        let mut bead_count = 0;
+        let mut found_created = false;
+        for line in json_output.lines() {
+            if line.trim().is_empty() {
+                continue;
             }
-            println!("Workspace contains {} beads", bead_count);
-            assert!(bead_count > 0, "Workspace should contain at least one bead");
+            let parsed: serde_json::Value = serde_json::from_str(line)
+                .unwrap_or_else(|_| panic!("Invalid JSON on line: {}", line));
+            assert!(parsed.is_object(), "Each line should be a JSON object");
+            if parsed["id"] == bead_id.as_str() {
+                found_created = true;
+            }
+            bead_count += 1;
         }
+        println!("Workspace contains {} beads", bead_count);
+        assert!(bead_count > 0, "Workspace should contain at least one bead");
+        assert!(found_created, "Created bead should appear in list output");
     }
 
     #[test]
     fn test_bead_show_by_id() {
-        // Test showing a specific bead (bf-2atz should exist as the current bead)
+        // Create a bead in an isolated workspace, then show it by its returned ID.
+        let workspace = setup_test_workspace();
+        let title = "Complete test bead";
+        let bead_id = create_bead(&workspace, title);
+
         let output = Command::new(bf_binary())
-            .args(["show", "bf-2atz"])
-            .current_dir("/home/coding/bead-forge")
+            .args(["show", &bead_id])
+            .current_dir(workspace.path())
             .output()
-            .expect("Failed to run 'bf show bf-2atz'");
+            .unwrap_or_else(|e| panic!("Failed to run 'bf show {}': {}", bead_id, e));
 
         assert!(
             output.status.success(),
-            "bf show bf-2atz failed: {}",
+            "bf show {} failed: {}",
+            bead_id,
             String::from_utf8_lossy(&output.stderr)
         );
 
         let show_output = String::from_utf8_lossy(&output.stdout);
         assert!(
-            show_output.contains("bf-2atz"),
+            show_output.contains(&bead_id),
             "Show output should contain bead ID"
         );
         assert!(
-            show_output.contains("Complete test bead"),
+            show_output.contains(title),
             "Show output should contain bead title"
         );
 
-        println!("bf show bf-2atz output verified");
+        println!("bf show {} output verified", bead_id);
     }
 }
