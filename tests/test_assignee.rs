@@ -8,7 +8,7 @@
 //! 5. Claim operations set assignees correctly
 
 use bead_forge::config::load_config;
-use bead_forge::model::{Issue, Status, IssueType, Priority, IssueChanges, EventType};
+use bead_forge::model::{EventType, Issue, IssueChanges, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 use std::path::PathBuf;
@@ -111,7 +111,8 @@ fn test_create_bead_with_assignee() {
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
     // Create bead with assignee
-    let bead = create_test_bead_with_assignee(&storage, "bf-1", "Test bead with assignee", Some("alice"));
+    let bead =
+        create_test_bead_with_assignee(&storage, "bf-1", "Test bead with assignee", Some("alice"));
 
     assert_eq!(bead.assignee.as_ref().unwrap(), "alice");
     assert_eq!(bead.title, "Test bead with assignee");
@@ -125,7 +126,12 @@ fn test_create_bead_without_assignee() {
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
     // Create bead without assignee
-    let bead = create_test_bead_with_assignee(&storage, "bf-test-no-assign", "Test bead without assignee", None);
+    let bead = create_test_bead_with_assignee(
+        &storage,
+        "bf-test-no-assign",
+        "Test bead without assignee",
+        None,
+    );
 
     assert!(bead.assignee.is_none());
     assert_eq!(bead.title, "Test bead without assignee");
@@ -139,7 +145,8 @@ fn test_update_bead_assignee() {
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
     // Create bead without assignee
-    let bead = create_test_bead_with_assignee(&storage, "bf-test-update", "Test bead for update", None);
+    let bead =
+        create_test_bead_with_assignee(&storage, "bf-test-update", "Test bead for update", None);
     assert!(bead.assignee.is_none());
 
     // Update assignee
@@ -162,7 +169,12 @@ fn test_clear_bead_assignee() {
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
     // Create bead with assignee
-    let bead = create_test_bead_with_assignee(&storage, "bf-test-clear", "Test bead for clearing", Some("charlie"));
+    let bead = create_test_bead_with_assignee(
+        &storage,
+        "bf-test-clear",
+        "Test bead for clearing",
+        Some("charlie"),
+    );
     assert_eq!(bead.assignee.as_ref().unwrap(), "charlie");
 
     // Clear assignee
@@ -236,7 +248,8 @@ fn test_assignee_change_generates_event() {
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
     // Create bead without assignee
-    let bead = create_test_bead_with_assignee(&storage, "bf-test-events", "Test bead for events", None);
+    let bead =
+        create_test_bead_with_assignee(&storage, "bf-test-events", "Test bead for events", None);
 
     // Update assignee
     let changes = IssueChanges {
@@ -304,14 +317,25 @@ fn test_assignee_special_characters() {
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
     // Test assignee with email format
-    let bead1 = create_test_bead_with_assignee(&storage, "bf-email", "Email assignee", Some("alice@example.com"));
+    let bead1 = create_test_bead_with_assignee(
+        &storage,
+        "bf-email",
+        "Email assignee",
+        Some("alice@example.com"),
+    );
     assert_eq!(bead1.assignee.as_ref().unwrap(), "alice@example.com");
 
     // Test assignee with spaces
-    let bead2 = create_test_bead_with_assignee(&storage, "bf-space", "Space assignee", Some("Alice Smith"));
+    let bead2 =
+        create_test_bead_with_assignee(&storage, "bf-space", "Space assignee", Some("Alice Smith"));
     assert_eq!(bead2.assignee.as_ref().unwrap(), "Alice Smith");
 
     // Test assignee with hyphens
-    let bead3 = create_test_bead_with_assignee(&storage, "bf-hyphen", "Hyphen assignee", Some("alice-worker-1"));
+    let bead3 = create_test_bead_with_assignee(
+        &storage,
+        "bf-hyphen",
+        "Hyphen assignee",
+        Some("alice-worker-1"),
+    );
     assert_eq!(bead3.assignee.as_ref().unwrap(), "alice-worker-1");
 }

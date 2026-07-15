@@ -18,7 +18,11 @@ fn test_task_default_priority_is_p2() {
     };
 
     // Verify the default priority is P2 (Medium)
-    assert_eq!(task.priority, Priority::MEDIUM, "Task should have P2 (Medium) priority by default");
+    assert_eq!(
+        task.priority,
+        Priority::MEDIUM,
+        "Task should have P2 (Medium) priority by default"
+    );
     assert_eq!(task.priority.0, 2, "Task priority value should be 2");
 }
 
@@ -42,9 +46,20 @@ fn test_task_default_priority_storage() {
     // Retrieve and verify the default priority was preserved
     let retrieved = storage.get_issue("task-storage-default").unwrap().unwrap();
 
-    assert_eq!(retrieved.issue_type, IssueType::Task, "Issue type should be Task");
-    assert_eq!(retrieved.priority, Priority::MEDIUM, "Retrieved task should have P2 priority");
-    assert_eq!(retrieved.priority.0, 2, "Retrieved task priority value should be 2");
+    assert_eq!(
+        retrieved.issue_type,
+        IssueType::Task,
+        "Issue type should be Task"
+    );
+    assert_eq!(
+        retrieved.priority,
+        Priority::MEDIUM,
+        "Retrieved task should have P2 priority"
+    );
+    assert_eq!(
+        retrieved.priority.0, 2,
+        "Retrieved task priority value should be 2"
+    );
 }
 
 #[test]
@@ -63,10 +78,16 @@ fn test_task_default_priority_serialization() {
     let json = serde_json::to_string(&task).unwrap();
 
     // Verify task type is serialized correctly
-    assert!(json.contains(r#""issue_type":"task""#), "JSON should contain task type");
+    assert!(
+        json.contains(r#""issue_type":"task""#),
+        "JSON should contain task type"
+    );
 
     // Verify default P2 priority is serialized as 2
-    assert!(json.contains(r#""priority":2"#), "JSON should contain priority: 2");
+    assert!(
+        json.contains(r#""priority":2"#),
+        "JSON should contain priority: 2"
+    );
 
     // Deserialize and verify
     let deserialized: Issue = serde_json::from_str(&json).unwrap();
@@ -110,7 +131,11 @@ fn test_multiple_tasks_with_default_priority() {
             "Task {} should have P2 priority",
             task.id
         );
-        assert_eq!(task.priority.0, 2, "Task {} priority value should be 2", task.id);
+        assert_eq!(
+            task.priority.0, 2,
+            "Task {} priority value should be 2",
+            task.id
+        );
     }
 }
 
@@ -145,7 +170,8 @@ fn test_task_default_vs_explicit_priorities() {
             format!("{}", task.priority),
             label,
             "{} task should display as {}",
-            label, label
+            label,
+            label
         );
     }
 }
@@ -198,8 +224,7 @@ fn test_task_and_epic_both_have_p2_default() {
 
     // Both should have the same default priority
     assert_eq!(
-        task.priority,
-        epic.priority,
+        task.priority, epic.priority,
         "Task and Epic should both have P2 default priority"
     );
     assert_eq!(task.priority, Priority::MEDIUM);

@@ -57,11 +57,11 @@ fn test_mitosis_atomic_batch() {
         // Use placeholder references @0 and @1 for the created children
         // For mitosis: children block the parent (parent depends on children)
         BatchOp::DepAddBlocker {
-            id: parent_id.clone(),    // parent is blocked
+            id: parent_id.clone(),     // parent is blocked
             blocker: "@0".to_string(), // first created child (blocks)
         },
         BatchOp::DepAddBlocker {
-            id: parent_id.clone(),    // parent is blocked
+            id: parent_id.clone(),     // parent is blocked
             blocker: "@1".to_string(), // second created child (blocks)
         },
         BatchOp::Close {
@@ -141,7 +141,7 @@ fn test_batch_rollback_on_error() {
         },
         BatchOp::DepAddBlocker {
             id: "non-existent-parent".to_string(), // This will fail
-            blocker: "@0".to_string(),              // first created child (blocks)
+            blocker: "@0".to_string(),             // first created child (blocks)
         },
     ];
 

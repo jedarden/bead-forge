@@ -56,7 +56,9 @@ pub fn create_test_bead_with_description(
     );
     issue.description = description.map(|d| d.to_string());
     issue.created_at = Utc::now();
-    storage.create_issue(&issue).expect("Failed to create test bead");
+    storage
+        .create_issue(&issue)
+        .expect("Failed to create test bead");
     issue
 }
 
@@ -90,14 +92,17 @@ pub fn read_description_from_db(db_path: &PathBuf, bead_id: &str) -> Option<Stri
 /// Read all fields of a bead directly from SQLite as a tuple.
 ///
 /// Returns: (id, title, description, design, acceptance_criteria, notes)
-pub fn read_bead_fields_from_db(db_path: &PathBuf, bead_id: &str) -> Option<(String, String, String, String, String, String)> {
+pub fn read_bead_fields_from_db(
+    db_path: &PathBuf,
+    bead_id: &str,
+) -> Option<(String, String, String, String, String, String)> {
     let conn = Connection::open(db_path).expect("Failed to open connection");
     let mut stmt = conn
         .prepare("SELECT id, title, description, design, acceptance_criteria, notes FROM issues WHERE id = ?1")
         .expect("Failed to prepare statement");
 
-    let result: Result<(String, String, String, String, String, String), rusqlite::Error> =
-        stmt.query_row([bead_id], |row| {
+    let result: Result<(String, String, String, String, String, String), rusqlite::Error> = stmt
+        .query_row([bead_id], |row| {
             Ok((
                 row.get(0)?,
                 row.get(1)?,
@@ -157,7 +162,8 @@ pub fn test_description_update_cycle(
     // Verify initial state via direct DB read
     let db_desc = read_description_from_db(&test_db.db_path, &bead_id);
     assert_eq!(
-        db_desc, Some(initial_desc.to_string()),
+        db_desc,
+        Some(initial_desc.to_string()),
         "Initial description not persisted to DB"
     );
 
@@ -167,7 +173,8 @@ pub fn test_description_update_cycle(
     // Verify update via direct DB read
     let db_desc_after = read_description_from_db(&test_db.db_path, &bead_id);
     assert_eq!(
-        db_desc_after, Some(updated_desc.to_string()),
+        db_desc_after,
+        Some(updated_desc.to_string()),
         "Updated description not persisted to DB"
     );
 
@@ -212,7 +219,10 @@ pub fn test_description_update_preserves_fields(
     bead.priority = Priority(2);
     bead.issue_type = bead_forge::model::IssueType::Task;
 
-    test_db.storage.create_issue(&bead).expect("Failed to create bead");
+    test_db
+        .storage
+        .create_issue(&bead)
+        .expect("Failed to create bead");
     let bead_id = bead.id.clone();
 
     // Update only description
@@ -228,14 +238,8 @@ pub fn test_description_update_preserves_fields(
     );
 
     // Verify other fields preserved
-    assert_eq!(
-        fields.3, "Original design",
-        "Design field was modified"
-    );
-    assert_eq!(
-        fields.4, "Original AC",
-        "Acceptance criteria was modified"
-    );
+    assert_eq!(fields.3, "Original design", "Design field was modified");
+    assert_eq!(fields.4, "Original AC", "Acceptance criteria was modified");
     assert_eq!(fields.5, "Original notes", "Notes field was modified");
 
     // Get via storage layer for return value
@@ -264,7 +268,10 @@ fn test_infrastructure_create_test_bead() {
         .expect("Failed to get bead")
         .expect("Bead not found");
     assert_eq!(retrieved.title, "infrastructure test");
-    assert_eq!(retrieved.description, Some("Initial description".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("Initial description".to_string())
+    );
 }
 
 #[test]
@@ -296,12 +303,8 @@ fn test_infrastructure_update_via_storage_verify_via_db() {
 #[test]
 fn test_infrastructure_description_update_cycle() {
     let test_db = TestDatabase::new();
-    let (_bead_id, _bead) = test_description_update_cycle(
-        &test_db,
-        "cycle test",
-        "Initial",
-        "Updated",
-    );
+    let (_bead_id, _bead) =
+        test_description_update_cycle(&test_db, "cycle test", "Initial", "Updated");
 }
 
 #[test]

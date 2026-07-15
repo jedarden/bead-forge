@@ -2,7 +2,7 @@
 // This test verifies that epics can be created with P0 (critical) priority
 // and that the priority is correctly preserved through serialization, storage, and retrieval
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 
 #[test]
@@ -163,7 +163,9 @@ fn test_epic_p0_with_children() {
         storage.create_issue(&child).unwrap();
 
         use bead_forge::model::DependencyType;
-        storage.add_dependency("epic-p0-children", id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency("epic-p0-children", id, &DependencyType::ParentChild, "test")
+            .unwrap();
     }
 
     // Verify epic has all children
@@ -191,10 +193,12 @@ fn test_epic_p0_priority_ordering() {
 
     // Verify numerical ordering: CRITICAL (0) < HIGH (1) < MEDIUM (2) < LOW (3) < BACKLOG (4)
     for i in 1..priorities.len() {
-        assert!(priorities[i - 1] < priorities[i],
+        assert!(
+            priorities[i - 1] < priorities[i],
             "Priority ordering failed: {:?} should be < {:?}",
             priorities[i - 1],
-            priorities[i]);
+            priorities[i]
+        );
     }
 
     // Specifically verify P0 has lowest numerical value (highest priority)

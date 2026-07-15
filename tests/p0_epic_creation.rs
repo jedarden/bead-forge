@@ -1,7 +1,7 @@
 // Test P0 (Critical Priority) Epic Creation
 // Tests creating epics with P0 (critical) priority, verifying storage and serialization
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 
@@ -40,7 +40,10 @@ fn test_p0_epic_creation() {
     assert_eq!(retrieved.status, Status::Open);
 
     // Test 5: Verify description is preserved
-    assert_eq!(retrieved.description, Some("This is a critical priority epic".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("This is a critical priority epic".to_string())
+    );
 }
 
 #[test]
@@ -116,7 +119,10 @@ fn test_p0_epic_with_full_metadata() {
     assert_eq!(retrieved.issue_type, IssueType::Epic);
     assert_eq!(retrieved.priority, Priority::CRITICAL);
     assert_eq!(retrieved.priority.0, 0);
-    assert_eq!(retrieved.description, Some("Full metadata test".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("Full metadata test".to_string())
+    );
     assert_eq!(retrieved.assignee, Some("test-worker".to_string()));
 }
 
@@ -161,7 +167,8 @@ fn test_multiple_p0_epics() {
 
     // Verify all were stored with correct priority
     let all_issues = storage.list_issues(&Default::default()).unwrap();
-    let p0_epics: Vec<_> = all_issues.iter()
+    let p0_epics: Vec<_> = all_issues
+        .iter()
         .filter(|i| i.issue_type == IssueType::Epic && i.priority == Priority::CRITICAL)
         .collect();
 

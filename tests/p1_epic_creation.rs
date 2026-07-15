@@ -1,7 +1,7 @@
 // Test P1 (High Priority) Epic Creation
 // Tests creating epics with P1 (high) priority, verifying storage and serialization
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 
@@ -40,7 +40,10 @@ fn test_p1_epic_creation() {
     assert_eq!(retrieved.status, Status::Open);
 
     // Test 5: Verify description is preserved
-    assert_eq!(retrieved.description, Some("This is a high priority epic".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("This is a high priority epic".to_string())
+    );
 }
 
 #[test]
@@ -117,7 +120,10 @@ fn test_p1_epic_with_full_metadata() {
     assert_eq!(retrieved.issue_type, IssueType::Epic);
     assert_eq!(retrieved.priority, Priority::HIGH);
     assert_eq!(retrieved.priority.0, 1);
-    assert_eq!(retrieved.description, Some("Full metadata test".to_string()));
+    assert_eq!(
+        retrieved.description,
+        Some("Full metadata test".to_string())
+    );
     assert_eq!(retrieved.assignee, Some("test-worker".to_string()));
 }
 
@@ -162,7 +168,8 @@ fn test_multiple_p1_epics() {
 
     // Verify all were stored with correct priority
     let all_issues = storage.list_issues(&Default::default()).unwrap();
-    let p1_epics: Vec<_> = all_issues.iter()
+    let p1_epics: Vec<_> = all_issues
+        .iter()
         .filter(|i| i.issue_type == IssueType::Epic && i.priority == Priority::HIGH)
         .collect();
 
@@ -236,17 +243,33 @@ fn test_p1_epic_json_roundtrip() {
 fn test_p1_priority_from_string() {
     // Test parsing P1 from various string formats
     let p1_from_p1_str = "P1".parse::<Priority>().unwrap();
-    assert_eq!(p1_from_p1_str, Priority::HIGH, "Parsing 'P1' should give HIGH");
+    assert_eq!(
+        p1_from_p1_str,
+        Priority::HIGH,
+        "Parsing 'P1' should give HIGH"
+    );
 
     let p1_from_1_str = "1".parse::<Priority>().unwrap();
-    assert_eq!(p1_from_1_str, Priority::HIGH, "Parsing '1' should give HIGH");
+    assert_eq!(
+        p1_from_1_str,
+        Priority::HIGH,
+        "Parsing '1' should give HIGH"
+    );
 
     let p1_from_p1_lowercase = "p1".parse::<Priority>().unwrap();
-    assert_eq!(p1_from_p1_lowercase, Priority::HIGH, "Parsing 'p1' should give HIGH (case insensitive)");
+    assert_eq!(
+        p1_from_p1_lowercase,
+        Priority::HIGH,
+        "Parsing 'p1' should give HIGH (case insensitive)"
+    );
 
     // Test with whitespace
     let p1_from_whitespace = "  P1  ".parse::<Priority>().unwrap();
-    assert_eq!(p1_from_whitespace, Priority::HIGH, "Parsing '  P1  ' should give HIGH (whitespace trimmed)");
+    assert_eq!(
+        p1_from_whitespace,
+        Priority::HIGH,
+        "Parsing '  P1  ' should give HIGH (whitespace trimmed)"
+    );
 }
 
 #[test]
@@ -303,7 +326,8 @@ fn test_p1_epic_with_different_statuses() {
 
     // Verify all were stored with P1 priority
     let all_issues = storage.list_issues(&Default::default()).unwrap();
-    let p1_epics: Vec<_> = all_issues.iter()
+    let p1_epics: Vec<_> = all_issues
+        .iter()
         .filter(|i| i.issue_type == IssueType::Epic && i.priority == Priority::HIGH)
         .collect();
 
@@ -347,12 +371,14 @@ fn test_p1_epic_with_children() {
         storage.create_issue(&child).unwrap();
 
         // Add dependency relationship (child depends on epic)
-        storage.add_dependency(
-            &child_id,
-            &epic.id,
-            &bead_forge::model::DependencyType::ParentChild,
-            "test"
-        ).unwrap();
+        storage
+            .add_dependency(
+                &child_id,
+                &epic.id,
+                &bead_forge::model::DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Retrieve epic and verify

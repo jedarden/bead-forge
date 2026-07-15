@@ -5,8 +5,8 @@
 //! --title, --status, --priority, --assignee, --description, --acceptance-criteria,
 //! --notes, --design, --due-at
 
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
 use tempfile::TempDir;
 
 use bead_forge::config::load_config;
@@ -69,8 +69,11 @@ fn init_cli_workspace() -> TempDir {
         .output()
         .expect("Failed to initialize workspace");
 
-    assert!(init_result.status.success(), "bf init failed: {}",
-            String::from_utf8_lossy(&init_result.stderr));
+    assert!(
+        init_result.status.success(),
+        "bf init failed: {}",
+        String::from_utf8_lossy(&init_result.stderr)
+    );
 
     temp_dir
 }
@@ -90,10 +93,16 @@ fn create_cli_bead(workspace: impl AsRef<std::path::Path>, title: &str) -> Strin
         .output()
         .expect("Failed to create bead");
 
-    assert!(create_result.status.success(), "bf create failed: {}",
-            String::from_utf8_lossy(&create_result.stderr));
+    assert!(
+        create_result.status.success(),
+        "bf create failed: {}",
+        String::from_utf8_lossy(&create_result.stderr)
+    );
 
-    String::from_utf8(create_result.stdout).unwrap().trim().to_string()
+    String::from_utf8(create_result.stdout)
+        .unwrap()
+        .trim()
+        .to_string()
 }
 
 /// Update a bead via CLI and verify success
@@ -101,13 +110,16 @@ fn update_cli_bead(workspace: impl AsRef<std::path::Path>, bead_id: &str, args: 
     let bf = bf_path();
     let mut cmd = Command::new(&bf);
     cmd.arg("update")
-       .arg(bead_id)
-       .args(args)
-       .current_dir(workspace);
+        .arg(bead_id)
+        .args(args)
+        .current_dir(workspace);
 
     let result = cmd.output().expect("Failed to run update");
-    assert!(result.status.success(), "bf update failed: {}",
-            String::from_utf8_lossy(&result.stderr));
+    assert!(
+        result.status.success(),
+        "bf update failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
 }
 
 /// Get bead details as JSON via CLI
@@ -122,12 +134,15 @@ fn get_cli_bead_json(workspace: impl AsRef<std::path::Path>, bead_id: &str) -> s
         .output()
         .expect("Failed to show bead");
 
-    assert!(show_result.status.success(), "bf show failed: {}",
-            String::from_utf8_lossy(&show_result.stderr));
+    assert!(
+        show_result.status.success(),
+        "bf show failed: {}",
+        String::from_utf8_lossy(&show_result.stderr)
+    );
 
     let output = String::from_utf8(show_result.stdout).unwrap();
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Failed to parse JSON");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Failed to parse JSON");
     beads.into_iter().next().expect("No bead found")
 }
 
@@ -140,7 +155,11 @@ fn test_update_description_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-desc".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-desc".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let changes = IssueChanges {
@@ -160,7 +179,11 @@ fn test_update_acceptance_criteria_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-ac".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-ac".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let changes = IssueChanges {
@@ -170,7 +193,10 @@ fn test_update_acceptance_criteria_via_storage() {
     storage.update_issue("bf-test-ac", &changes).unwrap();
 
     let updated = storage.get_issue("bf-test-ac").unwrap().unwrap();
-    assert_eq!(updated.acceptance_criteria, Some("Should pass tests".to_string()));
+    assert_eq!(
+        updated.acceptance_criteria,
+        Some("Should pass tests".to_string())
+    );
 }
 
 #[test]
@@ -180,7 +206,11 @@ fn test_update_notes_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-notes".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-notes".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let changes = IssueChanges {
@@ -200,7 +230,11 @@ fn test_update_design_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-design".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-design".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let changes = IssueChanges {
@@ -220,7 +254,11 @@ fn test_update_due_at_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-due".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-due".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let due_date: DateTime<Utc> = "2025-12-31T23:59:59Z".parse().unwrap();
@@ -232,7 +270,10 @@ fn test_update_due_at_via_storage() {
     storage.update_issue("bf-test-due", &changes).unwrap();
 
     let updated = storage.get_issue("bf-test-due").unwrap().unwrap();
-    assert_eq!(updated.due_at.map(|d| d.to_rfc3339()), Some("2025-12-31T23:59:59+00:00".to_string()));
+    assert_eq!(
+        updated.due_at.map(|d| d.to_rfc3339()),
+        Some("2025-12-31T23:59:59+00:00".to_string())
+    );
 }
 
 #[test]
@@ -242,7 +283,11 @@ fn test_update_multiline_text_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-multiline".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-multiline".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let multiline_desc = "Line 1\nLine 2\nLine 3".to_string();
@@ -264,7 +309,11 @@ fn test_update_unicode_characters_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-unicode".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-unicode".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let unicode_text = "Description with émojis 🎉 and spëcial çharacters".to_string();
@@ -288,7 +337,11 @@ fn test_update_all_fields_together_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let issue = Issue::new("bf-test-all".to_string(), "Test".to_string(), ".".to_string());
+    let issue = Issue::new(
+        "bf-test-all".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     storage.create_issue(&issue).unwrap();
 
     let due_at: DateTime<Utc> = "2025-06-30T12:00:00Z".parse().unwrap();
@@ -316,7 +369,10 @@ fn test_update_all_fields_together_via_storage() {
     assert_eq!(updated.acceptance_criteria, Some("AC 1, AC 2".to_string()));
     assert_eq!(updated.notes, Some("Notes here".to_string()));
     assert_eq!(updated.design, Some("Design docs".to_string()));
-    assert_eq!(updated.due_at.map(|d| d.to_rfc3339()), Some("2025-06-30T12:00:00+00:00".to_string()));
+    assert_eq!(
+        updated.due_at.map(|d| d.to_rfc3339()),
+        Some("2025-06-30T12:00:00+00:00".to_string())
+    );
 }
 
 #[test]
@@ -326,7 +382,11 @@ fn test_update_preserves_unspecified_fields_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let mut issue = Issue::new("bf-test-preserve".to_string(), "Test".to_string(), ".".to_string());
+    let mut issue = Issue::new(
+        "bf-test-preserve".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     issue.description = Some("Original description".to_string());
     issue.acceptance_criteria = Some("Original AC".to_string());
     storage.create_issue(&issue).unwrap();
@@ -340,7 +400,10 @@ fn test_update_preserves_unspecified_fields_via_storage() {
     storage.update_issue("bf-test-preserve", &changes).unwrap();
 
     let updated = storage.get_issue("bf-test-preserve").unwrap().unwrap();
-    assert_eq!(updated.description, Some("New description only".to_string()));
+    assert_eq!(
+        updated.description,
+        Some("New description only".to_string())
+    );
     assert_eq!(updated.acceptance_criteria, Some("Original AC".to_string()));
 }
 
@@ -351,7 +414,11 @@ fn test_update_fields_orthogonal_via_storage() {
     let db_path = beads_dir.join("beads.db");
     let storage = Storage::open_with_config(&db_path, &config).unwrap();
 
-    let mut issue = Issue::new("bf-test-ortho".to_string(), "Test".to_string(), ".".to_string());
+    let mut issue = Issue::new(
+        "bf-test-ortho".to_string(),
+        "Test".to_string(),
+        ".".to_string(),
+    );
     issue.description = Some("Original".to_string());
     issue.notes = Some("Original notes".to_string());
     storage.create_issue(&issue).unwrap();
@@ -523,9 +590,15 @@ fn test_cli_update_assignee_empty_rejected() {
         .output()
         .expect("Failed to run update");
 
-    assert!(!result.status.success(), "bf update should reject empty assignee");
+    assert!(
+        !result.status.success(),
+        "bf update should reject empty assignee"
+    );
     let stderr = String::from_utf8_lossy(&result.stderr);
-    assert!(stderr.contains("Assignee cannot be empty"), "Expected validation error message");
+    assert!(
+        stderr.contains("Assignee cannot be empty"),
+        "Expected validation error message"
+    );
 
     // Verify the assignee was NOT changed
     let bead = get_cli_bead_json(workspace, &bead_id);
@@ -576,7 +649,10 @@ fn test_cli_update_due_at_invalid_format() {
         .expect("Failed to run update");
 
     // Should fail with invalid date format
-    assert!(!result.status.success(), "bf update should fail with invalid date format");
+    assert!(
+        !result.status.success(),
+        "bf update should fail with invalid date format"
+    );
 }
 
 #[test]
@@ -585,17 +661,30 @@ fn test_cli_update_all_flags_together() {
     let workspace = temp_dir.path();
     let bead_id = create_cli_bead(workspace, "Test All Flags");
 
-    update_cli_bead(workspace, &bead_id, &[
-        "--title", "Completely Updated Title",
-        "--status", "in_progress",
-        "--priority", "1",
-        "--assignee", "super-worker",
-        "--description", "Updated description",
-        "--acceptance-criteria", "Updated AC",
-        "--notes", "Updated notes",
-        "--design", "Updated design",
-        "--due-at", "2025-12-31T23:59:59Z"
-    ]);
+    update_cli_bead(
+        workspace,
+        &bead_id,
+        &[
+            "--title",
+            "Completely Updated Title",
+            "--status",
+            "in_progress",
+            "--priority",
+            "1",
+            "--assignee",
+            "super-worker",
+            "--description",
+            "Updated description",
+            "--acceptance-criteria",
+            "Updated AC",
+            "--notes",
+            "Updated notes",
+            "--design",
+            "Updated design",
+            "--due-at",
+            "2025-12-31T23:59:59Z",
+        ],
+    );
 
     let bead = get_cli_bead_json(workspace, &bead_id);
     assert_eq!(bead["title"], "Completely Updated Title");
@@ -625,7 +714,10 @@ fn test_cli_update_nonexistent_bead() {
         .expect("Failed to run update");
 
     // Should fail with non-existent bead
-    assert!(!result.status.success(), "bf update should fail with non-existent bead");
+    assert!(
+        !result.status.success(),
+        "bf update should fail with non-existent bead"
+    );
 }
 
 #[test]
@@ -644,5 +736,8 @@ fn test_cli_update_without_changes() {
         .expect("Failed to run update");
 
     // Should still succeed (no-op is allowed)
-    assert!(result.status.success(), "bf update with no changes should succeed");
+    assert!(
+        result.status.success(),
+        "bf update with no changes should succeed"
+    );
 }

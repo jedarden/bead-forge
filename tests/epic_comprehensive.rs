@@ -1,9 +1,9 @@
 // Comprehensive epic bead type tests
 // Tests epic creation, parent-child relationships, epic status computation, and critical path
 
-use bead_forge::model::{Issue, IssueType, Status, DependencyType, EpicStatus, Priority};
+use bead_forge::model::{DependencyType, EpicStatus, Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
 
 #[test]
 fn test_epic_type_creation_and_serialization() {
@@ -76,18 +76,17 @@ fn test_epic_child_relationship_storage() {
         storage.create_issue(&child).unwrap();
 
         // Add parent-child dependency
-        storage.add_dependency(
-            "epic-1",
-            &child.id,
-            &DependencyType::ParentChild,
-            "test"
-        ).unwrap();
+        storage
+            .add_dependency("epic-1", &child.id, &DependencyType::ParentChild, "test")
+            .unwrap();
     }
 
     // Verify all children are linked
     let children = storage.get_dependencies("epic-1").unwrap();
     assert_eq!(children.len(), 5);
-    assert!(children.iter().all(|d| d.dep_type == DependencyType::ParentChild));
+    assert!(children
+        .iter()
+        .all(|d| d.dep_type == DependencyType::ParentChild));
 }
 
 #[test]
@@ -114,7 +113,14 @@ fn test_epic_status_computation_all_open() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-status-1", &child.id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-status-1",
+                &child.id,
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Query epic and children
@@ -122,12 +128,13 @@ fn test_epic_status_computation_all_open() {
     let children = storage.get_dependencies("epic-status-1").unwrap();
 
     // Compute epic status manually
-    let closed_children = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_children = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     let epic_status = EpicStatus {
         epic: epic_issue,
@@ -159,7 +166,11 @@ fn test_epic_status_computation_partial_closed() {
     // Create 5 children, close 2 of them
     for i in 1..=5 {
         let is_closed = i <= 2;
-        let status = if is_closed { Status::Closed } else { Status::Open };
+        let status = if is_closed {
+            Status::Closed
+        } else {
+            Status::Open
+        };
         let mut child = Issue {
             id: format!("child-partial-{}", i),
             title: format!("Child {}", i),
@@ -171,18 +182,26 @@ fn test_epic_status_computation_partial_closed() {
             child.closed_at = Some(Utc::now());
         }
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-status-2", &child.id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-status-2",
+                &child.id,
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     let epic_issue = storage.get_issue("epic-status-2").unwrap().unwrap();
     let children = storage.get_dependencies("epic-status-2").unwrap();
 
-    let closed_children = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_children = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     let epic_status = EpicStatus {
         epic: epic_issue,
@@ -222,18 +241,26 @@ fn test_epic_status_computation_all_closed_eligible() {
         };
         child.closed_at = Some(Utc::now());
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-status-3", &child.id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-status-3",
+                &child.id,
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     let epic_issue = storage.get_issue("epic-status-3").unwrap().unwrap();
     let children = storage.get_dependencies("epic-status-3").unwrap();
 
-    let closed_children = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_children = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     let epic_status = EpicStatus {
         epic: epic_issue,
@@ -310,7 +337,9 @@ fn test_epic_child_types_mixed() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-mixed", id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency("epic-mixed", id, &DependencyType::ParentChild, "test")
+            .unwrap();
     }
 
     // Verify all types are preserved
@@ -319,7 +348,10 @@ fn test_epic_child_types_mixed() {
 
     let mut found_types = vec![false; 5];
     for child_dep in &children {
-        let child = storage.get_issue(&child_dep.depends_on_id).unwrap().unwrap();
+        let child = storage
+            .get_issue(&child_dep.depends_on_id)
+            .unwrap()
+            .unwrap();
         match child.issue_type {
             IssueType::Task => found_types[0] = true,
             IssueType::Bug => found_types[1] = true,
@@ -358,12 +390,14 @@ fn test_multiple_epics_independent() {
                 ..Default::default()
             };
             storage.create_issue(&child).unwrap();
-            storage.add_dependency(
-                &format!("epic-independent-{}", epic_num),
-                &format!("epic{}-child{}", epic_num, child_num),
-                &DependencyType::ParentChild,
-                "test"
-            ).unwrap();
+            storage
+                .add_dependency(
+                    &format!("epic-independent-{}", epic_num),
+                    &format!("epic{}-child{}", epic_num, child_num),
+                    &DependencyType::ParentChild,
+                    "test",
+                )
+                .unwrap();
         }
     }
 
@@ -372,7 +406,9 @@ fn test_multiple_epics_independent() {
         let epic_id = format!("epic-independent-{}", epic_num);
         let children = storage.get_dependencies(&epic_id).unwrap();
         assert_eq!(children.len(), 2);
-        assert!(children.iter().all(|d| d.dep_type == DependencyType::ParentChild));
+        assert!(children
+            .iter()
+            .all(|d| d.dep_type == DependencyType::ParentChild));
     }
 }
 
@@ -431,7 +467,14 @@ fn test_epic_with_blocked_child() {
         ..Default::default()
     };
     storage.create_issue(&child).unwrap();
-    storage.add_dependency("epic-blocked", "blocked-child", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-blocked",
+            "blocked-child",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Verify blocked status is preserved
     let retrieved_child = storage.get_issue("blocked-child").unwrap().unwrap();
@@ -494,19 +537,34 @@ fn test_epic_with_deferred_child() {
     };
     storage.create_issue(&open_child).unwrap();
 
-    storage.add_dependency("epic-deferred", "deferred-child", &DependencyType::ParentChild, "test").unwrap();
-    storage.add_dependency("epic-deferred", "open-child", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-deferred",
+            "deferred-child",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
+    storage
+        .add_dependency(
+            "epic-deferred",
+            "open-child",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Deferred children should count as not closed
     let children = storage.get_dependencies("epic-deferred").unwrap();
     assert_eq!(children.len(), 2);
 
-    let closed_count = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_count = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     assert_eq!(closed_count, 0); // Neither deferred nor open count as closed
 }
@@ -544,43 +602,64 @@ fn test_epic_children_closure_affects_eligibility() {
     };
     storage.create_issue(&child2).unwrap();
 
-    storage.add_dependency("epic-closure", "child-closure-1", &DependencyType::ParentChild, "test").unwrap();
-    storage.add_dependency("epic-closure", "child-closure-2", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-closure",
+            "child-closure-1",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
+    storage
+        .add_dependency(
+            "epic-closure",
+            "child-closure-2",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Initially not eligible
     let children = storage.get_dependencies("epic-closure").unwrap();
-    let closed_count = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_count = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
     assert!(!(closed_count == children.len() && children.len() > 0));
 
     // Close first child
-    storage.close_issue("child-closure-1", "Test closure", "test").unwrap();
+    storage
+        .close_issue("child-closure-1", "Test closure", "test")
+        .unwrap();
 
     // Still not eligible (only 1 of 2 closed)
     let children = storage.get_dependencies("epic-closure").unwrap();
-    let closed_count = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_count = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
     assert!(!(closed_count == children.len() && children.len() > 0));
 
     // Close second child
-    storage.close_issue("child-closure-2", "Test closure", "test").unwrap();
+    storage
+        .close_issue("child-closure-2", "Test closure", "test")
+        .unwrap();
 
     // Now eligible
     let children = storage.get_dependencies("epic-closure").unwrap();
-    let closed_count = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_count = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
     assert_eq!(closed_count, 2);
     assert!(closed_count == children.len() && children.len() > 0);
 }

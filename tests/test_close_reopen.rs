@@ -1,10 +1,10 @@
 //! Test close and reopen functionality
 
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
-use bead_forge::model::{Issue, Status, Priority, IssueType};
+use chrono::Utc;
 use std::path::PathBuf;
 use tempfile::TempDir;
-use chrono::Utc;
 
 fn setup_test_storage() -> (TempDir, PathBuf) {
     let temp_dir = TempDir::new().unwrap();
@@ -76,7 +76,9 @@ fn test_close_and_reopen_bead() {
 
     // Close the bead
     let close_reason = "Test completed successfully";
-    storage.close_issue("test-close-1", close_reason, "test_actor").unwrap();
+    storage
+        .close_issue("test-close-1", close_reason, "test_actor")
+        .unwrap();
 
     // Verify it's closed
     let closed = storage.get_issue("test-close-1").unwrap().unwrap();
@@ -86,7 +88,9 @@ fn test_close_and_reopen_bead() {
 
     // Check that the event was recorded
     let events = storage.list_events("test-close-1").unwrap();
-    assert!(events.iter().any(|e| e.event_type == bead_forge::model::EventType::Closed));
+    assert!(events
+        .iter()
+        .any(|e| e.event_type == bead_forge::model::EventType::Closed));
 
     // Reopen the bead
     let changes = bead_forge::model::IssueChanges {
@@ -150,7 +154,9 @@ fn test_close_already_closed_bead() {
     };
 
     storage.create_issue(&bead).unwrap();
-    storage.close_issue("test-close-2", "First close", "test_actor").unwrap();
+    storage
+        .close_issue("test-close-2", "First close", "test_actor")
+        .unwrap();
 
     // Try to close again - this should succeed (idempotent)
     let result = storage.close_issue("test-close-2", "Second close", "test_actor");
@@ -208,7 +214,9 @@ fn test_reopen_in_progress_bead() {
     storage.create_issue(&bead).unwrap();
 
     // Close from in_progress
-    storage.close_issue("test-reopen-1", "Completed", "test_actor").unwrap();
+    storage
+        .close_issue("test-reopen-1", "Completed", "test_actor")
+        .unwrap();
 
     // Reopen back to in_progress
     let changes = bead_forge::model::IssueChanges {

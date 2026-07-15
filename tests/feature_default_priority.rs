@@ -18,7 +18,11 @@ fn test_feature_default_priority_is_p2() {
     };
 
     // Verify the default priority is P2 (Medium)
-    assert_eq!(feature.priority, Priority::MEDIUM, "Feature should have P2 (Medium) priority by default");
+    assert_eq!(
+        feature.priority,
+        Priority::MEDIUM,
+        "Feature should have P2 (Medium) priority by default"
+    );
     assert_eq!(feature.priority.0, 2, "Feature priority value should be 2");
 }
 
@@ -40,11 +44,25 @@ fn test_feature_default_priority_storage() {
     storage.create_issue(&feature).unwrap();
 
     // Retrieve and verify the default priority was preserved
-    let retrieved = storage.get_issue("feature-storage-default").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("feature-storage-default")
+        .unwrap()
+        .unwrap();
 
-    assert_eq!(retrieved.issue_type, IssueType::Feature, "Issue type should be Feature");
-    assert_eq!(retrieved.priority, Priority::MEDIUM, "Retrieved feature should have P2 priority");
-    assert_eq!(retrieved.priority.0, 2, "Retrieved feature priority value should be 2");
+    assert_eq!(
+        retrieved.issue_type,
+        IssueType::Feature,
+        "Issue type should be Feature"
+    );
+    assert_eq!(
+        retrieved.priority,
+        Priority::MEDIUM,
+        "Retrieved feature should have P2 priority"
+    );
+    assert_eq!(
+        retrieved.priority.0, 2,
+        "Retrieved feature priority value should be 2"
+    );
 }
 
 #[test]
@@ -63,10 +81,16 @@ fn test_feature_default_priority_serialization() {
     let json = serde_json::to_string(&feature).unwrap();
 
     // Verify feature type is serialized correctly
-    assert!(json.contains(r#""issue_type":"feature""#), "JSON should contain feature type");
+    assert!(
+        json.contains(r#""issue_type":"feature""#),
+        "JSON should contain feature type"
+    );
 
     // Verify default P2 priority is serialized as 2
-    assert!(json.contains(r#""priority":2"#), "JSON should contain priority: 2");
+    assert!(
+        json.contains(r#""priority":2"#),
+        "JSON should contain priority: 2"
+    );
 
     // Deserialize and verify
     let deserialized: Issue = serde_json::from_str(&json).unwrap();
@@ -110,7 +134,11 @@ fn test_multiple_features_with_default_priority() {
             "Feature {} should have P2 priority",
             feature.id
         );
-        assert_eq!(feature.priority.0, 2, "Feature {} priority value should be 2", feature.id);
+        assert_eq!(
+            feature.priority.0, 2,
+            "Feature {} priority value should be 2",
+            feature.id
+        );
     }
 }
 
@@ -145,7 +173,8 @@ fn test_feature_default_vs_explicit_priorities() {
             format!("{}", feature.priority),
             label,
             "{} feature should display as {}",
-            label, label
+            label,
+            label
         );
     }
 }
@@ -207,7 +236,13 @@ fn test_feature_all_priorities_exist() {
         assert_eq!(deserialized.priority, *priority);
         assert_eq!(deserialized.issue_type, IssueType::Feature);
 
-        println!("Test {} for {}: Feature has priority {} (display: {})", i + 1, display, value, format!("{}", feature.priority));
+        println!(
+            "Test {} for {}: Feature has priority {} (display: {})",
+            i + 1,
+            display,
+            value,
+            format!("{}", feature.priority)
+        );
     }
 }
 
@@ -228,8 +263,15 @@ fn test_feature_vs_bug_default_priority() {
         ..Default::default()
     };
 
-    assert_eq!(feature.priority, bug.priority, "Features and bugs should have the same default priority");
-    assert_eq!(feature.priority, Priority::MEDIUM, "Both should default to P2");
+    assert_eq!(
+        feature.priority, bug.priority,
+        "Features and bugs should have the same default priority"
+    );
+    assert_eq!(
+        feature.priority,
+        Priority::MEDIUM,
+        "Both should default to P2"
+    );
 }
 
 #[test]
@@ -252,8 +294,15 @@ fn test_feature_explicit_p1_priority() {
 
     let retrieved = storage.get_issue("feature-p1-test").unwrap().unwrap();
 
-    assert_eq!(retrieved.priority, Priority::HIGH, "Feature should have P1 priority when explicitly set");
-    assert_eq!(retrieved.priority.0, 1, "Feature priority value should be 1");
+    assert_eq!(
+        retrieved.priority,
+        Priority::HIGH,
+        "Feature should have P1 priority when explicitly set"
+    );
+    assert_eq!(
+        retrieved.priority.0, 1,
+        "Feature priority value should be 1"
+    );
 }
 
 #[test]
@@ -269,6 +318,10 @@ fn test_feature_explicit_p0_critical_priority() {
         ..Default::default()
     };
 
-    assert_eq!(feature.priority, Priority::CRITICAL, "Feature should have P0 priority when explicitly set");
+    assert_eq!(
+        feature.priority,
+        Priority::CRITICAL,
+        "Feature should have P0 priority when explicitly set"
+    );
     assert_eq!(feature.priority.0, 0, "Feature priority value should be 0");
 }

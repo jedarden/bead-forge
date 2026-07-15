@@ -2,8 +2,8 @@
 // Tests comprehensive JSON serialization/deserialization for epic issues
 // Bead: bf-4adhu
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
-use bead_forge::format::{Formatter, JsonFormatter, OutputFormat, get_formatter};
+use bead_forge::format::{get_formatter, Formatter, JsonFormatter, OutputFormat};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
@@ -16,8 +16,12 @@ fn test_epic_json_format_basic() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::MEDIUM,
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 
@@ -47,8 +51,12 @@ fn test_epic_json_format_with_description() {
         status: Status::Open,
         priority: Priority::HIGH,
         description: Some("This is an epic with a detailed description".to_string()),
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 
@@ -56,7 +64,10 @@ fn test_epic_json_format_with_description() {
     let parsed: Value = serde_json::from_str(&json).unwrap();
 
     // Verify description is included in JSON
-    assert_eq!(parsed["description"], "This is an epic with a detailed description");
+    assert_eq!(
+        parsed["description"],
+        "This is an epic with a detailed description"
+    );
     assert_eq!(parsed["issue_type"], "epic");
 }
 
@@ -69,9 +80,17 @@ fn test_epic_json_format_with_labels() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::CRITICAL,
-        labels: vec!["phase-1".to_string(), "critical".to_string(), "backend".to_string()],
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        labels: vec![
+            "phase-1".to_string(),
+            "critical".to_string(),
+            "backend".to_string(),
+        ],
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 
@@ -97,8 +116,12 @@ fn test_epic_json_format_pretty_print() {
         status: Status::InProgress,
         priority: Priority::LOW,
         description: Some("Testing pretty printed JSON format".to_string()),
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 
@@ -136,7 +159,10 @@ fn test_epic_json_deserialization_from_string() {
     assert_eq!(epic.issue_type, IssueType::Epic);
     assert_eq!(epic.status, Status::Open);
     assert_eq!(epic.priority, Priority::HIGH);
-    assert_eq!(epic.description, Some("Testing deserialization".to_string()));
+    assert_eq!(
+        epic.description,
+        Some("Testing deserialization".to_string())
+    );
 }
 
 #[test]
@@ -150,8 +176,12 @@ fn test_epic_json_roundtrip_comprehensive() {
         priority: Priority::CRITICAL,
         description: Some("Full roundtrip test".to_string()),
         labels: vec!["test".to_string(), "roundtrip".to_string()],
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 
@@ -189,8 +219,12 @@ fn test_epic_json_formatter_output() {
         status: Status::Open,
         priority: Priority::MEDIUM,
         description: Some("Testing formatter output".to_string()),
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 
@@ -218,8 +252,12 @@ fn test_epic_json_multiple_issues_format() {
             issue_type: IssueType::Epic,
             status: Status::Open,
             priority: Priority::CRITICAL,
-            created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-            updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             ..Default::default()
         },
         Issue {
@@ -228,8 +266,12 @@ fn test_epic_json_multiple_issues_format() {
             issue_type: IssueType::Epic,
             status: Status::InProgress,
             priority: Priority::HIGH,
-            created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-            updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             ..Default::default()
         },
     ];
@@ -271,8 +313,12 @@ fn test_epic_json_all_priority_levels() {
             issue_type: IssueType::Epic,
             status: Status::Open,
             priority,
-            created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-            updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             ..Default::default()
         };
 
@@ -293,8 +339,12 @@ fn test_epic_json_empty_fields_handling() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::MEDIUM,
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         description: None,
         labels: vec![],
         ..Default::default()
@@ -326,8 +376,12 @@ fn test_epic_json_format_with_assignee() {
         status: Status::Open,
         priority: Priority::HIGH,
         assignee: Some("worker-1".to_string()),
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 
@@ -349,8 +403,12 @@ fn test_epic_json_output_format_integration() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::CRITICAL,
-        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
-        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z").unwrap().with_timezone(&Utc),
+        created_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2026-07-06T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc),
         ..Default::default()
     };
 

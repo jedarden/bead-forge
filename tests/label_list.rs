@@ -1,7 +1,7 @@
 // Comprehensive label list tests
 // Tests label creation, listing, aggregation, counting, and ordering
 
-use bead_forge::model::{Issue, IssueType, Status, Priority, IssueChanges};
+use bead_forge::model::{Issue, IssueChanges, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 
@@ -74,7 +74,11 @@ fn test_label_list_multiple_labels_same_issue() {
         title: "Multi Label Issue".to_string(),
         issue_type: IssueType::Task,
         status: Status::Open,
-        labels: vec!["bug".to_string(), "urgent".to_string(), "frontend".to_string()],
+        labels: vec![
+            "bug".to_string(),
+            "urgent".to_string(),
+            "frontend".to_string(),
+        ],
         ..Default::default()
     };
     storage.create_issue(&issue).unwrap();
@@ -230,7 +234,11 @@ fn test_label_list_after_remove() {
         title: "Remove Test".to_string(),
         issue_type: IssueType::Task,
         status: Status::Open,
-        labels: vec!["bug".to_string(), "urgent".to_string(), "frontend".to_string()],
+        labels: vec![
+            "bug".to_string(),
+            "urgent".to_string(),
+            "frontend".to_string(),
+        ],
         ..Default::default()
     };
     storage.create_issue(&issue).unwrap();
@@ -292,7 +300,7 @@ fn test_label_list_after_issue_close() {
     let labels = storage.list_all_labels().unwrap();
     assert_eq!(labels.len(), 2);
     let label_map: std::collections::HashMap<String, i64> = labels.into_iter().collect();
-    assert_eq!(label_map.get("bug"), Some(&2));  // Still 2
+    assert_eq!(label_map.get("bug"), Some(&2)); // Still 2
     assert_eq!(label_map.get("urgent"), Some(&1));
 }
 

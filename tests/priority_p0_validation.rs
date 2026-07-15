@@ -23,20 +23,40 @@ fn test_p0_to_string_conversion() {
 fn test_p0_from_string_conversion() {
     // Test that P0 can be parsed from string correctly
     let p0_from_p0_str = "P0".parse::<Priority>().unwrap();
-    assert_eq!(p0_from_p0_str, Priority::CRITICAL, "Parsing 'P0' should give CRITICAL");
+    assert_eq!(
+        p0_from_p0_str,
+        Priority::CRITICAL,
+        "Parsing 'P0' should give CRITICAL"
+    );
 
     let p0_from_0_str = "0".parse::<Priority>().unwrap();
-    assert_eq!(p0_from_0_str, Priority::CRITICAL, "Parsing '0' should give CRITICAL");
+    assert_eq!(
+        p0_from_0_str,
+        Priority::CRITICAL,
+        "Parsing '0' should give CRITICAL"
+    );
 
     let p0_from_p0_lowercase = "p0".parse::<Priority>().unwrap();
-    assert_eq!(p0_from_p0_lowercase, Priority::CRITICAL, "Parsing 'p0' should give CRITICAL (case insensitive)");
+    assert_eq!(
+        p0_from_p0_lowercase,
+        Priority::CRITICAL,
+        "Parsing 'p0' should give CRITICAL (case insensitive)"
+    );
 
     let p0_from_p0_uppercase = "P0".parse::<Priority>().unwrap();
-    assert_eq!(p0_from_p0_uppercase, Priority::CRITICAL, "Parsing 'P0' should give CRITICAL");
+    assert_eq!(
+        p0_from_p0_uppercase,
+        Priority::CRITICAL,
+        "Parsing 'P0' should give CRITICAL"
+    );
 
     // Test with whitespace
     let p0_from_whitespace = "  P0  ".parse::<Priority>().unwrap();
-    assert_eq!(p0_from_whitespace, Priority::CRITICAL, "Parsing '  P0  ' should give CRITICAL (whitespace trimmed)");
+    assert_eq!(
+        p0_from_whitespace,
+        Priority::CRITICAL,
+        "Parsing '  P0  ' should give CRITICAL (whitespace trimmed)"
+    );
 }
 
 #[test]
@@ -64,7 +84,11 @@ fn test_p0_is_highest_priority() {
 #[test]
 fn test_p0_priority_const_definition() {
     // Test that Priority::CRITICAL is properly defined as P0
-    assert_eq!(Priority::CRITICAL, Priority(0), "CRITICAL should equal Priority(0)");
+    assert_eq!(
+        Priority::CRITICAL,
+        Priority(0),
+        "CRITICAL should equal Priority(0)"
+    );
     assert_eq!(Priority::CRITICAL.0, 0, "CRITICAL value should be 0");
 }
 
@@ -130,7 +154,10 @@ fn test_p0_invalid_string_parsing() {
         let result = input.parse::<Priority>();
         assert!(result.is_err(), "Parsing '{}' should fail", input);
         if let Err(e) = result {
-            assert!(e.contains("Invalid priority"), "Error should mention 'Invalid priority'");
+            assert!(
+                e.contains("Invalid priority"),
+                "Error should mention 'Invalid priority'"
+            );
         }
     }
 }
@@ -148,7 +175,11 @@ fn test_p0_deserialization() {
     // Test that P0 deserializes correctly from JSON
     // Priority uses #[serde(transparent)] so it only deserializes as integer, not string
     let p0: Priority = serde_json::from_str("0").unwrap();
-    assert_eq!(p0, Priority::CRITICAL, "JSON 0 should deserialize to CRITICAL");
+    assert_eq!(
+        p0,
+        Priority::CRITICAL,
+        "JSON 0 should deserialize to CRITICAL"
+    );
 }
 
 #[test]
@@ -168,16 +199,30 @@ fn test_p0_debug_formatting() {
     // Test debug formatting for P0
     let p0 = Priority::CRITICAL;
     let debug_str = format!("{:?}", p0);
-    assert_eq!(debug_str, "Priority(0)", "Debug format should show Priority(0)");
+    assert_eq!(
+        debug_str, "Priority(0)",
+        "Debug format should show Priority(0)"
+    );
 }
 
 #[test]
 fn test_priority_default_is_not_p0() {
     // Test that default priority is MEDIUM (P2), not P0
     let default_priority = Priority::default();
-    assert_eq!(default_priority, Priority::MEDIUM, "Default priority should be MEDIUM");
-    assert_ne!(default_priority, Priority::CRITICAL, "Default priority should not be CRITICAL");
-    assert_eq!(default_priority.0, 2, "Default priority value should be 2 (MEDIUM)");
+    assert_eq!(
+        default_priority,
+        Priority::MEDIUM,
+        "Default priority should be MEDIUM"
+    );
+    assert_ne!(
+        default_priority,
+        Priority::CRITICAL,
+        "Default priority should not be CRITICAL"
+    );
+    assert_eq!(
+        default_priority.0, 2,
+        "Default priority value should be 2 (MEDIUM)"
+    );
 }
 
 #[test]
@@ -209,7 +254,11 @@ fn test_p0_ord_trait_implementation() {
     let p1 = Priority::HIGH;
 
     assert_eq!(p0.cmp(&p1), Ordering::Less, "P0 should be Less than P1");
-    assert_eq!(p1.cmp(&p0), Ordering::Greater, "P1 should be Greater than P0");
+    assert_eq!(
+        p1.cmp(&p0),
+        Ordering::Greater,
+        "P1 should be Greater than P0"
+    );
     assert_eq!(p0.cmp(&p0), Ordering::Equal, "P0 should be Equal to itself");
 }
 

@@ -1,7 +1,7 @@
 /// Test for limit=0 behavior in ready command
 use bead_forge::claim::get_ready_candidates;
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
-use bead_forge::model::{Status, Issue, Priority, IssueType};
 use chrono::Utc;
 use tempfile::TempDir;
 
@@ -60,26 +60,36 @@ fn test_ready_limit_zero_returns_all() {
     }
 
     // Test with limit=0 (should return all 15 beads)
-    storage.with_immediate_transaction(|tx| {
-        let candidates = get_ready_candidates(tx, 0, None, None).unwrap();
-        assert_eq!(candidates.len(), 15, "limit=0 should return all 15 beads");
-        Ok(())
-    }).unwrap();
+    storage
+        .with_immediate_transaction(|tx| {
+            let candidates = get_ready_candidates(tx, 0, None, None).unwrap();
+            assert_eq!(candidates.len(), 15, "limit=0 should return all 15 beads");
+            Ok(())
+        })
+        .unwrap();
 
     // Test with limit=5 (should return only 5 beads)
-    storage.with_immediate_transaction(|tx| {
-        let candidates = get_ready_candidates(tx, 5, None, None).unwrap();
-        assert_eq!(candidates.len(), 5, "limit=5 should return only 5 beads");
-        Ok(())
-    }).unwrap();
+    storage
+        .with_immediate_transaction(|tx| {
+            let candidates = get_ready_candidates(tx, 5, None, None).unwrap();
+            assert_eq!(candidates.len(), 5, "limit=5 should return only 5 beads");
+            Ok(())
+        })
+        .unwrap();
 
     // Test with a very large limit (simulating unlimited)
     let large_limit = usize::MAX;
-    storage.with_immediate_transaction(|tx| {
-        let candidates = get_ready_candidates(tx, large_limit, None, None).unwrap();
-        assert_eq!(candidates.len(), 15, "large limit should return all 15 beads");
-        Ok(())
-    }).unwrap();
+    storage
+        .with_immediate_transaction(|tx| {
+            let candidates = get_ready_candidates(tx, large_limit, None, None).unwrap();
+            assert_eq!(
+                candidates.len(),
+                15,
+                "large limit should return all 15 beads"
+            );
+            Ok(())
+        })
+        .unwrap();
 }
 
 #[test]

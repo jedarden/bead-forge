@@ -203,9 +203,7 @@ pub fn reconstruct_events_from_git(
                             old_value: None,
                             new_value: current_issue.close_reason.clone(),
                             comment: None,
-                            created_at: current_issue
-                                .closed_at
-                                .unwrap_or(current_issue.created_at),
+                            created_at: current_issue.closed_at.unwrap_or(current_issue.created_at),
                         });
                         next_event_id -= 1;
                     }

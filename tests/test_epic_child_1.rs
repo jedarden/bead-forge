@@ -1,7 +1,7 @@
 // Test epic child 1 - bf-2k7fn
 // Tests epic-child relationships and dependency tracking
 
-use bead_forge::model::{Issue, IssueType, Status, DependencyType};
+use bead_forge::model::{DependencyType, Issue, IssueType, Status};
 use bead_forge::storage::Storage;
 
 #[test]
@@ -30,12 +30,9 @@ fn test_epic_child_relationship() {
     storage.create_issue(&child).unwrap();
 
     // Create parent-child dependency (epic depends on child)
-    storage.add_dependency(
-        "epic-1",
-        "child-1",
-        &DependencyType::ParentChild,
-        "test"
-    ).unwrap();
+    storage
+        .add_dependency("epic-1", "child-1", &DependencyType::ParentChild, "test")
+        .unwrap();
 
     // Test 1: Verify dependency exists
     let deps = storage.get_dependencies("epic-1").unwrap();
@@ -79,18 +76,19 @@ fn test_multiple_epic_children() {
         let child = Issue {
             id: format!("child-{}", i),
             title: format!("Child Task {}", i),
-            issue_type: if i == 3 { IssueType::Feature } else { IssueType::Task },
+            issue_type: if i == 3 {
+                IssueType::Feature
+            } else {
+                IssueType::Task
+            },
             status: Status::Open,
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
 
-        storage.add_dependency(
-            "epic-2",
-            &child.id,
-            &DependencyType::ParentChild,
-            "test"
-        ).unwrap();
+        storage
+            .add_dependency("epic-2", &child.id, &DependencyType::ParentChild, "test")
+            .unwrap();
     }
 
     // Test: Get all dependencies of epic (should be 3 children)
@@ -98,12 +96,28 @@ fn test_multiple_epic_children() {
     assert_eq!(children.len(), 3);
 
     // Test: Verify different child types are preserved
-    let tasks: Vec<_> = children.iter().filter(|d| {
-        storage.get_issue(&d.depends_on_id).unwrap().unwrap().issue_type == IssueType::Task
-    }).collect();
-    let features: Vec<_> = children.iter().filter(|d| {
-        storage.get_issue(&d.depends_on_id).unwrap().unwrap().issue_type == IssueType::Feature
-    }).collect();
+    let tasks: Vec<_> = children
+        .iter()
+        .filter(|d| {
+            storage
+                .get_issue(&d.depends_on_id)
+                .unwrap()
+                .unwrap()
+                .issue_type
+                == IssueType::Task
+        })
+        .collect();
+    let features: Vec<_> = children
+        .iter()
+        .filter(|d| {
+            storage
+                .get_issue(&d.depends_on_id)
+                .unwrap()
+                .unwrap()
+                .issue_type
+                == IssueType::Feature
+        })
+        .collect();
     assert_eq!(tasks.len(), 2);
     assert_eq!(features.len(), 1);
 }
@@ -129,19 +143,49 @@ fn test_epic_type_serialization() {
     assert_eq!(deserialized.issue_type, IssueType::Epic);
 
     // Test that all issue types serialize correctly
-    let task = Issue { issue_type: IssueType::Task, ..Default::default() };
-    let feature = Issue { issue_type: IssueType::Feature, ..Default::default() };
-    let bug = Issue { issue_type: IssueType::Bug, ..Default::default() };
-    let chore = Issue { issue_type: IssueType::Chore, ..Default::default() };
-    let docs = Issue { issue_type: IssueType::Docs, ..Default::default() };
-    let question = Issue { issue_type: IssueType::Question, ..Default::default() };
+    let task = Issue {
+        issue_type: IssueType::Task,
+        ..Default::default()
+    };
+    let feature = Issue {
+        issue_type: IssueType::Feature,
+        ..Default::default()
+    };
+    let bug = Issue {
+        issue_type: IssueType::Bug,
+        ..Default::default()
+    };
+    let chore = Issue {
+        issue_type: IssueType::Chore,
+        ..Default::default()
+    };
+    let docs = Issue {
+        issue_type: IssueType::Docs,
+        ..Default::default()
+    };
+    let question = Issue {
+        issue_type: IssueType::Question,
+        ..Default::default()
+    };
 
-    assert!(serde_json::to_string(&task).unwrap().contains("\"issue_type\":\"task\""));
-    assert!(serde_json::to_string(&feature).unwrap().contains("\"issue_type\":\"feature\""));
-    assert!(serde_json::to_string(&bug).unwrap().contains("\"issue_type\":\"bug\""));
-    assert!(serde_json::to_string(&chore).unwrap().contains("\"issue_type\":\"chore\""));
-    assert!(serde_json::to_string(&docs).unwrap().contains("\"issue_type\":\"docs\""));
-    assert!(serde_json::to_string(&question).unwrap().contains("\"issue_type\":\"question\""));
+    assert!(serde_json::to_string(&task)
+        .unwrap()
+        .contains("\"issue_type\":\"task\""));
+    assert!(serde_json::to_string(&feature)
+        .unwrap()
+        .contains("\"issue_type\":\"feature\""));
+    assert!(serde_json::to_string(&bug)
+        .unwrap()
+        .contains("\"issue_type\":\"bug\""));
+    assert!(serde_json::to_string(&chore)
+        .unwrap()
+        .contains("\"issue_type\":\"chore\""));
+    assert!(serde_json::to_string(&docs)
+        .unwrap()
+        .contains("\"issue_type\":\"docs\""));
+    assert!(serde_json::to_string(&question)
+        .unwrap()
+        .contains("\"issue_type\":\"question\""));
 }
 
 #[test]
@@ -179,20 +223,14 @@ fn test_dependency_tree_epic_to_children() {
     storage.create_issue(&subtask).unwrap();
 
     // Epic -> child1 (ParentChild)
-    storage.add_dependency(
-        "epic-3",
-        "child-1",
-        &DependencyType::ParentChild,
-        "test"
-    ).unwrap();
+    storage
+        .add_dependency("epic-3", "child-1", &DependencyType::ParentChild, "test")
+        .unwrap();
 
     // child1 -> subtask (Blocks)
-    storage.add_dependency(
-        "child-1",
-        "subtask-1",
-        &DependencyType::Blocks,
-        "test"
-    ).unwrap();
+    storage
+        .add_dependency("child-1", "subtask-1", &DependencyType::Blocks, "test")
+        .unwrap();
 
     // Test dependency tree "down" from epic
     let tree = storage.get_dep_tree("epic-3", "down", 0).unwrap();

@@ -1,7 +1,9 @@
 // Epic 6: Complex Labels Tests
 // Tests epics with many labels (4+), complex label interactions, and edge cases
 
-use bead_forge::model::{Issue, IssueType, Status, DependencyType, EpicStatus, Priority, IssueChanges};
+use bead_forge::model::{
+    DependencyType, EpicStatus, Issue, IssueChanges, IssueType, Priority, Status,
+};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 
@@ -138,7 +140,14 @@ fn test_epic_complex_labels_with_children() {
         ..Default::default()
     };
     storage.create_issue(&child1).unwrap();
-    storage.add_dependency("epic-complex-children", "child-complex-1", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-complex-children",
+            "child-complex-1",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     let child2 = Issue {
         id: "child-complex-2".to_string(),
@@ -149,7 +158,14 @@ fn test_epic_complex_labels_with_children() {
         ..Default::default()
     };
     storage.create_issue(&child2).unwrap();
-    storage.add_dependency("epic-complex-children", "child-complex-2", &DependencyType::ParentChild, "test").unwrap();
+    storage
+        .add_dependency(
+            "epic-complex-children",
+            "child-complex-2",
+            &DependencyType::ParentChild,
+            "test",
+        )
+        .unwrap();
 
     // Verify epic still has all 4 labels
     let epic_retrieved = storage.get_issue("epic-complex-children").unwrap().unwrap();
@@ -199,7 +215,14 @@ fn test_epic_complex_labels_aggregation() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-complex-aggregation", &format!("agg-child-{}", i), &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-complex-aggregation",
+                &format!("agg-child-{}", i),
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // List all labels globally
@@ -209,11 +232,11 @@ fn test_epic_complex_labels_aggregation() {
     assert_eq!(all_labels.len(), 5);
 
     let label_map: std::collections::HashMap<String, i64> = all_labels.into_iter().collect();
-    assert_eq!(label_map.get("api"), Some(&6));    // 1 epic + 5 children
+    assert_eq!(label_map.get("api"), Some(&6)); // 1 epic + 5 children
     assert_eq!(label_map.get("breaking-change"), Some(&1));
     assert_eq!(label_map.get("critical"), Some(&1));
     assert_eq!(label_map.get("feature"), Some(&1));
-    assert_eq!(label_map.get("bug"), Some(&5));    // 5 children
+    assert_eq!(label_map.get("bug"), Some(&5)); // 5 children
 }
 
 #[test]
@@ -250,19 +273,27 @@ fn test_epic_complex_labels_status_computation() {
         };
         child.closed_at = Some(Utc::now());
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-complex-status", &format!("complex-status-child-{}", i), &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-complex-status",
+                &format!("complex-status-child-{}", i),
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Compute epic status
     let epic_issue = storage.get_issue("epic-complex-status").unwrap().unwrap();
     let children = storage.get_dependencies("epic-complex-status").unwrap();
 
-    let closed_children = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_children = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     let epic_status = EpicStatus {
         epic: epic_issue,
@@ -301,23 +332,40 @@ fn test_epic_complex_labels_add_and_remove() {
     storage.create_issue(&epic).unwrap();
 
     // Verify initial state
-    let retrieved = storage.get_issue("epic-complex-add-remove").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("epic-complex-add-remove")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.labels.len(), 4);
 
     // Add more labels
-    storage.add_label("epic-complex-add-remove", "breaking-change").unwrap();
-    storage.add_label("epic-complex-add-remove", "security").unwrap();
+    storage
+        .add_label("epic-complex-add-remove", "breaking-change")
+        .unwrap();
+    storage
+        .add_label("epic-complex-add-remove", "security")
+        .unwrap();
 
     // Verify now has 6 labels
-    let retrieved = storage.get_issue("epic-complex-add-remove").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("epic-complex-add-remove")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.labels.len(), 6);
 
     // Remove some labels
-    storage.remove_label("epic-complex-add-remove", "urgent").unwrap();
-    storage.remove_label("epic-complex-add-remove", "feature").unwrap();
+    storage
+        .remove_label("epic-complex-add-remove", "urgent")
+        .unwrap();
+    storage
+        .remove_label("epic-complex-add-remove", "feature")
+        .unwrap();
 
     // Verify back to 4 labels
-    let retrieved = storage.get_issue("epic-complex-add-remove").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("epic-complex-add-remove")
+        .unwrap()
+        .unwrap();
     assert_eq!(retrieved.labels.len(), 4);
     assert!(retrieved.labels.contains(&"api".to_string()));
     assert!(retrieved.labels.contains(&"critical".to_string()));
@@ -332,9 +380,18 @@ fn test_multiple_epics_with_complex_labels() {
 
     // Create multiple epics each with different complex label sets
     let epics = vec![
-        ("epic-complex-1", vec!["api", "backend", "critical", "feature"]),
-        ("epic-complex-2", vec!["bug", "urgent", "frontend", "performance"]),
-        ("epic-complex-3", vec!["docs", "low-priority", "refactor", "tech-debt"]),
+        (
+            "epic-complex-1",
+            vec!["api", "backend", "critical", "feature"],
+        ),
+        (
+            "epic-complex-2",
+            vec!["bug", "urgent", "frontend", "performance"],
+        ),
+        (
+            "epic-complex-3",
+            vec!["docs", "low-priority", "refactor", "tech-debt"],
+        ),
     ];
 
     for (id, labels) in &epics {
@@ -419,7 +476,10 @@ fn test_epic_complex_labels_json_roundtrip() {
     storage.create_issue(&epic).unwrap();
 
     // Retrieve and serialize
-    let retrieved = storage.get_issue("epic-complex-roundtrip").unwrap().unwrap();
+    let retrieved = storage
+        .get_issue("epic-complex-roundtrip")
+        .unwrap()
+        .unwrap();
     let json = serde_json::to_string(&retrieved).unwrap();
 
     // Deserialize
@@ -431,7 +491,10 @@ fn test_epic_complex_labels_json_roundtrip() {
     assert_eq!(deserialized.status, Status::InProgress);
     assert_eq!(deserialized.labels.len(), 4);
     assert_eq!(deserialized.priority, Priority::HIGH);
-    assert_eq!(deserialized.description, Some("Testing complex label roundtrip".to_string()));
+    assert_eq!(
+        deserialized.description,
+        Some("Testing complex label roundtrip".to_string())
+    );
 }
 
 #[test]
@@ -499,7 +562,9 @@ fn test_epic_complex_labels_update_via_changes() {
         labels: Some(new_labels.clone()),
         ..Default::default()
     };
-    storage.update_issue("epic-complex-update", &changes).unwrap();
+    storage
+        .update_issue("epic-complex-update", &changes)
+        .unwrap();
 
     // Verify labels were replaced
     let retrieved = storage.get_issue("epic-complex-update").unwrap().unwrap();
@@ -544,7 +609,14 @@ fn test_epic_complex_labels_with_closed_children() {
         };
         child.closed_at = Some(Utc::now());
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-complex-closed", &format!("complex-closed-child-{}", i), &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-complex-closed",
+                &format!("complex-closed-child-{}", i),
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Verify epic still has all 4 labels
@@ -555,12 +627,13 @@ fn test_epic_complex_labels_with_closed_children() {
     let children = storage.get_dependencies("epic-complex-closed").unwrap();
     assert_eq!(children.len(), 5);
 
-    let closed_count = children.iter().filter(|d| {
-        match storage.get_issue(&d.depends_on_id) {
+    let closed_count = children
+        .iter()
+        .filter(|d| match storage.get_issue(&d.depends_on_id) {
             Ok(Some(child)) => child.status == Status::Closed,
             _ => false,
-        }
-    }).count();
+        })
+        .count();
 
     assert_eq!(closed_count, 5);
 
@@ -592,11 +665,31 @@ fn test_epic_complex_labels_with_various_types() {
 
     // Create children of various types with complex labels
     let child_types = vec![
-        ("task-child", IssueType::Task, vec!["urgent", "bug", "performance"]),
-        ("bug-child", IssueType::Bug, vec!["critical", "security", "api"]),
-        ("feature-child", IssueType::Feature, vec!["feature", "frontend", "high-priority"]),
-        ("chore-child", IssueType::Chore, vec!["low-priority", "docs"]),
-        ("docs-child", IssueType::Docs, vec!["documentation", "review-needed"]),
+        (
+            "task-child",
+            IssueType::Task,
+            vec!["urgent", "bug", "performance"],
+        ),
+        (
+            "bug-child",
+            IssueType::Bug,
+            vec!["critical", "security", "api"],
+        ),
+        (
+            "feature-child",
+            IssueType::Feature,
+            vec!["feature", "frontend", "high-priority"],
+        ),
+        (
+            "chore-child",
+            IssueType::Chore,
+            vec!["low-priority", "docs"],
+        ),
+        (
+            "docs-child",
+            IssueType::Docs,
+            vec!["documentation", "review-needed"],
+        ),
     ];
 
     for (id, issue_type, labels) in &child_types {
@@ -609,7 +702,14 @@ fn test_epic_complex_labels_with_various_types() {
             ..Default::default()
         };
         storage.create_issue(&child).unwrap();
-        storage.add_dependency("epic-complex-types", id, &DependencyType::ParentChild, "test").unwrap();
+        storage
+            .add_dependency(
+                "epic-complex-types",
+                id,
+                &DependencyType::ParentChild,
+                "test",
+            )
+            .unwrap();
     }
 
     // Verify epic still has all 4 labels

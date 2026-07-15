@@ -1,7 +1,7 @@
 // Test Epic Default Priority
 // Tests that when creating an epic without specifying priority, it uses the default
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 
 #[test]
 fn test_epic_default_priority() {
@@ -140,6 +140,12 @@ fn test_all_priorities_exist_for_epics() {
         assert_eq!(deserialized.priority, *priority);
         assert_eq!(deserialized.issue_type, IssueType::Epic);
 
-        println!("Test {} for {}: Epic has priority {} (display: {})", i + 1, display, value, format!("{}", epic.priority));
+        println!(
+            "Test {} for {}: Epic has priority {} (display: {})",
+            i + 1,
+            display,
+            value,
+            format!("{}", epic.priority)
+        );
     }
 }

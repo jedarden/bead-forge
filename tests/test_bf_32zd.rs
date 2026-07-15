@@ -9,8 +9,8 @@ fn test_update_flags() {
     let _beads_dir = workspace.join(".beads");
 
     // Initialize workspace
-    let bf_path = std::env::var("CARGO_BIN_EXE_bf")
-        .unwrap_or_else(|_| "./target/debug/bf".to_string());
+    let bf_path =
+        std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string());
     let init_result = std::process::Command::new(&bf_path)
         .arg("init")
         .arg("--prefix")
@@ -40,7 +40,10 @@ fn test_update_flags() {
 
     assert!(create_result.status.success(), "bf create failed");
 
-    let bead_id = String::from_utf8(create_result.stdout).unwrap().trim().to_string();
+    let bead_id = String::from_utf8(create_result.stdout)
+        .unwrap()
+        .trim()
+        .to_string();
     println!("Created test bead: {}", bead_id);
 
     // Test 1: Update title
@@ -118,7 +121,10 @@ fn test_update_flags() {
         .output()
         .expect("Failed to update acceptance criteria");
 
-    assert!(result.status.success(), "bf update --acceptance-criteria failed");
+    assert!(
+        result.status.success(),
+        "bf update --acceptance-criteria failed"
+    );
     println!("✓ Update --acceptance-criteria works");
 
     // Test 7: Update notes
@@ -174,7 +180,10 @@ fn test_update_flags() {
         .output()
         .expect("Failed to update multiple fields");
 
-    assert!(result.status.success(), "bf update with multiple flags failed");
+    assert!(
+        result.status.success(),
+        "bf update with multiple flags failed"
+    );
     println!("✓ Update with multiple flags works");
 
     // Verify final state
@@ -193,8 +202,8 @@ fn test_update_flags() {
     println!("Final bead state: {}", output);
 
     // Parse JSON and verify values
-    let beads: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Failed to parse JSON");
+    let beads: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Failed to parse JSON");
     let bead = &beads[0];
 
     assert_eq!(bead["title"], "Final title");

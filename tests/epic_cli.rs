@@ -99,11 +99,7 @@ fn test_create_multiple_epics() {
     let bf_path = get_bf_binary();
 
     // Create multiple epics
-    let epic_titles = vec![
-        "First Epic",
-        "Second Epic",
-        "Third Epic"
-    ];
+    let epic_titles = vec!["First Epic", "Second Epic", "Third Epic"];
 
     let mut bead_ids = Vec::new();
     for title in epic_titles {
@@ -241,10 +237,11 @@ fn test_show_json_format_epic() {
     println!("JSON output:\n{}", json_output);
 
     // Parse and verify JSON structure - show returns an array
-    let json_array: serde_json::Value = serde_json::from_str(&json_output)
-        .expect("Failed to parse JSON output");
+    let json_array: serde_json::Value =
+        serde_json::from_str(&json_output).expect("Failed to parse JSON output");
 
-    let json = json_array.as_array()
+    let json = json_array
+        .as_array()
         .expect("Show output should be an array")
         .first()
         .expect("Array should have at least one element");
@@ -355,10 +352,7 @@ fn test_list_json_format_epics() {
     let bf_path = get_bf_binary();
 
     // Create epics with different priorities
-    let epics = vec![
-        ("High Priority Epic", "1"),
-        ("Medium Priority Epic", "2"),
-    ];
+    let epics = vec![("High Priority Epic", "1"), ("Medium Priority Epic", "2")];
 
     for (title, priority) in &epics {
         let create_result = Command::new(&bf_path)
@@ -475,10 +469,11 @@ fn test_epic_appears_in_json_with_correct_type() {
     println!("Epic JSON output:\n{}", json_output);
 
     // Parse and verify complete epic structure - show returns an array
-    let json_array: serde_json::Value = serde_json::from_str(&json_output)
-        .expect("Failed to parse epic JSON");
+    let json_array: serde_json::Value =
+        serde_json::from_str(&json_output).expect("Failed to parse epic JSON");
 
-    let json = json_array.as_array()
+    let json = json_array
+        .as_array()
         .expect("Show output should be an array")
         .first()
         .expect("Array should have at least one element");
@@ -496,16 +491,18 @@ fn test_epic_appears_in_json_with_correct_type() {
 
     // Verify JSON structure contains expected keys
     let expected_keys = vec![
-        "id", "title", "issue_type", "status", "priority",
-        "description", "created_at", "updated_at"
+        "id",
+        "title",
+        "issue_type",
+        "status",
+        "priority",
+        "description",
+        "created_at",
+        "updated_at",
     ];
 
     for key in expected_keys {
-        assert!(
-            json.get(key).is_some(),
-            "JSON should contain {} field",
-            key
-        );
+        assert!(json.get(key).is_some(), "JSON should contain {} field", key);
     }
 }
 
@@ -552,10 +549,11 @@ fn test_create_epic_with_all_fields() {
         .expect("Failed to run bf show");
 
     let json_output = String::from_utf8(show_result.stdout).unwrap();
-    let json_array: serde_json::Value = serde_json::from_str(&json_output)
-        .expect("Failed to parse epic JSON");
+    let json_array: serde_json::Value =
+        serde_json::from_str(&json_output).expect("Failed to parse epic JSON");
 
-    let json = json_array.as_array()
+    let json = json_array
+        .as_array()
         .expect("Show output should be an array")
         .first()
         .expect("Array should have at least one element");
