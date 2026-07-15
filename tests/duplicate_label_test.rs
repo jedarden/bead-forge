@@ -1,7 +1,7 @@
 // Duplicate Label Test (bf-29jlp)
 // Tests for duplicate label handling across various scenarios
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use std::collections::HashSet;
 
@@ -28,7 +28,11 @@ fn test_duplicate_label_add_prevention() {
 
     // Verify only one instance exists
     let labels = storage.get_labels("dup-test-bead").unwrap();
-    assert_eq!(labels.len(), 1, "Duplicate adds should result in single label");
+    assert_eq!(
+        labels.len(),
+        1,
+        "Duplicate adds should result in single label"
+    );
     assert!(labels.contains(&"urgent".to_string()));
 }
 
@@ -53,12 +57,16 @@ fn test_multiple_duplicate_labels() {
     storage.add_label("multi-dup-bead", "backend").unwrap();
     storage.add_label("multi-dup-bead", "urgent").unwrap(); // duplicate
     storage.add_label("multi-dup-bead", "frontend").unwrap();
-    storage.add_label("multi-dup-bead", "backend").unwrap();  // duplicate
-    storage.add_label("multi-dup-bead", "urgent").unwrap();  // duplicate again
+    storage.add_label("multi-dup-bead", "backend").unwrap(); // duplicate
+    storage.add_label("multi-dup-bead", "urgent").unwrap(); // duplicate again
 
     // Verify unique labels only
     let labels = storage.get_labels("multi-dup-bead").unwrap();
-    assert_eq!(labels.len(), 3, "Should have 3 unique labels despite duplicate adds");
+    assert_eq!(
+        labels.len(),
+        3,
+        "Should have 3 unique labels despite duplicate adds"
+    );
     assert!(labels.contains(&"urgent".to_string()));
     assert!(labels.contains(&"backend".to_string()));
     assert!(labels.contains(&"frontend".to_string()));
@@ -150,9 +158,21 @@ fn test_duplicate_labels_across_beads() {
     let all_labels = storage.list_all_labels().unwrap();
     let label_map: std::collections::HashMap<String, i64> = all_labels.into_iter().collect();
 
-    assert_eq!(label_map.get("urgent"), Some(&2), "urgent should appear in 2 beads");
-    assert_eq!(label_map.get("backend"), Some(&2), "backend should appear in 2 beads");
-    assert_eq!(label_map.get("frontend"), Some(&2), "frontend should appear in 2 beads");
+    assert_eq!(
+        label_map.get("urgent"),
+        Some(&2),
+        "urgent should appear in 2 beads"
+    );
+    assert_eq!(
+        label_map.get("backend"),
+        Some(&2),
+        "backend should appear in 2 beads"
+    );
+    assert_eq!(
+        label_map.get("frontend"),
+        Some(&2),
+        "frontend should appear in 2 beads"
+    );
 }
 
 #[test]
@@ -165,7 +185,7 @@ fn test_duplicate_label_serialization() {
         status: Status::Open,
         labels: vec![
             "urgent".to_string(),
-            "urgent".to_string(),  // duplicate in vector
+            "urgent".to_string(), // duplicate in vector
             "backend".to_string(),
         ],
         ..Default::default()
@@ -178,7 +198,11 @@ fn test_duplicate_label_serialization() {
     let deserialized: Issue = serde_json::from_str(&json).unwrap();
 
     // Verify duplicates are preserved during serialization
-    assert_eq!(deserialized.labels.len(), 3, "Serialization should preserve duplicates in vector");
+    assert_eq!(
+        deserialized.labels.len(),
+        3,
+        "Serialization should preserve duplicates in vector"
+    );
 }
 
 #[test]
@@ -303,7 +327,7 @@ fn test_duplicate_label_empty_string() {
             // If empty strings are allowed, they should be deduplicated too
             let unique_labels: HashSet<String> = labels.into_iter().collect();
             assert!(unique_labels.contains("urgent"));
-        },
+        }
         Err(_) => {
             // Expected behavior - empty strings rejected
             let labels = storage.get_labels("dup-empty-bead").unwrap();
@@ -330,14 +354,18 @@ fn test_duplicate_label_whitespace_handling() {
 
     // Add labels with whitespace variations
     storage.add_label("dup-whitespace-bead", "urgent").unwrap();
-    storage.add_label("dup-whitespace-bead", "urgent ").unwrap();  // trailing space
-    storage.add_label("dup-whitespace-bead", " urgent").unwrap();  // leading space
+    storage.add_label("dup-whitespace-bead", "urgent ").unwrap(); // trailing space
+    storage.add_label("dup-whitespace-bead", " urgent").unwrap(); // leading space
 
     // Verify behavior (whitespace should create different labels or be trimmed)
     let labels = storage.get_labels("dup-whitespace-bead").unwrap();
     // The exact assertion depends on whitespace handling implementation
     assert!(labels.len() >= 1, "At least one label should exist");
-    assert!(labels.contains(&"urgent".to_string()) || labels.contains(&"urgent ".to_string()) || labels.contains(&" urgent".to_string()));
+    assert!(
+        labels.contains(&"urgent".to_string())
+            || labels.contains(&"urgent ".to_string())
+            || labels.contains(&" urgent".to_string())
+    );
 }
 
 #[test]
@@ -364,7 +392,11 @@ fn test_duplicate_label_with_special_characters() {
 
     // Verify deduplication works with special characters
     let labels = storage.get_labels("dup-special-bead").unwrap();
-    assert_eq!(labels.len(), 2, "Special character labels should be deduplicated");
+    assert_eq!(
+        labels.len(),
+        2,
+        "Special character labels should be deduplicated"
+    );
     assert!(labels.contains(&"phase-1".to_string()));
     assert!(labels.contains(&"bug/fix".to_string()));
 }

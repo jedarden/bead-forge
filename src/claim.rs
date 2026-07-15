@@ -614,7 +614,12 @@ pub fn claim_any(
         (None, None)
     };
 
-    // Score across all workspaces
+    // Primary-first: the first workspace is the worker's home. If it has any
+    // claimable candidate, claim there — fallback workspaces are considered
+    // only when the primary is empty. Pinned fleet workers must exhaust
+    // their home queue before roaming (shared-worktree safety); scoring
+    // globally across workspaces made the winner nondeterministic on
+    // near-ties. Fallback workspaces are still ranked by score.
     let mut best: Option<(Score, usize)> = None;
     for (idx, workspace_path) in workspace_paths.iter().enumerate() {
         let beads_dir = get_beads_dir(workspace_path)?;
@@ -627,6 +632,10 @@ pub fn claim_any(
                 if let Some(score) = storage.top_candidate_score(model, harness)? {
                     if best.as_ref().map(|(b, _)| score > *b).unwrap_or(true) {
                         best = Some((score, idx));
+                    }
+                    if idx == 0 {
+                        // Primary has a claimable candidate — no fallback.
+                        break;
                     }
                 }
             }

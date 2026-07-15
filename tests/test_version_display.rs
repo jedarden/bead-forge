@@ -2,8 +2,8 @@
 // This test verifies that --version flag outputs the correct format
 // and that the version matches Cargo.toml
 
-use std::process::Command;
 use std::fs;
+use std::process::Command;
 
 #[cfg(test)]
 mod tests {
@@ -47,7 +47,10 @@ mod tests {
         );
 
         // Should be a valid semver format (major.minor.patch)
-        let version_str = version_text.trim().strip_prefix("bf ").unwrap_or(&version_text);
+        let version_str = version_text
+            .trim()
+            .strip_prefix("bf ")
+            .unwrap_or(&version_text);
         assert!(
             is_valid_semver(version_str),
             "Version should be valid semver. Got: '{}'",
@@ -67,23 +70,22 @@ mod tests {
             .expect("Failed to run 'bf --version'");
 
         let version_text = String::from_utf8_lossy(&output.stdout);
-        let cli_version = version_text.trim().strip_prefix("bf ").unwrap_or(&version_text);
+        let cli_version = version_text
+            .trim()
+            .strip_prefix("bf ")
+            .unwrap_or(&version_text);
 
         // Read version from Cargo.toml in the project root
         // The test runs from the project root during cargo test
         let cargo_toml_path = std::path::Path::new("Cargo.toml");
-        let cargo_toml_content = fs::read_to_string(cargo_toml_path)
-            .expect("Failed to read Cargo.toml");
+        let cargo_toml_content =
+            fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
 
         // Parse version from Cargo.toml
         let cargo_version = cargo_toml_content
             .lines()
             .find(|line| line.starts_with("version = "))
-            .and_then(|line| {
-                line.split('=')
-                    .nth(1)
-                    .map(|v| v.trim().trim_matches('"'))
-            })
+            .and_then(|line| line.split('=').nth(1).map(|v| v.trim().trim_matches('"')))
             .expect("Could not find version in Cargo.toml");
 
         assert_eq!(
@@ -141,8 +143,9 @@ mod tests {
             return false;
         }
         // Check that major, minor are numeric, patch can have pre-release identifier
-        parts[0].parse::<u32>().is_ok() &&
-        parts[1].parse::<u32>().is_ok() &&
-        (parts[2].parse::<u32>().is_ok() || parts[2].split('-').next().unwrap().parse::<u32>().is_ok())
+        parts[0].parse::<u32>().is_ok()
+            && parts[1].parse::<u32>().is_ok()
+            && (parts[2].parse::<u32>().is_ok()
+                || parts[2].split('-').next().unwrap().parse::<u32>().is_ok())
     }
 }
