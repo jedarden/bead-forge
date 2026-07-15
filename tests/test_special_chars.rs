@@ -194,14 +194,7 @@ mod tests {
         let title = "Test with emoji 🎉 and unicode: café, naïve";
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &[
-                "--title",
-                title,
-                "--type",
-                "task",
-                "--priority",
-                "2",
-            ],
+            &["--title", title, "--type", "task", "--priority", "2"],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -209,10 +202,7 @@ mod tests {
         let bead_id = stdout.trim();
         let show_output = run_show(&beads_dir, bead_id);
 
-        assert!(
-            show_output.contains("🎉"),
-            "Emoji should be preserved"
-        );
+        assert!(show_output.contains("🎉"), "Emoji should be preserved");
         assert!(
             show_output.contains("café"),
             "Unicode characters should be preserved"
@@ -299,8 +289,7 @@ mod tests {
 
         // Read the JSONL file
         let jsonl_path = beads_dir.join("issues.jsonl");
-        let jsonl_content = fs::read_to_string(&jsonl_path)
-            .expect("Failed to read JSONL file");
+        let jsonl_content = fs::read_to_string(&jsonl_path).expect("Failed to read JSONL file");
 
         assert!(
             jsonl_content.contains("@#$%^&*()"),

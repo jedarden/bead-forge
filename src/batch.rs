@@ -69,7 +69,15 @@ pub struct BatchResult {
 /// Allowed field names for each operation type (for validation)
 fn get_allowed_fields(op_name: &str) -> &'static [&'static str] {
     match op_name {
-        "create" => &["op", "title", "type", "priority", "description", "assignee", "labels"],
+        "create" => &[
+            "op",
+            "title",
+            "type",
+            "priority",
+            "description",
+            "assignee",
+            "labels",
+        ],
         "dep_add_blocker" => &["op", "id", "blocker", "parent", "child"],
         "close" => &["op", "id", "reason"],
         _ => &[],
@@ -240,18 +248,24 @@ fn execute_create(
     // Get count to generate ID
     let count: i64 = tx.query_row("SELECT COUNT(*) FROM issues", [], |row| row.get(0))?;
     let prefix = get_default_prefix(config);
-    let id = crate::id::generate_id(prefix, count as usize);
 
-    let mut issue = Issue::new(id.clone(), title.to_string(), ".".to_string());
+    let mut issue = Issue::new(String::new(), title.to_string(), ".".to_string());
     issue.issue_type = IssueType::from_str(type_).map_err(|e| anyhow!("Invalid type: {}", e))?;
     issue.priority = Priority(priority);
     issue.description = description.clone().or_else(|| Some(String::new()));
     issue.assignee = assignee.clone();
     issue.labels = labels.to_vec();
 
-    // Insert issue
-    tx.execute(
-        "INSERT INTO issues (
+    // Insert issue. Short IDs are sized for ~1% collision probability by
+    // design, so re-roll the ID on a colliding INSERT instead of failing.
+    let mut id = String::new();
+    let mut inserted = false;
+    let mut last_err: Option<rusqlite::Error> = None;
+    for _ in 0..5 {
+        id = crate::id::generate_id(prefix, count as usize);
+        issue.id = id.clone();
+        let insert_result = tx.execute(
+            "INSERT INTO issues (
             id, content_hash, title, description, design, acceptance_criteria, notes,
             status, priority, issue_type, assignee, owner, estimated_minutes,
             created_at, created_by, updated_at, closed_at, close_reason,
@@ -262,45 +276,65 @@ fn execute_create(
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
                   ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27,
                   ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36)",
-        rusqlite::params![
-            &issue.id,
-            &issue.content_hash,
-            &issue.title,
-            issue.description.as_deref().unwrap_or(""),
-            issue.design.as_deref().unwrap_or(""),
-            issue.acceptance_criteria.as_deref().unwrap_or(""),
-            issue.notes.as_deref().unwrap_or(""),
-            issue.status.to_string(),
-            &issue.priority,
-            &issue.issue_type.to_string(),
-            &issue.assignee,
-            &issue.owner,
-            &issue.estimated_minutes,
-            issue.created_at.to_rfc3339(),
-            &issue.created_by,
-            issue.updated_at.to_rfc3339(),
-            issue.closed_at.map(|d| d.to_rfc3339()),
-            issue.close_reason.as_deref().unwrap_or(""),
-            issue.closed_by_session.as_deref().unwrap_or(""),
-            issue.due_at.map(|d| d.to_rfc3339()),
-            issue.defer_until.map(|d| d.to_rfc3339()),
-            issue.external_ref.as_deref(),
-            issue.source_system.as_deref().unwrap_or(""),
-            &issue.source_repo,
-            issue.deleted_at.map(|d| d.to_rfc3339()),
-            issue.deleted_by.as_deref().unwrap_or(""),
-            issue.delete_reason.as_deref().unwrap_or(""),
-            issue.original_type.as_deref().unwrap_or(""),
-            &issue.compaction_level,
-            issue.compacted_at.map(|d| d.to_rfc3339()),
-            issue.compacted_at_commit.as_deref().unwrap_or(""),
-            &issue.original_size,
-            issue.sender.as_deref().unwrap_or(""),
-            if issue.ephemeral { 1 } else { 0 },
-            if issue.pinned { 1 } else { 0 },
-            if issue.is_template { 1 } else { 0 },
-        ],
-    )?;
+            rusqlite::params![
+                &issue.id,
+                &issue.content_hash,
+                &issue.title,
+                issue.description.as_deref().unwrap_or(""),
+                issue.design.as_deref().unwrap_or(""),
+                issue.acceptance_criteria.as_deref().unwrap_or(""),
+                issue.notes.as_deref().unwrap_or(""),
+                issue.status.to_string(),
+                &issue.priority,
+                &issue.issue_type.to_string(),
+                &issue.assignee,
+                &issue.owner,
+                &issue.estimated_minutes,
+                issue.created_at.to_rfc3339(),
+                &issue.created_by,
+                issue.updated_at.to_rfc3339(),
+                issue.closed_at.map(|d| d.to_rfc3339()),
+                issue.close_reason.as_deref().unwrap_or(""),
+                issue.closed_by_session.as_deref().unwrap_or(""),
+                issue.due_at.map(|d| d.to_rfc3339()),
+                issue.defer_until.map(|d| d.to_rfc3339()),
+                issue.external_ref.as_deref(),
+                issue.source_system.as_deref().unwrap_or(""),
+                &issue.source_repo,
+                issue.deleted_at.map(|d| d.to_rfc3339()),
+                issue.deleted_by.as_deref().unwrap_or(""),
+                issue.delete_reason.as_deref().unwrap_or(""),
+                issue.original_type.as_deref().unwrap_or(""),
+                &issue.compaction_level,
+                issue.compacted_at.map(|d| d.to_rfc3339()),
+                issue.compacted_at_commit.as_deref().unwrap_or(""),
+                &issue.original_size,
+                issue.sender.as_deref().unwrap_or(""),
+                if issue.ephemeral { 1 } else { 0 },
+                if issue.pinned { 1 } else { 0 },
+                if issue.is_template { 1 } else { 0 },
+            ],
+        );
+        match insert_result {
+            Ok(_) => {
+                inserted = true;
+                break;
+            }
+            Err(e)
+                if e.to_string()
+                    .contains("UNIQUE constraint failed: issues.id") =>
+            {
+                last_err = Some(e);
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    if !inserted {
+        return Err(anyhow!(
+            "ID collision retries exhausted: {}",
+            last_err.map(|e| e.to_string()).unwrap_or_default()
+        ));
+    }
 
     // Insert labels
     for label in labels {
@@ -639,7 +673,7 @@ fn parse_dep_add(input: &str) -> Result<BatchOp> {
         ));
     }
     Ok(BatchOp::DepAddBlocker {
-        id: parts[0].to_string(),    // bead being blocked
+        id: parts[0].to_string(),      // bead being blocked
         blocker: parts[1].to_string(), // bead that blocks
     })
 }
@@ -716,7 +750,16 @@ mod tests {
 
         // Both should parse to the same struct
         match (op_old, op_new) {
-            (BatchOp::DepAddBlocker { id: id1, blocker: blocker1 }, BatchOp::DepAddBlocker { id: id2, blocker: blocker2 }) => {
+            (
+                BatchOp::DepAddBlocker {
+                    id: id1,
+                    blocker: blocker1,
+                },
+                BatchOp::DepAddBlocker {
+                    id: id2,
+                    blocker: blocker2,
+                },
+            ) => {
                 assert_eq!(id1, "bf-blocked");
                 assert_eq!(blocker1, "bf-blocker");
                 assert_eq!(id1, id2);
@@ -739,10 +782,12 @@ mod tests {
     #[test]
     fn test_validate_op_fields_accepts_aliases() {
         // Both old and new syntax should validate
-        let new_json = serde_json::json!({"op": "dep_add_blocker", "id": "bf-1", "blocker": "bf-2"});
+        let new_json =
+            serde_json::json!({"op": "dep_add_blocker", "id": "bf-1", "blocker": "bf-2"});
         assert!(validate_op_fields(&new_json).is_ok());
 
-        let old_json = serde_json::json!({"op": "dep_add_blocker", "parent": "bf-2", "child": "bf-1"});
+        let old_json =
+            serde_json::json!({"op": "dep_add_blocker", "parent": "bf-2", "child": "bf-1"});
         assert!(validate_op_fields(&old_json).is_ok());
     }
 
@@ -795,30 +840,38 @@ mod tests {
         }).unwrap();
 
         // Add dependency via batch function (should match CLI direction)
-        storage.with_immediate_transaction(|tx| {
-            execute_dep_add_blocker(tx, "bf-blocked", "bf-blocker").unwrap();
-            Ok(())
-        }).unwrap();
+        storage
+            .with_immediate_transaction(|tx| {
+                execute_dep_add_blocker(tx, "bf-blocked", "bf-blocker").unwrap();
+                Ok(())
+            })
+            .unwrap();
 
         // Verify the dependency row matches what CLI would create
-        let deps = storage.with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare(
+        let deps = storage
+            .with_immediate_transaction(|tx| {
+                let mut stmt = tx.prepare(
                 "SELECT issue_id, depends_on_id, type FROM dependencies WHERE issue_id = ?1"
             ).unwrap();
-            let deps: Vec<(String, String, String)> = stmt
-                .query_map(["bf-blocked"], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
-                })
-                .unwrap()
-                .filter_map(|r| r.ok())
-                .collect();
-            Ok(deps)
-        }).unwrap();
+                let deps: Vec<(String, String, String)> = stmt
+                    .query_map(["bf-blocked"], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                        ))
+                    })
+                    .unwrap()
+                    .filter_map(|r| r.ok())
+                    .collect();
+                Ok(deps)
+            })
+            .unwrap();
 
         assert_eq!(deps.len(), 1);
-        assert_eq!(deps[0].0, "bf-blocked");   // issue_id
-        assert_eq!(deps[0].1, "bf-blocker");   // depends_on_id
-        assert_eq!(deps[0].2, "blocks");      // type
+        assert_eq!(deps[0].0, "bf-blocked"); // issue_id
+        assert_eq!(deps[0].1, "bf-blocker"); // depends_on_id
+        assert_eq!(deps[0].2, "blocks"); // type
 
         // This matches: storage.add_dependency("bf-blocked", "bf-blocker", ...)
         // which CLI uses via: bf dep add bf-blocker --blocks bf-blocked
@@ -853,15 +906,16 @@ mod tests {
         }).unwrap();
 
         // Add dependency: B blocks A
-        storage.with_immediate_transaction(|tx| {
-            execute_dep_add_blocker(tx, "bf-a", "bf-b").unwrap();
-            Ok(())
-        }).unwrap();
+        storage
+            .with_immediate_transaction(|tx| {
+                execute_dep_add_blocker(tx, "bf-a", "bf-b").unwrap();
+                Ok(())
+            })
+            .unwrap();
 
         // Attempting to add reverse dependency should fail (cycle detection)
-        let result = storage.with_immediate_transaction(|tx| {
-            execute_dep_add_blocker(tx, "bf-b", "bf-a")
-        });
+        let result =
+            storage.with_immediate_transaction(|tx| execute_dep_add_blocker(tx, "bf-b", "bf-a"));
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -897,15 +951,16 @@ mod tests {
         }).unwrap();
 
         // Add dependency once
-        storage.with_immediate_transaction(|tx| {
-            execute_dep_add_blocker(tx, "bf-a", "bf-b").unwrap();
-            Ok(())
-        }).unwrap();
+        storage
+            .with_immediate_transaction(|tx| {
+                execute_dep_add_blocker(tx, "bf-a", "bf-b").unwrap();
+                Ok(())
+            })
+            .unwrap();
 
         // Attempting to add same dependency again should fail
-        let result = storage.with_immediate_transaction(|tx| {
-            execute_dep_add_blocker(tx, "bf-a", "bf-b")
-        });
+        let result =
+            storage.with_immediate_transaction(|tx| execute_dep_add_blocker(tx, "bf-a", "bf-b"));
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1023,11 +1078,11 @@ mod tests {
             // Add dependencies using placeholder references
             // Each child blocks the parent
             BatchOp::DepAddBlocker {
-                id: parent_id.clone(),    // parent is blocked
+                id: parent_id.clone(),     // parent is blocked
                 blocker: "@0".to_string(), // first child blocks parent
             },
             BatchOp::DepAddBlocker {
-                id: parent_id.clone(),    // parent is blocked
+                id: parent_id.clone(),     // parent is blocked
                 blocker: "@1".to_string(), // second child blocks parent
             },
             // Close the parent
@@ -1112,15 +1167,15 @@ mod tests {
 
         // Verify placeholder references (new canonical schema)
         if let BatchOp::DepAddBlocker { id, blocker } = &ops[2] {
-            assert_eq!(id, parent_id);    // parent is blocked
-            assert_eq!(blocker, "@0");    // first child blocks parent
+            assert_eq!(id, parent_id); // parent is blocked
+            assert_eq!(blocker, "@0"); // first child blocks parent
         } else {
             panic!("Expected DepAddBlocker");
         }
 
         if let BatchOp::DepAddBlocker { id, blocker } = &ops[3] {
-            assert_eq!(id, parent_id);    // parent is blocked
-            assert_eq!(blocker, "@1");    // second child blocks parent
+            assert_eq!(id, parent_id); // parent is blocked
+            assert_eq!(blocker, "@1"); // second child blocks parent
         } else {
             panic!("Expected DepAddBlocker");
         }

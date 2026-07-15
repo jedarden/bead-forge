@@ -408,11 +408,9 @@ impl Storage {
         // Validate that the bead exists
         let exists = {
             let conn = self.conn.lock().unwrap();
-            match conn.query_row(
-                "SELECT 1 FROM issues WHERE id = ?1",
-                params![id],
-                |_| Ok(true),
-            ) {
+            match conn.query_row("SELECT 1 FROM issues WHERE id = ?1", params![id], |_| {
+                Ok(true)
+            }) {
                 Ok(result) => result,
                 Err(rusqlite::Error::QueryReturnedNoRows) => false,
                 Err(e) => return Err(e.into()),

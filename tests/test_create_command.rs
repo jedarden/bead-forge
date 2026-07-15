@@ -3,9 +3,9 @@
 
 #[cfg(test)]
 mod tests {
-    use tempfile::TempDir;
     use std::fs;
     use std::process::Command;
+    use tempfile::TempDir;
 
     /// Resolve the freshly-built bf binary — never the system-installed one.
     fn bf_binary() -> String {
@@ -80,7 +80,9 @@ claim_ttl_minutes: 30
         // Minimum is bf- + 3 chars = 7 chars total
         let hash_part = bead_id.strip_prefix("bf-").unwrap();
         assert!(
-            hash_part.len() >= 3 && hash_part.len() <= 8 && hash_part.chars().all(|c| c.is_ascii_alphanumeric()),
+            hash_part.len() >= 3
+                && hash_part.len() <= 8
+                && hash_part.chars().all(|c| c.is_ascii_alphanumeric()),
             "Bead ID hash part should be 3-8 alphanumeric chars, got: {} (full ID: {})",
             hash_part,
             bead_id
@@ -173,18 +175,9 @@ claim_ttl_minutes: 30
             show_text.contains("This is a detailed description"),
             "Description should be set"
         );
-        assert!(
-            show_text.contains("bug"),
-            "Type should be 'bug'"
-        );
-        assert!(
-            show_text.contains("P0"),
-            "Priority should be 'P0'"
-        );
-        assert!(
-            show_text.contains("test-worker"),
-            "Assignee should be set"
-        );
+        assert!(show_text.contains("bug"), "Type should be 'bug'");
+        assert!(show_text.contains("P0"), "Priority should be 'P0'");
+        assert!(show_text.contains("test-worker"), "Assignee should be set");
         assert!(
             show_text.contains("urgent"),
             "First label should be present"
@@ -204,7 +197,9 @@ claim_ttl_minutes: 30
         let temp_dir = setup_test_workspace();
         let workspace = temp_dir.path();
 
-        let types = vec!["task", "bug", "feature", "epic", "chore", "docs", "question"];
+        let types = vec![
+            "task", "bug", "feature", "epic", "chore", "docs", "question",
+        ];
 
         for issue_type in types {
             let create_output = Command::new(bf_binary())
@@ -250,7 +245,13 @@ claim_ttl_minutes: 30
         let temp_dir = setup_test_workspace();
         let workspace = temp_dir.path();
 
-        let priorities = vec![("0", "P0"), ("1", "P1"), ("2", "P2"), ("3", "P3"), ("4", "P4")];
+        let priorities = vec![
+            ("0", "P0"),
+            ("1", "P1"),
+            ("2", "P2"),
+            ("3", "P3"),
+            ("4", "P4"),
+        ];
 
         for (priority_value, priority_display) in priorities {
             let create_output = Command::new(bf_binary())
@@ -261,7 +262,10 @@ claim_ttl_minutes: 30
                 .arg(priority_value)
                 .current_dir(workspace)
                 .output()
-                .expect(&format!("Failed to create bead with priority {}", priority_value));
+                .expect(&format!(
+                    "Failed to create bead with priority {}",
+                    priority_value
+                ));
 
             assert!(
                 create_output.status.success(),
@@ -347,9 +351,7 @@ claim_ttl_minutes: 30
             cmd.arg("--label").arg(label);
         }
 
-        let create_output = cmd
-            .output()
-            .expect("Failed to create bead");
+        let create_output = cmd.output().expect("Failed to create bead");
 
         assert!(
             create_output.status.success(),
@@ -499,7 +501,10 @@ claim_ttl_minutes: 30
                 .arg(custom_type)
                 .current_dir(workspace)
                 .output()
-                .expect(&format!("Failed to create bead with custom type {}", custom_type));
+                .expect(&format!(
+                    "Failed to create bead with custom type {}",
+                    custom_type
+                ));
 
             assert!(
                 create_output.status.success(),
@@ -628,14 +633,8 @@ claim_ttl_minutes: 30
             show_text.contains("open"),
             "Default status should be 'open'"
         );
-        assert!(
-            show_text.contains("P2"),
-            "Default priority should be 'P2'"
-        );
-        assert!(
-            show_text.contains("task"),
-            "Default type should be 'task'"
-        );
+        assert!(show_text.contains("P2"), "Default priority should be 'P2'");
+        assert!(show_text.contains("task"), "Default type should be 'task'");
     }
 
     #[test]
@@ -692,14 +691,8 @@ claim_ttl_minutes: 30
             .expect("Failed to show bead");
 
         let show_text = String::from_utf8_lossy(&show_output.stdout);
-        assert!(
-            show_text.contains("feature"),
-            "Type should be persisted"
-        );
-        assert!(
-            show_text.contains("P1"),
-            "Priority should be persisted"
-        );
+        assert!(show_text.contains("feature"), "Type should be persisted");
+        assert!(show_text.contains("P1"), "Priority should be persisted");
     }
 
     #[test]
@@ -773,9 +766,7 @@ claim_ttl_minutes: 30
             cmd.arg("--label").arg(label);
         }
 
-        let create_output = cmd
-            .output()
-            .expect("Failed to create bead");
+        let create_output = cmd.output().expect("Failed to create bead");
 
         assert!(
             create_output.status.success(),

@@ -1,8 +1,8 @@
 // Comprehensive label functionality tests
 // Tests all label operations including add, remove, list, and edge cases
 
-use std::process::Command;
 use std::collections::HashSet;
+use std::process::Command;
 
 /// Resolve the freshly-built bf binary — never the system-installed one.
 fn bf_binary() -> String {
@@ -27,7 +27,11 @@ fn create_test_bead(title: &str) -> String {
         .output()
         .expect("Failed to create bead");
 
-    assert!(output.status.success(), "Failed to create bead: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "Failed to create bead: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     stdout.trim().to_string()
@@ -42,7 +46,11 @@ fn get_labels(bead_id: &str) -> Vec<String> {
         .output()
         .expect("Failed to list labels");
 
-    assert!(output.status.success(), "Failed to list labels: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "Failed to list labels: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     serde_json::from_str::<Vec<String>>(&json_output).expect("Failed to parse labels JSON")
@@ -71,8 +79,11 @@ fn test_label_lifecycle() {
         .output()
         .expect("Failed to add labels");
 
-    assert!(add_output.status.success(), "Failed to add labels: {}",
-        String::from_utf8_lossy(&add_output.stderr));
+    assert!(
+        add_output.status.success(),
+        "Failed to add labels: {}",
+        String::from_utf8_lossy(&add_output.stderr)
+    );
 
     // Verify labels were added
     let labels = get_labels(&bead_id);
@@ -93,21 +104,34 @@ fn test_label_lifecycle() {
         .output()
         .expect("Failed to remove label");
 
-    assert!(remove_output.status.success(), "Failed to remove label: {}",
-        String::from_utf8_lossy(&remove_output.stderr));
+    assert!(
+        remove_output.status.success(),
+        "Failed to remove label: {}",
+        String::from_utf8_lossy(&remove_output.stderr)
+    );
 
     // Verify label was removed
     let labels = get_labels(&bead_id);
     assert_eq!(labels.len(), 2, "Should have 2 labels after removal");
 
     let label_set: HashSet<_> = labels.into_iter().collect();
-    assert!(!label_set.contains("urgent"), "'urgent' label should be removed");
-    assert!(label_set.contains("backend"), "'backend' label should still exist");
+    assert!(
+        !label_set.contains("urgent"),
+        "'urgent' label should be removed"
+    );
+    assert!(
+        label_set.contains("backend"),
+        "'backend' label should still exist"
+    );
     assert!(label_set.contains("bug"), "'bug' label should still exist");
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -116,8 +140,7 @@ fn test_label_duplicates_prevented() {
     let bead_id = create_test_bead("Duplicate prevention test");
 
     // Add the same label twice
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -133,8 +156,12 @@ fn test_label_duplicates_prevented() {
     assert_eq!(labels[0], "urgent", "Only 'urgent' label should exist");
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -143,8 +170,7 @@ fn test_label_multiple_operations() {
     let bead_id = create_test_bead("Multiple operations test");
 
     // Add labels in batches
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -158,8 +184,7 @@ fn test_label_multiple_operations() {
     assert_eq!(labels.len(), 2, "Should have 2 labels after first batch");
 
     // Add more labels
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -173,8 +198,7 @@ fn test_label_multiple_operations() {
     assert_eq!(labels.len(), 4, "Should have 4 labels after second batch");
 
     // Remove multiple labels at once
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("remove")
         .arg(&bead_id)
         .arg("--label")
@@ -189,13 +213,26 @@ fn test_label_multiple_operations() {
 
     let label_set: HashSet<_> = labels.into_iter().collect();
     assert!(label_set.contains("bug"), "'bug' label should remain");
-    assert!(label_set.contains("backend"), "'backend' label should remain");
-    assert!(!label_set.contains("urgent"), "'urgent' label should be removed");
-    assert!(!label_set.contains("frontend"), "'frontend' label should be removed");
+    assert!(
+        label_set.contains("backend"),
+        "'backend' label should remain"
+    );
+    assert!(
+        !label_set.contains("urgent"),
+        "'urgent' label should be removed"
+    );
+    assert!(
+        !label_set.contains("frontend"),
+        "'frontend' label should be removed"
+    );
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -204,8 +241,7 @@ fn test_label_idempotent_removal() {
     let bead_id = create_test_bead("Idempotent removal test");
 
     // Add a label
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -223,7 +259,10 @@ fn test_label_idempotent_removal() {
         .output()
         .expect("Failed to attempt removal");
 
-    assert!(output.status.success(), "Removing non-existent label should succeed");
+    assert!(
+        output.status.success(),
+        "Removing non-existent label should succeed"
+    );
 
     // Verify the original label is still there
     let labels = get_labels(&bead_id);
@@ -240,11 +279,18 @@ fn test_label_idempotent_removal() {
         .output()
         .expect("Failed to attempt second removal");
 
-    assert!(output.status.success(), "Second removal should also succeed");
+    assert!(
+        output.status.success(),
+        "Second removal should also succeed"
+    );
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -253,8 +299,7 @@ fn test_label_special_characters() {
     let bead_id = create_test_bead("Special characters test");
 
     // Add labels with various special characters
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -268,16 +313,33 @@ fn test_label_special_characters() {
 
     // Verify all labels were stored correctly
     let labels = get_labels(&bead_id);
-    assert_eq!(labels.len(), 3, "Should have 3 labels with special characters");
+    assert_eq!(
+        labels.len(),
+        3,
+        "Should have 3 labels with special characters"
+    );
 
     let label_set: HashSet<_> = labels.into_iter().collect();
-    assert!(label_set.contains("high-priority"), "Missing 'high-priority' label");
-    assert!(label_set.contains("needs-review"), "Missing 'needs-review' label");
-    assert!(label_set.contains("API:breaking"), "Missing 'API:breaking' label");
+    assert!(
+        label_set.contains("high-priority"),
+        "Missing 'high-priority' label"
+    );
+    assert!(
+        label_set.contains("needs-review"),
+        "Missing 'needs-review' label"
+    );
+    assert!(
+        label_set.contains("API:breaking"),
+        "Missing 'API:breaking' label"
+    );
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -286,8 +348,7 @@ fn test_label_phase_labels() {
     let bead_id = create_test_bead("Phase labels test");
 
     // Add various phase labels
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -309,8 +370,12 @@ fn test_label_phase_labels() {
     assert!(label_set.contains("phase-3"), "Missing 'phase-3' label");
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -320,8 +385,7 @@ fn test_label_all_unique() {
     let bead2 = create_test_bead("Label uniqueness test 2");
 
     // Add overlapping labels to different beads
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead1)
         .arg("--label")
@@ -331,8 +395,7 @@ fn test_label_all_unique() {
         .output()
         .expect("Failed to add labels to bead 1");
 
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead2)
         .arg("--label")
@@ -349,8 +412,11 @@ fn test_label_all_unique() {
         .output()
         .expect("Failed to list all labels");
 
-    assert!(output.status.success(), "Failed to list all labels: {}",
-        String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "Failed to list all labels: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
@@ -362,16 +428,37 @@ fn test_label_all_unique() {
         .collect();
 
     // Verify we have the expected unique labels
-    assert!(labels.len() >= 3, "Should have at least 3 unique labels: {:?}", labels);
-    assert!(labels.contains(&"urgent".to_string()), "Missing 'urgent' label");
-    assert!(labels.contains(&"backend".to_string()), "Missing 'backend' label");
-    assert!(labels.contains(&"frontend".to_string()), "Missing 'frontend' label");
+    assert!(
+        labels.len() >= 3,
+        "Should have at least 3 unique labels: {:?}",
+        labels
+    );
+    assert!(
+        labels.contains(&"urgent".to_string()),
+        "Missing 'urgent' label"
+    );
+    assert!(
+        labels.contains(&"backend".to_string()),
+        "Missing 'backend' label"
+    );
+    assert!(
+        labels.contains(&"frontend".to_string()),
+        "Missing 'frontend' label"
+    );
 
     // Clean up
-    bf().arg("close").arg(&bead1).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead 1");
-    bf().arg("close").arg(&bead2).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead 2");
+    bf().arg("close")
+        .arg(&bead1)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead 1");
+    bf().arg("close")
+        .arg(&bead2)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead 2");
 }
 
 #[test]
@@ -380,8 +467,7 @@ fn test_label_unicode() {
     let bead_id = create_test_bead("Unicode labels test");
 
     // Add labels with unicode characters
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -403,8 +489,12 @@ fn test_label_unicode() {
     assert!(label_set.contains("critical"), "Missing 'critical' label");
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -426,15 +516,22 @@ fn test_label_empty_operations() {
         .output()
         .expect("Failed to attempt removal");
 
-    assert!(output.status.success(), "Removal from empty label list should succeed");
+    assert!(
+        output.status.success(),
+        "Removal from empty label list should succeed"
+    );
 
     // Verify still no labels
     let labels = get_labels(&bead_id);
     assert_eq!(labels.len(), 0, "Should still have no labels");
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }
 
 #[test]
@@ -443,8 +540,7 @@ fn test_label_persistence() {
     let bead_id = create_test_bead("Label persistence test");
 
     // Add labels
-    bf()
-        .arg("label")
+    bf().arg("label")
         .arg("add")
         .arg(&bead_id)
         .arg("--label")
@@ -463,18 +559,31 @@ fn test_label_persistence() {
         .output()
         .expect("Failed to update bead");
 
-    assert!(update_output.status.success(), "Failed to update bead: {}",
-        String::from_utf8_lossy(&update_output.stderr));
+    assert!(
+        update_output.status.success(),
+        "Failed to update bead: {}",
+        String::from_utf8_lossy(&update_output.stderr)
+    );
 
     // Verify labels still exist after update
     let labels = get_labels(&bead_id);
     assert_eq!(labels.len(), 2, "Labels should persist after update");
 
     let label_set: HashSet<_> = labels.into_iter().collect();
-    assert!(label_set.contains("urgent"), "'urgent' label should persist");
-    assert!(label_set.contains("backend"), "'backend' label should persist");
+    assert!(
+        label_set.contains("urgent"),
+        "'urgent' label should persist"
+    );
+    assert!(
+        label_set.contains("backend"),
+        "'backend' label should persist"
+    );
 
     // Clean up
-    bf().arg("close").arg(&bead_id).arg("--reason").arg("Test cleanup")
-        .output().expect("Failed to close bead");
+    bf().arg("close")
+        .arg(&bead_id)
+        .arg("--reason")
+        .arg("Test cleanup")
+        .output()
+        .expect("Failed to close bead");
 }

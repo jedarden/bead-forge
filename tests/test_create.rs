@@ -153,7 +153,10 @@ mod tests {
 
         let bead_id = stdout.trim();
         let list_output = run_list(&beads_dir);
-        assert!(list_output.contains("test-user"), "Assignee should be in list");
+        assert!(
+            list_output.contains("test-user"),
+            "Assignee should be in list"
+        );
     }
 
     #[test]
@@ -215,7 +218,10 @@ mod tests {
             list_output.contains("feature-x"),
             "Second label should be in list"
         );
-        assert!(list_output.contains("urgent"), "Third label should be in list");
+        assert!(
+            list_output.contains("urgent"),
+            "Third label should be in list"
+        );
     }
 
     #[test]
@@ -250,7 +256,14 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &["--title", "Feature bead", "--type", "feature", "--priority", "2"],
+            &[
+                "--title",
+                "Feature bead",
+                "--type",
+                "feature",
+                "--priority",
+                "2",
+            ],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -263,7 +276,14 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &["--title", "Critical bead", "--type", "task", "--priority", "0"],
+            &[
+                "--title",
+                "Critical bead",
+                "--type",
+                "task",
+                "--priority",
+                "0",
+            ],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -276,7 +296,14 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &["--title", "High priority bead", "--type", "task", "--priority", "1"],
+            &[
+                "--title",
+                "High priority bead",
+                "--type",
+                "task",
+                "--priority",
+                "1",
+            ],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -289,7 +316,14 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &["--title", "Medium priority bead", "--type", "task", "--priority", "2"],
+            &[
+                "--title",
+                "Medium priority bead",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -302,7 +336,14 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &["--title", "Low priority bead", "--type", "task", "--priority", "3"],
+            &[
+                "--title",
+                "Low priority bead",
+                "--type",
+                "task",
+                "--priority",
+                "3",
+            ],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -315,7 +356,14 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &["--title", "Backlog bead", "--type", "task", "--priority", "4"],
+            &[
+                "--title",
+                "Backlog bead",
+                "--type",
+                "task",
+                "--priority",
+                "4",
+            ],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -381,7 +429,14 @@ mod tests {
 
         let (id2, stderr, success2) = run_create(
             &beads_dir,
-            &["--title", "Second bead", "--type", "task", "--priority", "2"],
+            &[
+                "--title",
+                "Second bead",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
         );
         assert!(success2, "Second create should succeed. stderr: {}", stderr);
 
@@ -398,7 +453,14 @@ mod tests {
 
         let (stdout, stderr, success) = run_create(
             &beads_dir,
-            &["--title", "Prefixed bead", "--type", "task", "--priority", "2"],
+            &[
+                "--title",
+                "Prefixed bead",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
         );
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
@@ -449,10 +511,8 @@ mod tests {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
         // Test that create command fails when title is not provided
-        let (stdout, stderr, success) = run_create(
-            &beads_dir,
-            &["--type", "task", "--priority", "2"],
-        );
+        let (stdout, stderr, success) =
+            run_create(&beads_dir, &["--type", "task", "--priority", "2"]);
 
         assert!(!success, "Create command should fail when title is missing");
         assert!(
@@ -473,6 +533,9 @@ mod tests {
 
         // Empty title should either be rejected or accepted (depending on implementation)
         // This test documents current behavior
-        println!("Empty title test - success: {}, stdout: {}, stderr: {}", success, stdout, stderr);
+        println!(
+            "Empty title test - success: {}, stdout: {}, stderr: {}",
+            success, stdout, stderr
+        );
     }
 }

@@ -7,7 +7,7 @@
 //! - Handles the bead_annotations table correctly
 //! - Foreign key ON DELETE CASCADE works when bead is deleted
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -163,9 +163,15 @@ fn test_bead_annotations_removal() {
 
     // Create issue with annotations
     let mut issue = create_test_issue("bf-1", vec![]);
-    issue.annotations.insert("key1".to_string(), "value1".to_string());
-    issue.annotations.insert("key2".to_string(), "value2".to_string());
-    issue.annotations.insert("key3".to_string(), "value3".to_string());
+    issue
+        .annotations
+        .insert("key1".to_string(), "value1".to_string());
+    issue
+        .annotations
+        .insert("key2".to_string(), "value2".to_string());
+    issue
+        .annotations
+        .insert("key3".to_string(), "value3".to_string());
     storage.create_issue(&issue).unwrap();
 
     // Verify annotations exist
@@ -190,7 +196,9 @@ fn test_bead_annotations_uses_immediate_transaction() {
     let storage = Storage::open(&db_path).unwrap();
 
     let mut issue = create_test_issue("bf-1", vec![]);
-    issue.annotations.insert("key1".to_string(), "value1".to_string());
+    issue
+        .annotations
+        .insert("key1".to_string(), "value1".to_string());
     storage.create_issue(&issue).unwrap();
 
     // remove_annotation uses with_immediate_transaction
@@ -207,8 +215,12 @@ fn test_clear_annotations() {
     let storage = Storage::open(&db_path).unwrap();
 
     let mut issue = create_test_issue("bf-1", vec![]);
-    issue.annotations.insert("key1".to_string(), "value1".to_string());
-    issue.annotations.insert("key2".to_string(), "value2".to_string());
+    issue
+        .annotations
+        .insert("key1".to_string(), "value1".to_string());
+    issue
+        .annotations
+        .insert("key2".to_string(), "value2".to_string());
     storage.create_issue(&issue).unwrap();
 
     // Clear all annotations

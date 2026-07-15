@@ -8,8 +8,8 @@
 //! 5. Valid assignees are accepted during both create and update operations
 //! 6. None (no assignee) is accepted during both create and update operations
 
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
 use tempfile::TempDir;
 
 /// Create a temporary workspace for testing
@@ -33,14 +33,21 @@ fn setup_test_workspace() -> TempDir {
         .expect("Failed to run bf init");
 
     if !output.status.success() {
-        panic!("bf init failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "bf init failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     temp_dir
 }
 
 /// Run bf create command and return the result
-fn run_bf_create(workspace_dir: &PathBuf, title: &str, assignee: Option<&str>) -> (bool, String, String) {
+fn run_bf_create(
+    workspace_dir: &PathBuf,
+    title: &str,
+    assignee: Option<&str>,
+) -> (bool, String, String) {
     let mut cmd = Command::new(bf_binary());
     cmd.arg("create")
         .arg("--title")
@@ -60,11 +67,13 @@ fn run_bf_create(workspace_dir: &PathBuf, title: &str, assignee: Option<&str>) -
 }
 
 /// Run bf update command and return the result
-fn run_bf_update(workspace_dir: &PathBuf, id: &str, assignee: Option<&str>) -> (bool, String, String) {
+fn run_bf_update(
+    workspace_dir: &PathBuf,
+    id: &str,
+    assignee: Option<&str>,
+) -> (bool, String, String) {
     let mut cmd = Command::new(bf_binary());
-    cmd.arg("update")
-        .arg(id)
-        .current_dir(workspace_dir);
+    cmd.arg("update").arg(id).current_dir(workspace_dir);
 
     if let Some(assignee_val) = assignee {
         cmd.arg("--assignee").arg(assignee_val);
@@ -101,7 +110,10 @@ fn test_create_bead_with_whitespace_only_assignee_rejected() {
 
     let (success, stdout, stderr) = run_bf_create(&workspace_dir, "Test bead", Some("   "));
 
-    assert!(!success, "bf create should fail with whitespace-only assignee");
+    assert!(
+        !success,
+        "bf create should fail with whitespace-only assignee"
+    );
     assert!(
         stderr.contains("Assignee cannot be empty or whitespace-only"),
         "Error message should mention empty assignee"
@@ -116,7 +128,10 @@ fn test_create_bead_with_tab_whitespace_assignee_rejected() {
 
     let (success, stdout, stderr) = run_bf_create(&workspace_dir, "Test bead", Some("\t\t"));
 
-    assert!(!success, "bf create should fail with tab whitespace-only assignee");
+    assert!(
+        !success,
+        "bf create should fail with tab whitespace-only assignee"
+    );
     assert!(
         stderr.contains("Assignee cannot be empty or whitespace-only"),
         "Error message should mention empty assignee"
@@ -152,7 +167,10 @@ fn test_create_bead_with_padded_whitespace_assignee_accepted() {
 
     let (success, stdout, _stderr) = run_bf_create(&workspace_dir, "Test bead", Some("  alice  "));
 
-    assert!(success, "bf create should succeed with padded assignee (after trim)");
+    assert!(
+        success,
+        "bf create should succeed with padded assignee (after trim)"
+    );
     assert!(!stdout.is_empty(), "Should output bead ID");
 }
 
@@ -191,7 +209,10 @@ fn test_update_bead_with_whitespace_only_assignee_rejected() {
     // Try to update with whitespace-only assignee
     let (success, _stdout, stderr) = run_bf_update(&workspace_dir, bead_id, Some("   "));
 
-    assert!(!success, "bf update should fail with whitespace-only assignee");
+    assert!(
+        !success,
+        "bf update should fail with whitespace-only assignee"
+    );
     assert!(
         stderr.contains("Assignee cannot be empty or whitespace-only"),
         "Error message should mention empty assignee"
@@ -227,7 +248,10 @@ fn test_update_bead_without_assignee_accepted() {
     // Update without specifying assignee (should not clear the existing assignee)
     let (success, _stdout, _stderr) = run_bf_update(&workspace_dir, bead_id, None);
 
-    assert!(success, "bf update should succeed without specifying assignee");
+    assert!(
+        success,
+        "bf update should succeed without specifying assignee"
+    );
 
     // Verify the assignee is still set (not cleared)
     let output = Command::new(bf_binary())
@@ -238,7 +262,10 @@ fn test_update_bead_without_assignee_accepted() {
         .expect("Failed to run bf show");
 
     let show_output = String::from_utf8_lossy(&output.stdout);
-    assert!(show_output.contains("alice"), "Assignee should still be set to alice");
+    assert!(
+        show_output.contains("alice"),
+        "Assignee should still be set to alice"
+    );
 }
 
 #[test]
@@ -247,16 +274,31 @@ fn test_create_bead_with_special_characters_in_assignee() {
     let workspace_dir = temp_dir.path().join("test-workspace");
 
     // Test with email format
-    let (success, stdout, _stderr) = run_bf_create(&workspace_dir, "Test bead with email", Some("alice@example.com"));
+    let (success, stdout, _stderr) = run_bf_create(
+        &workspace_dir,
+        "Test bead with email",
+        Some("alice@example.com"),
+    );
     assert!(success, "bf create should succeed with email assignee");
 
     // Test with hyphens
-    let (success, stdout, _stderr) = run_bf_create(&workspace_dir, "Test bead with hyphens", Some("alice-worker-1"));
+    let (success, stdout, _stderr) = run_bf_create(
+        &workspace_dir,
+        "Test bead with hyphens",
+        Some("alice-worker-1"),
+    );
     assert!(success, "bf create should succeed with hyphenated assignee");
 
     // Test with underscores
-    let (success, stdout, _stderr) = run_bf_create(&workspace_dir, "Test bead with underscores", Some("alice_worker"));
-    assert!(success, "bf create should succeed with underscored assignee");
+    let (success, stdout, _stderr) = run_bf_create(
+        &workspace_dir,
+        "Test bead with underscores",
+        Some("alice_worker"),
+    );
+    assert!(
+        success,
+        "bf create should succeed with underscored assignee"
+    );
 
     assert!(!stdout.is_empty(), "Should output bead ID");
 }
@@ -274,7 +316,10 @@ fn test_update_assignee_from_valid_to_valid() {
     // Update to a different valid assignee
     let (success, _stdout, _stderr) = run_bf_update(&workspace_dir, bead_id, Some("bob"));
 
-    assert!(success, "bf update should succeed when changing assignee from alice to bob");
+    assert!(
+        success,
+        "bf update should succeed when changing assignee from alice to bob"
+    );
 
     // Verify the assignee was updated
     let output = Command::new(bf_binary())
@@ -285,6 +330,12 @@ fn test_update_assignee_from_valid_to_valid() {
         .expect("Failed to run bf show");
 
     let show_output = String::from_utf8_lossy(&output.stdout);
-    assert!(show_output.contains("bob"), "Assignee should be updated to bob");
-    assert!(!show_output.contains("alice"), "Old assignee alice should not appear");
+    assert!(
+        show_output.contains("bob"),
+        "Assignee should be updated to bob"
+    );
+    assert!(
+        !show_output.contains("alice"),
+        "Old assignee alice should not appear"
+    );
 }
