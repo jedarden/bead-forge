@@ -2,7 +2,7 @@
 
 ![bead-forge hero](hero.png)
 
-**bead-forge** is a Rust CLI that replaces `br` (beads_rust) as the bead management tool for AI-supervised coding workflows. It is a drop-in replacement for `br` — every command, flag, and output format is identical — with one critical improvement: **concurrent claiming is correct**.
+**bead-forge** is a Rust CLI for AI-supervised coding workflows. **`bf` is the canonical command.** The `br` command name is deprecated — a temporary compatibility alias only.
 
 ---
 
@@ -223,7 +223,7 @@ bf search        <query>
 bf commit-check  # git pre-commit hook for secret scanning
 ```
 
-All `br` commands work identically. `bf` is a strict superset.
+All commands work identically. `bf` is a strict superset with additional features.
 
 ---
 
@@ -237,12 +237,6 @@ Replace the five non-atomic `br` chains in `bead_store/mod.rs`:
 | `br create` + `br dep add` (orphan if crash between) | `bf batch` (crash-safe, all-or-nothing) |
 | `br show` just to get `.labels` field | `bf labels <id>` (direct `SELECT` on labels table) |
 | N × `br label add` loops (N processes) | `bf label <id> add l1 l2 l3` (one transaction) |
-
-Backward compatibility — install `br` as a symlink:
-
-```bash
-ln -sf ~/.local/bin/bf ~/.local/bin/br
-```
 
 ---
 
@@ -316,12 +310,8 @@ See [`docs/plan/plan.md`](plan/plan.md) for the complete implementation plan inc
 curl -L https://github.com/jedarden/bead-forge/releases/latest/download/bf-linux-x86_64 \
   -o ~/.local/bin/bf && chmod +x ~/.local/bin/bf
 
-# Drop-in replace br (all existing scripts work unchanged)
-ln -sf ~/.local/bin/bf ~/.local/bin/br
-
 # Verify installation
 bf --version
-br --version  # should show same version
 ```
 
 ### Per-Workspace Migration
@@ -378,12 +368,8 @@ bf migrate --workspace /path/to/workspace --from-jsonl [--seed-velocity]
 curl -L https://github.com/jedarden/bead-forge/releases/latest/download/bf-linux-x86_64 \
   -o ~/.local/bin/bf && chmod +x ~/.local/bin/bf
 
-# Drop-in replace br (all existing scripts work unchanged)
-ln -sf ~/.local/bin/bf ~/.local/bin/br
-
 # Verify installation
 bf --version
-br --version  # should show same version
 ```
 
 **Step 2: Per-workspace migration loop**
@@ -406,7 +392,7 @@ done
 **Step 3: Verify each migration**
 
 ```bash
-# Verify each workspace passes both doctor checks
+# Verify each workspace passes doctor check
 for workspace in \
   /home/coding/FORGE \
   /home/coding/NEEDLE \
@@ -417,14 +403,11 @@ for workspace in \
   /home/coding/bead-forge; do
   echo "Checking $workspace..."
   cd "$workspace" || continue
-  echo "  bf doctor:"
   bf doctor || echo "  ❌ bf doctor failed"
-  echo "  br doctor:"
-  br doctor || echo "  ❌ br doctor failed"
 done
 ```
 
-Both `bf doctor` and `br doctor` should exit 0 with no errors for each workspace.
+Each `bf doctor` should exit 0 with no errors.
 
 **Step 4: Update NEEDLE adapter configs**
 
@@ -445,14 +428,9 @@ For each workspace, verify both tools can read the database:
 # Verify bf doctor passes
 cd /path/to/workspace
 bf doctor --check
-
-# Verify br doctor passes (forward compatibility)
-br doctor
 ```
 
-Both commands should exit 0 with no errors.
-
-**Known limitation:** The migration may show a forward compatibility warning: "Forward compatibility check failed: issues table column count mismatch". This is expected because bf adds a `content_hash` column to the issues table for sync optimization. The database remains fully functional — both `bf doctor` and `br doctor` will pass. The warning indicates that br sees an extra column, but all br operations continue to work correctly.
+This should exit 0 with no errors.
 
 ### NEEDLE Integration Update
 
@@ -481,13 +459,9 @@ cargo build --release
 cp target/release/bf ~/.local/bin/bf
 chmod +x ~/.local/bin/bf
 
-# Drop-in replace br
-ln -sf ~/.local/bin/bf ~/.local/bin/br
-
 # Verify
 bf --help
 bf list
-br list  # should work identically
 ```
 
 ### CI/CD Deployment
