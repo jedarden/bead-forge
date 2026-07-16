@@ -29,6 +29,10 @@ pub struct DoctorResult {
     // these as terminal for blocking/scheduling purposes, but they still display as
     // non-terminal everywhere else, so this check surfaces them for manual `bf close`.
     pub pseudo_terminal_status_ids: Vec<String>,
+    // Beads stuck in 'blocked' status despite having no active blockers -- see bf-5id.
+    // These beads should be 'open' but were never transitioned when their last blocker
+    // closed, so this check surfaces them for manual `bf update <id> --status open`.
+    pub stale_blocked_ids: Vec<String>,
 }
 
 /// Perform a health check on the bead database and JSONL file.
@@ -113,11 +117,61 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
     }
     result.pseudo_terminal_status_ids = pseudo_terminal_ids;
 
+    // Check for beads stuck in 'blocked' status despite having no active blockers
+    // (bf-5id). These are stale 'blocked' beads that should be 'open' but were never
+    // transitioned when their last blocker closed. Independent of db_ok/jsonl_ok since
+    // it only needs the sqlite db to be openable.
+    let stale_blocked_ids = check_stale_blocked_statuses(&db_path)?;
+    if !stale_blocked_ids.is_empty() {
+        issues.push(format!(
+            "{} bead(s) stuck in 'blocked' status despite having no active blockers \
+             -- run `bf update <id> --status open` on each to unblock them: {}",
+            stale_blocked_ids.len(),
+            stale_blocked_ids.join(", ")
+        ));
+    }
+    result.stale_blocked_ids = stale_blocked_ids;
+
     result.db_ok = db_ok;
     result.jsonl_ok = jsonl_ok;
     result.issues = issues;
 
     Ok(result)
+}
+
+/// Find beads whose status is 'blocked' but have no active (non-terminal) blockers.
+/// These are stale 'blocked' beads that should be 'open' but were never transitioned
+/// when their last blocker closed (bf-5id).
+fn check_stale_blocked_statuses(db_path: &Path) -> Result<Vec<String>> {
+    let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
+
+    // Find beads where:
+    // 1. status = 'blocked'
+    // 2. NOT deleted
+    // 3. COUNT of active blockers (non-terminal status) = 0
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT i.id
+        FROM issues i
+        WHERE i.status = 'blocked'
+        AND i.deleted_at IS NULL
+        AND (
+            SELECT COUNT(DISTINCT d.depends_on_id)
+            FROM dependencies d
+            INNER JOIN issues blocker ON blocker.id = d.depends_on_id
+            WHERE d.issue_id = i.id
+            AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+            AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+        ) = 0
+        ORDER BY i.id
+        "#
+    )?;
+
+    let ids = stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(ids)
 }
 
 /// Find beads whose status is a `TERMINAL_STATUS_ALIASES` value (e.g. "completed",

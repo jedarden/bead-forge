@@ -406,6 +406,18 @@ impl Storage {
             // Invalidate critical path cache: new beads may add dependencies
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
+            // Rebuild blocked_issues_cache to reflect new dependencies
+            tx.execute("DELETE FROM blocked_issues_cache", [])?;
+            tx.execute(
+                "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                 SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                 FROM dependencies d
+                 INNER JOIN issues i ON i.id = d.depends_on_id
+                 WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                 GROUP BY d.issue_id",
+                params![chrono::Utc::now().to_rfc3339()],
+            )?;
             Ok(())
         })
     }
@@ -763,6 +775,75 @@ impl Storage {
             )?;
             // Update worker session with close time and duration for velocity tracking
             crate::velocity::update_session_on_close(tx, id, now)?;
+
+            // Cascade status transition: find dependents that should move from blocked->open
+            // A dependent should be unblocked if it has no remaining blockers in non-terminal status
+            let dependents: Vec<(String, String)> = tx
+                .prepare(
+                    "SELECT d.issue_id, i.status
+                     FROM dependencies d
+                     INNER JOIN issues i ON i.id = d.issue_id
+                     WHERE d.depends_on_id = ?1
+                     AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')",
+                )?
+                .query_map(params![id], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+
+            for (dep_id, dep_status) in dependents {
+                // Only transition beads currently at status='blocked'
+                if dep_status != "blocked" {
+                    continue;
+                }
+
+                // Check if the dependent has any OTHER remaining blockers not in terminal status
+                let remaining_blockers: i64 = tx
+                    .query_row(
+                        r#"
+                        SELECT COUNT(DISTINCT d.depends_on_id)
+                        FROM dependencies d
+                        INNER JOIN issues i ON i.id = d.depends_on_id
+                        WHERE d.issue_id = ?1
+                        AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                        AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                        "#,
+                        params![&dep_id],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(0);
+
+                // If no remaining blockers, transition to 'open'
+                if remaining_blockers == 0 {
+                    let now = Utc::now();
+                    tx.execute(
+                        "UPDATE issues SET status = 'open', updated_at = ?1 WHERE id = ?2",
+                        params![now.to_rfc3339(), &dep_id],
+                    )?;
+                    tx.execute(
+                        "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'status_changed', 'system', 'blocked', 'open', ?2)",
+                        params![&dep_id, now.to_rfc3339()],
+                    )?;
+                    tx.execute(
+                        "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                        params![&dep_id, now.to_rfc3339()],
+                    )?;
+                }
+            }
+
+            // Rebuild blocked_issues_cache to reflect the new blocker state
+            tx.execute("DELETE FROM blocked_issues_cache", [])?;
+            tx.execute(
+                "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                 SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                 FROM dependencies d
+                 INNER JOIN issues i ON i.id = d.depends_on_id
+                 WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                 GROUP BY d.issue_id",
+                params![Utc::now().to_rfc3339()],
+            )?;
+
             // Invalidate critical path cache: closing a bead can unblock dependents
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
@@ -796,6 +877,25 @@ impl Storage {
             )?;
             Ok(())
         })
+    }
+
+    /// Get all beads currently in the blocked_issues_cache.
+    ///
+    /// Returns a list of (issue_id, blocked_by) tuples where blocked_by is
+    /// a JSON array of blocker IDs.
+    pub fn get_blocked_issues(&self) -> Result<Vec<(String, String)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT issue_id, blocked_by FROM blocked_issues_cache ORDER BY issue_id"
+        )?;
+
+        let result = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        Ok(result)
     }
 
     pub fn count_issues(&self) -> Result<usize> {

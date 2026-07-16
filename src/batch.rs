@@ -441,6 +441,20 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
         return Err(anyhow!("Bead not found: {}", id));
     }
 
+    // Check if already closed for idempotence
+    let current_status: Option<String> = tx
+        .query_row(
+            "SELECT status FROM issues WHERE id = ?1",
+            &[id],
+            |row| row.get(0),
+        )
+        .ok();
+
+    if current_status.as_deref() == Some("closed") {
+        // Already closed - idempotent, return success
+        return Ok(());
+    }
+
     let now = Utc::now();
     tx.execute(
         "UPDATE issues SET status = 'closed', closed_at = ?, close_reason = ?, updated_at = ?
@@ -453,6 +467,74 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
          VALUES (?1, 'closed', '', '', ?2, ?3)",
         rusqlite::params![id, reason, now.to_rfc3339()],
     )?;
+
+    // Cascade status transition: find dependents that should move from blocked->open
+    // A dependent should be unblocked if it has no remaining blockers in non-terminal status
+    let dependents: Vec<(String, String)> = tx
+        .prepare(
+            "SELECT d.issue_id, i.status
+             FROM dependencies d
+             INNER JOIN issues i ON i.id = d.issue_id
+             WHERE d.depends_on_id = ?1
+             AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')",
+        )?
+        .query_map(&[id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    for (dep_id, dep_status) in dependents {
+        // Only transition beads currently at status='blocked'
+        if dep_status != "blocked" {
+            continue;
+        }
+
+        // Check if the dependent has any OTHER remaining blockers not in terminal status
+        let remaining_blockers: i64 = tx
+            .query_row(
+                r#"
+                SELECT COUNT(DISTINCT d.depends_on_id)
+                FROM dependencies d
+                INNER JOIN issues i ON i.id = d.depends_on_id
+                WHERE d.issue_id = ?1
+                AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                "#,
+                &[&dep_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        // If no remaining blockers, transition to 'open'
+        if remaining_blockers == 0 {
+            let now = Utc::now();
+            tx.execute(
+                "UPDATE issues SET status = 'open', updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![now.to_rfc3339(), &dep_id],
+            )?;
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'status_changed', 'system', 'blocked', 'open', ?2)",
+                rusqlite::params![&dep_id, now.to_rfc3339()],
+            )?;
+        }
+    }
+
+    // Rebuild blocked_issues_cache to reflect the new blocker state
+    tx.execute("DELETE FROM blocked_issues_cache", [])?;
+    tx.execute(
+        "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+         SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+         FROM dependencies d
+         INNER JOIN issues i ON i.id = d.depends_on_id
+         WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+         AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+         GROUP BY d.issue_id",
+        rusqlite::params![Utc::now().to_rfc3339()],
+    )?;
+
+    // Invalidate critical path cache: closing a bead can unblock dependents
+    crate::critical_path::invalidate_cache(tx)?;
+    crate::critical_path::compute_all_critical_paths(tx)?;
 
     Ok(())
 }
