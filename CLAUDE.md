@@ -53,9 +53,9 @@ Never `ALTER TABLE issues ADD COLUMN annotations ...`.
 
 The `with_immediate_transaction()` wrapper in `src/storage/sqlite.rs` handles exponential backoff on `SQLITE_BUSY`. Use it for claim, batch, and any read-score-update sequences. Plain reads use `BEGIN DEFERRED`.
 
-### 3. br compatibility — exact flag and output parity
+### 3. Command interface
 
-`bf` is a strict superset of `br`. Every `br` flag, every output format (text/json/toon), every field name must be identical. Run `br <cmd> --help` and `bf <cmd> --help` side by side when implementing a command to verify.
+All commands must follow the interface documented in `docs/README.md`. The `bf` CLI is the canonical tool — `br` is a deprecated alias maintained only for backward compatibility.
 
 ### 4. rusqlite — NOT FrankenSQLite
 
@@ -79,12 +79,12 @@ The `with_immediate_transaction()` wrapper in `src/storage/sqlite.rs` handles ex
 Close with a reason that summarizes what was implemented and where:
 
 ```bash
-br close <id> --reason "Implemented X in src/Y.rs. cargo build clean."
+bf close <id> --reason "Implemented X in src/Y.rs. cargo build clean."
 ```
 
 If you cannot complete a bead (missing prerequisite, blocked by another bead, or the spec is ambiguous), update it with the blocker and leave it open:
 
 ```bash
-br update <id> --status blocked
-br comment <id> --text "Blocked: <reason>"
+bf update <id> --status blocked
+bf comment <id> --text "Blocked: <reason>"
 ```
