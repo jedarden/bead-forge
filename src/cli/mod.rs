@@ -1113,7 +1113,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason, no_auto_flush),
         Commands::Reopen { id } => cmd_reopen(&beads_dir, &id, no_auto_flush),
-        Commands::Delete { id } => cmd_delete(&beads_dir, &id),
+        Commands::Delete { id } => cmd_delete(&beads_dir, &id, no_auto_flush),
         Commands::Ready {
             limit,
             format,
@@ -1146,6 +1146,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 &workspace_paths,
                 dry_run,
                 &format,
+                no_auto_flush,
             )
         }
         Commands::Sync {
@@ -1172,13 +1173,15 @@ pub fn run(cli: Cli) -> Result<()> {
         ),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
-        Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
+        Commands::Batch { file, json, stdin } => {
+            cmd_batch(&beads_dir, file, json, stdin, no_auto_flush)
+        }
         Commands::Mitosis {
             id,
             children,
             reason,
             format,
-        } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format),
+        } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format, no_auto_flush),
         Commands::Dep(dep) => cmd_dep(&beads_dir, dep, no_auto_flush),
         Commands::Label(label) => cmd_label(&beads_dir, label, no_auto_flush),
         Commands::Comments(comments) => cmd_comments(&beads_dir, comments, no_auto_flush),
@@ -1355,6 +1358,30 @@ fn autoflush_after_mutation(
     no_auto_flush: bool,
 ) -> Option<String> {
     let outcome = crate::autoflush::after_mutation_with_config(beads_dir, config, no_auto_flush);
+    surface_flush_outcome(&outcome)
+}
+
+/// Like [`autoflush_after_mutation`] but for a hard delete: prunes the deleted
+/// beads' now-stale lines from JSONL via [`crate::autoflush::after_delete`]
+/// (the FK cascade drops their `dirty_issues` rows, so an ordinary dirty flush
+/// could never remove them). Best-effort — a flush failure never fails the
+/// delete; it degrades to a stderr warning and the returned text.
+fn autoflush_after_delete(
+    beads_dir: &Path,
+    config: &Config,
+    no_auto_flush: bool,
+    removed_ids: &[String],
+) -> Option<String> {
+    let enabled = crate::autoflush::enabled(config, no_auto_flush);
+    let outcome = crate::autoflush::after_delete(beads_dir, enabled, removed_ids);
+    surface_flush_outcome(&outcome)
+}
+
+/// Bridge a [`crate::autoflush::FlushOutcome`] into the user-facing warning
+/// channel: emit a stderr `warning:` line on failure and return the text so a
+/// `--json` caller can fold it into its envelope. `None` when silent
+/// (disabled/succeeded).
+fn surface_flush_outcome(outcome: &crate::autoflush::FlushOutcome) -> Option<String> {
     match outcome.warning() {
         Some(w) => {
             crate::format::warn_stderr(w);
@@ -1686,7 +1713,8 @@ fn cmd_reopen(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> 
     Ok(())
 }
 
-fn cmd_delete(beads_dir: &PathBuf, id: &str) -> Result<()> {
+fn cmd_delete(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1695,6 +1723,11 @@ fn cmd_delete(beads_dir: &PathBuf, id: &str) -> Result<()> {
         tx.execute("DELETE FROM issues WHERE id = ?", [&id])?;
         Ok(())
     })?;
+
+    // The hard DELETE cascades away the bead's dirty_issues row, so a normal
+    // dirty flush can never remove its stale JSONL line. Prune it explicitly
+    // (best effort; a flush failure never fails the delete).
+    autoflush_after_delete(beads_dir, &config, no_auto_flush, &[id.to_string()]);
 
     println!("Deleted bead {}", id);
     Ok(())
@@ -1767,9 +1800,20 @@ fn cmd_claim(
     workspace_paths: &[PathBuf],
     dry_run: bool,
     format: &str,
+    no_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let claim_ttl = config.claim_ttl_minutes;
+
+    // Pre-resolved auto-flush switch; each successful (non-dry-run) claim flushes
+    // the workspace whose bead it mutated. `flush_claim` targets that workspace
+    // (which may differ from `beads_dir` under `--any`/fallback) and surfaces a
+    // flush failure as a warning without failing the claim.
+    let flush_enabled = crate::autoflush::enabled(&config, no_auto_flush);
+    let flush_claim = |ws: &Path| {
+        let outcome = crate::autoflush::after_mutation(ws, flush_enabled);
+        surface_flush_outcome(&outcome);
+    };
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
@@ -1865,6 +1909,9 @@ fn cmd_claim(
                 reclaimed,
                 workspace_path,
             }) => {
+                // Flush the workspace that actually got claimed (may differ
+                // from the invoking `beads_dir` under --any).
+                flush_claim(workspace_path.as_deref().unwrap_or(beads_dir.as_path()));
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
                 out.workspace = workspace_path.map(|p| p.display().to_string());
@@ -1888,6 +1935,8 @@ fn cmd_claim(
             Some(ClaimResult {
                 bead_id, reclaimed, ..
             }) => {
+                // Claimed in the current workspace.
+                flush_claim(beads_dir);
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
                 println!("{}", formatter.format_claim_result(&out));
@@ -1908,6 +1957,7 @@ fn cmd_claim(
                         reclaimed,
                         workspace_path,
                     }) => {
+                        flush_claim(workspace_path.as_deref().unwrap_or(beads_dir.as_path()));
                         let mut out = ClaimResultOutput::new(&bead_id, assignee);
                         out.reclaimed = Some(reclaimed);
                         out.workspace = workspace_path.map(|p| p.display().to_string());
@@ -1933,6 +1983,7 @@ fn cmd_claim(
             Some(ClaimResult {
                 bead_id, reclaimed, ..
             }) => {
+                flush_claim(beads_dir);
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
                 println!("{}", formatter.format_claim_result(&out));
@@ -2177,6 +2228,7 @@ fn cmd_batch(
     file: Option<PathBuf>,
     json: Option<String>,
     stdin: bool,
+    no_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -2195,6 +2247,11 @@ fn cmd_batch(
     };
 
     let results = execute_batch(&storage, ops, beads_dir)?;
+
+    // Single end-of-transaction flush: execute_batch marked every touched bead
+    // dirty inside one transaction, so one surgical flush exports them all at
+    // once (no per-op write amplification).
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
 
     // Print results
     for result in results {
@@ -2222,6 +2279,7 @@ fn cmd_mitosis(
     children: &str,
     reason: &str,
     format: &str,
+    no_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -2236,6 +2294,10 @@ fn cmd_mitosis(
 
     // Execute atomically
     let results = execute_batch(&storage, ops, beads_dir)?;
+
+    // One surgical flush after the whole mitosis transaction commits (parent
+    // close + all children + dep edges were marked dirty together).
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
 
     match format {
         "json" => {

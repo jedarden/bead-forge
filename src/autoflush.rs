@@ -13,7 +13,7 @@
 //! auto-flush and the explicit `bf sync --flush-only` path share one code path.
 
 use crate::config::Config;
-use crate::sync::flush_dirty;
+use crate::sync::{flush_after_delete, flush_dirty};
 use std::path::Path;
 
 /// Resolve whether auto-flush is effectively enabled for this invocation.
@@ -83,6 +83,24 @@ pub fn after_mutation(workspace_dir: &Path, enabled: bool) -> FlushOutcome {
         return FlushOutcome::Disabled;
     }
     match run(workspace_dir) {
+        Ok(count) => FlushOutcome::Flushed(count),
+        Err(e) => FlushOutcome::Failed(format!("auto-flush to JSONL failed: {e}")),
+    }
+}
+
+/// Run auto-flush after a hard delete, honoring a pre-resolved `enabled`
+/// decision. Unlike [`after_mutation`], this passes the removed ids through
+/// [`crate::sync::flush_after_delete`] so their now-stale lines are pruned from
+/// JSONL (the FK cascade already removed their `dirty_issues` rows, so a plain
+/// dirty flush could never drop them).
+///
+/// Like every auto-flush path, a failure is non-fatal and degrades to a
+/// warning — the bead is already deleted in SQLite.
+pub fn after_delete(workspace_dir: &Path, enabled: bool, removed_ids: &[String]) -> FlushOutcome {
+    if !enabled {
+        return FlushOutcome::Disabled;
+    }
+    match flush_after_delete(workspace_dir, removed_ids) {
         Ok(count) => FlushOutcome::Flushed(count),
         Err(e) => FlushOutcome::Failed(format!("auto-flush to JSONL failed: {e}")),
     }

@@ -5,7 +5,7 @@
 
 use crate::config::{find_beads_dir, load_config, load_metadata};
 use crate::history::backup_before_export;
-use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, UpsertResult};
+use crate::jsonl::{export_jsonl, export_jsonl_dirty, export_jsonl_merge, import_jsonl, UpsertResult};
 use crate::merge::update_base_anchor;
 use crate::model::Issue;
 use crate::storage::Storage;
@@ -108,6 +108,42 @@ pub fn flush_dirty(workspace_dir: &Path) -> Result<usize> {
 
     // Update export_hashes for dirty issues only
     update_export_hashes_for_issues(&storage, &dirty_issues)?;
+
+    Ok(result.count)
+}
+
+/// Flush after a hard delete: surgically drop the deleted beads' lines from
+/// JSONL while flushing any still-dirty beads.
+///
+/// A hard `DELETE FROM issues` cascades away the bead's `dirty_issues` row (see
+/// the FK `ON DELETE CASCADE`), so [`flush_dirty`] alone can never remove the
+/// stale line — the deleted bead would linger in `issues.jsonl` forever. This
+/// path passes the removed ids explicitly to [`export_jsonl_merge`], which
+/// strips them while preserving every other line, then flushes and clears any
+/// dirty beads in the same atomic write.
+///
+/// Returns the number of dirty beads re-exported (0 when only removals ran).
+pub fn flush_after_delete(workspace_dir: &Path, removed_ids: &[String]) -> Result<usize> {
+    let beads_dir = find_beads_dir(workspace_dir).ok_or_else(|| {
+        anyhow::anyhow!("No .beads directory found in {}", workspace_dir.display())
+    })?;
+    let metadata = load_metadata(&beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+
+    let storage = Storage::open(&db_path)?;
+    let dirty_issues = storage.list_dirty_issues()?;
+
+    // Nothing to write and no file to prune — avoid creating an empty JSONL.
+    if dirty_issues.is_empty() && !jsonl_path.exists() {
+        return Ok(0);
+    }
+
+    let result = export_jsonl_merge(&jsonl_path, &dirty_issues, removed_ids)?;
+    if !dirty_issues.is_empty() {
+        storage.clear_dirty()?;
+        update_export_hashes_for_issues(&storage, &dirty_issues)?;
+    }
 
     Ok(result.count)
 }

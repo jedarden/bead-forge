@@ -45,4 +45,4 @@ pub use rotate::{
     RotateResult,
 };
 pub use storage::Storage;
-pub use sync::{flush, flush_dirty, import, sync, SyncResult};
+pub use sync::{flush, flush_after_delete, flush_dirty, import, sync, SyncResult};

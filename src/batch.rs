@@ -221,6 +221,20 @@ pub fn execute_batch(
     })
 }
 
+/// Mark a bead dirty within the batch transaction so the single
+/// end-of-transaction auto-flush (Phase 7.1) surgically re-exports it to JSONL.
+///
+/// Mirrors [`crate::storage::Storage::mark_dirty`] but reuses the caller's open
+/// transaction so every mutation in the batch lands its dirty mark atomically
+/// with the change itself — a rollback drops both together.
+fn mark_dirty_tx(tx: &Connection, id: &str) -> Result<()> {
+    tx.execute(
+        "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+        rusqlite::params![id, Utc::now().to_rfc3339()],
+    )?;
+    Ok(())
+}
+
 /// Resolve placeholder references like @0, @1 to actual created IDs
 /// If the input is not a placeholder reference, return it as-is
 fn resolve_reference(reference: &str, created_ids: &[String]) -> String {
@@ -344,6 +358,9 @@ fn execute_create(
         )?;
     }
 
+    // Mark dirty so the end-of-transaction flush exports the new bead.
+    mark_dirty_tx(tx, &id)?;
+
     created_ids.push(id.clone());
     Ok(id)
 }
@@ -426,6 +443,11 @@ fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<(
         ],
     )?;
 
+    // Both endpoints' exported records reflect the new edge; mark both dirty so
+    // the end-of-transaction flush re-exports them.
+    mark_dirty_tx(tx, id)?;
+    mark_dirty_tx(tx, blocker)?;
+
     Ok(())
 }
 
@@ -467,6 +489,9 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
          VALUES (?1, 'closed', '', '', ?2, ?3)",
         rusqlite::params![id, reason, now.to_rfc3339()],
     )?;
+
+    // Mark the just-closed bead dirty for the end-of-transaction flush.
+    mark_dirty_tx(tx, id)?;
 
     // Cascade status transition: find dependents that should move from blocked->open
     // A dependent should be unblocked if it has no remaining blockers in non-terminal status
@@ -516,6 +541,9 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
                 "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'status_changed', 'system', 'blocked', 'open', ?2)",
                 rusqlite::params![&dep_id, now.to_rfc3339()],
             )?;
+            // A cascaded blocked->open transition changes the dependent's
+            // exported status; mark it dirty too.
+            mark_dirty_tx(tx, &dep_id)?;
         }
     }
 
