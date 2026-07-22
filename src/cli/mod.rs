@@ -4,7 +4,7 @@ use crate::claim::{
 };
 use crate::close::close_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
-use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
+use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, ClaimResultOutput, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
@@ -70,6 +70,10 @@ pub enum Commands {
         /// Labels
         #[arg(long)]
         label: Vec<String>,
+
+        /// Output JSON ({"id": "..."} plus a "warning" key if auto-flush fails)
+        #[arg(long)]
+        json: bool,
     },
 
     /// List beads
@@ -990,6 +994,11 @@ pub fn run_cli() -> Result<Cli> {
 }
 
 pub fn run(cli: Cli) -> Result<()> {
+    // Captured before `cli.command` is moved out below. This is the
+    // per-invocation half of the effective auto-flush switch; combined with
+    // `config.sync.auto_flush` inside each handler via
+    // `autoflush::after_mutation_with_config` (see child 1, bf-37xjd).
+    let no_auto_flush = cli.no_auto_flush;
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
 
     // Handle case where no subcommand is provided
@@ -1034,6 +1043,7 @@ pub fn run(cli: Cli) -> Result<()> {
             description,
             assignee,
             label,
+            json,
         } => cmd_create(
             &beads_dir,
             title,
@@ -1042,6 +1052,8 @@ pub fn run(cli: Cli) -> Result<()> {
             description,
             assignee,
             label,
+            json,
+            no_auto_flush,
         ),
         Commands::List {
             status,
@@ -1096,10 +1108,11 @@ pub fn run(cli: Cli) -> Result<()> {
                 notes,
                 design,
                 due_at,
+                no_auto_flush,
             )
         }
-        Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason),
-        Commands::Reopen { id } => cmd_reopen(&beads_dir, &id),
+        Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason, no_auto_flush),
+        Commands::Reopen { id } => cmd_reopen(&beads_dir, &id, no_auto_flush),
         Commands::Delete { id } => cmd_delete(&beads_dir, &id),
         Commands::Ready {
             limit,
@@ -1166,9 +1179,9 @@ pub fn run(cli: Cli) -> Result<()> {
             reason,
             format,
         } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format),
-        Commands::Dep(dep) => cmd_dep(&beads_dir, dep),
-        Commands::Label(label) => cmd_label(&beads_dir, label),
-        Commands::Comments(comments) => cmd_comments(&beads_dir, comments),
+        Commands::Dep(dep) => cmd_dep(&beads_dir, dep, no_auto_flush),
+        Commands::Label(label) => cmd_label(&beads_dir, label, no_auto_flush),
+        Commands::Comments(comments) => cmd_comments(&beads_dir, comments, no_auto_flush),
         Commands::Search {
             query,
             status,
@@ -1213,7 +1226,7 @@ pub fn run(cli: Cli) -> Result<()> {
             format,
         } => cmd_velocity(&beads_dir, model, harness, &format),
         Commands::Labels { id, format } => cmd_labels(&beads_dir, &id, &format),
-        Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate),
+        Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate, no_auto_flush),
         Commands::Log {
             id,
             limit,
@@ -1322,6 +1335,35 @@ claim_ttl_minutes: 30
     Ok(())
 }
 
+/// Best-effort SQLite→JSONL flush after a SUCCESSFUL single-issue mutation.
+///
+/// This is the shared wiring for Phase 7.1 child 2/5 (bf-3iosi): every
+/// single-issue mutation handler calls this once its storage write has
+/// committed. It honors the effective auto-flush switch
+/// (`config.sync.auto_flush && !--no-auto-flush`) via child 1's
+/// [`crate::autoflush::after_mutation_with_config`].
+///
+/// A flush failure NEVER fails the mutation — the write already succeeded and
+/// the flush layer retains the `dirty_issues` marks so the next flush (or
+/// `bf sync --flush-only`) recovers. On failure we emit a stderr warning and
+/// return the warning text so a `--json` caller can also fold it into its
+/// output envelope via [`crate::format::with_warning`]. Returns `None` when
+/// auto-flush is disabled or the flush succeeded.
+fn autoflush_after_mutation(
+    beads_dir: &Path,
+    config: &Config,
+    no_auto_flush: bool,
+) -> Option<String> {
+    let outcome = crate::autoflush::after_mutation_with_config(beads_dir, config, no_auto_flush);
+    match outcome.warning() {
+        Some(w) => {
+            crate::format::warn_stderr(w);
+            Some(w.to_string())
+        }
+        None => None,
+    }
+}
+
 fn cmd_create(
     beads_dir: &PathBuf,
     title: String,
@@ -1330,6 +1372,8 @@ fn cmd_create(
     description: Option<String>,
     assignee: Option<String>,
     labels: Vec<String>,
+    json: bool,
+    no_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -1375,7 +1419,18 @@ fn cmd_create(
         return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted")));
     }
 
-    println!("{}", id);
+    // Incremental flush of the just-created bead (best effort; never fatal).
+    let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
+
+    if json {
+        let out = crate::format::with_warning(
+            serde_json::json!({ "id": id }),
+            warning.as_deref(),
+        );
+        println!("{}", serde_json::to_string(&out)?);
+    } else {
+        println!("{}", id);
+    }
     Ok(())
 }
 
@@ -1554,6 +1609,7 @@ fn cmd_update(
     notes: Option<String>,
     design: Option<String>,
     due_at: Option<String>,
+    no_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -1589,20 +1645,24 @@ fn cmd_update(
     };
 
     storage.update_issue(id, &changes)?;
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
     println!("Updated bead {}", id);
     Ok(())
 }
 
-fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str) -> Result<()> {
+fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
     close_bead(&db_path, id, reason, "cli")?;
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
     println!("Closed bead {}", id);
     Ok(())
 }
 
-fn cmd_reopen(beads_dir: &PathBuf, id: &str) -> Result<()> {
+fn cmd_reopen(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1621,6 +1681,7 @@ fn cmd_reopen(beads_dir: &PathBuf, id: &str) -> Result<()> {
     };
 
     storage.update_issue(id, &changes)?;
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
     println!("Reopened bead {}", id);
     Ok(())
 }
@@ -2267,7 +2328,7 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
     Ok(())
 }
 
-fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
+fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands, no_auto_flush: bool) -> Result<()> {
     match dep {
         DepCommands::Add {
             blocks,
@@ -2278,6 +2339,7 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                 anyhow!("Missing --blocks argument. Usage: bf dep add <blocker> --blocks <blocked>")
             })?;
 
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
@@ -2296,16 +2358,19 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                 storage.update_issue(&blocks, &changes)?;
             }
 
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!(
                 "Added dependency: {} depends on {} ({})",
                 blocks, blocker, type_
             );
         }
         DepCommands::Remove { issue, depends_on } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             storage.remove_dependency(&issue, &depends_on)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Removed dependency: {} -> {}", issue, depends_on);
         }
         DepCommands::List { id } => {
@@ -2401,9 +2466,10 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
     Ok(())
 }
 
-fn cmd_label(beads_dir: &PathBuf, label: LabelCommands) -> Result<()> {
+fn cmd_label(beads_dir: &PathBuf, label: LabelCommands, no_auto_flush: bool) -> Result<()> {
     match label {
         LabelCommands::Add { id, label } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
@@ -2411,8 +2477,11 @@ fn cmd_label(beads_dir: &PathBuf, label: LabelCommands) -> Result<()> {
                 storage.add_label(&id, &l)?;
                 println!("Added label '{}' to {}", l, id);
             }
+            // One flush after all labels are applied (all mark the same bead).
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
         }
         LabelCommands::Remove { id, label } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
@@ -2420,6 +2489,7 @@ fn cmd_label(beads_dir: &PathBuf, label: LabelCommands) -> Result<()> {
                 storage.remove_label(&id, &l)?;
                 println!("Removed label '{}' from {}", l, id);
             }
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
         }
         LabelCommands::List { id } => {
             let metadata = load_metadata(beads_dir)?;
@@ -2458,14 +2528,16 @@ fn cmd_labels(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_comments(beads_dir: &PathBuf, comments: CommentsCommands) -> Result<()> {
+fn cmd_comments(beads_dir: &PathBuf, comments: CommentsCommands, no_auto_flush: bool) -> Result<()> {
     match comments {
         CommentsCommands::Add { id, text } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let comment_text = text.join(" ");
             let comment_id = storage.add_comment(&id, "cli", &comment_text)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Added comment {} to {}", comment_id, id);
         }
         CommentsCommands::List { id } => {
@@ -2871,7 +2943,8 @@ fn cmd_velocity(
     Ok(())
 }
 
-fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
+fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -2879,6 +2952,7 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
     match annotate {
         AnnotateCommands::Set { id, key, value } => {
             storage.set_annotation(&id, &key, &value)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Set annotation '{}' on {}", key, id);
         }
         AnnotateCommands::Get { id, key } => {
@@ -2891,6 +2965,7 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
         }
         AnnotateCommands::Remove { id, key } => {
             storage.remove_annotation(&id, &key)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Removed annotation '{}' from {}", key, id);
         }
         AnnotateCommands::List { id } => {
@@ -2906,6 +2981,7 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
         }
         AnnotateCommands::Clear { id } => {
             storage.clear_annotations(&id)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Cleared all annotations from {}", id);
         }
     }
