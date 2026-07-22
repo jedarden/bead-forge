@@ -249,6 +249,153 @@ fallback-any first-try sub-branch (line 1838) and normal single-workspace (line 
 
 ---
 
+## Bead bf-20da: Focused Audit of `stats` and `velocity` Commands
+
+**Date:** 2026-07-22
+**Purpose:** Detailed audit of JSON output implementations for stats and velocity commands
+**Method:** Verified against current source (`src/cli/mod.rs`, `src/velocity.rs`, `src/storage/sqlite.rs`) **and** empirically against the live `target/debug/bf` binary.
+
+### Summary
+
+| Command | Formatter Used | Output Format | Array Wrapper | Implementation Pattern |
+|---------|---------------|---------------|---------------|----------------------|
+| `stats`    | None (bypasses formatter) | Single JSON object | NO | **Direct** `serde_json::to_string_pretty(&Stats)` + `println!` |
+| `velocity` | None (bypasses formatter) | JSON array of objects | YES | **Direct** `serde_json::to_string_pretty(&Vec<VelocityStats>)` + `println!` |
+
+### Stats Command (`bf stats --format json`)
+
+**Implementation:** `src/cli/mod.rs:2574-2633`. JSON branch is the match arm at `src/cli/mod.rs:2587-2590`:
+
+```rust
+let stats = storage.get_stats()?;
+match format {
+    "json" => {
+        println!("{}", serde_json::to_string_pretty(&stats)?);
+    }
+    _ => { /* text: Total / Open / In Progress / Closed */ }
+}
+```
+
+**Formatter methods used:** NONE. `stats` does not touch the `Formatter` trait / `JsonFormatter` at all — it does not call `format_issues`, `format_issue`, or `format_error`. It serializes the `Stats` struct directly.
+
+**Data source:** `storage.get_stats()` → `Stats` (`src/storage/sqlite.rs:1529-1556`). `get_stats` runs four `SELECT COUNT(*) FROM issues WHERE ... AND deleted_at IS NULL` queries (total, open, in_progress, closed) and casts the `i64` counts to `usize`.
+
+**Serialized struct:** `Stats` (`src/storage/sqlite.rs:1980-1986`):
+```rust
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Stats {
+    pub total: usize,
+    pub open: usize,
+    pub in_progress: usize,
+    pub closed: usize,
+}
+```
+
+**Output format:** a single JSON object, pretty-printed (2-space indent), with a trailing newline from `println!`. Key order follows struct declaration order (`total`, `open`, `in_progress`, `closed`) — NOT alphabetical (the `Serialize` derive preserves field order; contrast with `claim`'s `json!` macro, which sorts keys — see bf-2x0p).
+
+**Empirically verified** against `target/debug/bf`:
+```json
+{
+  "total": 964,
+  "open": 102,
+  "in_progress": 5,
+  "closed": 662
+}
+```
+
+**Key characteristics:**
+- Bypasses the formatter system; serializes the `Stats` struct via its `Serialize` derive
+- Single object — never an array
+- Pretty-printed (`to_string_pretty`), unlike the compact `to_string` used by `list`/`search`/`show`
+- No "empty" case to speak of: `get_stats` always returns an object (counts may be `0`). On an empty db it would emit `{"total":0,"open":0,"in_progress":0,"closed":0}`
+- Uses `println!` (trailing newline)
+
+**⚠ Inconsistency / latent bug — breakdown flags ignore `--format json`:** The `--by-type` / `--by-priority` / `--by-assignee` / `--by-label` breakdowns are emitted by `if by_type { ... }` blocks (`src/cli/mod.rs:2599-2630`) that run *after* the format match and always use plain `println!` text, regardless of `format`. So `bf stats --format json --by-type` produces the JSON object **followed by text**:
+
+```
+{
+  "total": 964,
+  "open": 102,
+  "in_progress": 5,
+  "closed": 662
+}
+
+By type:
+  task (794)
+  epic (106)
+  ...
+```
+
+This is not valid JSON as a whole — a machine consumer gets the object and then garbage. (Empirically verified.) If JSON consumers ever need breakdowns, the breakdown data would need to be folded into the JSON object (e.g. nested `by_type`/`by_priority` maps) rather than printed as text.
+
+### Velocity Command (`bf velocity --format json`)
+
+**Implementation:** `src/cli/mod.rs:2846-2915`. JSON branch is the match arm at `src/cli/mod.rs:2860-2863`:
+
+```rust
+let stats = storage.with_immediate_transaction(|tx| {
+    crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())
+})?;
+match format {
+    "json" => {
+        println!("{}", serde_json::to_string_pretty(&stats)?);
+    }
+    "toon" => { /* per-stat text block */ }
+    _ => { /* columnar table */ }
+}
+```
+
+**Formatter methods used:** NONE. Like `stats`, `velocity` does not invoke any `Formatter`/`JsonFormatter` method; it serializes the `Vec<VelocityStats>` directly. (`velocity` is the only command in this file that also has a `"toon"` arm in addition to `"json"`/default.)
+
+**Data source:** `crate::velocity::get_velocity_stats(tx, model, harness)` → `Vec<VelocityStats>` (`src/velocity.rs:343-378`), run inside `storage.with_immediate_transaction`. Optional `--model` / `--harness` filters narrow the (model, harness, issue_type) tuples returned.
+
+**Serialized struct:** `VelocityStats` (`src/velocity.rs:49-59`):
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VelocityStats {
+    pub model: String,
+    pub harness: String,
+    pub issue_type: String,
+    pub sample_count: i64,
+    pub p50_seconds: Option<i64>,
+    pub p90_seconds: Option<i64>,
+    pub avg_seconds: Option<f64>,
+    pub last_updated: Option<String>,
+}
+```
+
+**Output format:** a JSON **array** of `VelocityStats` objects, pretty-printed (2-space indent), trailing newline from `println!`. Key order follows struct declaration order. `Option` fields serialize as `null` when absent (insufficient samples for a given percentile/avg). Empty result → `[]`.
+
+**Empirically verified** empty case against `target/debug/bf` (this workspace's db has no velocity rows):
+```json
+[]
+```
+
+(A non-empty row would be a single object inside the array with all eight fields above — `p50_seconds`/`p90_seconds` as integers-or-`null`, `avg_seconds` as a float-or-`null`, `last_updated` as an RFC3339 string-or-`null`. The field set is confirmed from the `Serialize` derive since no populated velocity rows were available to sample.)
+
+**Key characteristics:**
+- Bypasses the formatter system; serializes `Vec<VelocityStats>` via the struct's `Serialize` derive
+- JSON array (matching `ready`/`log`/`mitosis`/`labels`, unlike `list`/`search`'s JSONL)
+- Pretty-printed; trailing newline via `println!`
+- Empty case → `[]` (unlike `list`/`search`, which emit nothing)
+- Key order = struct field order (not alphabetical)
+
+**Correction to the original comprehensive audit (bf-xmwq, §6 velocity):** that example is **stale**. It listed only 7 fields and omitted `last_updated`, and showed `p50_seconds`/`p90_seconds`/`avg_seconds` as non-Option (`"p50_seconds": 120`). The current `VelocityStats` struct has **8** fields, with `p50_seconds`/`p90_seconds` as `Option<i64>`, `avg_seconds` as `Option<f64>`, and `last_updated` as `Option<String>` (all of which serialize to `null` when `None`).
+
+### Inconsistency Notes (stats vs. velocity, and vs. the rest)
+
+1. **Formatter usage:** neither uses the formatter — both serialize a derived-`Serialize` struct directly. This is appropriate: both return aggregate/non-`Issue` data (`Stats`, `Vec<VelocityStats>`), so the `Formatter` trait (designed for `&[Issue]`/`&Issue`) has no fitting method. Consistent with `claim`'s rationale (bf-2x0p).
+
+2. **Container shape differs by data, not by whim:** `stats` is a single summary object → object output; `velocity` is a list of rows → array output. Both are the natural shape for their data (contrast with `list` vs. `ready`, where two bead-*list* commands disagree on JSONL-vs-array).
+
+3. **Pretty-printing + trailing newline:** both use `to_string_pretty` + `println!`, consistent with each other and with `log`/`labels`/`schema`/`mitosis`/`critical-path`/`dep tree`, but unlike the compact `to_string` of `list`/`search`/`show`.
+
+4. **Key ordering:** both preserve struct field order (via `Serialize` derive), consistent with `list`/`search`/`show`/`ready` — and unlike `claim`/`schema`/`dep tree`, which sort keys alphabetically through the `json!` macro.
+
+5. **The real defect is in `stats`, not `velocity`:** `stats --format json` plus any breakdown flag (`--by-type`, `--by-priority`, `--by-assignee`, `--by-label`) emits JSON followed by un-ignorable plain-text lines, so the combined stdout is not valid JSON. `velocity` has no such secondary output and is clean.
+
+---
+
 ## Original Comprehensive Audit (bf-xmwq)
 
 ---
