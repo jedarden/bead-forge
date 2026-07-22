@@ -78,6 +78,18 @@ pub fn flush(workspace_dir: &Path) -> Result<usize> {
 /// NOTE: This function exports ONLY dirty beads to the JSONL file, replacing
 /// its contents. For a full export of all beads, use `flush()` instead.
 ///
+/// # Rotation interplay (plan §7.1 Open Question — RESOLVED)
+///
+/// The export target is ALWAYS the **active** file named by
+/// `metadata.jsonl_export` (e.g. `issues.jsonl`). Rotated archives
+/// (`issues.jsonl.1`, `.2`, …) are written EXCLUSIVELY by
+/// [`crate::rotate::rotate`]; this incremental flush path never reads or
+/// writes them. This holds by construction — the only resolution of the
+/// export path is `beads_dir.join(&metadata.jsonl_export)` two lines below —
+/// so an archived bead cannot be silently revived into, or merged into, the
+/// active file by auto-flush. Pinned by
+/// `tests/batch_cascade_and_rotation.rs::incremental_flush_targets_only_active_jsonl_not_archive`.
+///
 /// # Arguments
 /// * `workspace_dir` - Path to the workspace root (contains .beads/)
 ///

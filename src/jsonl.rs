@@ -107,7 +107,9 @@ pub fn export_jsonl_merge(
     removals: &[String],
 ) -> Result<ExportResult> {
     let file_exists = path.exists();
-    if upserts.is_empty() && removals.is_empty() && !file_exists {
+    // Nothing to add and no file to prune: never create an empty JSONL. (A
+    // removal against a nonexistent file is a no-op.)
+    if upserts.is_empty() && !file_exists {
         return Ok(ExportResult { count: 0 });
     }
 
@@ -174,6 +176,15 @@ pub fn export_jsonl_merge(
 /// commits, so a failed flush leaves the dirty marks intact for recovery.
 ///
 /// A no-op (nothing dirty) returns early without touching the file.
+///
+/// # Rotation interplay invariant (plan §7.1 Open Question — RESOLVED)
+///
+/// `path` MUST be the **active** file named by `metadata.jsonl_export`
+/// (`issues.jsonl`), never a rotated archive (`issues.jsonl.1`, …). The sole
+/// caller ([`crate::sync::flush_dirty`]) resolves `path` that way, and rotated
+/// archives are owned exclusively by [`crate::rotate::rotate`]. Passing an
+/// archive path here would corrupt rotation; it is prevented by construction
+/// (single resolution site), not by a runtime guard.
 pub fn export_jsonl_dirty<F1, F2>(
     path: &Path,
     mut list_dirty: F1,
@@ -213,5 +224,83 @@ mod tests {
             .count();
 
         assert_eq!(count, 2);
+    }
+
+    fn issue(id: &str, title: &str) -> Issue {
+        Issue::new(id.to_string(), title.to_string(), ".".to_string())
+    }
+
+    fn ids_in(path: &Path) -> Vec<String> {
+        std::fs::read_to_string(path)
+            .unwrap()
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| {
+                serde_json::from_str::<serde_json::Value>(l).unwrap()["id"]
+                    .as_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn merge_upserts_dirty_and_preserves_untouched() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Seed three beads, then merge in only one changed bead: the other two
+        // must survive byte-for-byte (surgical, not full rewrite).
+        export_jsonl_merge(&path, &[issue("bf-a", "A"), issue("bf-b", "B"), issue("bf-c", "C")], &[])
+            .unwrap();
+        let raw_before = std::fs::read_to_string(&path).unwrap();
+
+        let mut changed = issue("bf-b", "B renamed");
+        changed.priority = crate::model::Priority(0);
+        let result = export_jsonl_merge(&path, &[changed], &[]).unwrap();
+        assert_eq!(result.count, 1, "count reports upserts applied");
+
+        assert_eq!(ids_in(&path), vec!["bf-a", "bf-b", "bf-c"], "all beads retained, sorted");
+        // bf-a and bf-c lines are untouched relative to the seed write.
+        let line_a_before = raw_before.lines().find(|l| l.contains("\"bf-a\"")).unwrap();
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert!(after.contains(line_a_before), "untouched bead line preserved verbatim");
+        assert!(after.contains("B renamed"), "dirty bead line replaced");
+    }
+
+    #[test]
+    fn merge_removes_ids() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+        export_jsonl_merge(&path, &[issue("bf-a", "A"), issue("bf-b", "B"), issue("bf-c", "C")], &[])
+            .unwrap();
+
+        // Remove the middle bead; no upserts. count == 0 (no upserts).
+        let result = export_jsonl_merge(&path, &[], &[String::from("bf-b")]).unwrap();
+        assert_eq!(result.count, 0);
+        assert_eq!(ids_in(&path), vec!["bf-a", "bf-c"], "removed id's line pruned");
+    }
+
+    #[test]
+    fn merge_no_op_on_missing_file_writes_nothing() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+        // No upserts, no removals, no existing file → never create an empty file.
+        let result = export_jsonl_merge(&path, &[], &[String::from("bf-x")]).unwrap();
+        assert_eq!(result.count, 0);
+        assert!(!path.exists(), "a pure no-op must not create an empty JSONL file");
+    }
+
+    #[test]
+    fn merge_preserves_unparseable_orphan_lines() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+        std::fs::write(&path, "{\"id\":\"bf-a\",\"title\":\"A\"}\nnot json at all\n").unwrap();
+
+        // Merge a new bead; the foreign/hand-edited line must not be dropped.
+        export_jsonl_merge(&path, &[issue("bf-z", "Z")], &[]).unwrap();
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert!(after.contains("not json at all"), "orphan line must be preserved");
+        assert!(after.contains("\"bf-z\""), "new bead merged in");
     }
 }
