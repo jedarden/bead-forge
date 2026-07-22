@@ -9,7 +9,7 @@
 ## Core Principles
 
 1. **SQLite is the live store** — all mutations are SQL writes; reads are SQL queries. Fast, concurrent-read, serialized-write via WAL mode.
-2. **JSONL is the git artifact** — exported on `bf sync`, committed to git, one entry per bead. Used for backup, cross-machine sharing, and recovery. Never written during normal operation.
+2. **JSONL is the git artifact** — exported on `bf sync`, committed to git, one entry per bead. Used for backup, cross-machine sharing, and recovery. ~~Never written during normal operation.~~ *(Amended 2026-07-21, Phase 7.1: with `sync.auto_flush` — default on — every successful mutation incrementally exports the changed beads to JSONL, so the artifact tracks the live store instead of trailing it. `bf sync --flush-only` remains the explicit checkpoint and the recovery path when auto-flush fails. Read-only commands still never write.)*
 3. **Drop-in CLI** — all `br` commands work under `bf` with the same flags and output formats
 4. **`BEGIN IMMEDIATE` for atomic claim** — the read-score-update sequence runs inside a single SQLite write transaction, eliminating the race condition `br` has without requiring flock or a daemon
 
@@ -1224,6 +1224,151 @@ Deploy as a standalone binary to the Hetzner server at `~/.local/bin/bf`. Symlin
 
 ---
 
+## Phase 7: Upstream Robustness Parity (br backports)
+
+Upstream `beads_rust` has kept shipping at remarkable velocity since the fork (reference:
+`Dicklesworthstone/beads_rust` `main` @ `8bff67a`, 2026-07-21 — nearly 400 issues worked,
+most of them hardening the exact dual-store failure modes bf has hit in production). This
+phase ports the **robustness behaviors** into bf's architecture. Concepts only, not code —
+the codebases have diverged too far to merge, upstream accepts no PRs (one-way flow), and
+attribution is carried here (beads_rust is MIT). Product-surface breadth is explicitly out
+of scope (see Non-goals).
+
+Items are ordered P0 → P2. Each maps to a standing bf pain point documented in incident
+memory or CLAUDE.md.
+
+### 7.1 Incremental auto-flush + dirty tracking (P0) — amends Core Principle 2
+
+The single highest-value port. Upstream writes the JSONL after every successful mutation;
+bf's flush-on-demand model is why db-only beads exist and why CLAUDE.md carries the
+"ALWAYS `bf sync --flush-only` before repair" ritual (post-2026-06-10 wipe).
+
+- New `dirty_issues` table (`issue_id`, `marked_at`); every mutation marks its issue dirty.
+- After each successful mutation: best-effort incremental export of *dirty rows only* into
+  the JSONL (surgical line replacement, not full rewrite). On failure: warn loudly (stderr
+  + `warning` field in the `--json` envelope), keep the dirty marks, never fail the
+  mutation. Named recovery: `bf sync --flush-only`.
+- Config `sync.auto_flush` (default **true**); `--no-auto-flush` per-invocation override.
+- `bf batch` flushes once at transaction end, not per-op (write amplification).
+- Read-only and diagnostic commands never write the JSONL (upstream's #326 lesson:
+  status/doctor commands that rewrite the artifact create git churn and mask real drift).
+
+**Exit criteria:** the flush-before-repair ritual is deletable from CLAUDE.md; killing a
+worker at any point between mutation and flush loses nothing that `git diff .beads/` can't
+show; flush failure is visible in machine-readable output.
+
+### 7.2 Doctor safety stack (P0)
+
+bf's current guard (refuse/flush-first before repair) is one check. Upstream's is a layered
+architecture; port the layers:
+
+1. **Healthy early-return** — `bf doctor --repair` on a workspace with no errors runs only
+   trivial fixers and exits; it must be provably impossible to reach the JSONL rebuild from
+   a healthy state.
+2. **Local repair first** — integrity-check triage, VACUUM/REINDEX, cache rebuilds. The
+   JSONL rebuild is the last resort, not the first tool.
+3. **Verified pre-rebuild backups** — SHA-256-hashed copies of the full DB family into a
+   recovery dir before any rebuild; restore-on-failure; `bf doctor runs` / `bf doctor
+   restore <run-id|latest>` to list and roll back.
+4. **JSONL authority preflight** — refuse rebuild if the JSONL contains merge-conflict
+   markers or invalid records (rebuilding from a poisoned authority is how a bad flush
+   becomes permanent).
+5. **Repeat-failure refusal** — a rebuild whose post-verification failed writes a marker;
+   further rebuilds refuse without `--allow-repeated-repair`.
+6. **Preservation across rebuild** — snapshot unflushed **dirty issues** (with labels,
+   dependencies, comments) *and* tombstones before rebuild; restore and re-mark dirty
+   after; report the count in the repair summary. This is `beads_rust#394` (filed by us
+   upstream 2026-07-21) — implement it here first.
+
+**Exit criteria:** an induced rebuild on a workspace with unflushed beads loses nothing;
+repair on a healthy workspace is a no-op; every rebuild leaves a restorable, hash-verified
+backup.
+
+### 7.3 NULL-datetime & schema hardening (P0, small)
+
+Fix the `parse_datetime` crash on NULL datetime columns (the flush/list crash class that
+previously forced the destructive `rm beads.db + reimport` workaround). Add a doctor
+detector + repair fixer for NULL-in-NOT-NULL rows generally.
+
+### 7.4 Anomaly classification & sync verdicts (P1)
+
+- An `AnomalyClass` enum with severity tiers: `DbNewer`, `JsonlNewer`, `CountMismatch`,
+  `IdSetMismatch`, `ConflictMarkers`, `DatabaseCorrupt`, … surfaced uniformly in
+  `bf doctor --json`.
+- `bf sync --status` renders an **"In sync" verdict** backed by evidence: stored
+  `jsonl_content_hash` matches computed hash AND `dirty_issues` is empty.
+
+**Exit criteria:** the manual corruption-triage ritual (compare `git log -1 issues.jsonl`
+against bead counts) is replaced by one command with a machine-readable verdict.
+
+### 7.5 `update` description editing (P1)
+
+`bf update --description` / `--description-file` / `--acceptance-criteria` — closes the
+documented "bf update cannot edit description; add a comment instead" gap. Lesson from
+upstream's #386 regression: the fix must be wired through the real update path and covered
+by a round-trip integration test (their first fix for this shipped without ever touching
+`update.rs`).
+
+### 7.6 Batch surface expansion (P1)
+
+`bf batch` today supports only create/dep_add_blocker/close. Expand to a uniform op set
+(update, label add/remove, dep add/remove, comment) inside one transaction with one
+auto-flush at the end. The bf-5id blocked→open cascade must hold identically in the batch
+close path.
+
+### 7.7 JSON contract discipline (P1)
+
+- One stable envelope shape for every command's `--json` output — fixes the
+  `bf ready` (JSON array) vs `bf list` (NDJSON) divergence that silently miscounts under
+  `json.load`.
+- `bf robot-docs`: machine-readable enumeration of every command's contract, for agent
+  consumers (NEEDLE worker prompts reference it instead of hardcoding shapes).
+
+### 7.8 Derived blocked status (P2 — architectural)
+
+Upstream computes blocked-ness from the dependency graph (with a `blocked_issues_cache`
+invalidated on dep/close mutations) instead of storing a status that must be transitioned.
+This deletes the bf-5id bug class (stuck-blocked beads stalling workers) at the root — the
+just-shipped cascade fix treats the symptom.
+
+**Hard constraint:** NEEDLE's safe-dispatch fences beads by manually setting
+`status=blocked`. A derived model MUST retain an explicit manual hold that presents as
+blocked and takes precedence over the derived value (dedicated flag or a preserved manual
+status — decide at design time, with NEEDLE-side review). CLI and JSONL compatibility:
+consumers keep seeing `status: "blocked"`.
+
+Includes a migration for existing stored-blocked rows.
+
+### 7.9 Multi-box & fleet concurrency (P2)
+
+- **Merge anchor** (`beads.base.jsonl`): a base snapshot enabling 3-way merge of JSONL
+  across checkouts — targets the recurring lab/ex44 divergence.
+- **Concurrent-writer hardening**: fleet-scale tests (N concurrent `bf` processes doing
+  create/claim/close) hunting the upstream-documented classes — parallel-write silent loss,
+  spurious sync conflicts during auto-import.
+- **Pre-export history backups** (`.bf_history/` with prune policy): one more insurance
+  layer under the JSONL, cheap to keep.
+
+### Non-goals
+
+Upstream surface deliberately NOT ported: the MCP server, workflow gates /
+transition-scoped required fields, scheduler, agent-coordination module, epic containment,
+capacity/admission control, and graph-analytics TUI. NEEDLE owns orchestration in this
+stack; `bv` exists for visualization; bf's identity is the lean, fleet-hardened store.
+Preserve bf's own differentiators upstream lacks: atomic `claim`, `critical_path`,
+`velocity`, `commit_check`, secret scanning, genesis beads, annotations.
+
+### Open questions
+
+- Auto-flush × rotation: incremental flush must target only the active `issues.jsonl`,
+  never archives — confirm rotation interplay before 7.1 ships.
+- Does auto-flush change git-commit cadence guidance for NEEDLE workers (`.beads/` will now
+  be dirty far more often between commits)?
+- 7.8 manual-hold representation (new flag vs preserved manual status) needs NEEDLE-side
+  review before implementation — do not start 7.8 until that decision is recorded here.
+
+---
+
 ## Test Strategy & Isolation
 
 bf must be testable without touching, modifying, or interfering with any live `br` workspace. Three isolation concerns drive the test strategy:
@@ -1487,8 +1632,9 @@ bf claim --any --assignee "multi-worker" --json --workspace /tmp/ws-a --workspac
 | 4B | Extended features (log rotation, batch ops, annotations, operation history, secret scanning, critical path, velocity scoring) | Medium |
 | 5 | NEEDLE integration (pluck.sh update, backward compat) | Small |
 | 6 | Build & deploy (CI, binary) | Small |
+| 7 | Upstream robustness parity: auto-flush + dirty tracking, doctor safety stack, NULL hardening, anomaly verdicts, update/batch/JSON-contract gaps, derived blocked, multi-box concurrency | Medium-Large |
 
-Phases 1-3 produce a fully functional standalone `bf` that replaces `br`. Phase 4 adds atomic claiming for fleet operations. Phase 4B adds extended features that make bf more powerful than br. Phases 5-6 integrate and deploy.
+Phases 1-3 produce a fully functional standalone `bf` that replaces `br`. Phase 4 adds atomic claiming for fleet operations. Phase 4B adds extended features that make bf more powerful than br. Phases 5-6 integrate and deploy. Phase 7 (added 2026-07-21) back-ports the robustness behaviors upstream `beads_rust` developed after the fork — P0 items first (7.1-7.3), then P1 (7.4-7.7), then the architectural/multi-box P2 items (7.8-7.9).
 
 ---
 
@@ -1521,6 +1667,8 @@ Phases 1-3 produce a fully functional standalone `bf` that replaces `br`. Phase 
 13. **Critical path drives claim priority, not just listed priority**: Listed priority is a human signal, but it decays as the project evolves and humans stop curating it. Critical path float is computed from the live dependency graph and is always current. A priority-3 bead on the critical path outranks a priority-0 bead with float=5 — the fleet naturally works on what matters most without human recuration.
 
 14. **Worker composition is first-class metadata**: `--model`, `--harness`, `--harness-version` on `bf claim` record what kind of agent did the work. This transforms the events table from a bare audit log into a performance dataset: which model+harness combinations close which task types fastest. The fleet becomes self-optimizing — velocity data informs which workers to dispatch to which workspace, without any external ML pipeline.
+
+15. **Upstream br is a tracked ideas source, ported one-way as behaviors, never merged as code** (2026-07-21): beads_rust keeps solving dual-store robustness problems bf also has — credit where due, Emanuel keeps finding improvements on top of what already exists. The codebases are architecturally divergent and upstream accepts no PRs (their agents integrate from filed issues), so the flow is: study upstream behavior → spec it against bf's architecture in this plan (Phase 7) → implement natively with attribution. Never vendor upstream code, never chase their product surface (see Phase 7 Non-goals), and periodically re-scan their tracker/source for new robustness work worth porting.
 
 ---
 
