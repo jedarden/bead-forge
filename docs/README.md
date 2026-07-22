@@ -130,7 +130,9 @@ All operations execute in one `BEGIN IMMEDIATE` transaction. A crash mid-batch l
 Arbitrary key-value metadata on any bead, transparent to `br`:
 
 ```bash
-bf annotate bf-a3f8 needle_attempt=3 needle_session=abc123 review_status=needs_review
+bf annotate set bf-a3f8 needle_attempt 3
+bf annotate set bf-a3f8 needle_session abc123
+bf annotate set bf-a3f8 review_status needs_review
 bf list --annotation needle_attempt=3
 ```
 
@@ -198,28 +200,71 @@ secret_protection:
 
 ## Commands
 
+Most commands accept `--format json|text|toon` for output and a global `-w/--workspace <path>` to target a workspace other than the current directory.
+
 ```
-bf create        --title "..." --type <type> --priority <N> [--label ...]
-bf list          [--status <s>] [--type <t>] [--assignee <a>] [--format json|text|toon]
-bf show          <id>
-bf update        <id> [--status <s>] [--assignee <a>] ...]
+# ── Lifecycle ────────────────────────────────────────────────────────────────
+bf create        --title "..." [--type <t>] [--priority <N>] [--description "..."]
+                 [--assignee <a>] [--label <l> ...]
+bf list          [--status <s>] [--type <t>] [--assignee <a>] [--priority <N>]
+                 [--annotation k=v] [--limit <N>] [--all] [--format json|text|toon] [--json]
+bf show          <id> [--format json|text|toon] [--json]
+bf update        <id> [--title "..."] [--status <s>] [--priority <N>] [--assignee <a>]
+                 [--description "..."] [--acceptance-criteria "..."] [--notes "..."]
+                 [--design "..."] [--due-at <RFC3339>]
 bf close         <id> [--reason "..."]
+bf reopen        <id>
+bf delete        <id>
+bf ready         [--limit <N>] [--format json|text|toon] [--json]   # unblocked beads
+bf count         [--status <s>]
+
+# ── Claiming & concurrency ───────────────────────────────────────────────────
 bf claim         --assignee <id> [--model <m>] [--harness <h>] [--harness-version <v>]
-                 [--workspace <path>] [--any]
-bf critical-path <epic-id>
-bf batch         [--file ops.json] [--json '[...]']
-bf annotate      <id> key=value [--remove key]
-bf log           [<id>] [--since <date>] [--actor <a>] [--diff]
-bf rotate        [--age-days N]
-bf velocity      [--model <m>] [--harness <h>]
-bf dep           add-blocker <blocker> <blockee>
-bf dep           tree <id>
-bf label         <id> add <label> [<label> ...]
+                 [--any] [--fallback <mode>] [--workspace-paths <p> ...] [--dry-run]
+                 [--format json|text|toon] [--json]
+bf batch         [--file ops.json] [--json '[...]'] [--stdin]       # atomic multi-op
+bf mitosis       <id> --children '[...]' [--reason "..."] [--format ...]   # split into children
+
+# ── Dependencies & structure ─────────────────────────────────────────────────
+bf dep add       <blocker> --blocks <blocked> [-t <type>]   # blocker must close first
+bf dep remove    <issue> <depends-on>
+bf dep list      <id>
+bf dep tree      <id> [-d down|up|both] [--max-depth <N>] [--format ...] [--json]
+bf critical-path <epic-id> [--max-depth <N>] [--format ...]
+
+# ── Labels, comments, annotations ────────────────────────────────────────────
+bf label add     --label <l> [<l> ...] <id>
+bf label remove  --label <l> [<l> ...] <id>
+bf label list    [<id>]                  # all unique labels if id omitted
+bf labels        <id> [--format text|json]                  # efficient single-bead SELECT
+bf comments add  <id> <text ...>
+bf comments list <id>
+bf annotate set    <id> <key> <value>
+bf annotate get    <id> <key>
+bf annotate remove <id> <key>
+bf annotate list   <id>
+bf annotate clear  <id>
+
+# ── Query & history ──────────────────────────────────────────────────────────
+bf search        [<query>] [-s <status> ...] [-t <type> ...] [--assignee <a>]
+                 [-l <label> ...] [--priority-min <N>] [--priority-max <N>] [--limit <N>]
+                 [--format json|text|toon]
+bf recent        [--status <s>] [--type <t>] [--assignee <a>] [--priority <N>]
+                 [--since <RFC3339>] [--before <RFC3339>] [-t <period>] [-n <N>]
+                 [--format json|text|toon] [--json]           # period: e.g. 1h, 24h, 7d, 4w
+bf log           [<id>] [--limit <N>] [--since <RFC3339>] [--actor <a>]
+                 [--status-changes] [--diff] [--git] [--format json|text|toon] [--json]
+bf stats         [--by-type] [--by-priority] [--by-assignee] [--by-label] [--format ...]
+bf velocity      [--model <m>] [--harness <h>] [--format json|text|toon]
+
+# ── Maintenance & config ─────────────────────────────────────────────────────
 bf sync          [--flush-only] [--import-only]
-bf doctor        [--repair [--flush-first] [--force]] [--check] [--reclaim-stale [--ttl <duration>]]
+bf doctor        [--repair [--flush-first] [--force]] [--reclaim-stale [--ttl <minutes>]]  # no flags = health check
+bf rotate        [--days <N>] [--dry-run]
+bf migrate       [--workspace <p>] [--from-jsonl] [--seed-velocity] [--dry-run] [--skip-verify]
 bf init          [--prefix <p>]
-bf stats
-bf search        <query>
+bf schema        [<target|id>] [--format json|text]      # "all" = DDL; a bead id = full JSON
+bf config        list | get <key> | set <key> <value> | path
 bf commit-check  # git pre-commit hook for secret scanning
 ```
 
@@ -352,7 +397,7 @@ done
 4. Primes critical_path_cache for all epics
 5. Seeds `config.yaml` with bf-specific defaults if missing
 6. Verifies forward compatibility (br can still open the database)
-7. Verifies backward compatibility (`bf doctor --check` passes)
+7. Verifies backward compatibility (`bf doctor` health check passes)
 8. Releases migration lock
 
 **Dry-run mode** (see what would happen without making changes):
@@ -442,9 +487,9 @@ This enables velocity-aware routing (see §Velocity-Aware Scoring above).
 For each workspace, verify both tools can read the database:
 
 ```bash
-# Verify bf doctor passes
+# Verify bf doctor passes (no flags = health check)
 cd /path/to/workspace
-bf doctor --check
+bf doctor
 
 # Verify br doctor passes (forward compatibility)
 br doctor
