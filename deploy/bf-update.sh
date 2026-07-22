@@ -81,9 +81,18 @@ fi
 
 # Verify the SHA256 checksum BEFORE installing. On any mismatch (or a
 # missing/malformed manifest) leave the existing bf binary untouched.
-EXPECTED=$(awk '{print $1; exit}' "$TEMP_DIR/SHA256SUMS")
+#
+# Match the entry for our specific asset rather than blindly trusting the
+# first line: a manifest that lists a different (attacker-chosen) file first
+# must not be accepted. Handles both text (`<hash>  name`) and binary
+# (`<hash> *name`) manifest formats.
+EXPECTED=$(awk '$2 == "bf-linux-x86_64" || $2 == "*bf-linux-x86_64" {print $1; exit}' "$TEMP_DIR/SHA256SUMS")
 if [[ -z "$EXPECTED" ]]; then
-    echo "ERROR: SHA256SUMS manifest is empty or malformed — refusing to install"
+    # Fallback: legacy manifest with a single line containing only the hash
+    EXPECTED=$(awk 'NF==1 {print $1; exit}' "$TEMP_DIR/SHA256SUMS")
+fi
+if [[ -z "$EXPECTED" ]]; then
+    echo "ERROR: SHA256SUMS has no entry for bf-linux-x86_64 (empty or malformed) — refusing to install"
     exit 1
 fi
 ACTUAL=$(sha256sum "$TEMP_DIR/bf-linux-x86_64" | awk '{print $1}')
