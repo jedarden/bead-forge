@@ -1,5 +1,6 @@
-use crate::format::{ClaimResultOutput, Formatter};
+use crate::format::{ClaimResultOutput, Formatter, StatsOutput};
 use crate::model::Issue;
+use crate::velocity::VelocityStats;
 use serde_json::{self, Map, Value};
 
 #[derive(Debug, Clone, Copy)]
@@ -60,6 +61,14 @@ impl Formatter for JsonFormatter {
 
     fn format_no_claim(&self) -> String {
         "{}".to_string()
+    }
+
+    fn format_stats(&self, stats: &StatsOutput) -> String {
+        serde_json::to_string(stats).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    fn format_velocity(&self, stats: &[VelocityStats]) -> String {
+        serde_json::to_string(stats).unwrap_or_else(|_| "[]".to_string())
     }
 }
 

@@ -1,5 +1,6 @@
-use crate::format::{ClaimResultOutput, Formatter};
+use crate::format::{text::format_stats_text, ClaimResultOutput, Formatter, StatsOutput};
 use crate::model::Issue;
+use crate::velocity::VelocityStats;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ToonFormatter;
@@ -58,6 +59,31 @@ impl Formatter for ToonFormatter {
 
     fn format_no_claim(&self) -> String {
         "No beads available to claim".to_string()
+    }
+
+    fn format_stats(&self, stats: &StatsOutput) -> String {
+        format_stats_text(stats)
+    }
+
+    fn format_velocity(&self, stats: &[VelocityStats]) -> String {
+        let mut s = String::new();
+        for stat in stats {
+            s.push_str(&format!("Model: {}\n", stat.model));
+            s.push_str(&format!("Harness: {}\n", stat.harness));
+            s.push_str(&format!("Type: {}\n", stat.issue_type));
+            s.push_str(&format!("Samples: {}\n", stat.sample_count));
+            if let Some(p50) = stat.p50_seconds {
+                s.push_str(&format!("P50: {}s\n", p50));
+            }
+            if let Some(p90) = stat.p90_seconds {
+                s.push_str(&format!("P90: {}s\n", p90));
+            }
+            if let Some(avg) = stat.avg_seconds {
+                s.push_str(&format!("Avg: {:.1}s\n", avg));
+            }
+            s.push('\n');
+        }
+        s
     }
 }
 

@@ -6,7 +6,7 @@ use crate::close::close_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
-use crate::format::{get_formatter, ClaimResultOutput, OutputFormat};
+use crate::format::{get_formatter, ClaimResultOutput, OutputFormat, StatsOutput};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
@@ -2613,50 +2613,41 @@ fn cmd_stats(
     let storage = Storage::open(&db_path)?;
     let stats = storage.get_stats()?;
 
-    match format {
-        "json" => {
-            println!("{}", serde_json::to_string_pretty(&stats)?);
-        }
-        _ => {
-            println!("Total beads: {}", stats.total);
-            println!("  Open: {}", stats.open);
-            println!("  In Progress: {}", stats.in_progress);
-            println!("  Closed: {}", stats.closed);
-        }
-    }
-
+    // Build the serializable projection. Breakdowns are fetched only when
+    // requested and folded into the object so that `--format json --by-*`
+    // yields one valid JSON document (the prior impl appended plain text
+    // after the JSON object). Priority/assignee keys are stringified to
+    // satisfy JSON's string-key rule; unassigned buckets use "None" to match
+    // the text view.
+    let mut output = StatsOutput::new(stats.total, stats.open, stats.in_progress, stats.closed);
     if by_type {
-        let by_type_stats = storage.get_stats_by_type()?;
-        println!("\nBy type:");
-        for (issue_type, count) in by_type_stats {
-            println!("  {} ({})", issue_type, count);
-        }
+        output.by_type = Some(storage.get_stats_by_type()?.into_iter().collect());
     }
     if by_priority {
-        let by_priority_stats = storage.get_stats_by_priority()?;
-        println!("\nBy priority:");
-        for (priority, count) in by_priority_stats {
-            println!("  P{} ({})", priority, count);
-        }
+        output.by_priority = Some(
+            storage
+                .get_stats_by_priority()?
+                .into_iter()
+                .map(|(priority, count)| (priority.to_string(), count))
+                .collect(),
+        );
     }
     if by_assignee {
-        let by_assignee_stats = storage.get_stats_by_assignee()?;
-        println!("\nBy assignee:");
-        if by_assignee_stats.is_empty() {
-            println!("  (no assigned beads)");
-        } else {
-            for (assignee, count) in by_assignee_stats {
-                println!("  {} ({})", assignee.as_deref().unwrap_or("None"), count);
-            }
-        }
+        output.by_assignee = Some(
+            storage
+                .get_stats_by_assignee()?
+                .into_iter()
+                .map(|(assignee, count)| (assignee.unwrap_or_else(|| "None".to_string()), count))
+                .collect(),
+        );
     }
     if by_label {
-        let labels = storage.list_all_labels()?;
-        println!("\nBy label:");
-        for (label, count) in labels {
-            println!("  {} ({})", label, count);
-        }
+        output.by_label = Some(storage.list_all_labels()?.into_iter().collect());
     }
+
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    print!("{}", formatter.format_stats(&output));
 
     Ok(())
 }
@@ -2886,59 +2877,9 @@ fn cmd_velocity(
         crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())
     })?;
 
-    match format {
-        "json" => {
-            println!("{}", serde_json::to_string_pretty(&stats)?);
-        }
-        "toon" => {
-            for stat in stats {
-                println!("Model: {}", stat.model);
-                println!("Harness: {}", stat.harness);
-                println!("Type: {}", stat.issue_type);
-                println!("Samples: {}", stat.sample_count);
-                if let Some(p50) = stat.p50_seconds {
-                    println!("P50: {}s", p50);
-                }
-                if let Some(p90) = stat.p90_seconds {
-                    println!("P90: {}s", p90);
-                }
-                if let Some(avg) = stat.avg_seconds {
-                    println!("Avg: {:.1}s", avg);
-                }
-                println!();
-            }
-        }
-        _ => {
-            if stats.is_empty() {
-                println!("No velocity statistics available yet.");
-                println!("Velocity data accumulates as beads are claimed and closed.");
-            } else {
-                println!("Velocity Statistics:");
-                println!();
-                println!(
-                    "{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8}",
-                    "Model", "Harness", "Type", "Samples", "P50(s)", "P90(s)", "Avg(s)"
-                );
-                println!("{}", "-".repeat(85));
-                for stat in stats {
-                    println!(
-                        "{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8.1}",
-                        stat.model,
-                        stat.harness,
-                        stat.issue_type,
-                        stat.sample_count,
-                        stat.p50_seconds
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| "-".to_string()),
-                        stat.p90_seconds
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| "-".to_string()),
-                        stat.avg_seconds.unwrap_or(0.0),
-                    );
-                }
-            }
-        }
-    }
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    print!("{}", formatter.format_velocity(&stats));
 
     Ok(())
 }
