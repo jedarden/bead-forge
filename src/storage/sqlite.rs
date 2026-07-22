@@ -1311,6 +1311,7 @@ impl Storage {
                 "INSERT INTO comments (issue_id, author, text, created_at) VALUES (?1, ?2, ?3, ?4)",
                 params![issue_id, author, body, now.to_rfc3339()],
             )?;
+            mark_dirty_tx(tx, issue_id)?;
             Ok(tx.last_insert_rowid())
         })
     }
@@ -1410,6 +1411,7 @@ impl Storage {
                 "INSERT OR REPLACE INTO bead_annotations (bead_id, key, value) VALUES (?1, ?2, ?3)",
                 params![issue_id, key, value],
             )?;
+            mark_dirty_tx(tx, issue_id)?;
             Ok(())
         })
     }
@@ -1420,17 +1422,20 @@ impl Storage {
                 "DELETE FROM bead_annotations WHERE bead_id = ?1 AND key = ?2",
                 params![issue_id, key],
             )?;
+            mark_dirty_tx(tx, issue_id)?;
             Ok(())
         })
     }
 
     pub fn clear_annotations(&self, issue_id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "DELETE FROM bead_annotations WHERE bead_id = ?1",
-            params![issue_id],
-        )?;
-        Ok(())
+        self.with_immediate_transaction(|tx| {
+            tx.execute(
+                "DELETE FROM bead_annotations WHERE bead_id = ?1",
+                params![issue_id],
+            )?;
+            mark_dirty_tx(tx, issue_id)?;
+            Ok(())
+        })
     }
 
     pub fn search_issues(
