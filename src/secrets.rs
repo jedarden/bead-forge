@@ -197,8 +197,15 @@ impl SecretScanner {
                 "Google OAuth",
                 Regex::new(r"\b[0-9]+-[a-zA-Z0-9_]{32}\.apps\.googleusercontent\.com\b")?,
             ),
-            // Azure keys
-            ("Azure Key", Regex::new(r"[a-zA-Z0-9/_-]{44}")?),
+            // Azure storage account keys: 512-bit key, base64-encoded to 88 chars
+            // ending in "==" (base64 alphabet includes '+' and '/'), frequently
+            // preceded by "AccountKey=". Requiring the 88-char "==" shape (or the
+            // AccountKey keyword) avoids false-positives on long absolute paths,
+            // which contain '/' and '-' but never '+' and never end in "==".
+            (
+                "Azure Key",
+                Regex::new(r"(?i)(?:accountkey\s*=\s*)?[a-zA-Z0-9+/]{86}==")?,
+            ),
             // Password fields (common patterns)
             (
                 "Password in Key",
@@ -366,6 +373,38 @@ mod tests {
 
         let matches = scanner.scan_issue(&issue);
         assert!(!matches.is_empty());
+    }
+
+    #[test]
+    fn test_detects_azure_key() {
+        let scanner = SecretScanner::new().unwrap();
+        // A real Azure storage account key: 88 base64 chars ending in "==".
+        let azure_key =
+            "DefaultEndpointsProtocol=https;AccountName=demo;AccountKey=abcdefghij\
+             klmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab+/cdefghijklmno\
+             pqrstuvwx==;EndpointSuffix=core.windows.net";
+        let matches = scanner.scan_string(azure_key);
+        assert!(
+            matches.iter().any(|m| m.pattern_name == "Azure Key"),
+            "expected Azure Key match, got: {:?}",
+            matches
+        );
+    }
+
+    #[test]
+    fn test_long_absolute_path_is_not_azure_key() {
+        let scanner = SecretScanner::new().unwrap();
+        // The fleet-observed false-positive shape: a scratchpad path that trivially
+        // contains a 44+ char run of alnum/slash/dash/underscore. The old overbroad
+        // `[a-zA-Z0-9/_-]{44}` pattern flagged this as an Azure Key.
+        let path =
+            "/home/coding/.tmp/claude-1000/-home-coding-bead-forge/7429dcb0-702a-4c7a-a0c5-989cfe3d93c1/scratchpad/some-working-file.txt";
+        let matches = scanner.scan_string(path);
+        assert!(
+            !matches.iter().any(|m| m.pattern_name == "Azure Key"),
+            "long absolute path should not match Azure Key, got: {:?}",
+            matches
+        );
     }
 
     #[test]
