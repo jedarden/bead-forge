@@ -125,6 +125,130 @@ The `Formatter` trait is designed for `Issue` objects and cannot handle `ScoredB
 
 ---
 
+## Bead bf-2x0p: Focused Audit of `search` and `claim` Commands
+
+**Date:** 2026-07-22
+**Purpose:** Detailed audit of JSON output implementations for search and claim commands
+**Method:** Verified against current source (`src/cli/mod.rs`) **and** empirically against the live `target/debug/bf` binary — line numbers below are current as of this date (the comprehensive audit below uses stale 2026-07-03 line numbers).
+
+### Summary
+
+| Command | Formatter Used | Output Format | Array Wrapper | Implementation Pattern |
+|---------|---------------|---------------|---------------|----------------------|
+| `search` | `JsonFormatter.format_issues()` | JSONL (newline-delimited) | NO | **Formatter system** via `get_formatter().format_issues()` |
+| `claim`  | None (bypasses formatter) | Single JSON object | NO | **Direct** `serde_json::json!({...})` + `println!` Display |
+
+### Search Command (`bf search --format json`)
+
+**Implementation:** `src/cli/mod.rs:2531-2572`
+
+**Uses the Formatter system** (identical pattern to `list`):
+```rust
+let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+let formatter = get_formatter(output_format);
+print!("{}", formatter.format_issues(&issues));
+```
+
+The `issues` vec comes from `storage.search_issues(...)` — full `Issue` objects.
+
+**Formatter method used:** `Formatter::format_issues()` → `JsonFormatter::format_issues()` (`src/format/json.rs:17-29`). `search` does **not** call `format_issue` (singular) or `format_error`.
+
+**Formatter implementation:**
+```rust
+fn format_issues(&self, issues: &[Issue]) -> String {
+    issues
+        .iter()
+        .map(|issue| {
+            let mut stripped = issue.clone();
+            stripped.dependencies = vec![];
+            stripped.comments = vec![];
+            serde_json::to_string(&stripped)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_default()
+        .join("\n")
+}
+```
+
+**Output format:** JSONL (newline-delimited JSON objects), one full `Issue` per line. **Empirically verified** — each line parses independently as valid JSON and contains all br-canonical `Issue` fields (`id`, `title`, `description`, `design`, `acceptance_criteria`, `notes`, `status`, `priority`, `issue_type`, `assignee`, `created_at`, `updated_at`, `closed_at`, `close_reason`, `closed_by_session`, `source_repo`, `compaction_level`, `labels`).
+
+**Key characteristics:**
+- Uses `JsonFormatter.format_issues()` method (the only formatter trait method invoked)
+- Outputs JSONL (objects separated by `\n`) — **not** a JSON array
+- NO array wrapper
+- Strips `dependencies` and `comments` before serialization (br compatibility)
+- Empty result produces **no output** (empty string via `.join("\n")` on an empty vec)
+- Uses compact `serde_json::to_string` (single-line objects, key order follows struct field order)
+- Emitted with `print!` (no trailing newline beyond the JSONL separators)
+
+### Claim Command (`bf claim --format json`)
+
+**Implementation:** `src/cli/mod.rs:1674-1929`
+
+**Bypasses the Formatter system entirely.** Output is built with the `serde_json::json!` macro into a `serde_json::Value`, then printed via `Value`'s `Display` impl:
+```rust
+let output = serde_json::json!({
+    "bead_id": candidate.id,
+    "title": candidate.title,
+    ...
+});
+println!("{}", output);
+```
+
+The handler has **four mutually exclusive branches**, each with its own JSON object shape. Which branch runs depends on `--dry-run`, `--any`, and `--fallback`:
+
+| Branch | Condition | Source lines | Extra fields vs. base |
+|--------|-----------|--------------|----------------------|
+| **dry-run** | `--dry-run` | 1697-1780 | `title`, `priority`, `downstream_impact`, `workspace`, `dry_run: true` |
+| **any** | `--any` (no dry-run) | 1781-1822 | `reclaimed`, `workspace` |
+| **fallback-any** | `--fallback any` (no dry-run, no any) | 1823-1891 | `reclaimed`, plus `workspace` on the fallback sub-branch |
+| **normal** | none of the above | 1892-1926 | `reclaimed` only |
+
+**Field sets per branch (verified):**
+
+dry-run (`serde_json::json!` at line 1755):
+```json
+{"bead_id":"bf-2hgh8","title":"...","priority":2,"downstream_impact":1,"assignee":"test-worker","workspace":".","dry_run":true}
+```
+
+any (line 1799) and fallback-any fallback sub-branch (line 1866):
+```json
+{"bead_id":"bf-123","reclaimed":0,"assignee":"test-worker","workspace":"/abs/path"}
+```
+
+fallback-any first-try sub-branch (line 1838) and normal single-workspace (line 1907):
+```json
+{"bead_id":"bf-123","reclaimed":0,"assignee":"test-worker"}
+```
+
+**Common object fields:** every branch emits at least `bead_id` + `assignee`.
+
+**Key characteristics:**
+- Does NOT use the formatter system, `ScoredBead`, or `ClaimResult` serialization directly. It hand-picks fields into a `serde_json::json!` literal (so the JSON shape is a custom projection, not a struct's `Serialize`).
+- Always a **single JSON object** — never an array, regardless of branch.
+- **Empty / no-candidate case:** every branch emits the literal object `{}` via `println!("{{}}")` (lines 1777, 1817, 1884, 1920). Confirmed in source.
+- Uses `println!` (adds a trailing newline), unlike `search`'s `print!`.
+- **`reclaimed`** is a `usize` (count of reclaimed stale beads) from `ClaimResult` (`src/claim.rs:18-22`), serialized as a JSON number.
+- **`workspace`** is emitted via `workspace_path.map(|p| p.display().to_string())` — the key is **always present** in branches that include it, with value `null` when `workspace_path` is `None` (e.g. certain `claim_any` results). In dry-run, `workspace` is always a string (defaults to `.` or the absolute workspace path).
+- **Key order is alphabetical, not source order.** `serde_json = "1"` in `Cargo.toml:13` does **not** enable the `preserve_order` feature, so `json!` builds a `BTreeMap`-backed `Map` and `Value::Display` emits keys sorted (e.g. `assignee, bead_id, downstream_impact, dry_run, priority, title, workspace`). **Empirically verified.** This differs from `search`/`list`, whose `Issue` serialization preserves struct field order.
+
+**Why claim bypasses the Formatter:**
+- `Formatter` is designed for `&[Issue]` / `&Issue`. Claim emits a **single** result object that is a hand-picked projection (mixing fields from `ScoredBead`, `ClaimResult`, and the caller's `assignee`/`workspace`), not an `Issue`. The formatter trait has no `format_claim_result` method, so the command serializes inline.
+
+### Inconsistency Notes (search vs. claim)
+
+1. **Formatter usage:** `search` routes through the shared `JsonFormatter`; `claim` inlines its own `json!` projection. A change to JSON conventions in the formatter (e.g. switching `list`/`search` to arrays) would not affect `claim`.
+
+2. **Trailing newline:** `search` uses `print!` (no extra newline after the last JSONL line); `claim` uses `println!` (trailing newline).
+
+3. **Empty case:** `search` → empty string (no output); `claim` → `{}`. Both are reasonable for their shapes (list vs. single object), but differ.
+
+4. **Key ordering:** `search` preserves `Issue` struct field order; `claim` emits alphabetically-sorted keys (no `preserve_order` feature). Consumers parsing either as a generic object are unaffected, but byte-for-byte expectations differ.
+
+5. **No array path:** neither command ever wraps results in a JSON array. `search` is JSONL; `claim` is a single object. (Contrast with `ready`, which does emit an array — see bf-5haf above.)
+
+---
+
 ## Original Comprehensive Audit (bf-xmwq)
 
 ---
