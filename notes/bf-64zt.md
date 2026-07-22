@@ -53,3 +53,27 @@ $ ./target/debug/bf ready --format json --workspace "$TMP"
 
 All three acceptance criteria pass. No code change was needed this session —
 the fix was already committed and pushed; this session verified it.
+
+## Re-verification (2026-07-22, retry dispatch)
+
+The bead was re-dispatched (prior session committed the fix in `1c78bc9` and
+the notes in `3315714` but never closed it). Re-ran all criteria fresh against
+`origin/main` (HEAD == origin/main == `e52d33f`):
+
+1. `cargo build` — clean, no errors.
+2. `./target/debug/bf ready --format json` — emits JSONL, one full `Issue` per
+   line (`id`, `title`, `description`, `status`, `priority`, `issue_type`,
+   `labels`, `acceptance_criteria`, `assignee`, …).
+3. `--json` alias — exit 0.
+4. Fresh empty workspace — prints `[]`, exit 0.
+5. `ready` unit tests all pass:
+   `test_get_ready_candidates_limit_zero_returns_all`,
+   `test_ready_includes_zero_dependency_open_beads_bf_1nprw`,
+   `test_get_ready_candidates_respects_limit`.
+
+One **unrelated, pre-existing** failure in the full suite:
+`sync::tests::test_find_workspace_not_found` (`src/sync.rs:311`) — in the `sync`
+module (workspace discovery), not the `ready` path. 169 passed / 1 failed; the
+failure predates and is independent of this bead.
+
+No code change was needed this session either. Closing.
