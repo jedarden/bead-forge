@@ -53,7 +53,8 @@ systemctl --user status bf-update.timer
 
 The timer runs hourly and automatically:
 - Checks GitHub API for the latest bead-forge release
-- Downloads `bf-linux-x86_64` if newer than the installed version
+- Downloads `bf-linux-x86_64` and its `SHA256SUMS` manifest if newer than the installed version
+- Verifies the binary's SHA256 against `SHA256SUMS` **before** installing — on any mismatch (or missing manifest) it fails loudly and leaves the existing `bf` in place
 - Installs it to `~/.local/bin/bf`
 - Saves version to `~/.local/bin/.bf-version` for comparison
 

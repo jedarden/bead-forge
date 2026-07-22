@@ -68,8 +68,9 @@ systemctl --user status bf-update.timer
    - First checks `~/.local/bin/.bf-version` file (most reliable)
    - Falls back to parsing `bf --version` output
    - Final fallback to parsing `bf --help` output
-5. **Download if needed**: If a newer version exists, downloads and installs to `~/.local/bin/bf`
-6. **Version tracking**: Saves installed version to `~/.local/bin/.bf-version` for next check
+5. **Download if needed**: If a newer version exists, downloads `bf-linux-x86_64` and its `SHA256SUMS` manifest from the release
+6. **Checksum verification**: Verifies the binary's SHA256 against `SHA256SUMS` **before** installing — on any mismatch (or missing manifest) it fails loudly and leaves the existing `bf` in place
+7. **Version tracking**: Saves installed version to `~/.local/bin/.bf-version` for next check
 
 ## Manual update
 
