@@ -21,3 +21,9 @@ Cargo.lock
 
 # Python cache
 __pycache__/
+
+# bead-forge local-only artifacts (Phase 7.9)
+# Pre-export JSONL history snapshots and the per-checkout merge anchor are
+# recovery/merge insurance kept locally, never shared through git.
+.beads/.bf_history/
+.beads/beads.base.jsonl

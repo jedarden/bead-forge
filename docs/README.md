@@ -259,6 +259,7 @@ bf velocity      [--model <m>] [--harness <h>] [--format json|text|toon]
 
 # ── Maintenance & config ─────────────────────────────────────────────────────
 bf sync          [--flush-only] [--import-only]
+bf merge-jsonl   --ours <A> --theirs <B> [--base <O>] [--output <path>]  # 3-way JSONL merge / git driver
 bf doctor        [--repair [--flush-first] [--force]] [--reclaim-stale [--ttl <minutes>]]  # no flags = health check
 bf rotate        [--days <N>] [--dry-run]
 bf migrate       [--workspace <p>] [--from-jsonl] [--seed-velocity] [--dry-run] [--skip-verify]
@@ -336,6 +337,24 @@ bf doctor --repair --force
 ```
 
 **Historical context**: On 2026-06-10, seven independent agents across seven workspaces (ARMOR, NEEDLE, AgentScribe, kalshi-weather, jedarden.com, vibe-coding-discovery, face/pose/sun repos) each lost their entire first batch of freshly created beads by running `doctor --repair` after bulk creates. Four db-only beads in ARMOR (bf-4rm7/5zxa/tojg/tr44) were permanently lost. This fix implements the flush-before-repair protection.
+
+### Multi-Box & Fleet Hardening (Phase 7.9)
+
+When the same repo is checked out on several boxes, each keeps its own live `beads.db` and shares state through the git-committed `issues.jsonl`. Three layers defend that shared artifact:
+
+**Three-way JSONL merge** — a plain git text merge of `issues.jsonl` is unsafe: each line is a whole bead, so a textual conflict marker corrupts JSON and "take theirs" silently drops beads. `bf merge-jsonl` merges **per-bead** against a common ancestor instead. Resolution is deterministic: a one-sided edit is taken as-is; a two-sided edit resolves last-writer-wins by `updated_at` (ties broken by content hash, so the result is independent of which box runs the merge); a delete that races a concurrent edit keeps the edit (never silently discards work). Wire it as a git merge driver:
+
+```bash
+git config merge.beads.name   "bead-forge 3-way JSONL merge"
+git config merge.beads.driver "bf merge-jsonl --base %O --ours %A --theirs %B --output %A"
+echo '.beads/issues.jsonl merge=beads' >> .gitattributes
+```
+
+**Merge anchor** (`.beads/beads.base.jsonl`) — every full flush/import refreshes this snapshot of the last state this box agreed on with the artifact. It is the fallback three-way base for `bf merge-jsonl` when git does not supply `%O` (out-of-band merges across checkouts). Local-only; git-ignored.
+
+**Pre-export history backups** (`.beads/.bf_history/`) — before every full flush overwrites `issues.jsonl`, the previous version is copied into `.bf_history/` and pruned to the newest `history.max_backups` snapshots (default 20). One more recovery layer under a bad export or merge. Enabled by default; disable with `history.enabled: false` in `config.yaml`. Local-only; git-ignored.
+
+**Fleet concurrency tests** (`tests/fleet_concurrency.rs`) — spawn N concurrent `bf` *processes* doing create/claim/close and assert the upstream bug classes stay dead: no parallel-write silent loss (`count` equals successful creates), no loss across flush + fresh-DB reimport, and no bead claimed twice under a 20-worker herd on 15 beads.
 
 ---
 

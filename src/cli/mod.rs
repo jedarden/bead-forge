@@ -10,11 +10,11 @@ use crate::format::{get_formatter, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
-use crate::validation::validate_assignee;
+use crate::validation::normalize_assignee;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 /// Version of bead-forge, read from Cargo.toml
@@ -276,6 +276,34 @@ pub enum Commands {
         /// TTL in minutes for stale bead detection (overrides config claim_ttl_minutes)
         #[arg(long)]
         ttl: Option<i64>,
+    },
+
+    /// Three-way merge of JSONL bead files (usable as a git merge driver)
+    ///
+    /// Resolves divergent `issues.jsonl` files per-bead instead of per-line,
+    /// so no bead is ever dropped or corrupted by a text merge. Configure as a
+    /// git merge driver:
+    ///
+    ///   git config merge.beads.name "bead-forge 3-way JSONL merge"
+    ///   git config merge.beads.driver "bf merge-jsonl --base %O --ours %A --theirs %B --output %A"
+    ///   echo '.beads/issues.jsonl merge=beads' >> .gitattributes
+    MergeJsonl {
+        /// Common-ancestor snapshot (git %O). Defaults to `.beads/beads.base.jsonl`.
+        #[arg(long)]
+        base: Option<PathBuf>,
+
+        /// Our version of the file (git %A).
+        #[arg(long)]
+        ours: PathBuf,
+
+        /// Their version of the file (git %B).
+        #[arg(long)]
+        theirs: PathBuf,
+
+        /// Where to write the merged result. Defaults to `--ours` (git driver
+        /// convention: git reads the resolved artifact back from %A).
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
     /// Commit check - scan staged .beads/ changes for secrets (git pre-commit hook)
@@ -799,6 +827,24 @@ pub fn run(cli: Cli) -> Result<()> {
         return cmd_init(&beads_dir, prefix);
     }
 
+    // Handle MergeJsonl specially: it operates on explicit file paths (as a git
+    // merge driver would) and must not require a discoverable .beads directory.
+    if let Commands::MergeJsonl {
+        base,
+        ours,
+        theirs,
+        output,
+    } = &command
+    {
+        return cmd_merge_jsonl(
+            &workspace,
+            base.as_deref(),
+            ours,
+            theirs,
+            output.as_deref(),
+        );
+    }
+
     // All other commands require existing .beads directory
     let beads_dir = find_beads_dir(&workspace)
         .ok_or_else(|| anyhow!("No .beads directory found in {:?}", workspace))?;
@@ -905,6 +951,8 @@ pub fn run(cli: Cli) -> Result<()> {
             flush_only,
             import_only,
         } => cmd_sync(&beads_dir, flush_only, import_only),
+        // Handled specially before the .beads-directory requirement above.
+        Commands::MergeJsonl { .. } => unreachable!("MergeJsonl handled earlier"),
         Commands::Doctor {
             repair,
             flush_first,
@@ -1094,14 +1142,13 @@ fn cmd_create(
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
 
-    // Validate assignee
-    validate_assignee(assignee.as_deref())?;
-
     let mut issue = Issue::new(String::new(), title, ".".to_string());
     issue.issue_type = IssueType::from_str(type_.as_str()).map_err(|e| anyhow::anyhow!(e))?;
     issue.priority = Priority(priority);
     issue.description = description;
-    issue.assignee = assignee;
+    // Normalize empty/whitespace-only to None so `bf create --assignee ''`
+    // creates a bead with no assignee instead of a literal empty string.
+    issue.assignee = normalize_assignee(assignee.as_deref());
     issue.labels = labels;
 
     // Short IDs are sized for ~1% collision probability by design
@@ -1316,11 +1363,10 @@ fn cmd_update(
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open_with_config(&db_path, &config)?;
 
-    // Validate assignee if provided
-    if assignee.is_some() {
-        validate_assignee(assignee.as_deref())?;
-    }
-
+    // Note: an empty/whitespace `--assignee` is intentionally NOT rejected here.
+    // It flows through to update_issue, whose storage layer maps it to
+    // `assignee = NULL` (clearing the assignee). Normalizing to None at this
+    // layer would erase the "clear" intent (None means "leave unchanged").
     // Parse due_at if provided
     let due_at_parsed = match due_at {
         Some(date_str) => {
@@ -1364,8 +1410,16 @@ fn cmd_reopen(beads_dir: &PathBuf, id: &str) -> Result<()> {
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
+    // Reopening a bead logically makes it unclaimed again, so clear any stale
+    // assignee left over from before it was closed/tombstoned. An empty
+    // `assignee` is the three-valued "clear to NULL" signal: update_issue's
+    // storage layer maps it to `assignee = NULL` (it never persists a literal
+    // empty string, which would read back as "assigned" and hide the bead from
+    // claiming). Defaulting `assignee` to None here would mean "leave
+    // unchanged", leaving a foreign assignee on a now-open bead.
     let changes = IssueChanges {
         status: Some(Status::Open),
+        assignee: Some(String::new()),
         ..Default::default()
     };
 
@@ -1687,6 +1741,42 @@ fn cmd_claim(
         }
     }
 
+    Ok(())
+}
+
+fn cmd_merge_jsonl(
+    workspace: &Path,
+    base: Option<&Path>,
+    ours: &Path,
+    theirs: &Path,
+    output: Option<&Path>,
+) -> Result<()> {
+    // Resolve the base: explicit path wins; otherwise fall back to the merge
+    // anchor in the discovered .beads directory. A missing base is not fatal —
+    // merge_jsonl_files degrades to a safe union.
+    let base_path = match base {
+        Some(p) => p.to_path_buf(),
+        None => {
+            let anchor = find_beads_dir(workspace)
+                .map(|bd| crate::merge::base_anchor_path(&bd))
+                .unwrap_or_else(|| PathBuf::from(crate::merge::BASE_ANCHOR));
+            anchor
+        }
+    };
+
+    // Git driver convention: write the resolved artifact back over "ours" (%A).
+    let out_path = output.unwrap_or(ours);
+
+    let report = crate::merge::merge_jsonl_files(&base_path, ours, theirs, out_path)?;
+
+    eprintln!(
+        "Merged {} bead(s): {} added, {} updated, {} deleted, {} conflict(s) auto-resolved",
+        report.total, report.added, report.updated, report.deleted, report.conflicts
+    );
+
+    // Exit 0 even with auto-resolved conflicts: as a git merge driver, a
+    // zero exit means "clean merge, use the result". We never emit markers, so
+    // there is nothing for a human to resolve.
     Ok(())
 }
 
@@ -2409,6 +2499,9 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
                 ["rotate", "rotate_max_size_mb"] => cfg.rotate.rotate_max_size_mb.to_string(),
                 ["rotate", "rotate_max_archives"] => cfg.rotate.rotate_max_archives.to_string(),
                 ["secret_protection", "enabled"] => cfg.secret_protection.enabled.to_string(),
+                ["checkpoint", "enabled"] => cfg.checkpoint.enabled.to_string(),
+                ["checkpoint", "interval_minutes"] => cfg.checkpoint.interval_minutes.to_string(),
+                ["checkpoint", "push"] => cfg.checkpoint.push.to_string(),
                 _ => return Err(anyhow!("Unknown config key: {}", key)),
             };
             println!("{}", value);
@@ -2503,6 +2596,24 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
                     cfg.secret_protection.enabled = value
                         .parse()
                         .map_err(|_| anyhow!("Invalid enabled: {}. Must be true/false", value))?;
+                    Ok(())
+                }
+                ["checkpoint", "enabled"] => {
+                    cfg.checkpoint.enabled = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid enabled: {}. Must be true/false", value))?;
+                    Ok(())
+                }
+                ["checkpoint", "interval_minutes"] => {
+                    cfg.checkpoint.interval_minutes = value.parse().map_err(|_| {
+                        anyhow!("Invalid interval_minutes: {}. Must be an integer", value)
+                    })?;
+                    Ok(())
+                }
+                ["checkpoint", "push"] => {
+                    cfg.checkpoint.push = value
+                        .parse()
+                        .map_err(|_| anyhow!("Invalid push: {}. Must be true/false", value))?;
                     Ok(())
                 }
                 _ => Err(anyhow!("Unknown config key: {}", key)),

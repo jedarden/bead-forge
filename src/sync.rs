@@ -3,8 +3,10 @@
 //! Implements flush (SQLite → JSONL) and import (JSONL → SQLite) operations
 //! for git-backed bead synchronization.
 
-use crate::config::{find_beads_dir, load_metadata};
+use crate::config::{find_beads_dir, load_config, load_metadata};
+use crate::history::backup_before_export;
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, UpsertResult};
+use crate::merge::update_base_anchor;
 use crate::model::Issue;
 use crate::storage::Storage;
 use anyhow::Result;
@@ -43,6 +45,13 @@ pub fn flush(workspace_dir: &Path) -> Result<usize> {
     // Get all issues for export
     let issues = storage.list_all_issues()?;
 
+    // Pre-export history backup: snapshot the outgoing issues.jsonl before it
+    // is overwritten (best-effort — a failed backup must not abort the flush).
+    let config = load_config(&beads_dir).unwrap_or_default();
+    if let Err(e) = backup_before_export(&beads_dir, &jsonl_path, &config.history) {
+        eprintln!("WARNING: pre-export history backup failed: {e}");
+    }
+
     // Export to JSONL with atomic temp+rename
     let result = export_jsonl(&jsonl_path, || Ok(issues.clone()))?;
 
@@ -51,6 +60,12 @@ pub fn flush(workspace_dir: &Path) -> Result<usize> {
 
     // Clear dirty marks - all beads have been flushed to JSONL
     storage.clear_dirty()?;
+
+    // Refresh the merge anchor: the freshly-exported JSONL is now the common
+    // ancestor for the next three-way merge across checkouts.
+    if let Err(e) = update_base_anchor(&beads_dir, &jsonl_path) {
+        eprintln!("WARNING: could not update merge anchor: {e}");
+    }
 
     Ok(result.count)
 }
@@ -186,6 +201,12 @@ pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
     // Clear dirty marks - after import from JSONL, db and JSONL are in sync
     // Beads that were created/updated during import are now flushed to JSONL
     storage.clear_dirty()?;
+
+    // The JSONL we just imported is now the agreed-upon common state; record it
+    // as the merge anchor for the next divergence.
+    if let Err(e) = update_base_anchor(&beads_dir, &jsonl_path) {
+        eprintln!("WARNING: could not update merge anchor: {e}");
+    }
 
     Ok(SyncResult {
         imported: result.imported,

@@ -8,9 +8,11 @@ pub mod critical_path;
 pub mod doctor;
 pub mod format;
 pub mod git_log;
+pub mod history;
 pub mod id;
 pub mod jsonl;
 pub mod log;
+pub mod merge;
 pub mod migrate;
 pub mod model;
 pub mod rotate;
@@ -22,7 +24,10 @@ pub mod velocity;
 
 pub use batch::{execute_batch, mitosis, mitosis_ex, BatchOp, BatchResult, MitosisChild};
 pub use claim::{claim, claim_any, get_ready_candidates, ClaimResult, ScoredBead};
-pub use config::{find_beads_dir, load_config, load_metadata, Config, Metadata, RotateConfig};
+pub use config::{
+    find_beads_dir, load_config, load_metadata, Config, HistoryConfig, Metadata, RotateConfig,
+};
+pub use merge::{merge_jsonl_files, merge_maps, MergeReport};
 pub use doctor::{check, rebuild_cache, reclaim_stale, repair, verify_schema, DoctorResult};
 pub use id::{generate_id, is_valid_bead_id};
 pub use log::{

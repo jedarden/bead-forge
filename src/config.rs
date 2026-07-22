@@ -19,6 +19,72 @@ pub struct Config {
     pub rotate: RotateConfig,
     #[serde(default)]
     pub secret_protection: SecretProtectionConfig,
+    #[serde(default)]
+    pub checkpoint: CheckpointConfig,
+    #[serde(default)]
+    pub history: HistoryConfig,
+}
+
+/// Pre-export JSONL history backups (Phase 7.9).
+///
+/// Before every full flush overwrites `issues.jsonl`, the previous version is
+/// copied into `.bf_history/` as one more recovery layer under the artifact.
+/// Local-only insurance: `.bf_history/` is git-ignored. Enabled by default and
+/// bounded to `max_backups` snapshots so it can never grow without limit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryConfig {
+    /// Master switch. `true` (default) backs up `issues.jsonl` before each full
+    /// flush; set `false` to disable snapshotting entirely.
+    #[serde(default = "default_history_enabled")]
+    pub enabled: bool,
+    /// Maximum number of snapshots to retain in `.bf_history/`. The oldest are
+    /// pruned once this cap is exceeded. `0` disables pruning (unbounded).
+    #[serde(default = "default_history_max_backups")]
+    pub max_backups: usize,
+}
+
+impl Default for HistoryConfig {
+    fn default() -> Self {
+        HistoryConfig {
+            enabled: default_history_enabled(),
+            max_backups: default_history_max_backups(),
+        }
+    }
+}
+
+/// Periodic git checkpointing of `.beads/` state (ADR-1).
+///
+/// Out-of-band only: the timer-driven `bf-checkpoint.sh` flushes SQLite → JSONL
+/// (`bf sync --flush-only`) and commits `.beads/issues.jsonl` to git. This is
+/// never invoked from the claim/close hot path — it runs solely on the systemd
+/// timer. Defaults are opt-out safe: `enabled` and `push` are both `false`, so
+/// deploying the timer does nothing until a workspace maintainer opts in.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckpointConfig {
+    /// Master switch. `false` (default) makes `bf-checkpoint.sh` a no-op even
+    /// when the timer is deployed — new rollouts stay inert until a maintainer
+    /// enables checkpointing for that workspace.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Minimum minutes between commits. The script self-throttles to this gap
+    /// regardless of how often the timer fires, so `interval_minutes` is the
+    /// source of truth for cadence (default 60).
+    #[serde(default = "default_checkpoint_interval_minutes")]
+    pub interval_minutes: u64,
+    /// Persistently opt into `git push` after each commit. Off by default; the
+    /// `--push` flag to `bf-checkpoint.sh` enables push for a single run.
+    #[serde(default)]
+    pub push: bool,
+}
+
+impl Default for CheckpointConfig {
+    fn default() -> Self {
+        CheckpointConfig {
+            enabled: false,
+            interval_minutes: default_checkpoint_interval_minutes(),
+            push: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,6 +187,18 @@ fn default_rotate_max_archives() -> usize {
     10
 }
 
+fn default_checkpoint_interval_minutes() -> u64 {
+    60
+}
+
+fn default_history_enabled() -> bool {
+    true
+}
+
+fn default_history_max_backups() -> usize {
+    20
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -131,6 +209,8 @@ impl Default for Config {
             claim_ttl_minutes: 30,
             rotate: RotateConfig::default(),
             secret_protection: SecretProtectionConfig::default(),
+            checkpoint: CheckpointConfig::default(),
+            history: HistoryConfig::default(),
         }
     }
 }
