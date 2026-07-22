@@ -1,0 +1,16 @@
+[Unit]
+Description=Hourly git checkpoint of .beads/issues.jsonl
+Requires=bf-checkpoint.service
+
+[Timer]
+# Run hourly
+OnCalendar=hourly
+# Also run on boot if the last run was > 1h ago
+OnBootSec=5min
+# Randomize start time by up to 5 minutes to avoid thundering herd
+RandomizedDelaySec=5min
+# Persist the timer across reboots
+Persistent=true
+
+[Install]
+WantedBy=timers.target

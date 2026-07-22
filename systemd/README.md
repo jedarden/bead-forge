@@ -2,6 +2,8 @@
 
 These systemd units enable automatic hourly updates of the `bf` binary from GitHub releases.
 
+This directory also ships the **`bf-checkpoint`** units (NixOS variant) — the out-of-band companion to `bf-update` that periodically flushes `.beads/` to JSONL and commits `issues.jsonl` (ADR-1). Install them the same way as the `bf-update` units (see [bf-checkpoint install](#bf-checkpoint--periodic-beads-git-checkpoint-adr-1) below).
+
 > **⚠️ NixOS-Specific Variant** — This directory contains the **NixOS-specific** systemd units that hardcode `/run/current-system/sw/bin/bash`. For Debian/Ubuntu/portable hosts, use the `deploy/` directory instead.
 
 ## Host Variants
@@ -81,6 +83,31 @@ journalctl --user -u bf-update.service -n 20
 systemctl --user list-timers | grep bf-update
 ```
 
+## bf-checkpoint — periodic `.beads/` git checkpoint (ADR-1)
+
+The NixOS `bf-checkpoint` units are the out-of-band companion to `bf-update`. The timer runs `bf-checkpoint.sh` hourly, which flushes SQLite→JSONL (`bf sync --flush-only`) and, if `.beads/issues.jsonl` changed, stages **only** that file and commits it as `chore(beads): auto-checkpoint …`. It never touches `beads.db` and never runs on the `bf` claim/close hot path (ADR-1). The Debian/Ubuntu portable variant lives in [`../deploy/README.md`](../deploy/README.md).
+
+**Inert by default:** the timer can be enabled with no side effect — `bf-checkpoint.sh` exits 0 unless `checkpoint.enabled: true` is set in `.beads/config.yaml`. **Push is off by default** too (set `checkpoint.push: true` to enable; never add `--push` to the unit).
+
+### Installation (NixOS hosts)
+
+```bash
+# Install the NixOS script variant (#!/usr/bin/env bash)
+cp ../scripts/bf-checkpoint.sh ~/.local/bin/bf-checkpoint.sh
+chmod +x ~/.local/bin/bf-checkpoint.sh
+
+# Install NixOS service + timer (hardcoded /run/current-system/sw/bin/bash)
+cp bf-checkpoint.service ~/.config/systemd/user/
+cp bf-checkpoint.timer ~/.config/systemd/user/
+
+systemctl --user daemon-reload
+systemctl --user enable bf-checkpoint.timer
+systemctl --user start bf-checkpoint.timer
+
+# Verify
+systemctl --user status bf-checkpoint.timer
+```
+
 ## How It Works
 
 1. **CI Release**: The `bead-forge-build` Argo Workflow builds the binary and creates a GitHub release with the `bf-linux-x86_64` asset.
@@ -93,3 +120,6 @@ systemctl --user list-timers | grep bf-update
 - `~/.config/systemd/user/bf-update.service` - Systemd service unit
 - `~/.config/systemd/user/bf-update.timer` - Systemd timer unit
 - `~/.local/bin/.bf-version` - Installed version tracker
+- `~/.local/bin/bf-checkpoint.sh` - Out-of-band checkpoint script (from `scripts/`)
+- `~/.config/systemd/user/bf-checkpoint.service` - Systemd checkpoint service unit
+- `~/.config/systemd/user/bf-checkpoint.timer` - Systemd checkpoint timer unit

@@ -2,6 +2,8 @@
 
 This directory contains files for auto-deploying the `bf` binary to fleet hosts after each GitHub release.
 
+It also contains the **`bf-checkpoint`** units — a systemd timer that periodically flushes `.beads/` to JSONL and commits `issues.jsonl` out-of-band (ADR-1, see [the parent bead `bf-48pw0`](../docs/plan/plan.md)). These ship alongside the `bf-update` units and are installed the same way.
+
 ## Host Variants
 
 There are **two** systemd service variants for different OS environments:
@@ -37,6 +39,9 @@ fi
 - **`bf-update.sh`** - Update script that fetches the latest release from GitHub and installs it
 - **`bf-update.service`** - Systemd user service that runs the update script
 - **`bf-update.timer`** - Systemd timer that triggers the service hourly
+- **`bf-checkpoint.sh`** - Out-of-band script: flushes SQLite→JSONL and commits `issues.jsonl` (ADR-1)
+- **`bf-checkpoint.service`** - Systemd user service that runs the checkpoint script
+- **`bf-checkpoint.timer`** - Systemd timer that triggers the service hourly
 
 ## Installation (Debian/Portable hosts)
 
@@ -71,6 +76,53 @@ systemctl --user status bf-update.timer
 5. **Download if needed**: If a newer version exists, downloads `bf-linux-x86_64` and its `SHA256SUMS` manifest from the release
 6. **Checksum verification**: Verifies the binary's SHA256 against `SHA256SUMS` **before** installing — on any mismatch (or missing manifest) it fails loudly and leaves the existing `bf` in place
 7. **Version tracking**: Saves installed version to `~/.local/bin/.bf-version` for next check
+
+## bf-checkpoint — periodic `.beads/` git checkpoint (ADR-1)
+
+The `bf-checkpoint` units are the out-of-band companion to `bf-update`. Where `bf-update.timer` keeps the **binary** current, `bf-checkpoint.timer` keeps the **workspace** current: every hour it runs `bf-checkpoint.sh`, which flushes SQLite→JSONL (`bf sync --flush-only`) and, if `.beads/issues.jsonl` changed, stages **only** that file and commits it as `chore(beads): auto-checkpoint …`. It never touches `beads.db` and never runs on the `bf` claim/close hot path (ADR-1).
+
+### Inert by default
+
+The timer can be enabled and active with **no side effects**. `bf-checkpoint.sh` exits 0 immediately unless `checkpoint.enabled: true` is set in `.beads/config.yaml` for the target workspace — so a freshly deployed timer stays dormant until a maintainer opts in:
+
+```yaml
+# .beads/config.yaml
+checkpoint:
+  enabled: true            # master switch; default false
+  interval_minutes: 60     # min gap between commits; default 60
+  push: false              # git push after each commit; default false
+```
+
+**Push is off by default** too. Commits stay local unless `checkpoint.push: true` (persistent) or the `--push` one-shot flag is passed to the script. Do **not** add `--push` to the unit's `ExecStart` — that would force-push on every timer fire.
+
+### Installation (Debian/Portable hosts)
+
+```bash
+# Install the script (Debian/Ubuntu variant — #!/bin/bash)
+cp bf-checkpoint.sh ~/.local/bin/bf-checkpoint.sh
+chmod +x ~/.local/bin/bf-checkpoint.sh
+
+# Install service and timer
+cp bf-checkpoint.service ~/.config/systemd/user/
+cp bf-checkpoint.timer ~/.config/systemd/user/
+
+# Reload systemd and enable timer
+systemctl --user daemon-reload
+systemctl --user enable bf-checkpoint.timer
+systemctl --user start bf-checkpoint.timer
+
+# Verify
+systemctl --user status bf-checkpoint.timer
+```
+
+On NixOS, install `scripts/bf-checkpoint.sh` instead and copy the `systemd/bf-checkpoint.{service,timer}` variant (hardcoded `/run/current-system/sw/bin/bash`) — see [`../systemd/README.md`](../systemd/README.md). The target workspace is pinned to `~/.local/bin`'s owning repo via `BF_WORKSPACE=%h/bead-forge` in the unit.
+
+### Check status
+
+```bash
+systemctl --user list-timers bf-checkpoint.timer
+journalctl --user -u bf-checkpoint.service -n 50
+```
 
 ## GitHub API Authentication (optional)
 
