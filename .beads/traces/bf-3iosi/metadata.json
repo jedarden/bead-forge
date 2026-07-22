@@ -1,0 +1,16 @@
+{
+  "bead_id": "bf-3iosi",
+  "agent": "claude-print-opus",
+  "provider": "anthropic",
+  "model": "opus",
+  "exit_code": 0,
+  "outcome": "success",
+  "duration_ms": 746468,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-22T15:00:57.636912076Z",
+  "trace_format": "claude_json",
+  "pruned": false,
+  "template_version": null
+}
