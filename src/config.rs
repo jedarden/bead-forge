@@ -302,3 +302,70 @@ pub fn init_workspace(beads_dir: &Path, prefix: &str) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_checkpoint_config_defaults() {
+        let cfg = CheckpointConfig::default();
+        assert!(!cfg.enabled, "enabled must default to false");
+        assert_eq!(
+            cfg.interval_minutes, 60,
+            "interval_minutes must default to 60"
+        );
+        assert!(!cfg.push, "push must default to false");
+    }
+
+    #[test]
+    fn test_checkpoint_config_via_config_default() {
+        // The top-level Config wires `checkpoint` in with `#[serde(default)]`,
+        // so `Config::default()` carries the same opt-out-safe defaults that
+        // `bf config get checkpoint.*` reports in an uninitialized workspace.
+        let cfg = Config::default();
+        assert!(!cfg.checkpoint.enabled);
+        assert_eq!(cfg.checkpoint.interval_minutes, 60);
+        assert!(!cfg.checkpoint.push);
+    }
+
+    #[test]
+    fn test_checkpoint_config_parses_populated_block() {
+        let yaml = "\
+checkpoint:
+  enabled: true
+  interval_minutes: 15
+  push: true
+";
+        let cfg: Config =
+            serde_yaml::from_str(yaml).expect("populated checkpoint block must parse");
+        assert!(cfg.checkpoint.enabled);
+        assert_eq!(cfg.checkpoint.interval_minutes, 15);
+        assert!(cfg.checkpoint.push);
+    }
+
+    #[test]
+    fn test_checkpoint_config_omitted_block_uses_defaults() {
+        // A config.yaml with no `checkpoint:` block must still deserialize and
+        // report the safe defaults — this is what `bf config get checkpoint.*`
+        // relies on in workspaces that haven't opted in.
+        let yaml = "issue_prefixes:\n- bf\n";
+        let cfg: Config =
+            serde_yaml::from_str(yaml).expect("config without checkpoint block must parse");
+        assert!(!cfg.checkpoint.enabled);
+        assert_eq!(cfg.checkpoint.interval_minutes, 60);
+        assert!(!cfg.checkpoint.push);
+    }
+
+    #[test]
+    fn test_checkpoint_config_partial_block_uses_defaults() {
+        // Partial block: only `enabled: true`. The other two fields must fall
+        // back to their serde defaults rather than zero values.
+        let yaml = "checkpoint:\n  enabled: true\n";
+        let cfg: Config =
+            serde_yaml::from_str(yaml).expect("partial checkpoint block must parse");
+        assert!(cfg.checkpoint.enabled);
+        assert_eq!(cfg.checkpoint.interval_minutes, 60);
+        assert!(!cfg.checkpoint.push);
+    }
+}
