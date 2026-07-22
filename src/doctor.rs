@@ -33,6 +33,26 @@ pub struct DoctorResult {
     // These beads should be 'open' but were never transitioned when their last blocker
     // closed, so this check surfaces them for manual `bf update <id> --status open`.
     pub stale_blocked_ids: Vec<String>,
+    // Rows that violate a NOT NULL column constraint (NULL stored in a column the
+    // schema declares NOT NULL) -- see bf-3hm5h. The historical case is a NULL
+    // created_at/updated_at that used to crash the entire list/flush with
+    // InvalidColumnType, forcing the destructive `rm beads.db + reimport` workaround.
+    // Reads are now NULL-tolerant, and this check surfaces the rows for `bf doctor
+    // --fix-schema` to repair in place.
+    pub null_not_null: Vec<NullNotNullViolation>,
+}
+
+/// A NOT NULL column that contains NULL values in one or more rows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NullNotNullViolation {
+    /// Table containing the offending column.
+    pub table: String,
+    /// Column declared NOT NULL that holds NULL values.
+    pub column: String,
+    /// Declared column type (e.g. "DATETIME", "TEXT", "INTEGER").
+    pub decl_type: String,
+    /// Number of rows with NULL in this column.
+    pub count: usize,
 }
 
 /// Perform a health check on the bead database and JSONL file.
@@ -132,6 +152,26 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
     }
     result.stale_blocked_ids = stale_blocked_ids;
 
+    // Check for NULL values stored in NOT NULL columns (bf-3hm5h). Independent of
+    // db_ok/jsonl_ok since it only needs the sqlite db to be openable, and it is
+    // precisely the kind of low-level corruption that other checks (which read
+    // through the storage layer) would otherwise have crashed on.
+    let null_not_null = check_null_not_null(&db_path)?;
+    if !null_not_null.is_empty() {
+        let total: usize = null_not_null.iter().map(|v| v.count).sum();
+        let detail = null_not_null
+            .iter()
+            .map(|v| format!("{}.{} ({})", v.table, v.column, v.count))
+            .collect::<Vec<_>>()
+            .join(", ");
+        issues.push(format!(
+            "{} NULL value(s) in NOT NULL column(s) [{}] -- run `bf doctor --fix-schema` \
+             to repair in place",
+            total, detail
+        ));
+    }
+    result.null_not_null = null_not_null;
+
     result.db_ok = db_ok;
     result.jsonl_ok = jsonl_ok;
     result.issues = issues;
@@ -194,6 +234,163 @@ fn check_pseudo_terminal_statuses(db_path: &Path) -> Result<Vec<String>> {
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(ids)
+}
+
+/// List the user tables in the database (excluding SQLite internal tables).
+fn user_tables(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    )?;
+    let tables = stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(tables)
+}
+
+/// A NOT NULL column, discovered by introspecting the live schema.
+struct NotNullColumn {
+    table: String,
+    column: String,
+    decl_type: String,
+}
+
+/// Introspect every user table via `PRAGMA table_info` and return the columns the
+/// schema declares NOT NULL. Driving off the live schema (rather than a hardcoded
+/// list) keeps the detector and fixer correct as the schema evolves -- this is the
+/// "generally" in "NULL-in-NOT-NULL rows generally" (bf-3hm5h).
+fn not_null_columns(conn: &Connection) -> Result<Vec<NotNullColumn>> {
+    let mut cols = Vec::new();
+    for table in user_tables(conn)? {
+        // PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info(\"{}\")", table.replace('"', "\"\"")))?;
+        let rows = stmt
+            .query_map([], |row| {
+                let name: String = row.get(1)?;
+                let decl_type: String = row.get(2)?;
+                let notnull: i64 = row.get(3)?;
+                Ok((name, decl_type, notnull))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for (name, decl_type, notnull) in rows {
+            if notnull == 1 {
+                cols.push(NotNullColumn {
+                    table: table.clone(),
+                    column: name,
+                    decl_type,
+                });
+            }
+        }
+    }
+    Ok(cols)
+}
+
+/// Quote a SQLite identifier (table or column name) for safe interpolation.
+fn quote_ident(name: &str) -> String {
+    format!("\"{}\"", name.replace('"', "\"\""))
+}
+
+/// Detect rows storing NULL in a NOT NULL column (bf-3hm5h).
+///
+/// The schema forbids this, but corrupted databases have contained it -- most
+/// notably a NULL `created_at`/`updated_at` that turned every `bf list`/`bf flush`
+/// into a fatal `InvalidColumnType` crash. Reads are now NULL-tolerant; this
+/// detector surfaces the underlying rows so `fix_null_not_null` can repair them.
+fn check_null_not_null(db_path: &Path) -> Result<Vec<NullNotNullViolation>> {
+    let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
+
+    let mut violations = Vec::new();
+    for col in not_null_columns(&conn)? {
+        // NOTE: test `typeof(col) = 'null'`, NOT `col IS NULL`. SQLite's query planner
+        // assumes a NOT NULL column never holds NULL and folds `col IS NULL` to a
+        // constant FALSE -- so `IS NULL` can *never* surface this corruption. `typeof()`
+        // forces per-row evaluation and reports 'null' for a stored NULL regardless of
+        // the column's declared constraint.
+        let count: i64 = conn.query_row(
+            &format!(
+                "SELECT COUNT(*) FROM {} WHERE typeof({}) = 'null'",
+                quote_ident(&col.table),
+                quote_ident(&col.column)
+            ),
+            [],
+            |row| row.get(0),
+        )?;
+        if count > 0 {
+            violations.push(NullNotNullViolation {
+                table: col.table,
+                column: col.column,
+                decl_type: col.decl_type,
+                count: count as usize,
+            });
+        }
+    }
+    Ok(violations)
+}
+
+/// Repair rows that store NULL in a NOT NULL column, in place (bf-3hm5h).
+///
+/// This is a non-destructive fixer -- unlike `repair`, it does not rebuild from
+/// JSONL, so it works even when JSONL is absent or itself suspect, and it never
+/// touches valid rows. Each NULL is replaced with a type-appropriate sentinel:
+///
+/// * `DATETIME` columns -> the Unix epoch (`1970-01-01T00:00:00+00:00`), matching
+///   the value NULL-tolerant reads already substitute, so a fixed row round-trips
+///   identically to how it was already being displayed.
+/// * `INTEGER`/`REAL`/numeric columns -> `0`.
+/// * everything else (TEXT/BLOB) -> the empty string, matching the schema's
+///   `NOT NULL DEFAULT ''` convention for text columns.
+///
+/// Returns the total number of column values updated.
+pub fn fix_null_not_null(workspace_dir: &Path) -> Result<usize> {
+    let beads_dir = find_beads_dir(workspace_dir)
+        .ok_or_else(|| anyhow!("No .beads directory found in {}", workspace_dir.display()))?;
+    let metadata = load_metadata(&beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+
+    let violations = check_null_not_null(&db_path)?;
+    if violations.is_empty() {
+        return Ok(0);
+    }
+
+    let conn = Connection::open(&db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
+
+    let mut fixed = 0usize;
+    for v in &violations {
+        let upper = v.decl_type.to_uppercase();
+        // SQLite type affinity: DATE/TIME columns first (they must not be caught by
+        // the INT affinity rule below), then numeric, then everything else.
+        let replacement = if upper.contains("DATE") || upper.contains("TIME") {
+            "'1970-01-01T00:00:00+00:00'".to_string()
+        } else if upper.contains("INT")
+            || upper.contains("REAL")
+            || upper.contains("FLOA")
+            || upper.contains("DOUB")
+            || upper.contains("NUM")
+            || upper.contains("DEC")
+        {
+            "0".to_string()
+        } else {
+            "''".to_string()
+        };
+
+        // `typeof(col) = 'null'`, NOT `col IS NULL`: the planner folds `IS NULL` on a
+        // NOT NULL column to FALSE, so an `IS NULL` UPDATE would silently match zero
+        // rows and "repair" nothing. See check_null_not_null for the full rationale.
+        let updated = conn.execute(
+            &format!(
+                "UPDATE {} SET {} = {} WHERE typeof({}) = 'null'",
+                quote_ident(&v.table),
+                quote_ident(&v.column),
+                replacement,
+                quote_ident(&v.column)
+            ),
+            [],
+        )?;
+        fixed += updated;
+    }
+
+    Ok(fixed)
 }
 
 /// Check database integrity.
@@ -1224,5 +1421,233 @@ mod tests {
             "only the status=completed bead should be flagged, not the open or properly-closed ones"
         );
         assert!(result.issues.iter().any(|i| i.contains("bf-pseudo-done")));
+    }
+
+    /// Force a NULL into a NOT NULL datetime column, bypassing the schema constraint
+    /// the same way a corrupted/partially-migrated DB does. `PRAGMA writable_schema`
+    /// lets us drop the NOT NULL from the table definition long enough to write the
+    /// bad row, then we restore it -- leaving a DB that is byte-for-byte what the
+    /// historical crash class produced.
+    fn inject_null_datetime(db_path: &Path, issue_id: &str) {
+        use rusqlite::Connection;
+        let conn = Connection::open(db_path).unwrap();
+        // Grab the current CREATE TABLE for issues and rewrite it without NOT NULL
+        // on created_at, temporarily, so the UPDATE below is accepted.
+        let create_sql: String = conn
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='issues'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let relaxed = create_sql.replace(
+            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "created_at DATETIME",
+        );
+        assert_ne!(relaxed, create_sql, "expected to relax created_at NOT NULL");
+        conn.execute_batch("PRAGMA writable_schema=ON;").unwrap();
+        conn.execute(
+            "UPDATE sqlite_master SET sql=?1 WHERE type='table' AND name='issues'",
+            [relaxed],
+        )
+        .unwrap();
+        conn.execute_batch("PRAGMA writable_schema=OFF;").unwrap();
+        // Reopen so the relaxed schema takes effect, then null out created_at.
+        drop(conn);
+        let conn = Connection::open(db_path).unwrap();
+        let updated = conn
+            .execute(
+                "UPDATE issues SET created_at = NULL WHERE id = ?1",
+                [issue_id],
+            )
+            .unwrap();
+        assert_eq!(updated, 1, "expected to null exactly one row's created_at");
+        // Restore the NOT NULL declaration so the detector (which keys off
+        // PRAGMA table_info's notnull flag) sees a genuine NOT-NULL column holding a
+        // NULL value -- exactly the corrupted state seen in the wild. The DEFAULT is
+        // deliberately dropped on restore: SQLite substitutes a column's DEFAULT when
+        // reading a stored NULL, which would mask the very NULL we injected. schema_
+        // version must be bumped or the direct sqlite_master edit is discarded on the
+        // next open.
+        let restored = create_sql.replace(
+            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "created_at DATETIME NOT NULL",
+        );
+        let ver: i64 = conn
+            .query_row("PRAGMA schema_version", [], |r| r.get(0))
+            .unwrap();
+        conn.execute_batch("PRAGMA writable_schema=ON;").unwrap();
+        conn.execute(
+            "UPDATE sqlite_master SET sql=?1 WHERE type='table' AND name='issues'",
+            [restored],
+        )
+        .unwrap();
+        conn.execute_batch(&format!("PRAGMA schema_version={};", ver + 1))
+            .unwrap();
+        conn.execute_batch("PRAGMA writable_schema=OFF;").unwrap();
+    }
+
+    /// Regression for bf-3hm5h: a NULL created_at must NOT crash list/flush, and the
+    /// row must still load (as the Unix epoch) rather than aborting the whole read.
+    #[test]
+    fn test_null_datetime_does_not_crash_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+
+        let storage = Storage::open(&db_path).unwrap();
+        let issue = Issue {
+            id: "bf-nulldt".to_string(),
+            title: "Bead with NULL created_at".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+        drop(storage);
+
+        inject_null_datetime(&db_path, "bf-nulldt");
+
+        // The whole point: this used to panic/error with InvalidColumnType.
+        let storage = Storage::open(&db_path).unwrap();
+        let all = storage
+            .list_all_issues()
+            .expect("list must not crash on NULL created_at");
+        let loaded = all
+            .iter()
+            .find(|i| i.id == "bf-nulldt")
+            .expect("row with NULL created_at should still load");
+        assert_eq!(
+            loaded.created_at,
+            chrono::DateTime::<chrono::Utc>::UNIX_EPOCH,
+            "NULL datetime should read back as the Unix epoch"
+        );
+    }
+
+    /// Regression for bf-3hm5h: doctor must detect NULL-in-NOT-NULL rows.
+    #[test]
+    fn test_check_reports_null_not_null() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+
+        let storage = Storage::open(&db_path).unwrap();
+        storage
+            .create_issue(&Issue {
+                id: "bf-nulldt".to_string(),
+                title: "NULL created_at".to_string(),
+                status: Status::Open,
+                priority: Priority::MEDIUM,
+                issue_type: IssueType::Task,
+                source_repo: Some(".".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        drop(storage);
+
+        inject_null_datetime(&db_path, "bf-nulldt");
+
+        let result = check(workspace).unwrap();
+        assert_eq!(
+            result.null_not_null.len(),
+            1,
+            "one violated column expected"
+        );
+        let v = &result.null_not_null[0];
+        assert_eq!(v.table, "issues");
+        assert_eq!(v.column, "created_at");
+        assert_eq!(v.count, 1);
+        assert!(result
+            .issues
+            .iter()
+            .any(|i| i.contains("NOT NULL") && i.contains("issues.created_at")));
+    }
+
+    /// Regression for bf-3hm5h: `--fix-schema` must repair NULL-in-NOT-NULL rows in
+    /// place (replacing a NULL datetime with the Unix epoch) without rebuilding from
+    /// JSONL, and the row must survive.
+    #[test]
+    fn test_fix_null_not_null_repairs_in_place() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+
+        let storage = Storage::open(&db_path).unwrap();
+        storage
+            .create_issue(&Issue {
+                id: "bf-nulldt".to_string(),
+                title: "NULL created_at".to_string(),
+                status: Status::Open,
+                priority: Priority::MEDIUM,
+                issue_type: IssueType::Task,
+                source_repo: Some(".".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        drop(storage);
+
+        inject_null_datetime(&db_path, "bf-nulldt");
+
+        // Repair, then confirm the detector is satisfied and the concrete value stuck.
+        let fixed = fix_null_not_null(workspace).unwrap();
+        assert_eq!(fixed, 1, "exactly one NULL value should be fixed");
+
+        let after = check_null_not_null(&db_path).unwrap();
+        assert!(after.is_empty(), "no violations should remain after fix");
+
+        let conn = Connection::open(&db_path).unwrap();
+        let created_at: String = conn
+            .query_row(
+                "SELECT created_at FROM issues WHERE id = 'bf-nulldt'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(created_at, "1970-01-01T00:00:00+00:00");
+
+        // Second run is a no-op (idempotent).
+        assert_eq!(fix_null_not_null(workspace).unwrap(), 0);
+    }
+
+    /// A clean database must report zero NULL-in-NOT-NULL violations.
+    #[test]
+    fn test_check_no_null_not_null_on_clean_db() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+
+        let storage = Storage::open(&db_path).unwrap();
+        storage
+            .create_issue(&Issue {
+                id: "bf-clean".to_string(),
+                title: "Clean bead".to_string(),
+                status: Status::Open,
+                priority: Priority::MEDIUM,
+                issue_type: IssueType::Task,
+                source_repo: Some(".".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        drop(storage);
+
+        let result = check(workspace).unwrap();
+        assert!(
+            result.null_not_null.is_empty(),
+            "clean db should have no NULL-in-NOT-NULL violations"
+        );
     }
 }

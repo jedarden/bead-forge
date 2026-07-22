@@ -36,6 +36,10 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Create a new bead
+    ///
+    /// Generates a unique short ID and prints it. Type defaults to "task" and
+    /// priority to 2 (Normal); 0 is Critical, 4 is Backlog. Pass --label
+    /// repeatedly to attach multiple labels.
     Create {
         /// Bead title
         #[arg(long)]
@@ -63,6 +67,11 @@ pub enum Commands {
     },
 
     /// List beads
+    ///
+    /// Lists beads in the workspace, optionally filtered by status, type,
+    /// assignee, priority, or annotation (key=value). Use --all to also include
+    /// beads that have been rotated to archive files. Output formats are text
+    /// (default), json, and toon; --limit 0 means unlimited.
     List {
         /// Filter by status
         #[arg(long)]
@@ -102,6 +111,10 @@ pub enum Commands {
     },
 
     /// Show bead details
+    ///
+    /// Prints full details for a single bead: title, status, priority, type,
+    /// description, assignee, labels, and dependencies. If the ID is not in the
+    /// active database, archive files are searched as a fallback.
     Show {
         /// Bead ID
         id: String,
@@ -116,6 +129,10 @@ pub enum Commands {
     },
 
     /// Update a bead
+    ///
+    /// Changes only the fields you pass. Note that description and
+    /// acceptance_criteria cannot be edited here — add a comment instead.
+    /// --due-at expects an RFC3339 timestamp (e.g. 2025-01-01T00:00:00Z).
     Update {
         /// Bead ID
         id: String,
@@ -158,6 +175,9 @@ pub enum Commands {
     },
 
     /// Close a bead
+    ///
+    /// Marks a bead as closed, recording a close event with the given reason
+    /// (default "Completed") in the event log.
     Close {
         /// Bead ID
         id: String,
@@ -168,18 +188,28 @@ pub enum Commands {
     },
 
     /// Reopen a bead
+    ///
+    /// Resets a closed bead back to open and clears any stale assignee left
+    /// over from before it was closed.
     Reopen {
         /// Bead ID
         id: String,
     },
 
     /// Delete a bead
+    ///
+    /// Permanently removes a bead from the database. Unlike close, this is
+    /// destructive and cannot be undone.
     Delete {
         /// Bead ID
         id: String,
     },
 
     /// Show ready (unblocked) beads
+    ///
+    /// Lists beads that are open and unblocked, ranked by downstream impact,
+    /// priority, and age — the best candidates to claim next. --limit 0 means
+    /// unlimited (default 10).
     Ready {
         /// Limit results (0 = unlimited)
         #[arg(long, default_value = "10")]
@@ -195,6 +225,12 @@ pub enum Commands {
     },
 
     /// Claim a bead (atomic)
+    ///
+    /// Atomically assigns an unblocked bead to a worker and sets it
+    /// in_progress. The claim runs under BEGIN IMMEDIATE, so concurrent workers
+    /// never claim the same bead. With --any, it searches all discoverable
+    /// workspaces; --fallback any tries the current workspace first and only
+    /// fans out if nothing is available. --dry-run previews without claiming.
     Claim {
         /// Assignee (worker ID)
         #[arg(long)]
@@ -238,6 +274,10 @@ pub enum Commands {
     },
 
     /// Initialize a new workspace
+    ///
+    /// Creates a .beads/ directory with a config.yaml, metadata.json, SQLite
+    /// database, and .gitignore. The issue prefix seeds the short IDs on
+    /// generated beads (default "bf").
     Init {
         /// Issue prefix
         #[arg(long, default_value = "bf")]
@@ -245,6 +285,10 @@ pub enum Commands {
     },
 
     /// Sync (flush to JSONL or import from JSONL)
+    ///
+    /// With no flags, bidirectionally syncs between SQLite and issues.jsonl.
+    /// --flush-only checkpoints the database out to JSONL; --import-only
+    /// rebuilds the database from JSONL.
     Sync {
         /// Flush only (SQLite -> JSONL)
         #[arg(long)]
@@ -256,6 +300,11 @@ pub enum Commands {
     },
 
     /// Doctor - check and repair
+    ///
+    /// Checks database integrity, JSONL validity, and drift between the two.
+    /// --repair rebuilds SQLite from JSONL (flush unflushed beads first with
+    /// --flush-first to avoid losing them). --reclaim-stale resets beads stuck
+    /// in_progress past the claim TTL back to open.
     Doctor {
         /// Repair database
         #[arg(long)]
@@ -276,6 +325,11 @@ pub enum Commands {
         /// TTL in minutes for stale bead detection (overrides config claim_ttl_minutes)
         #[arg(long)]
         ttl: Option<i64>,
+
+        /// Repair NULL values in NOT NULL columns in place (non-destructive; does
+        /// not rebuild from JSONL). Fixes the NULL-datetime crash class.
+        #[arg(long)]
+        fix_schema: bool,
     },
 
     /// Three-way merge of JSONL bead files (usable as a git merge driver)
@@ -307,9 +361,16 @@ pub enum Commands {
     },
 
     /// Commit check - scan staged .beads/ changes for secrets (git pre-commit hook)
+    ///
+    /// Intended for use as a git pre-commit hook. Scans staged .beads/ changes
+    /// for secrets and prints nothing on success (exit 0); if secrets are
+    /// found it prints a report and exits 1.
     CommitCheck,
 
     /// Count beads
+    ///
+    /// Prints the number of beads. Pass --status to count only beads in a
+    /// given status.
     Count {
         /// Filter by status
         #[arg(long)]
@@ -367,6 +428,10 @@ pub enum Commands {
     },
 
     /// Mitosis: split a bead into children atomically
+    ///
+    /// Splits a parent bead into the children defined by --children (a JSON
+    /// array of {title, type, priority, ...}), then closes the parent and wires
+    /// the new children to block it — all within a single atomic transaction.
     Mitosis {
         /// Parent bead ID to split
         id: String,
@@ -385,14 +450,24 @@ pub enum Commands {
     },
 
     /// Manage dependencies
+    ///
+    /// Subcommands to add, remove, list, or tree dependencies between beads.
+    /// A "blocks" dependency marks the blocked bead as Blocked until its
+    /// blocker closes.
     #[command(subcommand)]
     Dep(DepCommands),
 
     /// Manage labels
+    ///
+    /// Subcommands to add, remove, or list labels on beads. Labels are
+    /// free-form strings used for grouping and filtering.
     #[command(subcommand)]
     Label(LabelCommands),
 
     /// List labels for a specific issue (direct SELECT, efficient)
+    ///
+    /// A lightweight single-SELECT variant of `bf label list` for one bead.
+    /// Prints one label per line, or JSON with --format json.
     Labels {
         /// Bead ID
         id: String,
@@ -403,10 +478,17 @@ pub enum Commands {
     },
 
     /// Manage comments
+    ///
+    /// Subcommands to add or list comments on a bead. Comments are appended to
+    /// the bead's history and shown by `bf show`.
     #[command(subcommand)]
     Comments(CommentsCommands),
 
     /// Search beads
+    ///
+    /// Full-text search over bead titles and descriptions with filters for
+    /// status, type, assignee, label, and a priority range. Multiple values for
+    /// --status, --type, and --label are OR-combined.
     Search {
         /// Search query
         query: Option<String>,
@@ -445,6 +527,9 @@ pub enum Commands {
     },
 
     /// Show statistics
+    ///
+    /// Summarizes bead counts by status. Add --by-type, --by-priority,
+    /// --by-assignee, or --by-label for the corresponding breakdown.
     Stats {
         /// Show breakdown by type
         #[arg(long)]
@@ -468,6 +553,10 @@ pub enum Commands {
     },
 
     /// Emit JSON Schema
+    ///
+    /// With "all" (default) prints the SQLite DDL for every bf table. With a
+    /// bead ID instead, prints that bead's full JSON representation including
+    /// its annotations.
     Schema {
         /// Schema target
         #[arg(default_value = "all")]
@@ -479,10 +568,17 @@ pub enum Commands {
     },
 
     /// Configuration management
+    ///
+    /// Subcommands to list, get, set, or locate configuration values. Set and
+    /// Get support dot notation for nested keys (e.g. scoring.priority_weight).
     #[command(subcommand)]
     Config(ConfigCommands),
 
     /// Show velocity stats (bead-forge specific)
+    ///
+    /// Reports per-model/harness/type throughput (P50, P90, and average
+    /// seconds) reconstructed from claim-to-close events. Filter with --model
+    /// or --harness. Velocity data accumulates as beads are claimed and closed.
     Velocity {
         /// Model
         #[arg(long)]
@@ -498,10 +594,19 @@ pub enum Commands {
     },
 
     /// Manage annotations
+    ///
+    /// Subcommands to set, get, remove, list, or clear annotations — arbitrary
+    /// key/value metadata — on a bead. Annotations live in the
+    /// bead_annotations table, never as a column on issues.
     #[command(subcommand)]
     Annotate(AnnotateCommands),
 
     /// Show event log for a bead
+    ///
+    /// Shows the event history for one bead (omit the ID for all events).
+    /// Filter by --actor or --since; --status-changes shows only status
+    /// transitions; --git merges in events reconstructed from the JSONL git
+    /// history; --diff prints the field-level change for each event.
     Log {
         /// Bead ID (omit to show all events)
         id: Option<String>,
@@ -540,6 +645,11 @@ pub enum Commands {
     },
 
     /// Show critical path (longest chain of blocking dependencies)
+    ///
+    /// Computes the critical path through an epic: the longest chain of
+    /// blocking dependencies plus the float (slack) of every bead. Beads with
+    /// zero float lie on the critical path; the minimum remaining time is the
+    /// length of that longest chain.
     CriticalPath {
         /// Root bead ID
         id: String,
@@ -554,6 +664,10 @@ pub enum Commands {
     },
 
     /// Rotate (archive) closed beads older than threshold
+    ///
+    /// Moves closed beads older than --days (default 30) into a timestamped
+    /// archive JSONL file, keeping the active issues.jsonl lean. --dry-run
+    /// previews what would be archived without writing.
     Rotate {
         /// Days threshold (archive beads closed this many days ago)
         #[arg(long, default_value = "30")]
@@ -565,6 +679,11 @@ pub enum Commands {
     },
 
     /// Migrate workspace from br to bf
+    ///
+    /// Migrates a beads_rust (br) workspace to bead-forge format, with backup
+    /// and verification. --from-jsonl reimports from JSONL for corrupted or
+    /// missing databases; --seed-velocity reconstructs velocity stats from
+    /// events; --dry-run previews without writing.
     Migrate {
         /// Workspace path to migrate (defaults to current directory)
         #[arg(short, long)]
@@ -588,6 +707,11 @@ pub enum Commands {
     },
 
     /// Show recently modified beads
+    ///
+    /// Lists beads ordered by last-updated time. Filter by status, type,
+    /// assignee, or priority, and by time using --time-period (e.g. 24h, 7d,
+    /// 4w) or explicit --since/--before RFC3339 timestamps. -n/--limit caps the
+    /// result count (0 means unlimited).
     Recent {
         /// Filter by status
         #[arg(long)]
@@ -634,6 +758,10 @@ pub enum Commands {
 #[derive(Subcommand)]
 pub enum DepCommands {
     /// Add a dependency
+    ///
+    /// Records that --blocks depends on --blocker. For a "blocks" dependency
+    /// (the default) the blocked bead is marked Blocked until its blocker
+    /// closes.
     Add {
         /// Bead that is blocked (depends on the blocker)
         #[arg(long)]
@@ -648,6 +776,8 @@ pub enum DepCommands {
     },
 
     /// Remove a dependency
+    ///
+    /// Removes the dependency recorded from <issue> onto <depends-on>.
     Remove {
         /// Issue ID
         issue: String,
@@ -657,12 +787,18 @@ pub enum DepCommands {
     },
 
     /// List dependencies of an issue
+    ///
+    /// Lists the direct dependencies recorded for a single bead.
     List {
         /// Issue ID
         id: String,
     },
 
     /// Show dependency tree rooted at issue
+    ///
+    /// Prints the dependency tree from a root bead. --direction controls
+    /// traversal: down (default) shows what this bead depends on, up shows what
+    /// depends on it, both shows each separately.
     Tree {
         /// Issue ID (root of tree)
         id: String,
@@ -688,6 +824,9 @@ pub enum DepCommands {
 #[derive(Subcommand)]
 pub enum LabelCommands {
     /// Add label(s) to an issue
+    ///
+    /// Adds one or more labels (-l repeatable) to a bead. Labels already
+    /// present are left as-is.
     Add {
         /// Label(s) to add (multiple labels supported)
         #[arg(short, long, required = true, num_args = 1..)]
@@ -698,6 +837,8 @@ pub enum LabelCommands {
     },
 
     /// Remove label(s) from an issue
+    ///
+    /// Removes one or more labels (-l repeatable) from a bead.
     Remove {
         /// Label(s) to remove (multiple labels supported)
         #[arg(short, long, required = true, num_args = 1..)]
@@ -708,6 +849,9 @@ pub enum LabelCommands {
     },
 
     /// List labels for an issue or all unique labels
+    ///
+    /// With a bead ID, lists that bead's labels. Without one, lists every
+    /// unique label across the workspace with usage counts.
     List {
         /// Issue ID (optional - if omitted, lists all unique labels)
         id: Option<String>,
@@ -717,6 +861,9 @@ pub enum LabelCommands {
 #[derive(Subcommand)]
 pub enum CommentsCommands {
     /// Add a comment
+    ///
+    /// Adds a comment to a bead. Multiple text arguments are joined with
+    /// spaces, so quoting is optional.
     Add {
         /// Issue ID
         id: String,
@@ -727,6 +874,8 @@ pub enum CommentsCommands {
     },
 
     /// List comments for an issue
+    ///
+    /// Lists comments on a bead in the order they were added.
     List {
         /// Issue ID
         id: String,
@@ -736,15 +885,23 @@ pub enum CommentsCommands {
 #[derive(Subcommand)]
 pub enum ConfigCommands {
     /// List all config values
+    ///
+    /// Prints the current resolved configuration for the workspace.
     List,
 
     /// Get a specific config value
+    ///
+    /// Prints a single config value by key, supporting dot notation for nested
+    /// keys (e.g. scoring.priority_weight).
     Get {
         /// Config key
         key: String,
     },
 
     /// Set a config value
+    ///
+    /// Sets a config value and persists it to config.yaml. Supports dot
+    /// notation for nested keys (e.g. scoring.priority_weight).
     Set {
         /// Config key (supports dot notation for nested values, e.g., scoring.priority_weight)
         key: String,
@@ -754,12 +911,17 @@ pub enum ConfigCommands {
     },
 
     /// Show config file path
+    ///
+    /// Prints the path to the workspace's config.yaml.
     Path,
 }
 
 #[derive(Subcommand)]
 pub enum AnnotateCommands {
     /// Set an annotation
+    ///
+    /// Sets a key/value annotation on a bead, overwriting any existing value
+    /// for that key.
     Set {
         /// Issue ID
         id: String,
@@ -772,6 +934,8 @@ pub enum AnnotateCommands {
     },
 
     /// Get an annotation
+    ///
+    /// Prints the value of a single annotation key on a bead.
     Get {
         /// Issue ID
         id: String,
@@ -781,6 +945,8 @@ pub enum AnnotateCommands {
     },
 
     /// Remove an annotation
+    ///
+    /// Removes a single annotation key from a bead.
     Remove {
         /// Issue ID
         id: String,
@@ -790,12 +956,16 @@ pub enum AnnotateCommands {
     },
 
     /// List all annotations for an issue
+    ///
+    /// Lists every key/value annotation on a bead.
     List {
         /// Issue ID
         id: String,
     },
 
     /// Clear all annotations for an issue
+    ///
+    /// Removes every annotation from a bead at once.
     Clear {
         /// Issue ID
         id: String,
@@ -953,7 +1123,16 @@ pub fn run(cli: Cli) -> Result<()> {
             force,
             reclaim_stale,
             ttl,
-        } => cmd_doctor(&beads_dir, repair, flush_first, force, reclaim_stale, ttl),
+            fix_schema,
+        } => cmd_doctor(
+            &beads_dir,
+            repair,
+            flush_first,
+            force,
+            reclaim_stale,
+            ttl,
+            fix_schema,
+        ),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
         Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
@@ -1818,6 +1997,7 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_doctor(
     beads_dir: &PathBuf,
     repair: bool,
@@ -1825,11 +2005,23 @@ fn cmd_doctor(
     force: bool,
     reclaim_stale: bool,
     ttl: Option<i64>,
+    fix_schema: bool,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
-    if repair {
+    if fix_schema {
+        let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
+        let fixed = crate::doctor::fix_null_not_null(workspace_dir)?;
+        if fixed == 0 {
+            println!("✓ No NULL values in NOT NULL columns");
+        } else {
+            println!(
+                "Repaired {} NULL value(s) in NOT NULL column(s) in place",
+                fixed
+            );
+        }
+    } else if repair {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let imported = crate::doctor::repair(workspace_dir, flush_first, force)?;
         println!("Repaired database: imported {} beads from JSONL", imported);
@@ -1909,6 +2101,21 @@ fn cmd_doctor(
                 println!();
                 println!("Run 'bf doctor --repair' to rebuild SQLite from JSONL");
             }
+        }
+
+        // Report NULL-in-NOT-NULL corruption regardless of db_ok/jsonl_ok. This is
+        // the crash class from bf-3hm5h (e.g. a NULL created_at/updated_at) and is
+        // repaired in place, not by rebuilding from JSONL.
+        if !result.null_not_null.is_empty() {
+            let total: usize = result.null_not_null.iter().map(|v| v.count).sum();
+            println!("⚠ NULL in NOT NULL column(s): {}", total);
+            for v in &result.null_not_null {
+                println!(
+                    "    - {}.{} ({}): {} row(s)",
+                    v.table, v.column, v.decl_type, v.count
+                );
+            }
+            println!("  Run 'bf doctor --fix-schema' to repair these rows in place");
         }
     }
 

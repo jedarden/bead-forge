@@ -969,9 +969,9 @@ impl Storage {
             assignee: row.get(10)?,
             owner: row.get(11)?,
             estimated_minutes: row.get(12)?,
-            created_at: parse_datetime(row.get(13)?)?,
+            created_at: parse_required_datetime(row.get(13)?)?,
             created_by: row.get(14)?,
-            updated_at: parse_datetime(row.get(15)?)?,
+            updated_at: parse_required_datetime(row.get(15)?)?,
             closed_at: parse_opt_dt(16)?,
             close_reason: row.get(17)?,
             closed_by_session: row.get(18)?,
@@ -1027,7 +1027,7 @@ impl Storage {
                     .get::<_, Option<String>>(3)?
                     .and_then(|s| serde_json::from_str(&s).ok()),
                 thread_id: row.get(4)?,
-                created_at: parse_datetime(row.get(5)?)?,
+                created_at: parse_required_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
             });
         }
@@ -1046,7 +1046,7 @@ impl Storage {
                 issue_id: row.get(1)?,
                 author: row.get(2)?,
                 body: row.get(3)?,
-                created_at: parse_datetime(row.get(4)?)?,
+                created_at: parse_required_datetime(row.get(4)?)?,
             });
         }
         Ok(comments)
@@ -1101,6 +1101,8 @@ impl Storage {
                 "INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![issue_id, depends_on_id, dep_type.to_string(), now.to_rfc3339(), created_by],
             )?;
+            // The dependency is stored on issue_id's record and exported with it.
+            mark_dirty_tx(tx, issue_id)?;
             // Invalidate critical path cache after adding a dependency
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
@@ -1114,6 +1116,7 @@ impl Storage {
                 "DELETE FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2",
                 params![issue_id, depends_on_id],
             )?;
+            mark_dirty_tx(tx, issue_id)?;
             // Invalidate critical path cache after removing a dependency
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
@@ -1255,7 +1258,7 @@ impl Storage {
                     .get::<_, Option<String>>(3)?
                     .and_then(|s| serde_json::from_str(&s).ok()),
                 thread_id: row.get(4)?,
-                created_at: parse_datetime(row.get(5)?)?,
+                created_at: parse_required_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
             });
         }
@@ -1268,6 +1271,7 @@ impl Storage {
                 "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
                 params![issue_id, label],
             )?;
+            mark_dirty_tx(tx, issue_id)?;
             Ok(())
         })
     }
@@ -1278,6 +1282,7 @@ impl Storage {
                 "DELETE FROM labels WHERE issue_id = ?1 AND label = ?2",
                 params![issue_id, label],
             )?;
+            mark_dirty_tx(tx, issue_id)?;
             Ok(())
         })
     }
@@ -1390,7 +1395,7 @@ impl Storage {
             old_value: row.get(4)?,
             new_value: row.get(5)?,
             comment: row.get(6)?,
-            created_at: parse_datetime(row.get(7)?)?,
+            created_at: parse_required_datetime(row.get(7)?)?,
         })
     }
 
@@ -1975,6 +1980,19 @@ pub struct Stats {
     pub closed: usize,
 }
 
+/// Mark an issue dirty inside an open transaction so the next flush exports it.
+///
+/// Every mutation path that changes an issue's exported representation (fields,
+/// labels, dependencies, comments, annotations) must call this within the same
+/// transaction as the mutation, so the dirty mark and the change commit atomically.
+fn mark_dirty_tx(tx: &Connection, id: &str) -> Result<()> {
+    tx.execute(
+        "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+        params![id, Utc::now().to_rfc3339()],
+    )?;
+    Ok(())
+}
+
 fn is_busy_error(e: &rusqlite::Error) -> bool {
     matches!(
         e,
@@ -1986,6 +2004,28 @@ fn is_busy_error(e: &rusqlite::Error) -> bool {
             _
         )
     )
+}
+
+/// Read a NOT NULL datetime column tolerantly.
+///
+/// The schema declares these columns `DATETIME NOT NULL`, but corrupted
+/// databases have historically contained NULL (or empty) values in them — the
+/// flush/list crash class that forced the destructive `rm beads.db + reimport`
+/// workaround. The crash was `row.get::<_, String>(idx)` turning a NULL into a
+/// fatal `InvalidColumnType` error that aborted the entire list/flush before a
+/// single row was returned.
+///
+/// Mapping NULL/empty to the Unix epoch lets the row still load so the user can
+/// see and act on their data. `bf doctor` detects such rows (see
+/// `doctor::check_null_not_null`) and `bf doctor --fix-schema` repairs them in
+/// place. Genuinely malformed non-empty values still error — those are a
+/// different corruption class and the caller decides how to surface them.
+fn parse_required_datetime(v: Option<String>) -> Result<DateTime<Utc>> {
+    match v {
+        None => Ok(DateTime::<Utc>::UNIX_EPOCH),
+        Some(ref s) if s.trim().is_empty() => Ok(DateTime::<Utc>::UNIX_EPOCH),
+        Some(s) => parse_datetime(s),
+    }
 }
 
 fn parse_datetime(s: String) -> Result<DateTime<Utc>> {
@@ -2034,6 +2074,31 @@ mod parse_datetime_tests {
         // via parse_opt_dt before reaching here)
         assert!(parse_datetime("not a date".into()).is_err());
         assert!(parse_datetime(String::new()).is_err());
+    }
+
+    #[test]
+    fn required_datetime_tolerates_null_and_empty() {
+        // NULL column (row.get::<_, Option<String>>(idx)? == None) used to crash
+        // the entire list/flush with InvalidColumnType. It now loads as the epoch.
+        assert_eq!(
+            parse_required_datetime(None).unwrap(),
+            DateTime::<Utc>::UNIX_EPOCH
+        );
+        // Empty / whitespace-only strings are treated the same way.
+        assert_eq!(
+            parse_required_datetime(Some(String::new())).unwrap(),
+            DateTime::<Utc>::UNIX_EPOCH
+        );
+        assert_eq!(
+            parse_required_datetime(Some("   ".to_string())).unwrap(),
+            DateTime::<Utc>::UNIX_EPOCH
+        );
+        // Valid values still parse normally.
+        let dt = parse_required_datetime(Some("2026-05-15 21:10:36".to_string())).unwrap();
+        assert_eq!(dt.to_rfc3339(), "2026-05-15T21:10:36+00:00");
+        // Genuinely malformed non-empty values still error (a distinct corruption
+        // class from NULL — see parse_required_datetime docs).
+        assert!(parse_required_datetime(Some("not a date".to_string())).is_err());
     }
 }
 
