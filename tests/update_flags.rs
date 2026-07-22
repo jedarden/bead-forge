@@ -572,37 +572,88 @@ fn test_cli_update_assignee_reassignment() {
 }
 
 #[test]
-fn test_cli_update_assignee_empty_rejected() {
+fn test_cli_update_assignee_empty_clears() {
+    // Regression guard for bf-276: `bf update --assignee ""` must CLEAR the
+    // assignee (set it to NULL / unassigned), not be rejected. A prior version
+    // rejected empty input, which stranded open beads carrying a stale assignee
+    // from a dead worker — NEEDLE's explore strand excludes any non-empty
+    // assignee regardless of status, so such beads become permanently invisible
+    // to the fleet with no deterministic way to free them.
     let temp_dir = init_cli_workspace();
     let workspace = temp_dir.path();
     let bead_id = create_cli_bead(workspace, "Test Assignee");
 
-    update_cli_bead(workspace, &bead_id, &["--assignee", "worker-1"]);
+    update_cli_bead(workspace, &bead_id, &["--assignee", "claude-dead-worker"]);
+    let bead = get_cli_bead_json(workspace, &bead_id);
+    assert_eq!(bead["assignee"], "claude-dead-worker");
 
-    // Setting assignee to empty string should fail with validation error
+    // Empty string clears the assignee.
+    update_cli_bead(workspace, &bead_id, &["--assignee", ""]);
+
+    let bead = get_cli_bead_json(workspace, &bead_id);
+    assert!(
+        bead["assignee"].is_null(),
+        "empty --assignee should clear the field, got {:?}",
+        bead["assignee"]
+    );
+}
+
+#[test]
+fn test_cli_update_clear_assignee_flag() {
+    // bf-276: the explicit --clear-assignee flag is discoverable sugar for
+    // `--assignee ""`; it frees an already-open bead still carrying a stale
+    // assignee without a claim-then-reclaim-stale round trip.
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Test Clear Assignee");
+
+    update_cli_bead(
+        workspace,
+        &bead_id,
+        &["--assignee", "claude-code-glm-4.7-alpha"],
+    );
+    let bead = get_cli_bead_json(workspace, &bead_id);
+    assert_eq!(bead["assignee"], "claude-code-glm-4.7-alpha");
+
+    update_cli_bead(workspace, &bead_id, &["--clear-assignee"]);
+
+    let bead = get_cli_bead_json(workspace, &bead_id);
+    assert!(
+        bead["assignee"].is_null(),
+        "--clear-assignee should clear the field, got {:?}",
+        bead["assignee"]
+    );
+}
+
+#[test]
+fn test_cli_update_clear_assignee_conflicts_with_assignee() {
+    // --clear-assignee and --assignee are mutually exclusive: passing both is
+    // ambiguous (set vs. clear), so clap must reject the invocation.
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Test Conflict");
+
     let bf = bf_path();
     let result = Command::new(&bf)
         .arg("update")
         .arg(&bead_id)
         .arg("--assignee")
-        .arg("")
+        .arg("worker-1")
+        .arg("--clear-assignee")
         .current_dir(workspace)
         .output()
         .expect("Failed to run update");
 
     assert!(
         !result.status.success(),
-        "bf update should reject empty assignee"
+        "--assignee and --clear-assignee together should be rejected"
     );
     let stderr = String::from_utf8_lossy(&result.stderr);
     assert!(
-        stderr.contains("Assignee cannot be empty"),
-        "Expected validation error message"
+        stderr.contains("cannot be used with"),
+        "expected a clap conflict error, got: {}",
+        stderr
     );
-
-    // Verify the assignee was NOT changed
-    let bead = get_cli_bead_json(workspace, &bead_id);
-    assert_eq!(bead["assignee"], "worker-1");
 }
 
 #[test]

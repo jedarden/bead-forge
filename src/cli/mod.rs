@@ -153,6 +153,13 @@ pub enum Commands {
         #[arg(long)]
         assignee: Option<String>,
 
+        /// Clear the assignee (set to unassigned). Equivalent to --assignee ""
+        /// but more discoverable; useful for freeing an open bead that still
+        /// carries a stale assignee from a dead worker. Conflicts with
+        /// --assignee.
+        #[arg(long, conflicts_with = "assignee")]
+        clear_assignee: bool,
+
         /// New description
         #[arg(long)]
         description: Option<String>,
@@ -1056,24 +1063,35 @@ pub fn run(cli: Cli) -> Result<()> {
             status,
             priority,
             assignee,
+            clear_assignee,
             description,
             acceptance_criteria,
             notes,
             design,
             due_at,
-        } => cmd_update(
-            &beads_dir,
-            &id,
-            title,
-            status,
-            priority,
-            assignee,
-            description,
-            acceptance_criteria,
-            notes,
-            design,
-            due_at,
-        ),
+        } => {
+            // --clear-assignee is sugar for --assignee "": both flow the
+            // empty-string "clear to NULL" signal into update_issue. clap
+            // guarantees the two flags are mutually exclusive.
+            let assignee = if clear_assignee {
+                Some(String::new())
+            } else {
+                assignee
+            };
+            cmd_update(
+                &beads_dir,
+                &id,
+                title,
+                status,
+                priority,
+                assignee,
+                description,
+                acceptance_criteria,
+                notes,
+                design,
+                due_at,
+            )
+        }
         Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason),
         Commands::Reopen { id } => cmd_reopen(&beads_dir, &id),
         Commands::Delete { id } => cmd_delete(&beads_dir, &id),
