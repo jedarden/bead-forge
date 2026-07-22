@@ -273,6 +273,98 @@ All `br` commands work identically. `bf` is a strict superset.
 
 ---
 
+## Output Formats
+
+Most read commands accept `--format text|json|toon` (or the `--json` alias for
+`--format json`). The JSON shape depends on **which command** you run, and it is
+not always a JSON array.
+
+### Listing commands emit JSONL — not a JSON array
+
+`bf list`, `bf ready`, `bf search`, and `bf recent` with `--format json` emit
+**JSONL**: one self-contained, compact JSON object per line, joined by newlines,
+with **no array wrapper** and no commas between objects.
+
+```bash
+$ bf list --format json
+{"id":"test-3qv","title":"alpha task","status":"open","priority":2,"issue_type":"task","assignee":null,"labels":[],"created_at":"2026-07-22T15:54:16Z",...}
+{"id":"test-2c4","title":"beta task","status":"open","priority":2,"issue_type":"task","assignee":null,"labels":[],"created_at":"2026-07-22T15:54:16Z",...}
+```
+
+The concatenated stdout is **not** valid JSON (`{"a":1}\n{"b":2}` is two values,
+not one), so you cannot `json.loads()` the whole buffer. Parse it **line by
+line**:
+
+```python
+import json, subprocess
+out = subprocess.check_output(["bf", "list", "--format", "json"], text=True)
+beads = [json.loads(line) for line in out.splitlines() if line.strip()]
+```
+
+```bash
+# jq: slurp the JSONL lines into one array, then operate on it
+bf list --format json | jq -s 'map(.id)'
+```
+
+Two keys are **always** present on every emitted object, even on a bare bead:
+
+- `assignee` — `null` when unassigned (never omitted)
+- `labels` — an array, `[]` when empty (never omitted)
+
+The on-disk `issues.jsonl` checkpoint (written by `bf sync`) omits these when
+unset to stay compact; the CLI `--format json` path normalizes them back so a
+downstream struct with non-optional `assignee`/`labels` fields deserializes
+cleanly.
+
+**Empty results differ by command:**
+
+| Command | Empty `--format json` output |
+|---------|------------------------------|
+| `bf list` | nothing (empty stdout) |
+| `bf search` / `bf recent` | nothing (empty stdout) |
+| `bf ready` | `[]` |
+
+`ready` is the one listing command that special-cases emptiness to `[]`; the
+others print nothing at all.
+
+### `bf show` emits a one-element array
+
+Unlike the listing commands, `bf show <id> --format json` wraps the single bead
+in a **JSON array of one element**:
+
+```bash
+$ bf show test-3qv --format json
+[{"id":"test-3qv","title":"alpha task","status":"open","priority":2,...}]
+```
+
+This is deliberate: NEEDLE's `parse_single_bead` expects `Vec<Bead>` and takes
+the first element, so `show` ships an array to stay parse-compatible with that
+code path.
+
+### `bf claim` emits a single object
+
+`bf claim --json` prints one JSON object describing the claim (or `{}` when
+nothing was claimed) — never an array, never an `Issue`:
+
+```bash
+$ bf claim --assignee worker-7 --json
+{"bead_id":"test-3qv","assignee":"worker-7","reclaimed":0}
+```
+
+`bf velocity --format json` emits a JSON array of stat objects (`[]` when empty).
+
+### `br` produces byte-identical output
+
+`br` delegates to the `bf` binary — either directly (a symlink, as installed by
+`ln -sf ~/.local/bin/bf ~/.local/bin/br`) or via a logging shim that writes a
+deprecation-telemetry line and then `exec bf "$@"`. Neither path touches stdout,
+so every `br` command emits **byte-identical** output to its `bf` equivalent —
+same JSONL, same array wrapping for `show`, same empty-case behavior. A parser
+written for `br list --format json` works unchanged for `bf list --format json`,
+and vice versa.
+
+---
+
 ## NEEDLE Integration
 
 Replace the five non-atomic `br` chains in `bead_store/mod.rs`:
@@ -372,6 +464,25 @@ See [`docs/plan/plan.md`](plan/plan.md) for the complete implementation plan inc
 ---
 
 ## Migration from br to bf
+
+### Output Format Compatibility (no parser changes)
+
+Migrating to `bf` requires **no changes to JSON consumers**. `bf` is a drop-in
+replacement: every command emits byte-identical output to `br`, because `br`
+delegates to the `bf` binary (via symlink, or a logging shim that `exec bf
+"$@"`) and never alters stdout.
+
+The format to keep in mind (full details in [§ Output Formats](#output-formats)):
+
+- `list` / `ready` / `search` / `recent --format json` → **JSONL** (one object
+  per line, not a JSON array). Parse line-by-line — do not `json.loads()` the
+  whole buffer.
+- `show <id> --format json` → a **one-element array** (for NEEDLE's
+  `parse_single_bead`).
+- Empty `list`/`search`/`recent` print nothing; empty `ready` prints `[]`.
+
+Any script that already parses `br list --format json` line-by-line keeps
+working unchanged against `bf`.
 
 ### Per-Machine Installation
 
