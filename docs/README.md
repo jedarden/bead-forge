@@ -200,7 +200,7 @@ secret_protection:
 
 ## Commands
 
-Most commands accept `--format json|text|toon` for output and a global `-w/--workspace <path>` to target a workspace other than the current directory.
+Most commands accept `--format json|text|toon` for output and a global `-w/--workspace <path>` to target a workspace other than the current directory. The global `--no-auto-flush` flag disables the post-mutation incremental JSONL export for that one invocation (mutations stay db-only and marked dirty until `bf sync --flush-only`); see [Auto-Flush](#auto-flush-phase-71--the-checkpoint-tracks-the-live-store) below.
 
 ```
 # ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -410,25 +410,43 @@ ln -sf ~/.local/bin/bf ~/.local/bin/br
 | beads / br | JSONL (`issues.jsonl`) | SQLite is read-cache |
 | bead-forge | SQLite (`beads.db`) | JSONL is git-tracked checkpoint |
 
-This inversion is necessary for atomic multi-worker operations. All mutations (create/update/claim) go to SQLite; JSONL is a git checkpoint written only by `bf sync --flush-only`. **Beads created or modified since the last flush exist only in SQLite.**
+This inversion is necessary for atomic multi-worker operations. All mutations (create/update/claim) go to SQLite. With `sync.auto_flush` (default **on**), every successful mutation also incrementally exports the changed beads to `issues.jsonl`, so the checkpoint tracks the live store instead of trailing it — a separate flush is no longer needed in normal operation.
 
-### Flush-Before-Repair Rule
+### Auto-Flush (Phase 7.1) — the checkpoint tracks the live store
 
-`bf doctor --repair` rebuilds SQLite from JSONL. Without flushing first, **unflushed beads are silently destroyed**.
+With `sync.auto_flush` (default **on**), every successful mutation (`create`/`update`/`claim`/`close`/`batch`) incrementally exports just the changed beads to `issues.jsonl` (a surgical line replacement, not a full rewrite). The JSONL artifact therefore stays current with SQLite after every command — no separate flush step is required in normal operation. Read-only and diagnostic commands never write the JSONL.
 
-```bash
-# Always flush before repair
-bf sync --flush-only
-bf doctor --repair
-
-# Or use the combined command
-bf doctor --repair --flush-first
-
-# Force repair (with data loss warning)
-bf doctor --repair --force
+```yaml
+# .beads/config.yaml
+sync:
+  auto_flush: true     # default; set false to make mutations db-only until bf sync --flush-only
 ```
 
-**Historical context**: On 2026-06-10, seven independent agents across seven workspaces (ARMOR, NEEDLE, AgentScribe, kalshi-weather, jedarden.com, vibe-coding-discovery, face/pose/sun repos) each lost their entire first batch of freshly created beads by running `doctor --repair` after bulk creates. Four db-only beads in ARMOR (bf-4rm7/5zxa/tojg/tr44) were permanently lost. This fix implements the flush-before-repair protection.
+```bash
+bf create --title "..."               # auto-flushed by default → already in issues.jsonl
+bf create --title "..." --no-auto-flush   # per-invocation override: db-only, marked dirty
+```
+
+**Flush failure never fails the mutation.** Auto-flush is best-effort: if the incremental export fails, the mutation still commits, the dirty mark is retained, and the failure is surfaced loudly — a `warning:` line on stderr and a non-null `warning` field in the `--json` envelope naming the recovery command. The dirty bead stays recoverable.
+
+**Named recovery.** `bf sync --flush-only` is the explicit checkpoint and the recovery path: it clears the entire `dirty_issues` set and rewrites a **full** checkpoint (every bead, not just the dirty one). Run it after an auto-flush warning, or to produce a clean git-committable snapshot:
+
+```bash
+bf sync --flush-only
+```
+
+### Repair safety — protection is in the doctor, not a manual ritual
+
+`bf doctor --repair` rebuilds SQLite from `issues.jsonl`. Because auto-flush keeps the checkpoint current, the old "ALWAYS `bf sync --flush-only` before repair" ritual (added after the 2026-06-10 incident where seven agents across seven workspaces each lost their first batch of fresh beads to a post-create `doctor --repair`; four db-only beads in ARMOR — bf-4rm7/5zxa/tojg/tr44 — were permanently lost) is **obsolete**. The data-loss guard now lives in the doctor command itself: it **refuses** to repair when unflushed (db-only) beads exist, and tells you exactly what to do.
+
+```bash
+bf doctor                              # health check — reports "Unflushed beads: N" if any
+bf doctor --repair                     # REFUSES if unflushed beads exist (no data loss)
+bf doctor --repair --flush-first       # checkpoint unflushed beads first, then rebuild
+bf doctor --repair --force             # proceed anyway — unflushed beads WILL be lost
+```
+
+Killing a worker at any point between mutation and flush loses nothing that `git diff .beads/` can't show: with auto-flush on the bead is already in the artifact when the command returns; with auto-flush off the bead survives in SQLite (marked dirty) and is recovered by `bf sync --flush-only`. Pinned by `tests/recovery_and_exit_criteria.rs`.
 
 ### Multi-Box & Fleet Hardening (Phase 7.9)
 
