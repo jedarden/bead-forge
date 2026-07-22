@@ -319,6 +319,32 @@ Each command:
 4. Execute: mutations are SQL writes; reads are SQL queries
 5. `bf sync` is the only command that touches `issues.jsonl` — flush exports it, import reads it
 
+### 3.4 Assignee Clearing Semantics (`--assignee ""` means unassigned, never an error)
+
+**Correct behavior (br parity):** an empty or whitespace-only `--assignee` value passed to `bf create` or `bf update` means "no assignee" / "clear the assignee" — it must never be rejected. `src/storage/sqlite.rs::update_issue` already implements this correctly:
+
+```rust
+if let Some(ref assignee) = changes.assignee {
+    if assignee.trim().is_empty() {
+        // Clearing stores NULL, never an empty string that would
+        // read back as "assigned" and hide the bead from claiming.
+        updates.push("assignee = NULL");
+    } else {
+        updates.push("assignee = ?");
+        params.push(Box::new(assignee.clone()));
+    }
+}
+```
+
+**Known bug (currently live, blocking downstream consumers — fix tracked as bf-gj673, children bf-4mj7l and bf-2uhsk):** `src/cli/mod.rs`'s `cmd_create` and `cmd_update` both call `validate_assignee()` (`src/validation.rs`) *before* reaching the correct storage-layer logic above, and `validate_assignee()` still rejects empty/whitespace-only values with `Error: Assignee cannot be empty or whitespace-only`. This means the correct clear-on-empty behavior is currently unreachable via the CLI — `bf update <id> --assignee ""` fails outright instead of clearing the field.
+
+- `validate_assignee()` was added by bf-2nrol (closed) per an earlier, since-superseded design ("assignee must be non-empty when provided"). The storage layer was later fixed for `update`'s NULL-on-empty semantics without removing this now-contradictory CLI guard.
+- `tests/test_assignee_validation.rs` already documents the intended fix: 6 tests are marked `#[ignore = "aspirational: assignee validation never implemented; empty assignee now means clear/unassigned (br parity) - revisit via tracking bead"]` — asserting the *old* (wrong) rejection behavior. These need to be rewritten to assert the *correct* behavior (success + assignee cleared/unset) once the CLI guard is removed.
+- `cmd_create` has a second, independent gap: even after the CLI guard is removed, it assigns `issue.assignee = assignee` directly (`src/cli/mod.rs` around line 1104) with no empty-to-`None` normalization — unlike `update_issue`, which explicitly avoids ever storing a literal empty string. `bf create --assignee ""` must create a bead with `assignee = NULL`, not `assignee = ""` (an empty string would read back as "assigned" and hide the bead from claiming — the same failure mode the storage-layer comment above already guards against for `update`).
+- **`bf reopen` (`cmd_reopen`) has a separate, related bug**: it only ever sets `status: Some(Status::Open)` in `IssueChanges`, leaving `assignee: None` (`IssueChanges`'s default = "don't touch"). A bead reopened after being closed/tombstoned therefore keeps whatever assignee it had before — a reopened bead should always come back unassigned. This is confirmed as the root cause of a real production incident (see below): beads reopened by a fleet worker retained a stale foreign assignee, which permanently hid them from that worker fleet's candidate discovery (any bead with a non-empty assignee is treated as already-claimed) even though `status` correctly read `open`.
+
+**Why this matters — real-world impact:** NEEDLE (the primary consumer of `bf` as a fleet worker) relies on exactly this "empty assignee clears it" contract in two places: its bead-release-on-failure/timeout path (`bf update <id> --status open --assignee ""`) and a newer self-healing mend step (`clear_assignee()`, which calls `bf update <id> --assignee ""`) that's specifically designed to recover beads left with a stale assignee after a `reopen`. Both currently fail against `bf`, and — because `bf reopen` doesn't clear `assignee` either — beads reopened by any tool got stuck in a state (`open` + non-empty assignee) that no NEEDLE self-healing path can currently recover from. Traced end-to-end during a 2026-07-21 lab fleet audit ([[project_needle_lab_test_pollution_2026-07-21]] in that session's memory) — this was the actual root cause of several idle NEEDLE roaming workers permanently excluding real ready work.
+
 ---
 
 ## Phase 4: Concurrent Claiming
