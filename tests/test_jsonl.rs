@@ -15,8 +15,37 @@
 mod common;
 
 use bead_forge::format::Formatter;
+use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
+
+/// Compare an `assignee` field for br/bf parity, treating an omitted key and an
+/// explicit `null` as equivalent.
+///
+/// bf's display formatter always emits `assignee` (`null` when unset) so that
+/// downstream JSON consumers can distinguish "unset" from "field missing from
+/// the response" (see bf-1wj). br omits the key when unset. Both encode the same
+/// semantic value, so parity holds as long as neither side reports a *different*
+/// assignee.
+fn assignee_matches(bf: Option<&Value>, other: Option<&Value>) -> bool {
+    let norm = |v: Option<&Value>| match v {
+        None | Some(Value::Null) => None,
+        Some(other) => Some(other.clone()),
+    };
+    norm(bf) == norm(other)
+}
+
+/// Compare a `labels` field for br/bf parity, treating an omitted key and an
+/// explicit empty array as equivalent (bf always emits `labels`, br omits it
+/// when empty — see bf-1wj).
+fn labels_match(bf: Option<&Value>, other: Option<&Value>) -> bool {
+    let norm = |v: Option<&Value>| match v {
+        None => Vec::new(),
+        Some(Value::Array(arr)) => arr.clone(),
+        Some(_) => vec![Value::Null], // any non-array -> force mismatch
+    };
+    norm(bf) == norm(other)
+}
 
 /// Test E2E parity: bf list produces identical JSON output to br list.
 ///
@@ -163,17 +192,19 @@ fn test_e2e_bf_vs_br_output_parity_forge_snapshot() {
             "Description mismatch for bead {}",
             id
         );
-        assert_eq!(
+        assert!(
+            assignee_matches(bf_value.get("assignee"), fixture_value.get("assignee")),
+            "Assignee mismatch for bead {}: bf={:?} fixture={:?}",
+            id,
             bf_value.get("assignee"),
-            fixture_value.get("assignee"),
-            "Assignee mismatch for bead {}",
-            id
+            fixture_value.get("assignee")
         );
-        assert_eq!(
+        assert!(
+            labels_match(bf_value.get("labels"), fixture_value.get("labels")),
+            "Labels mismatch for bead {}: bf={:?} fixture={:?}",
+            id,
             bf_value.get("labels"),
-            fixture_value.get("labels"),
-            "Labels mismatch for bead {}",
-            id
+            fixture_value.get("labels")
         );
 
         // Verify dependencies and comments are stripped (br compatibility)
@@ -526,17 +557,19 @@ fn test_e2e_br_vs_bf_list_output_parity() {
             "Description mismatch for bead {}",
             id
         );
-        assert_eq!(
+        assert!(
+            assignee_matches(bf_value.get("assignee"), br_value.get("assignee")),
+            "Assignee mismatch for bead {}: bf={:?} br={:?}",
+            id,
             bf_value.get("assignee"),
-            br_value.get("assignee"),
-            "Assignee mismatch for bead {}",
-            id
+            br_value.get("assignee")
         );
-        assert_eq!(
+        assert!(
+            labels_match(bf_value.get("labels"), br_value.get("labels")),
+            "Labels mismatch for bead {}: bf={:?} br={:?}",
+            id,
             bf_value.get("labels"),
-            br_value.get("labels"),
-            "Labels mismatch for bead {}",
-            id
+            br_value.get("labels")
         );
     }
 

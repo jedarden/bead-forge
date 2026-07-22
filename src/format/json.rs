@@ -1,28 +1,50 @@
 use crate::format::Formatter;
 use crate::model::Issue;
-use serde_json;
+use serde_json::{self, Map, Value};
 
 #[derive(Debug, Clone, Copy)]
 pub struct JsonFormatter;
 
+/// Serialize a single issue to a JSON object, stripping the bulky
+/// dependencies/comments relations for `br` compatibility, and guaranteeing
+/// that `assignee` and `labels` are always present.
+///
+/// The `Issue` struct skips `assignee` when `None` and `labels` when empty so
+/// the on-disk JSONL stays compact and `bd`-compatible. That is the wrong shape
+/// for CLI consumers of `ready`/`list`/`search --format json`: a downstream
+/// filter that deserializes into a struct with optional `assignee`/`labels`
+/// fields cannot tell an omitted key from a genuinely unset value. We therefore
+/// normalize the display output so `assignee` is always emitted (`null` when
+/// unset) and `labels` is always an array (`[]` when empty).
+fn issue_to_value(issue: &Issue) -> Value {
+    let mut stripped = issue.clone();
+    stripped.dependencies = vec![];
+    stripped.comments = vec![];
+
+    let mut value = serde_json::to_value(&stripped).unwrap_or(Value::Null);
+    if let Value::Object(ref mut map) = value {
+        ensure_display_fields(map);
+    }
+    value
+}
+
+/// Guarantee the `assignee` and `labels` keys exist on a serialized issue map.
+fn ensure_display_fields(map: &mut Map<String, Value>) {
+    map.entry("assignee")
+        .or_insert(Value::Null);
+    map.entry("labels")
+        .or_insert_with(|| Value::Array(vec![]));
+}
+
 impl Formatter for JsonFormatter {
     fn format_issue(&self, issue: &Issue) -> String {
-        // Clone and strip dependencies/comments for br compatibility
-        let mut stripped = issue.clone();
-        stripped.dependencies = vec![];
-        stripped.comments = vec![];
-        serde_json::to_string(&stripped).unwrap_or_else(|_| "{}".to_string())
+        serde_json::to_string(&issue_to_value(issue)).unwrap_or_else(|_| "{}".to_string())
     }
 
     fn format_issues(&self, issues: &[Issue]) -> String {
         issues
             .iter()
-            .map(|issue| {
-                let mut stripped = issue.clone();
-                stripped.dependencies = vec![];
-                stripped.comments = vec![];
-                serde_json::to_string(&stripped)
-            })
+            .map(|issue| serde_json::to_string(&issue_to_value(issue)))
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_default()
             .join("\n")
@@ -30,5 +52,58 @@ impl Formatter for JsonFormatter {
 
     fn format_error(&self, message: &str) -> String {
         serde_json::json!({"error": message}).to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Issue;
+    use serde_json::Value;
+
+    fn parse(line: &str) -> Value {
+        serde_json::from_str(line).expect("formatter must emit valid JSON")
+    }
+
+    #[test]
+    fn assignee_null_when_unset() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("assignee"), Some(&Value::Null));
+    }
+
+    #[test]
+    fn labels_empty_array_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("labels"), Some(&Value::Array(vec![])));
+    }
+
+    #[test]
+    fn assignee_and_labels_populated_when_present() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.assignee = Some("claude-code-glm-4.7-alpha".to_string());
+        issue.labels = vec!["split-child".to_string()];
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("assignee").and_then(|a| a.as_str()), Some("claude-code-glm-4.7-alpha"));
+        assert_eq!(
+            v.get("labels"),
+            Some(&Value::Array(vec![Value::String("split-child".to_string())]))
+        );
+    }
+
+    #[test]
+    fn format_issues_guarantees_fields_per_line() {
+        let a = Issue::new("bf-a".to_string(), "A".to_string(), ".".to_string());
+        let mut b = Issue::new("bf-b".to_string(), "B".to_string(), ".".to_string());
+        b.assignee = Some("worker".to_string());
+        b.labels = vec!["x".to_string()];
+        let out = JsonFormatter.format_issues(&[a, b]);
+        for line in out.lines() {
+            let v = parse(line);
+            assert!(v.get("assignee").is_some(), "assignee key must be present");
+            assert!(v.get("labels").is_some(), "labels key must be present");
+            assert!(v.get("labels").unwrap().is_array(), "labels must be an array");
+        }
     }
 }
