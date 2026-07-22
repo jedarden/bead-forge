@@ -148,3 +148,55 @@ bash -n scripts/bf-checkpoint.sh  -> OK
 (shellcheck not installed on this box; `bash -n` is the available gate.) The two variants are
 byte-identical from the `set -euo pipefail` line onward — diff is confined to the shebang and the
 self-describing comment block.
+
+## Re-verification (retry dispatch — independent fresh run)
+
+This bead carries `failure-count:1` (a prior dispatch committed this note but did not reach
+`close`), so on retry the **entire** acceptance suite was re-run from scratch against fresh
+throwaway workspaces under `~/scratch/cp-61nxm-rv/` — no reliance on the prior run's artifacts.
+Every criterion reproduced. The headline addition below is a stronger adversarial beads.db test
+than the prior dispatch ran.
+
+Static (re-confirmed):
+- `bash -n` OK on both variants.
+- `diff` of the two variants past line 1 → only the 3-line variant-description comment differs.
+- `git show --name-only fef0340` → only `deploy/bf-checkpoint.sh` + `scripts/bf-checkpoint.sh`;
+  working-tree `git status --short` on `src/claim.rs src/claim src/batch.rs src/storage/sqlite.rs
+  src/jsonl.rs` → CLEAN (claim/close hot path untouched).
+
+Functional — each workspace `bf init`'d, `git init`'d, and seeded with an **adversarial
+repo-local identity** (`user.email=WRONG@example.invalid`, `user.name=Wrong Person`) so a correct
+result proves the script's `-c` overrides repo config. `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env vars
+were unset (realistic systemd-timer environment).
+
+| Workspace | Scenario | Result |
+|-----------|----------|--------|
+| `deploy-ws` | db-only bead + 2 pre-staged decoys + untracked stray, gitignored beads.db | commit `dc5a414`, ONLY `.beads/issues.jsonl` in HEAD; author+committer `jedarden <github@jedarden.com>`; subject `chore(beads): auto-checkpoint …`; decoys stayed staged, NOT committed; beads.db not staged, not in commit, `check-ignore` = ignored |
+| `scripts-ws` RUN1 | db-only bead (first flush, untracked jsonl) | ONLY issues.jsonl committed; correct identity+prefix |
+| `scripts-ws` RUN2 | tracked jsonl, 2nd bead modifies it | ONLY issues.jsonl committed (1 file, 1 ins); correct identity+prefix |
+| `tracked-db-ws` | **beads.db force-tracked + DIRTY + `.beads/.gitignore` removed** | see below |
+
+**Decisive beads.db test (`tracked-db-ws`)** — strips *both* defense layers (gitignore removed and
+beads.db force-`add -f`'d into a prior commit), then mutates the tracked beads.db and runs the
+script. This proves the script never sweeps beads.db by its own `add`+pathspec, not merely by
+gitignore:
+
+```
+beads.db tracked?   git ls-files .beads/beads.db  -> .beads/beads.db   (yes)
+working tree pre-run:                              -> ' M .beads/beads.db' (dirty, uncommitted)
+run deploy variant:
+  [master ...] chore(beads): auto-checkpoint 2026-07-22T13:57:44Z
+   1 file changed, 2 insertions(+)  create mode 100644 .beads/issues.jsonl
+files in HEAD:                                     -> .beads/issues.jsonl   (ONLY — beads.db absent)
+beads.db staged after run?                         -> (empty — not staged)
+beads.db in working tree after run?                -> ' M .beads/beads.db'  (still dirty, left alone)
+```
+
+Even with beads.db tracked + dirty + gitignore removed, the commit contained **only**
+`.beads/issues.jsonl` and the modified beads.db was neither staged nor committed. The
+`git add .beads/issues.jsonl` + `commit -- .beads/issues.jsonl` pathspec isolation is the load-bearing
+safety property and it holds unconditionally.
+
+**Conclusion:** every slice-#3 acceptance criterion is satisfied by the committed code in both
+variants; no source change was required or made. `src/claim.rs` and the claim/close hot path remain
+untouched.
