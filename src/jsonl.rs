@@ -19,6 +19,8 @@ pub struct ImportResult {
     pub imported: usize,
     pub updated: usize,
     pub skipped: usize,
+    /// IDs of beads that were newly created or updated during import
+    pub affected_ids: Vec<String>,
 }
 
 pub struct ExportResult {
@@ -44,15 +46,25 @@ where
         imported: 0,
         updated: 0,
         skipped: 0,
+        affected_ids: Vec::new(),
     };
 
     for line in reader.lines() {
         let line = line?;
         let issue: Issue = serde_json::from_str(&line)?;
-        match upsert(&issue)? {
-            UpsertResult::New => result.imported += 1,
-            UpsertResult::Updated => result.updated += 1,
-            UpsertResult::Unchanged => result.skipped += 1,
+        let upsert_result = upsert(&issue)?;
+        match upsert_result {
+            UpsertResult::New => {
+                result.imported += 1;
+                result.affected_ids.push(issue.id.clone());
+            }
+            UpsertResult::Updated => {
+                result.updated += 1;
+                result.affected_ids.push(issue.id.clone());
+            }
+            UpsertResult::Unchanged => {
+                result.skipped += 1;
+            }
         }
     }
 
