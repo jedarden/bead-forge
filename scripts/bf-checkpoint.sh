@@ -9,9 +9,7 @@
 #      it with a fixed git identity and the `chore(beads): auto-checkpoint`
 #      message prefix.
 #
-# This is the NixOS portable variant — same logic as
-# deploy/bf-checkpoint.sh but with a `#!/usr/bin/env bash` shebang. On Debian/Ubuntu, use
-# deploy/bf-checkpoint.sh (`#!/bin/bash`) instead; see deploy/README.md.
+# NixOS portable variant — use deploy/bf-checkpoint.sh on Debian/Ubuntu.
 #
 # Configuration (.beads/config.yaml, `checkpoint:` block):
 #   enabled: bool          (default false) master switch; when false this script
