@@ -162,11 +162,14 @@ fn killed_worker_between_mutation_and_flush_loses_nothing() {
 // 2026-06-10 wipe regression: doctor --repair must NOT silently lose dirty beads
 // ===========================================================================
 
-/// Regression test for the 2026-06-10 wipe: `bf doctor --repair` must refuse
-/// to proceed when there are unflushed beads, requiring explicit `--flush-first`
-/// or `--force`. This protects db-only beads from silent deletion.
+/// Regression test for the 2026-06-10 wipe, updated for the Phase 7.2 doctor
+/// safety stack: on a workspace whose only "problem" is unflushed (db-only)
+/// beads, `bf doctor --repair` is a **healthy no-op**. Unflushed beads are a
+/// flush concern, not corruption, so the JSONL rebuild is never reached (layer 1)
+/// and the dirty bead cannot be lost. This is strictly safer than the old
+/// refuse-or-force guard it replaces.
 #[test]
-fn doctor_repair_refuses_unflushed_without_explicit_consent() {
+fn doctor_repair_on_unflushed_only_is_a_safe_noop() {
     let tmp = init_ws();
     let ws = tmp.path();
 
@@ -190,32 +193,31 @@ fn doctor_repair_refuses_unflushed_without_explicit_consent() {
     let (_o, e, ok) = run(ws, &["show", &dirty_id]);
     assert!(ok, "dirty bead must exist in db: {e}");
 
-    // Attempt `bf doctor --repair` WITHOUT `--flush-first` or `--force`.
-    // This MUST FAIL with an error message about unflushed beads.
-    let (_o, e, ok) = run(ws, &["doctor", "--repair"]);
-    assert!(!ok, "doctor --repair must refuse without --flush-first or --force");
+    // `bf doctor --repair` on a healthy-but-dirty workspace SUCCEEDS as a no-op:
+    // it does NOT rebuild, and it does NOT lose the dirty bead.
+    let (o, _e, ok) = run(ws, &["doctor", "--repair"]);
+    assert!(ok, "doctor --repair must succeed (safe no-op) on an unflushed-only workspace");
     assert!(
-        e.contains("unflushed") || e.contains("Cannot repair"),
-        "error must mention unflushed beads, got: {e}"
+        o.contains("healthy") && o.contains("no JSONL rebuild"),
+        "repair must report a healthy no-op, got: {o}"
     );
-    assert!(e.contains(&dirty_id), "error must identify the dirty bead");
 
     // Verify the dirty bead STILL EXISTS (not silently lost).
     let (_o, e, ok) = run(ws, &["show", &dirty_id]);
-    assert!(ok, "dirty bead must still exist after refused repair: {e}");
+    assert!(ok, "dirty bead must still exist after no-op repair: {e}");
 
-    // Verify db still has both beads.
-    let (o, _e, ok) = run(ws, &["list", "--json"]);
-    assert!(ok, "list must succeed");
-    // list --json outputs JSONL (one JSON per line), parse the first line
-    let list_json: serde_json::Value = serde_json::from_str(o.lines().next().unwrap()).unwrap();
-    let id = list_json.get("id").unwrap().as_str().unwrap();
-    // List shows beads sorted, so we'll just check that we get at least one bead back
-    assert!(!id.is_empty(), "list must return bead IDs");
+    // And it is still db-only (repair did not flush it — that stays a `bf sync`
+    // concern), so no data was silently checkpointed either.
+    let jsonl_content = fs::read_to_string(jsonl_path(ws)).unwrap();
+    assert!(
+        !jsonl_content.contains(&dirty_id),
+        "no-op repair must not flush the dirty bead"
+    );
 }
 
-/// `bf doctor --repair --flush-first` must preserve dirty beads by flushing
-/// them to JSONL before rebuilding the database.
+/// `bf doctor --repair --flush-first` must preserve dirty beads by checkpointing
+/// them to JSONL. On a healthy workspace this is a flush-only no-op (no rebuild);
+/// the dirty bead ends up safely in the JSONL authority either way.
 #[test]
 fn doctor_repair_with_flush_first_preserves_dirty_beads() {
     let tmp = init_ws();
@@ -258,10 +260,14 @@ fn doctor_repair_with_flush_first_preserves_dirty_beads() {
     );
 }
 
-/// `bf doctor --repair --force` must warn but proceed, losing dirty beads.
-/// This is the "I know what I'm doing" escape hatch.
+/// Phase 7.2 safety improvement: `bf doctor --repair --force` on a *healthy*
+/// workspace does NOT lose dirty beads, because the JSONL rebuild is unreachable
+/// from a healthy state (layer 1) — `--force` only opts out of dirty-bead
+/// preservation *when a rebuild is actually triggered* by corruption/divergence.
+/// The old contract, where `--force` unconditionally rebuilt and dropped db-only
+/// beads even on a clean workspace, was itself the 2026-06-10 footgun.
 #[test]
-fn doctor_repair_with_force_warns_but_loses_dirty_beads() {
+fn doctor_repair_force_on_healthy_workspace_does_not_lose_dirty() {
     let tmp = init_ws();
     let ws = tmp.path();
 
@@ -275,27 +281,24 @@ fn doctor_repair_with_force_warns_but_loses_dirty_beads() {
     assert!(ok, "sync --flush-only failed: {e}");
 
     // Create another bead WITHOUT flushing (dirty-only).
-    let (out, _e, ok) = run(ws, &["--no-auto-flush", "create", "--title", "doomed"]);
+    let (out, _e, ok) = run(ws, &["--no-auto-flush", "create", "--title", "kept"]);
     assert!(ok, "create failed");
-    let doomed_id = out.trim().to_string();
+    let kept_id = out.trim().to_string();
 
-    // Run `bf doctor --repair --force`.
-    let (_o, e, ok) = run(ws, &["doctor", "--repair", "--force"]);
-    assert!(ok, "doctor --repair --force must succeed: {e}");
+    // Run `bf doctor --repair --force`. No corruption/divergence exists, so no
+    // rebuild happens and --force has nothing to discard.
+    let (o, _e, ok) = run(ws, &["doctor", "--repair", "--force"]);
+    assert!(ok, "doctor --repair --force must succeed on a healthy workspace");
     assert!(
-        e.contains("WARNING") || e.contains("will be LOST") || e.contains(&doomed_id),
-        "stderr must warn about losing dirty beads, got: {e}"
+        o.contains("healthy") && o.contains("no JSONL rebuild"),
+        "healthy workspace must not rebuild even with --force, got: {o}"
     );
 
-    // Verify: flushed bead exists, dirty bead is GONE.
+    // Both beads survive — --force did NOT nuke the dirty bead on a healthy tree.
     let (_o, _e, ok) = run(ws, &["show", &flushed_id]);
     assert!(ok, "flushed bead must exist after force repair");
-    let (_o, _e, ok) = run(ws, &["show", &doomed_id]);
-    assert!(!ok, "dirty bead must be lost after --force repair (that's the point of --force)");
-
-    // Verify JSONL does NOT contain the doomed bead.
-    let jsonl_content = fs::read_to_string(jsonl_path(ws)).unwrap();
-    assert!(!jsonl_content.contains(&doomed_id), "doomed bead must NOT be in JSONL after --force repair");
+    let (_o, e, ok) = run(ws, &["show", &kept_id]);
+    assert!(ok, "dirty bead must survive --force on a healthy workspace: {e}");
 }
 
 // ===========================================================================

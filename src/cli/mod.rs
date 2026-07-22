@@ -356,6 +356,19 @@ pub enum Commands {
         /// not rebuild from JSONL). Fixes the NULL-datetime crash class.
         #[arg(long)]
         fix_schema: bool,
+
+        /// Proceed with --repair even if a prior rebuild failed post-verification
+        /// (clears the repeat-failure gate; see the doctor safety stack).
+        #[arg(long)]
+        allow_repeated_repair: bool,
+
+        /// List verified pre-rebuild recovery runs (hash-checked DB backups).
+        #[arg(long)]
+        runs: bool,
+
+        /// Restore the DB family from a recovery run: a run id or "latest".
+        #[arg(long, value_name = "RUN_ID")]
+        restore: Option<String>,
     },
 
     /// Three-way merge of JSONL bead files (usable as a git merge driver)
@@ -1182,6 +1195,9 @@ pub fn run(cli: Cli) -> Result<()> {
             reclaim_stale,
             ttl,
             fix_schema,
+            allow_repeated_repair,
+            runs,
+            restore,
         } => cmd_doctor(
             &beads_dir,
             repair,
@@ -1190,6 +1206,9 @@ pub fn run(cli: Cli) -> Result<()> {
             reclaim_stale,
             ttl,
             fix_schema,
+            allow_repeated_repair,
+            runs,
+            restore,
         ),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
@@ -2095,11 +2114,49 @@ fn cmd_doctor(
     reclaim_stale: bool,
     ttl: Option<i64>,
     fix_schema: bool,
+    allow_repeated_repair: bool,
+    runs: bool,
+    restore: Option<String>,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
-    if fix_schema {
+    if runs {
+        // List verified pre-rebuild recovery runs (doctor safety stack, layer 3).
+        let all = crate::recovery::list_runs(beads_dir)?;
+        if all.is_empty() {
+            println!("No recovery runs found");
+        } else {
+            println!("Recovery runs (newest first):");
+            for m in &all {
+                let total: u64 = m.files.iter().map(|f| f.bytes).sum();
+                println!(
+                    "  {}  {}  {} file(s), {} bytes  [{}]",
+                    m.run_id,
+                    m.created_at,
+                    m.files.len(),
+                    total,
+                    m.reason
+                );
+                for f in &m.files {
+                    println!("      {}  sha256:{}…  {} bytes", f.name, &f.sha256[..12.min(f.sha256.len())], f.bytes);
+                }
+            }
+            println!();
+            println!("Restore one with: bf doctor --restore <run-id|latest>");
+        }
+    } else if let Some(run_ref) = restore {
+        // Restore the DB family from a hash-verified recovery run (layer 3).
+        let manifest = crate::recovery::restore_run(beads_dir, &run_ref)?;
+        println!(
+            "✓ Restored {} file(s) from recovery run {} (all hashes verified)",
+            manifest.files.len(),
+            manifest.run_id
+        );
+        for f in &manifest.files {
+            println!("    {}", f.name);
+        }
+    } else if fix_schema {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let fixed = crate::doctor::fix_null_not_null(workspace_dir)?;
         if fixed == 0 {
@@ -2112,8 +2169,29 @@ fn cmd_doctor(
         }
     } else if repair {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
-        let imported = crate::doctor::repair(workspace_dir, flush_first, force)?;
-        println!("Repaired database: imported {} beads from JSONL", imported);
+        let opts = crate::doctor::RepairOptions {
+            flush_first,
+            force,
+            allow_repeated_repair,
+        };
+        let report = crate::doctor::repair_stack(workspace_dir, &opts)?;
+        if report.rebuilt {
+            println!(
+                "Repaired database: rebuilt from JSONL ({} imported, {} unflushed bead(s) preserved)",
+                report.imported, report.preserved_dirty
+            );
+            if let Some(run_id) = &report.backup_run_id {
+                println!("  Verified pre-rebuild backup: recovery run {}", run_id);
+            }
+        } else {
+            println!("✓ Workspace healthy — no JSONL rebuild needed");
+            if !report.local_fixes.is_empty() {
+                println!("  Applied local fixers: {}", report.local_fixes.join(", "));
+            }
+        }
+        for msg in &report.messages {
+            println!("  {}", msg);
+        }
     } else if reclaim_stale {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let config = load_config(beads_dir)?;
