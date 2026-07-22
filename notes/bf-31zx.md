@@ -73,16 +73,15 @@ For more information, try '--help'.
 
 The lowercase `error:` prefix (note: clap uses lowercase `error:`, not `Error:`) appears **only** on `DisplayHelp`/`DisplayVersion`-rejected paths that represent genuine parse failures. Version output is a *successful, intentional* emission — it never touches the error formatter.
 
-**Empirical confirmation in this repo** (bead-forge):
-```
-$ cargo run -- --version
-bf 0.3.0           # ← stdout, no prefix
-$ echo $? 
-0
-```
-Routing `--version` to stdout-only vs stderr-only showed stdout = `bf 0.3.0`, stderr = empty — consistent with clap's documented behavior.
+**Empirical confirmation — clean control (no manual handler).** To isolate clap's *native* behavior (bead-forge's own `bf` binary has a manual handler that would confound the result — see §5), I built a throwaway clone in `~/scratch/clap-version-test` mirroring `bf`'s clap setup exactly — `#[command(name = "bf", version = env!("CARGO_PKG_VERSION"))]` under **clap 4.6.1** — but with **no** manual interception. Observed:
 
-> ⚠️ Note: that output currently comes from a **manual** handler in `src/main.rs:7-10`, not directly from clap (see §5). But the manual handler prints exactly what clap would print natively.
+| Invocation | Stream | Output | Exit |
+|---|---|---|---|
+| `--version` | **stdout** (stderr empty) | `bf 0.3.0` | **0** |
+| `-V` | **stdout** | `bf 0.3.0` | **0** |
+| `--bogus` (unknown flag, real error path) | **stderr** | `error: unexpected argument '--bogus' found` | **2** |
+
+This confirms directly: clap routes `--version`/`-V` to **stdout** with exit **0** and **no** prefix; the `error:` prefix (lowercase) appears **only** on genuine parse failures, which go to **stderr** with exit **2**. There is no capital-`E` `Error:` prefix anywhere in clap.
 
 ## 4. Common patterns for version output
 
