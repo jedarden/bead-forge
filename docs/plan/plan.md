@@ -1698,6 +1698,35 @@ Phases 1-3 produce a fully functional standalone `bf` that replaces `br`. Phase 
 
 ---
 
+## Architecture Decision Records
+
+### ADR-1: Periodic `.beads/` git checkpoint timer (2026-07-20)
+
+**Status:** Accepted & implemented — `bf-checkpoint.{sh,service,timer}` ship in `deploy/` (Debian/Ubuntu) and `systemd/` (NixOS); `CheckpointConfig` parses the block in `src/config.rs`. Parent bead: `bf-48pw0`.
+
+**Context.** bead-forge is a dual-store system: SQLite (`beads.db`) is the live store and `issues.jsonl` is the git-tracked checkpoint (see Core Principle #2 and §2.7). Historically, mutations did not auto-flush, so a workspace under active NEEDLE work could accumulate **db-only** beads never captured in git — losing the box meant losing work, and shared workspaces (many agents in one tree) had no coherent, low-noise way to land periodic snapshots. Phase 7.1's `sync.auto_flush` (default on) closes the per-mutation gap, but a periodic out-of-band safety net is still wanted so that even a workspace whose agents exit ungracefully still gets its state committed to git.
+
+**Decision.** A dedicated systemd timer (`bf-checkpoint.timer` → `bf-checkpoint.service` → `bf-checkpoint.sh`) periodically flushes SQLite → JSONL via `bf sync --flush-only` and, if `.beads/issues.jsonl` changed, stages **only** that file and commits it as `chore(beads): auto-checkpoint <UTC>`. It runs strictly out-of-band — driven by the timer, never by any `bf` command. New rollouts default to **`checkpoint.enabled: false`**; a maintainer must opt each workspace in. `git push` is off by default.
+
+**Consequences.**
+
+- **Out-of-band only.** `src/claim.rs` and the claim/close hot path are never touched — no git or flush work on the latency-critical dequeue path. Checkpointing cannot regress claim latency or contend with `BEGIN IMMEDIATE` write transactions on the hot path.
+- **Exactly one committed path.** Only `.beads/issues.jsonl` is ever staged. `beads.db` is never staged — it is gitignored and rebuilt from JSONL via `bf sync --import`.
+- **Safe by default / opt-in.** A freshly deployed timer is inert: `bf-checkpoint.sh` prints `checkpoint disabled` and exits 0 until `checkpoint.enabled: true`. Cadence is governed by `checkpoint.interval_minutes` via a per-workspace self-throttle state file, not by how often the timer fires.
+- **Distinguishable commits.** A fixed identity (`jedarden <github@jedarden.com>`) and the `chore(beads): auto-checkpoint` prefix keep machine checkpoints separable from human commits.
+- **Push stays opt-in.** Enabled persistently by `checkpoint.push: true` or one-shot by the script's `--push` flag. The unit's `ExecStart` must never carry `--push`, which would force-push on every timer fire.
+
+**Config block** (`.beads/config.yaml`):
+
+```yaml
+checkpoint:
+  enabled: false           # master switch; NEW ROLLOUTS STAY DISABLED until a maintainer opts in
+  interval_minutes: 60     # min gap between commits (self-throttle), default 60
+  push: false              # git push after each commit, default false
+```
+
+---
+
 ## Alternative Approaches Considered
 
 ### In-Memory Server (deferred)

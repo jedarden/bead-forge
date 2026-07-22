@@ -2,7 +2,7 @@
 
 This directory contains files for auto-deploying the `bf` binary to fleet hosts after each GitHub release.
 
-It also contains the **`bf-checkpoint`** units — a systemd timer that periodically flushes `.beads/` to JSONL and commits `issues.jsonl` out-of-band (ADR-1, see [the parent bead `bf-48pw0`](../docs/plan/plan.md)). These ship alongside the `bf-update` units and are installed the same way.
+It also contains the **`bf-checkpoint`** units — a systemd timer that periodically flushes `.beads/` to JSONL and commits `issues.jsonl` out-of-band ([ADR-1](../docs/plan/plan.md#adr-1-periodic-beads-git-checkpoint-timer-2026-07-20)). These ship alongside the `bf-update` units and are installed the same way.
 
 ## Host Variants
 

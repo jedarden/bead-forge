@@ -85,7 +85,7 @@ systemctl --user list-timers | grep bf-update
 
 ## bf-checkpoint — periodic `.beads/` git checkpoint (ADR-1)
 
-The NixOS `bf-checkpoint` units are the out-of-band companion to `bf-update`. The timer runs `bf-checkpoint.sh` hourly, which flushes SQLite→JSONL (`bf sync --flush-only`) and, if `.beads/issues.jsonl` changed, stages **only** that file and commits it as `chore(beads): auto-checkpoint …`. It never touches `beads.db` and never runs on the `bf` claim/close hot path (ADR-1). The Debian/Ubuntu portable variant lives in [`../deploy/README.md`](../deploy/README.md).
+The NixOS `bf-checkpoint` units are the out-of-band companion to `bf-update`. The timer runs `bf-checkpoint.sh` hourly, which flushes SQLite→JSONL (`bf sync --flush-only`) and, if `.beads/issues.jsonl` changed, stages **only** that file and commits it as `chore(beads): auto-checkpoint …`. It never touches `beads.db` and never runs on the `bf` claim/close hot path ([ADR-1](../docs/plan/plan.md#adr-1-periodic-beads-git-checkpoint-timer-2026-07-20)). The Debian/Ubuntu portable variant lives in [`../deploy/README.md`](../deploy/README.md).
 
 **Inert by default:** the timer can be enabled with no side effect — `bf-checkpoint.sh` exits 0 unless `checkpoint.enabled: true` is set in `.beads/config.yaml`. **Push is off by default** too (set `checkpoint.push: true` to enable; never add `--push` to the unit).
 
