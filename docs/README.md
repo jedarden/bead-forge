@@ -210,8 +210,8 @@ bf list          [--status <s>] [--type <t>] [--assignee <a>] [--priority <N>]
                  [--annotation k=v] [--limit <N>] [--all] [--format json|text|toon] [--json]
 bf show          <id> [--format json|text|toon] [--json]
 bf update        <id> [--title "..."] [--status <s>] [--priority <N>] [--assignee <a>]
-                 [--description "..."] [--acceptance-criteria "..."] [--notes "..."]
-                 [--design "..."] [--due-at <RFC3339>]
+                 [--description "..."] [--description-file <path>] [--acceptance-criteria "..."]
+                 [--notes "..."] [--design "..."] [--due-at <RFC3339>]
 bf close         <id> [--reason "..."]
 bf reopen        <id>
 bf delete        <id>

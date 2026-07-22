@@ -140,8 +140,11 @@ pub enum Commands {
 
     /// Update a bead
     ///
-    /// Changes only the fields you pass. Note that description and
-    /// acceptance_criteria cannot be edited here — add a comment instead.
+    /// Changes only the fields you pass. `--description` and
+    /// `--acceptance-criteria` edit those fields directly (closing the old
+    /// "add a comment instead" gap). For long/multiline descriptions pass
+    /// `--description-file <path>` instead — it reads the file's contents and
+    /// sets the description, and conflicts with `--description`.
     /// --due-at expects an RFC3339 timestamp (e.g. 2025-01-01T00:00:00Z).
     Update {
         /// Bead ID
@@ -173,6 +176,12 @@ pub enum Commands {
         /// New description
         #[arg(long)]
         description: Option<String>,
+
+        /// Read the new description from a file. Useful for long or multiline
+        /// bodies that are awkward to pass on the shell. Conflicts with
+        /// --description (which wins for short inline text).
+        #[arg(long, conflicts_with = "description")]
+        description_file: Option<PathBuf>,
 
         /// New acceptance criteria
         #[arg(long)]
@@ -1083,6 +1092,7 @@ pub fn run(cli: Cli) -> Result<()> {
             assignee,
             clear_assignee,
             description,
+            description_file,
             acceptance_criteria,
             notes,
             design,
@@ -1095,6 +1105,16 @@ pub fn run(cli: Cli) -> Result<()> {
                 Some(String::new())
             } else {
                 assignee
+            };
+            // --description-file resolves into `description` here (the REAL
+            // update path — cmd_update -> update_issue writes the column).
+            // clap's conflicts_with("description") guarantees only one is set.
+            let description = match description_file {
+                Some(path) => Some(
+                    std::fs::read_to_string(&path)
+                        .map_err(|e| anyhow!("Failed to read --description-file {}: {}", path.display(), e))?,
+                ),
+                None => description,
             };
             cmd_update(
                 &beads_dir,
