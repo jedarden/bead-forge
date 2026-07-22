@@ -26,9 +26,9 @@ fi
 
 | Host | OS | Variant | Timer Status |
 |------|-----|---------|--------------|
-| **kalshi-interserver VPS** | NixOS | `systemd/` | ⚠️ Service only, timer rollout needed |
-| **Hetzner** | Debian | `deploy/` | ✅ Installed 2026-06-21 |
-| **lab** | Debian | `deploy/` | ⚠️ Not deployed |
+| **lab (this host)** | NixOS | `systemd/` | ✅ Deployed & active — but **service fails every run: repo has 0 published Releases** (audit 2026-07-22, see [`../notes/bf-u4fxh.md`](../notes/bf-u4fxh.md)) |
+| **kalshi-interserver VPS** | NixOS? | `systemd/` | Not found on Tailscale mesh (audit 2026-07-22) |
+| **Hetzner (`hetzner-ex44`)** | ? | ? | Unverified from `lab` (SSH denied) |
 
 ## Installation (NixOS hosts)
 

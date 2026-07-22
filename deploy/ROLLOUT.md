@@ -2,6 +2,18 @@
 
 This document provides step-by-step deployment instructions for each fleet host.
 
+> **⚠️ AUDIT 2026-07-22 (bead bf-u4fxh) — premises did not match reality.** A live audit
+> found: (1) the host this repo lives on is named **`lab`** and is **NixOS** — it already
+> has the timer deployed with the correct `systemd/` NixOS variant, so the "deploy
+> `deploy/` (Debian) variant to lab" step is moot and would break it; (2) **no host named
+> `kalshi-interserver` exists** on the Tailscale mesh (all 73 nodes scanned), so its
+> timer cannot be deployed from here; (3) the repo currently has **zero published GitHub
+> Releases** (`releases/latest` → 404), so `bf-update.service` fails every hourly run on
+> every host — deploying the timer to more hosts would not fix the underlying
+> auto-update. Full evidence and remediation in [`notes/bf-u4fxh.md`](../notes/bf-u4fxh.md).
+> The status table below has been corrected to the verified state; unverified rows are
+> annotated as such.
+
 ## Quick Host Detection
 
 ```bash
@@ -140,6 +152,6 @@ grep -E "ExecStart|PATH" ~/.config/systemd/user/bf-update.service
 
 | Host | OS | Variant | Service | Timer | Status |
 |------|-----|---------|---------|-------|--------|
-| Hetzner | Debian | deploy/ | ✅ | ✅ | Complete (2026-06-21) |
-| kalshi-interserver | NixOS | systemd/ | ⚠️ | ❌ | Pending timer deployment |
-| lab | Debian | deploy/ | ❌ | ❌ | Pending full deployment |
+| lab (this host) | NixOS | systemd/ | ✅ | ✅ | Deployed (active/waiting); **service failing every run — repo has 0 published Releases** (audit 2026-07-22) |
+| Hetzner (`hetzner-ex44`) | ? | ? | ? | ? | Unverified from `lab` (SSH denied); separate node on mesh. Do not assume "this host" == Hetzner. |
+| kalshi-interserver | NixOS? | systemd/ | ? | ? | **Not found** on Tailscale mesh (audit 2026-07-22) — clarify/retire this row |

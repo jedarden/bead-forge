@@ -4,6 +4,15 @@
 
 This document tracks the deployment status of `bf-update` systemd timer across the bead-forge fleet and provides rollout instructions for remaining hosts.
 
+> **⚠️ AUDIT 2026-07-22 (bead bf-u4fxh) — fleet table was inaccurate.** Verified live: the
+> host this repo lives on is **`lab`** and is **NixOS**, and it **already has the timer
+> deployed** (`systemd/` variant, active/waiting) — so the prior "lab / Debian / not
+> deployed" row was wrong on all three counts. **No `kalshi-interserver` node exists** on
+> the Tailscale mesh. And the repo has **zero published GitHub Releases**, so
+> `bf-update.service` fails every hourly run regardless of timer deployment. Full evidence
+> and remediation in [`notes/bf-u4fxh.md`](../notes/bf-u4fxh.md). Tables below corrected
+> to the verified state; unverified rows annotated.
+
 ## Host Variants
 
 There are **two** systemd service variants for different OS environments:
@@ -21,9 +30,9 @@ The NixOS variant hardcodes the bash path because NixOS uses a non-standard file
 
 | Host | OS | Variant | Service | Timer | Installed | Notes |
 |------|-----|---------|---------|-------|-----------|-------|
-| **Hetzner (this host)** | Debian | `deploy/` | ✅ | ✅ | 2026-06-21 | Active, running hourly |
-| **kalshi-interserver VPS** | NixOS | `systemd/` | ✅ | ❌ | TBD | Service exists, timer needs deployment |
-| **lab** | Debian | `deploy/` | ❌ | ❌ | TBD | Full installation needed |
+| **lab (this host)** | NixOS | `systemd/` | ✅ | ✅ | active/waiting | Timer deployed & correct; **service failing every run — repo has 0 published Releases** (audit 2026-07-22) |
+| **Hetzner (`hetzner-ex44`)** | ? | ? | ? | ? | unverified | Separate mesh node; SSH denied from `lab`. Do not assume "this host" == Hetzner. |
+| **kalshi-interserver VPS** | NixOS? | `systemd/` | ? | ? | n/a | **Not found** on Tailscale mesh (audit 2026-07-22) — clarify/retire |
 
 ## Host Detection
 
@@ -173,11 +182,12 @@ If the script can't find commands, ensure the `deploy/bf-update.service` has `En
 
 ## Rollout Checklist
 
-- [x] **Hetzner** - Deploy variant installed with timer (2026-06-21)
-- [ ] **kalshi-interserver VPS** - Roll out timer to existing service
-- [ ] **lab** - Full deployment (service + timer)
-- [ ] Verify all hosts are receiving auto-updates after next release
+- [x] **lab (this host)** - `systemd/` NixOS variant + timer already deployed & active (audit 2026-07-22)
+- [ ] **Publish a GitHub Release** so `bf-update.service` can fetch it (currently 0 Releases → every run fails) — true blocker for auto-update anywhere
+- [ ] **kalshi-interserver VPS** - node absent from Tailscale mesh; clarify what it maps to or retire the row
+- [ ] Verify all hosts are receiving auto-updates after a release exists
 - [ ] Document any host-specific issues
+- [x] Reconcile "Hetzner (this host)" vs `lab` identity (audit 2026-07-22: this host is `lab`, NixOS)
 
 ## Related Documentation
 

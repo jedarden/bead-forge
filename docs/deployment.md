@@ -28,9 +28,9 @@ fi
 
 | Host | OS | Variant | Status | Notes |
 |------|-----|---------|--------|-------|
-| **Hetzner (this host)** | Debian | `deploy/` | ✅ **Installed 2026-06-21** | Service + timer active |
-| **kalshi-interserver VPS** | NixOS | `systemd/` | ⚠️ **Service only** | Timer rollout needed |
-| **lab** | Debian | `deploy/` | ⚠️ **Not deployed** | Full installation needed |
+| **lab (this host)** | NixOS | `systemd/` | ✅ **Deployed & active** | Timer correct; **service fails every run — repo has 0 published Releases** (audit 2026-07-22, see [`../notes/bf-u4fxh.md`](../notes/bf-u4fxh.md)) |
+| **Hetzner (`hetzner-ex44`)** | ? | ? | ❔ **Unverified** | Separate mesh node; SSH denied from `lab` — do not assume "this host" == Hetzner |
+| **kalshi-interserver VPS** | NixOS? | `systemd/` | ❔ **Not found** | Absent from Tailscale mesh (audit 2026-07-22) — clarify or retire |
 
 ## How It Works
 
@@ -39,6 +39,7 @@ fi
 2. **Auto-Update Script**: Each host runs `~/.local/bin/bf-update.sh` which:
    - Queries GitHub API for the latest release
    - Downloads `bf-linux-x86_64` if newer than current
+   - Backs up the binary being replaced to `~/.local/bin/bf.previous` (and its version to `.bf-version.previous`)
    - Installs to `~/.local/bin/bf`
    - Runs automatically hourly via systemd timer
 
@@ -48,6 +49,21 @@ fi
    # or
    systemctl --user start bf-update.service
    ```
+
+4. **Rollback**: Every successful update first copies the outgoing `bf` to
+   `bf.previous` (and its version to `.bf-version.previous`), so a bad release
+   can be undone without re-downloading anything. To restore the previous
+   binary on a host where a release broke `bf`:
+   ```bash
+   # Restore bf.previous → bf and .bf-version.previous → .bf-version
+   ~/.local/bin/bf-update.sh --rollback
+
+   # If the broken release is still the latest, also stop the timer or it will
+   # re-install the bad binary within the hour:
+   systemctl --user stop bf-update.timer
+   ```
+   `--rollback` is idempotent (running it twice restores the same binary). It
+   exits with an error if no `bf.previous` exists (e.g. on a first install).
 
 ## Installation
 
