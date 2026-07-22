@@ -1,4 +1,4 @@
-use crate::format::Formatter;
+use crate::format::{ClaimResultOutput, Formatter};
 use crate::model::Issue;
 use serde_json::{self, Map, Value};
 
@@ -53,6 +53,14 @@ impl Formatter for JsonFormatter {
     fn format_error(&self, message: &str) -> String {
         serde_json::json!({"error": message}).to_string()
     }
+
+    fn format_claim_result(&self, result: &ClaimResultOutput) -> String {
+        serde_json::to_string(result).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    fn format_no_claim(&self) -> String {
+        "{}".to_string()
+    }
 }
 
 #[cfg(test)]
@@ -105,5 +113,54 @@ mod tests {
             assert!(v.get("labels").is_some(), "labels key must be present");
             assert!(v.get("labels").unwrap().is_array(), "labels must be an array");
         }
+    }
+
+    #[test]
+    fn claim_dry_run_emits_only_preview_keys() {
+        // dry-run: bead_id/assignee always present, plus title/priority/impact/
+        // workspace/dry_run; `reclaimed` is never set so it must be omitted.
+        let mut out = ClaimResultOutput::new("bf-9", "claude-x");
+        out.title = Some("T".to_string());
+        out.priority = Some(2);
+        out.downstream_impact = Some(7);
+        out.workspace = Some("/repo".to_string());
+        out.dry_run = Some(true);
+
+        let v = parse(&JsonFormatter.format_claim_result(&out));
+        assert_eq!(v.get("bead_id").and_then(|x| x.as_str()), Some("bf-9"));
+        assert_eq!(v.get("assignee").and_then(|x| x.as_str()), Some("claude-x"));
+        assert_eq!(v.get("dry_run").and_then(|x| x.as_bool()), Some(true));
+        assert_eq!(v.get("priority").and_then(|x| x.as_i64()), Some(2));
+        assert_eq!(v.get("downstream_impact").and_then(|x| x.as_i64()), Some(7));
+        assert_eq!(v.get("workspace").and_then(|x| x.as_str()), Some("/repo"));
+        assert!(
+            v.get("reclaimed").is_none(),
+            "reclaimed key must be omitted when unset"
+        );
+    }
+
+    #[test]
+    fn claim_single_workspace_omits_workspace_key() {
+        // normal single-workspace claim: bead_id + reclaimed + assignee only.
+        let mut out = ClaimResultOutput::new("bf-1", "claude-y");
+        out.reclaimed = Some(0);
+
+        let v = parse(&JsonFormatter.format_claim_result(&out));
+        assert_eq!(v.get("bead_id").and_then(|x| x.as_str()), Some("bf-1"));
+        assert_eq!(v.get("assignee").and_then(|x| x.as_str()), Some("claude-y"));
+        assert_eq!(v.get("reclaimed").and_then(|x| x.as_i64()), Some(0));
+        assert!(
+            v.get("workspace").is_none(),
+            "workspace key must be omitted on a single-workspace claim"
+        );
+        assert!(
+            v.get("dry_run").is_none(),
+            "dry_run key must be omitted on a real claim"
+        );
+    }
+
+    #[test]
+    fn no_claim_is_empty_object() {
+        assert_eq!(JsonFormatter.format_no_claim(), "{}");
     }
 }

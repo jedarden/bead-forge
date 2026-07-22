@@ -6,7 +6,7 @@ use crate::close::close_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
 use crate::critical_path::compute_epic_critical_path;
-use crate::format::{get_formatter, OutputFormat};
+use crate::format::{get_formatter, ClaimResultOutput, OutputFormat};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
@@ -1704,6 +1704,9 @@ fn cmd_claim(
     let config = load_config(beads_dir)?;
     let claim_ttl = config.claim_ttl_minutes;
 
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+
     // Build worker metadata
     let worker_metadata = WorkerMetadata {
         worker_id: assignee.to_string(),
@@ -1768,33 +1771,15 @@ fn cmd_claim(
         };
 
         if let Some((path, candidate)) = candidates.first() {
-            match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": candidate.id,
-                        "title": candidate.title,
-                        "priority": candidate.priority,
-                        "downstream_impact": candidate.downstream_impact,
-                        "assignee": assignee,
-                        "workspace": path.display().to_string(),
-                        "dry_run": true
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    println!(
-                        "{} (priority={}, impact={}, workspace={})",
-                        candidate.id,
-                        candidate.priority,
-                        candidate.downstream_impact,
-                        path.display()
-                    );
-                }
-            }
-        } else if format == "json" {
-            println!("{{}}");
+            let mut out = ClaimResultOutput::new(&candidate.id, assignee);
+            out.title = Some(candidate.title.clone());
+            out.priority = Some(candidate.priority);
+            out.downstream_impact = Some(candidate.downstream_impact);
+            out.workspace = Some(path.display().to_string());
+            out.dry_run = Some(true);
+            println!("{}", formatter.format_claim_result(&out));
         } else {
-            println!("No beads available to claim");
+            println!("{}", formatter.format_no_claim());
         }
     } else if any {
         // Claim from any workspace
@@ -1812,30 +1797,14 @@ fn cmd_claim(
                 bead_id,
                 reclaimed,
                 workspace_path,
-            }) => match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": bead_id,
-                        "reclaimed": reclaimed,
-                        "assignee": assignee,
-                        "workspace": workspace_path.map(|p| p.display().to_string())
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    if let Some(path) = workspace_path {
-                        println!("{} (workspace: {})", bead_id, path.display());
-                    } else {
-                        println!("{}", bead_id);
-                    }
-                }
-            },
+            }) => {
+                let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                out.reclaimed = Some(reclaimed);
+                out.workspace = workspace_path.map(|p| p.display().to_string());
+                println!("{}", formatter.format_claim_result(&out));
+            }
             None => {
-                if format == "json" {
-                    println!("{{}}");
-                } else {
-                    println!("No beads available to claim");
-                }
+                println!("{}", formatter.format_no_claim());
             }
         }
     } else if fallback == Some("any") {
@@ -1851,19 +1820,11 @@ fn cmd_claim(
         match result {
             Some(ClaimResult {
                 bead_id, reclaimed, ..
-            }) => match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": bead_id,
-                        "reclaimed": reclaimed,
-                        "assignee": assignee
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    println!("{}", bead_id);
-                }
-            },
+            }) => {
+                let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                out.reclaimed = Some(reclaimed);
+                println!("{}", formatter.format_claim_result(&out));
+            }
             None => {
                 // Fallback to any workspace
                 let paths = if workspace_paths.is_empty() {
@@ -1879,30 +1840,14 @@ fn cmd_claim(
                         bead_id,
                         reclaimed,
                         workspace_path,
-                    }) => match format {
-                        "json" => {
-                            let output = serde_json::json!({
-                                "bead_id": bead_id,
-                                "reclaimed": reclaimed,
-                                "assignee": assignee,
-                                "workspace": workspace_path.map(|p| p.display().to_string())
-                            });
-                            println!("{}", output);
-                        }
-                        _ => {
-                            if let Some(path) = workspace_path {
-                                println!("{} (workspace: {})", bead_id, path.display());
-                            } else {
-                                println!("{}", bead_id);
-                            }
-                        }
-                    },
+                    }) => {
+                        let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                        out.reclaimed = Some(reclaimed);
+                        out.workspace = workspace_path.map(|p| p.display().to_string());
+                        println!("{}", formatter.format_claim_result(&out));
+                    }
                     None => {
-                        if format == "json" {
-                            println!("{{}}");
-                        } else {
-                            println!("No beads available to claim");
-                        }
+                        println!("{}", formatter.format_no_claim());
                     }
                 }
             }
@@ -1920,25 +1865,13 @@ fn cmd_claim(
         match result {
             Some(ClaimResult {
                 bead_id, reclaimed, ..
-            }) => match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": bead_id,
-                        "reclaimed": reclaimed,
-                        "assignee": assignee
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    println!("{}", bead_id);
-                }
-            },
+            }) => {
+                let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                out.reclaimed = Some(reclaimed);
+                println!("{}", formatter.format_claim_result(&out));
+            }
             None => {
-                if format == "json" {
-                    println!("{{}}");
-                } else {
-                    println!("No beads available to claim");
-                }
+                println!("{}", formatter.format_no_claim());
             }
         }
     }
