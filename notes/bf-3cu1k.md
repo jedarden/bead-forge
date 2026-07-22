@@ -69,3 +69,41 @@ Enabled check on the real workspace (no `checkpoint:` block):
 - `src/claim.rs` and the claim/close hot path — out-of-band only per ADR-1.
 - `deploy/bf-checkpoint.service`, `*.timer`, `systemd/*` — those are a sibling
   deliverable (parent bf-48pw0 scope #3), NOT bf-3cu1k. Left as untracked.
+
+## Retry re-verification (2026-07-22, whiskey dispatch — failure-count:2)
+
+This bead was re-dispatched (two prior attempts committed + pushed the scripts
+and these notes but never closed the bead). The deliverable is already on
+`origin/main` (`fef0340` = scripts, `c7fe664` = this notes file). This run
+re-verified everything independently from a clean shell before closing — no
+script edits were needed or made.
+
+Commit provenance:
+- `git branch -r --contains fef0340` → `origin/main` (scripts pushed). PASS
+- `git show --stat fef0340` → only `deploy/bf-checkpoint.sh` + `scripts/bf-checkpoint.sh`,
+  2 files / 360 insertions; zero `src/` (claim.rs + hot path untouched). PASS
+- `git log origin/main..HEAD` shows no bf-3cu1k commit unpushed. PASS
+
+Static:
+- `bash -n` clean on both variants. PASS
+- `shellcheck` not installed → "clean if available" clause N/A. PASS (conditional)
+- `diff` of the two variants: differences are ONLY the shebang + the 3-line
+  variant-description header comment; all executable logic byte-identical
+  (mirrors the `bf-update.sh` split exactly). PASS
+
+Functional, real workspace (no `checkpoint:` block):
+- `bf config get checkpoint.enabled/interval_minutes/push` → `false` / `60` / `false`. PASS
+- `deploy/bf-checkpoint.sh -w $PWD` → `checkpoint disabled ...` exit 0. PASS
+
+Functional, throwaway repo `~/scratch/bf-ckpt-test` (checkpoint.enabled=true,
+interval=1, push=false; both `issues.jsonl` + `beads.db` untracked `?? .beads/`):
+- `bf sync --flush-only` → `Flushed 964 beads to JSONL`. PASS
+- Commit created, message `chore(beads): auto-checkpoint <iso-ts>`. PASS
+- Author `jedarden <github@jedarden.com>`. PASS
+- `git show --stat HEAD` → 1 file, `.beads/issues.jsonl` only. PASS
+- `git ls-files --error-unmatch .beads/beads.db` → no match; status still
+  `?? .beads/beads.db` (never staged, never tracked). PASS
+- No `--push` + `push=false` → no `Pushing` line; commit count stayed 1. PASS
+- Immediate second run → `last checkpoint < 1m ago ... skipping`, exit 0
+  (self-throttle honored). PASS
+- Scratch repo removed after the test.
