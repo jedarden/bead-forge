@@ -124,6 +124,68 @@ mod tests {
         }
     }
 
+    /// Empty input emits no lines at all — `.join("\n")` over an empty slice is
+    /// the empty string, so `bf list --format json` on an empty workspace prints
+    /// nothing (as opposed to `bf ready`, which special-cases `[]`).
+    #[test]
+    fn format_issues_empty_yields_empty_string() {
+        let out = JsonFormatter.format_issues(&[]);
+        assert!(out.is_empty(), "empty input must produce empty output, got {out:?}");
+        assert_eq!(out.lines().count(), 0);
+    }
+
+    /// A single issue emits exactly one JSON object on one line — neither an
+    /// array-wrapped value nor a trailing newline.
+    #[test]
+    fn format_issues_single_yields_one_valid_json_line() {
+        let issue = Issue::new("bf-solo".to_string(), "Solo".to_string(), ".".to_string());
+        let out = JsonFormatter.format_issues(&[issue]);
+        assert_eq!(out.lines().count(), 1, "single issue must be exactly one line");
+
+        let v = parse(&out);
+        assert_eq!(v.get("id").and_then(|i| i.as_str()), Some("bf-solo"));
+        assert_eq!(v.get("title").and_then(|t| t.as_str()), Some("Solo"));
+        // Display normalization applies per-line, even with one entry.
+        assert!(v.get("assignee").is_some());
+        assert!(v.get("labels").is_some());
+    }
+
+    /// Multiple issues emit JSONL — one self-contained JSON object per line, in
+    /// input order, with no array wrapper or comma separators between them.
+    #[test]
+    fn format_issues_multiple_yields_jsonl_one_object_per_line() {
+        let a = Issue::new("bf-a".to_string(), "A".to_string(), ".".to_string());
+        let b = Issue::new("bf-b".to_string(), "B".to_string(), ".".to_string());
+        let c = Issue::new("bf-c".to_string(), "C".to_string(), ".".to_string());
+        let out = JsonFormatter.format_issues(&[a, b, c]);
+
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 3, "three issues must produce three JSONL lines");
+
+        // Each line is independently valid JSON; ids preserve input order.
+        let ids: Vec<String> = lines
+            .iter()
+            .map(|line| {
+                let v = parse(line);
+                v.get("id")
+                    .and_then(|i| i.as_str())
+                    .unwrap_or_else(|| panic!("line {line:?} must have a string id, got {v}"))
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(
+            ids,
+            vec!["bf-a".to_string(), "bf-b".to_string(), "bf-c".to_string()]
+        );
+
+        // No array wrapper or comma separators: the whole output is not valid
+        // JSON, but each line is.
+        assert!(
+            serde_json::from_str::<Value>(&out).is_err(),
+            "concatenated JSONL must not parse as a single JSON value"
+        );
+    }
+
     #[test]
     fn claim_dry_run_emits_only_preview_keys() {
         // dry-run: bead_id/assignee always present, plus title/priority/impact/
