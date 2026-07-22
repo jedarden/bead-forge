@@ -332,4 +332,142 @@ mod tests {
         let json = json.get(0).cloned().unwrap_or(json);
         assert_eq!(json["status"], "in_progress");
     }
+
+    /// Regression for bf-2uhsk: `bf reopen` must clear the assignee.
+    ///
+    /// A bead closed (or tombstoned) while it had an assignee is logically
+    /// unclaimed once reopened. If the stale assignee survives reopen, the bead
+    /// reads back as "assigned" and is excluded from candidate discovery. This
+    /// pins that the `bf reopen` command (cmd_reopen) — not just `bf update
+    /// --status open` — clears the assignee to NULL.
+    #[test]
+    fn test_reopen_clears_assignee() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Create a bead.
+        let (stdout, stderr, success) = run_bf(
+            &beads_dir,
+            &[
+                "create",
+                "--title",
+                "Reopen clears assignee",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
+        );
+        assert!(
+            success,
+            "Create failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+        let bead_id =
+            extract_bead_id(&stdout).expect("Could not extract bead ID from create output");
+
+        // Assign it so there is a stale assignee to clear on reopen.
+        let (stdout, stderr, success) =
+            run_bf(&beads_dir, &["update", &bead_id, "--assignee", "worker-1"]);
+        assert!(
+            success,
+            "Assign failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+
+        // Confirm the assignee is persisted and readable via `bf show`.
+        let (stdout, stderr, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
+        assert!(
+            success,
+            "Show after assign failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Failed to parse show output as JSON");
+        let json = json.get(0).cloned().unwrap_or(json);
+        assert_eq!(
+            json["assignee"], "worker-1",
+            "Assignee should be set before reopen"
+        );
+
+        // Close, then reopen via the dedicated `bf reopen` command.
+        let (stdout, stderr, success) =
+            run_bf(&beads_dir, &["close", &bead_id, "--reason", "done for now"]);
+        assert!(
+            success,
+            "Close failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+
+        let (stdout, stderr, success) = run_bf(&beads_dir, &["reopen", &bead_id]);
+        assert!(
+            success,
+            "Reopen failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+
+        // The bead is open again and its assignee must be cleared (NULL / absent
+        // in JSON, not the leftover "worker-1").
+        let (stdout, stderr, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
+        assert!(
+            success,
+            "Show after reopen failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Failed to parse show output after reopen");
+        let json = json.get(0).cloned().unwrap_or(json);
+        assert_eq!(json["status"], "open", "Bead should be open after reopen");
+        assert!(
+            json["assignee"].is_null(),
+            "Reopen must clear the assignee (got {:?})",
+            json["assignee"]
+        );
+    }
+
+    /// `bf reopen` on a bead that never had an assignee is a no-op on the
+    /// assignee field and must not error.
+    #[test]
+    fn test_reopen_without_assignee_is_noop() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        let (stdout, stderr, success) = run_bf(
+            &beads_dir,
+            &[
+                "create",
+                "--title",
+                "Reopen no assignee",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
+        );
+        assert!(
+            success,
+            "Create failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+        let bead_id =
+            extract_bead_id(&stdout).expect("Could not extract bead ID from create output");
+
+        let (_, _, success) = run_bf(&beads_dir, &["close", &bead_id, "--reason", "done"]);
+        assert!(success, "Close failed");
+
+        let (stdout, stderr, success) = run_bf(&beads_dir, &["reopen", &bead_id]);
+        assert!(
+            success,
+            "Reopen (no assignee) failed: stdout={}, stderr={}",
+            stdout, stderr
+        );
+
+        let (stdout, _, success) = run_bf(&beads_dir, &["show", &bead_id, "--format", "json"]);
+        assert!(success, "Show after reopen failed");
+        let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        let json = json.get(0).cloned().unwrap_or(json);
+        assert_eq!(json["status"], "open");
+        assert!(
+            json["assignee"].is_null(),
+            "Assignee should remain unset after reopening an unassigned bead"
+        );
+    }
 }
