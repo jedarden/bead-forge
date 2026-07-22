@@ -2,18 +2,19 @@
 
 bead-forge (`bf`) is a repo-local issue tracker built for multi-agent AI coding workflows. Each "bead" is a task (bug, feature, research item, etc.) stored as JSON entries in a JSONL file alongside your code. Agents claim beads, work on them, and close them — like a task queue where each worker is an LLM session.
 
-**NOTE:** `bf` is the canonical command. The `br` command name is deprecated — a temporary compatibility alias only. Use `bf` in all documentation, scripts, and examples.
-
 bead-forge is a drop-in replacement for [`beads_rust`](https://github.com/dicklesworthstone/beads_rust) (`br`) — every `br` command works unchanged. On top of that it adds **atomic claiming** via SQLite `BEGIN IMMEDIATE` transactions, so 20 workers can claim work simultaneously without racing each other.
 
 ```bash
+# Drop-in: symlink br → bf
+ln -sf ~/.local/bin/bf ~/.local/bin/br
+
 # Claim the next available bead atomically (no race conditions)
 bf claim --assignee worker-1 --format json
 
 # Split a large bead into children atomically
 bf mitosis bf-a3f8 --children '[{"title": "Implement handler"}, {"title": "Write tests"}]'
 
-# Show all commands
+# Show all commands, including br-compatible ones
 bf --help
 ```
 
@@ -28,7 +29,7 @@ The original. A git-backed issue tracker designed as "memory for coding agents."
 Fast Rust port of beads. 10–100× faster than the Python original. Adds `sync --flush-only / --import-only`, a `doctor --repair` command, TOON output format (token-optimized for LLMs), and orphan handling. Maintains full JSONL and `.beads/` compatibility. Our codebase runs a fork of this with a rusqlite shim replacing the upstream FrankenSQLite backend ([upstream issue #171](https://github.com/dicklesworthstone/beads_rust/issues/171)). Concurrency story is identical to `beads` — SQLite single-writer, no atomic claiming.
 
 **bead-forge (`bf`, this repo)**
-Superset of `br`. Preserves 100% of the JSONL format, `.beads/` directory layout, and CLI surface. The `br` command name is a deprecated compatibility alias — `bf` is canonical. Adds atomic claiming, critical-path scoring, velocity tracking, and crash-safe batch operations — the features required for reliable multi-worker fleets.
+Superset of `br`. Preserves 100% of the JSONL format, `.beads/` directory layout, and CLI surface so existing scripts, NEEDLE workers, and CLAUDE.md instructions that reference `br` continue to work without changes. Adds atomic claiming, critical-path scoring, velocity tracking, and crash-safe batch operations — the features required for reliable multi-worker fleets.
 
 ## Problem
 
@@ -149,21 +150,21 @@ If unflushed beads exist and neither `--flush-first` nor `--force` is specified,
 2. **Critical path float** — among equal-priority beads, pick the one on the longest blocking chain (finishing it unblocks the most downstream work)
 3. **Velocity affinity** — optional: route beads to workers whose historical p50 close time for that `issue_type` is fastest
 
-### Backward Compatibility
+### Compatibility with br
 
-For backward compatibility with existing scripts and workspaces, `bf` accepts all `br` commands:
+bead-forge is a strict superset of `br`. Every `br` command works identically:
 
 | Command | Behavior |
 |---------|----------|
-| `bf create / list / show / update / close / reopen` | Identical to br, identical JSONL entries |
-| `bf ready` | Same DAG-based filtering; adds critical-path sort |
-| `bf sync --flush-only / --import-only` | Same JSONL format |
-| `bf doctor --repair` | Same repair logic; bf-only tables are not affected |
-| `bf dep / bf label / bf search / bf stats` | Identical |
+| `br create / list / show / update / close / reopen` | Identical output, identical JSONL entries |
+| `br ready` | Same DAG-based filtering; bf adds critical-path sort |
+| `br sync --flush-only / --import-only` | Same JSONL format |
+| `br doctor --repair` | Same repair logic; bf-only tables are not affected |
+| `br dep / br label / br search / br stats` | Identical |
 
-A symlink `br → bf` allows existing scripts to run unchanged, but new scripts should use `bf` directly.
+The symlink `br → bf` is all that's needed on a migrated machine. Scripts that call `br` call `bf` automatically.
 
-**Forward-compatibility note**: `bf` adds a `content_hash` column to the `issues` table. If the old `br` binary is run directly on a migrated workspace, `br doctor` may emit a column-count mismatch warning. This is cosmetic — data is not affected and `br` reads/writes continue to work correctly.
+**Forward-compatibility note**: `bf` adds a `content_hash` column to the `issues` table. If `br` is run directly on a migrated workspace, `br doctor` may emit a column-count mismatch warning. This is cosmetic — data is not affected and `br` reads/writes continue to work correctly.
 
 ## NEEDLE Integration
 
@@ -265,6 +266,7 @@ VERSION=$(curl -s https://api.github.com/repos/jedarden/bead-forge/releases/late
 curl -fsSL "https://github.com/jedarden/bead-forge/releases/download/${VERSION}/bf-linux-x86_64" -o bf
 chmod +x bf
 sudo mv bf /usr/local/bin/bf
+sudo ln -sf /usr/local/bin/bf /usr/local/bin/br   # drop-in replace br
 ```
 
 Or build from source:
@@ -274,6 +276,7 @@ git clone https://github.com/jedarden/bead-forge
 cd bead-forge
 cargo build --release
 cp target/release/bf ~/.local/bin/bf
+ln -sf ~/.local/bin/bf ~/.local/bin/br   # drop-in replace br
 ```
 
 ## Migrating an existing workspace
@@ -287,11 +290,10 @@ Migration primes the bf-only tables (`bead_annotations`, `worker_sessions`, `vel
 
 ## Commands
 
-**bf is the canonical command.** The br command is a deprecated compatibility alias.
+All `br` commands plus:
 
 | Command | Description |
 |---------|-------------|
-| `bf create / list / show / update / close / reopen` | Core bead operations (br-compatible) |
 | `bf claim` | Atomic claim — picks next ready bead in a single transaction |
 | `bf mitosis <id> --children '[...]'` | Crash-safe split: create children + wire deps + close parent atomically |
 | `bf batch --json '[...]'` | Run multiple operations in one transaction |
