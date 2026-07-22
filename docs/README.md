@@ -561,7 +561,10 @@ Built via Argo Workflows on `iad-ci`. WorkflowTemplate: `bead-forge-build` in `j
 **Deployment steps (automated by WorkflowTemplate):**
 
 1. **Build**: `cargo build --release` produces `target/release/bf` (7.4M optimized binary)
-2. **Package**: Upload binary to GitHub Releases as `bf-linux-x86_64`
+2. **Package**: Upload binary to GitHub Releases as `bf-linux-x86_64`, and upload a
+   `SHA256SUMS` manifest alongside it (e.g. `sha256sum bf-linux-x86_64 > SHA256SUMS`).
+   The auto-update client (`bf-update.sh`) **requires** this manifest and refuses to
+   install without verifying the binary's checksum against it.
 3. **Install**: Download and install to `~/.local/bin/bf`
 4. **Symlink**: Create `~/.local/bin/br → bf` symlink for drop-in replacement
 5. **Verify**: Test `bf list` and `br list` in a NEEDLE workspace
