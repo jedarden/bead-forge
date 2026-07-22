@@ -836,13 +836,7 @@ pub fn run(cli: Cli) -> Result<()> {
         output,
     } = &command
     {
-        return cmd_merge_jsonl(
-            &workspace,
-            base.as_deref(),
-            ours,
-            theirs,
-            output.as_deref(),
-        );
+        return cmd_merge_jsonl(&workspace, base.as_deref(), ours, theirs, output.as_deref());
     }
 
     // All other commands require existing .beads directory

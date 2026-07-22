@@ -1,12 +1,13 @@
-//! Integration tests for assignee field validation
+//! Integration tests for assignee field handling
 //!
 //! This test file validates that:
-//! 1. Empty assignee is rejected during bead creation
-//! 2. Whitespace-only assignee is rejected during bead creation
-//! 3. Empty assignee is rejected during bead updates
-//! 4. Whitespace-only assignee is rejected during bead updates
-//! 5. Valid assignees are accepted during both create and update operations
-//! 6. None (no assignee) is accepted during both create and update operations
+//! 1. Empty assignee during bead creation is normalized to unassigned (NULL)
+//! 2. Whitespace-only assignee during bead creation is normalized to unassigned
+//! 3. Tab-whitespace assignee during bead creation is normalized to unassigned
+//! 4. Empty assignee during bead update clears the assignee (NULL)
+//! 5. Whitespace-only assignee during bead update clears the assignee (NULL)
+//! 6. Valid assignees are accepted during both create and update operations
+//! 7. None (no assignee flag) is accepted during both create and update operations
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -87,54 +88,83 @@ fn run_bf_update(
     (success, stdout, stderr)
 }
 
+/// Check via `bf show --json` that the bead's assignee is unset.
+///
+/// The Issue struct skips serialization when assignee is None, so an unassigned
+/// bead has no `assignee` key at all. A set assignee always serializes as a
+/// string value (`"assignee":"<name>"`); checking for the absence of that
+/// string covers both the omitted-key and a hypothetical null case.
+fn assignee_is_unset(workspace_dir: &PathBuf, id: &str) -> bool {
+    let output = Command::new(bf_binary())
+        .arg("show")
+        .arg("--json")
+        .arg(id)
+        .current_dir(workspace_dir)
+        .output()
+        .expect("Failed to run bf show --json");
+    assert!(
+        output.status.success(),
+        "bf show --json failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    !stdout.contains("\"assignee\":\"")
+}
+
 #[test]
-#[ignore = "aspirational: assignee validation never implemented; empty assignee now means clear/unassigned (br parity) - revisit via tracking bead"]
-fn test_create_bead_with_empty_assignee_rejected() {
+fn test_create_bead_with_empty_assignee_succeeds_unassigned() {
     let temp_dir = setup_test_workspace();
     let workspace_dir = temp_dir.path().join("test-workspace");
 
     let (success, stdout, stderr) = run_bf_create(&workspace_dir, "Test bead", Some(""));
 
-    assert!(!success, "bf create should fail with empty assignee");
     assert!(
-        stderr.contains("Assignee cannot be empty or whitespace-only"),
-        "Error message should mention empty assignee"
+        success,
+        "bf create with empty assignee should succeed, not fail. stderr: {stderr}"
+    );
+    let bead_id = stdout.trim();
+    assert!(!bead_id.is_empty(), "Should output bead ID");
+    assert!(
+        assignee_is_unset(&workspace_dir, bead_id),
+        "Empty assignee should be normalized to unassigned (NULL)"
     );
 }
 
 #[test]
-#[ignore = "aspirational: assignee validation never implemented; empty assignee now means clear/unassigned (br parity) - revisit via tracking bead"]
-fn test_create_bead_with_whitespace_only_assignee_rejected() {
+fn test_create_bead_with_whitespace_only_assignee_succeeds_unassigned() {
     let temp_dir = setup_test_workspace();
     let workspace_dir = temp_dir.path().join("test-workspace");
 
     let (success, stdout, stderr) = run_bf_create(&workspace_dir, "Test bead", Some("   "));
 
     assert!(
-        !success,
-        "bf create should fail with whitespace-only assignee"
+        success,
+        "bf create with whitespace-only assignee should succeed, not fail. stderr: {stderr}"
     );
+    let bead_id = stdout.trim();
+    assert!(!bead_id.is_empty(), "Should output bead ID");
     assert!(
-        stderr.contains("Assignee cannot be empty or whitespace-only"),
-        "Error message should mention empty assignee"
+        assignee_is_unset(&workspace_dir, bead_id),
+        "Whitespace-only assignee should be normalized to unassigned (NULL)"
     );
 }
 
 #[test]
-#[ignore = "aspirational: assignee validation never implemented; empty assignee now means clear/unassigned (br parity) - revisit via tracking bead"]
-fn test_create_bead_with_tab_whitespace_assignee_rejected() {
+fn test_create_bead_with_tab_whitespace_assignee_succeeds_unassigned() {
     let temp_dir = setup_test_workspace();
     let workspace_dir = temp_dir.path().join("test-workspace");
 
     let (success, stdout, stderr) = run_bf_create(&workspace_dir, "Test bead", Some("\t\t"));
 
     assert!(
-        !success,
-        "bf create should fail with tab whitespace-only assignee"
+        success,
+        "bf create with tab-whitespace assignee should succeed, not fail. stderr: {stderr}"
     );
+    let bead_id = stdout.trim();
+    assert!(!bead_id.is_empty(), "Should output bead ID");
     assert!(
-        stderr.contains("Assignee cannot be empty or whitespace-only"),
-        "Error message should mention empty assignee"
+        assignee_is_unset(&workspace_dir, bead_id),
+        "Tab-whitespace assignee should be normalized to unassigned (NULL)"
     );
 }
 
@@ -175,47 +205,60 @@ fn test_create_bead_with_padded_whitespace_assignee_accepted() {
 }
 
 #[test]
-#[ignore = "aspirational: assignee validation never implemented; empty assignee now means clear/unassigned (br parity) - revisit via tracking bead"]
-fn test_update_bead_with_empty_assignee_rejected() {
+fn test_update_bead_with_empty_assignee_succeeds_clears_assignee() {
     let temp_dir = setup_test_workspace();
     let workspace_dir = temp_dir.path().join("test-workspace");
 
-    // First create a valid bead
-    let (success, stdout, _) = run_bf_create(&workspace_dir, "Test bead", None);
+    // First create a bead WITH an assignee, so clearing is observable.
+    let (success, stdout, _stderr) = run_bf_create(&workspace_dir, "Test bead", Some("alice"));
     assert!(success, "Failed to create test bead");
     let bead_id = stdout.trim();
 
-    // Try to update with empty assignee
+    // Sanity: assignee really is set before we clear it.
+    assert!(
+        !assignee_is_unset(&workspace_dir, bead_id),
+        "Precondition: assignee should be set to alice before clearing"
+    );
+
+    // Update with empty assignee — must succeed and clear.
     let (success, _stdout, stderr) = run_bf_update(&workspace_dir, bead_id, Some(""));
 
-    assert!(!success, "bf update should fail with empty assignee");
     assert!(
-        stderr.contains("Assignee cannot be empty or whitespace-only"),
-        "Error message should mention empty assignee"
+        success,
+        "bf update with empty assignee should succeed and clear, not fail. stderr: {stderr}"
+    );
+    assert!(
+        assignee_is_unset(&workspace_dir, bead_id),
+        "Empty assignee should clear the assignee (set to NULL)"
     );
 }
 
 #[test]
-#[ignore = "aspirational: assignee validation never implemented; empty assignee now means clear/unassigned (br parity) - revisit via tracking bead"]
-fn test_update_bead_with_whitespace_only_assignee_rejected() {
+fn test_update_bead_with_whitespace_only_assignee_succeeds_clears_assignee() {
     let temp_dir = setup_test_workspace();
     let workspace_dir = temp_dir.path().join("test-workspace");
 
-    // First create a valid bead
-    let (success, stdout, _) = run_bf_create(&workspace_dir, "Test bead", None);
+    // First create a bead WITH an assignee, so clearing is observable.
+    let (success, stdout, _stderr) = run_bf_create(&workspace_dir, "Test bead", Some("alice"));
     assert!(success, "Failed to create test bead");
     let bead_id = stdout.trim();
 
-    // Try to update with whitespace-only assignee
+    // Sanity: assignee really is set before we clear it.
+    assert!(
+        !assignee_is_unset(&workspace_dir, bead_id),
+        "Precondition: assignee should be set to alice before clearing"
+    );
+
+    // Update with whitespace-only assignee — must succeed and clear.
     let (success, _stdout, stderr) = run_bf_update(&workspace_dir, bead_id, Some("   "));
 
     assert!(
-        !success,
-        "bf update should fail with whitespace-only assignee"
+        success,
+        "bf update with whitespace-only assignee should succeed and clear, not fail. stderr: {stderr}"
     );
     assert!(
-        stderr.contains("Assignee cannot be empty or whitespace-only"),
-        "Error message should mention empty assignee"
+        assignee_is_unset(&workspace_dir, bead_id),
+        "Whitespace-only assignee should clear the assignee (set to NULL)"
     );
 }
 
