@@ -79,3 +79,18 @@ bf list --type epic | grep bf-31l74
 4. **Multiple Labels:** Can specify multiple `--label` flags during creation
 
 ### All Tests: ✅ PASS
+
+---
+
+### Re-verification (2026-07-22)
+
+Independently re-ran the full flow on a fresh temp epic (`bf-5vktf`, deleted after):
+
+- `br create --type epic --label verify-a --label verify-b` → epic created with both labels
+- `br show` / `br labels` / `br label list` all agree on the label set
+- `br label add --label verify-c` → added
+- `br label remove --label verify-a` → removed
+- Confirmed positional label args are rejected — the `--label` flag is required for
+  `label add`/`label remove` (`error: unexpected argument`)
+
+Result: ✅ all epic-with-CLI-labels operations still pass.
