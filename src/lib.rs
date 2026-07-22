@@ -1,3 +1,4 @@
+pub mod autoflush;
 pub mod batch;
 pub mod claim;
 pub mod cli;
@@ -26,6 +27,7 @@ pub use batch::{execute_batch, mitosis, mitosis_ex, BatchOp, BatchResult, Mitosi
 pub use claim::{claim, claim_any, get_ready_candidates, ClaimResult, ScoredBead};
 pub use config::{
     find_beads_dir, load_config, load_metadata, Config, HistoryConfig, Metadata, RotateConfig,
+    SyncConfig,
 };
 pub use merge::{merge_jsonl_files, merge_maps, MergeReport};
 pub use doctor::{check, rebuild_cache, reclaim_stale, repair, verify_schema, DoctorResult};

@@ -1,10 +1,12 @@
 pub mod json;
 pub mod text;
 pub mod toon;
+pub mod warning;
 
 pub use json::JsonFormatter;
 pub use text::TextFormatter;
 pub use toon::ToonFormatter;
+pub use warning::{warn_stderr, with_warning};
 
 use crate::model::Issue;
 use serde::Serialize;

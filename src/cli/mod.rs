@@ -29,6 +29,12 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub workspace: Option<PathBuf>,
 
+    /// Disable the automatic SQLite→JSONL flush after mutating commands for
+    /// this invocation. Overrides `sync.auto_flush: true` in config; a no-op
+    /// when auto-flush is already off. See `crate::autoflush::enabled`.
+    #[arg(long, global = true)]
+    pub no_auto_flush: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
