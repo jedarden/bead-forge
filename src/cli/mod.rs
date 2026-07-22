@@ -1447,8 +1447,19 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
 
     match format {
         "json" => {
-            // Output as JSON array: [] for empty, [candidate] for single, [c1, c2, ...] for multiple
-            println!("{}", serde_json::to_string(&candidates)?);
+            // Use the shared formatter (JSONL, one Issue per line) for consistency with
+            // `list`/`search`. Resolve each scored candidate to its full Issue record so
+            // the formatter has every field; empty result prints `[]`.
+            let formatter = get_formatter(OutputFormat::Json);
+            let issues: Vec<Issue> = candidates
+                .iter()
+                .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
+                .collect();
+            if issues.is_empty() {
+                println!("[]");
+            } else {
+                print!("{}", formatter.format_issues(&issues));
+            }
         }
         "toon" => {
             for candidate in candidates {
