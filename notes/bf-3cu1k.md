@@ -175,3 +175,50 @@ Repo `~/scratch/bf-3cu1k-verify-push` with a bare `*-remote.git` and
 
 All scratch repos removed after the run. Acceptance criteria fully satisfied;
 closing.
+
+## Re-verification #4 (2026-07-22, bf-3cu1k re-dispatch — glm-5 worker)
+
+Deliverable unchanged — no script edits needed or made. Re-confirmed every
+acceptance criterion independently against isolated throwaway repos in
+`~/scratch/` (the shared bead-forge tree was never mutated by the test runs;
+all scratch repos removed afterward).
+
+Static: `bash -n` clean on both variants; `shellcheck` not installed (the
+"clean if available" clause is conditional). `diff deploy/bf-checkpoint.sh
+scripts/bf-checkpoint.sh` → differences are ONLY line 1 (shebang
+`#!/bin/bash` vs `#!/usr/bin/env bash`) and line 12 (the variant-description
+comment); body logic byte-identical, mirroring the `bf-update.sh` split exactly.
+`git log -- deploy/bf-checkpoint.sh scripts/bf-checkpoint.sh` → only commits
+`fef0340` (feat) + `83882b4` (refine); `src/claim.rs` and the claim/close hot
+path untouched (ADR-1 out-of-band only). Dependency bf-2hgh8 satisfied:
+`bf config get checkpoint.{enabled,interval_minutes,push} -w <ws>` returns
+`false` / `60` / `false` (dotted key + `-w` honored).
+
+Functional (isolated repo, `checkpoint.enabled=true`, repo-local identity set to
+a throwaway to prove the script overrides it):
+
+| Scenario | Result |
+|---|---|
+| `enabled=false` (no `checkpoint:` block) → no-op | prints `checkpoint disabled ...`, exit 0. PASS |
+| `enabled=true` + db-only bead → flush + commit | `Flushed 1 beads`, commit created, exit 0. PASS |
+| commit message prefix | `chore(beads): auto-checkpoint <iso-ts>`. PASS |
+| author identity (overrides repo-local) | `jedarden <github@jedarden.com>`. PASS |
+| commit scope | `git show --stat HEAD` → 1 file, `.beads/issues.jsonl` only. PASS |
+| `beads.db` never staged | 0 in index, 0 in HEAD; also gitignored by `bf init`. PASS |
+| `config.yaml` not swept in | 0 in HEAD (only the explicit `issues.jsonl` pathspec). PASS |
+| self-throttle (interval=60, immediate re-run) | `last checkpoint < 60m ago ... skipping`, exit 0. PASS |
+| no-changes no-op (interval=0, no new diff) | `nothing to commit`, exit 0; commit count unchanged. PASS |
+| `--push` with upstream set | `master -> master`, remote +1, exit 0. PASS |
+| persistent `push=true`, no flag | push fires, remote advances, exit 0. PASS |
+| `push=false`, no flag | local commit only, remote unchanged, no `Pushing` line. PASS |
+
+One environment nuance re-confirmed (not a script defect): `git push` with no
+upstream-tracking branch returns 128 — this only surfaces in a freshly
+`git init`'d probe repo; any real checked-out workspace (branch tracks a
+remote) pushes fine. The spec says `git push` and the script does exactly that.
+
+Shared-tree note: local tip diverged from `origin/needle/bf-5wku` by a
+sibling's duplicate `notes(bf-5wku)` commit (identical patch on both sides);
+rebased cleanly (duplicate dropped) before pushing this notes update. Only
+`notes/bf-3cu1k.md` was committed — the unrelated dirty `src/format/*.rs` /
+`src/cli/mod.rs` files belong to sibling workers and were left untouched.
