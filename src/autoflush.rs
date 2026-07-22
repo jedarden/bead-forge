@@ -72,19 +72,36 @@ pub fn run(workspace_dir: &Path) -> anyhow::Result<usize> {
     flush_dirty(workspace_dir)
 }
 
+/// Build the user-facing warning string for a failed auto-flush.
+///
+/// This is the SINGLE source of the flush-failure message (Phase 7.1 child
+/// 3/5, bf-3jc66). It is surfaced verbatim on both the stderr `warning:` line
+/// and the `--json` envelope's `warning` field, so it embeds the recovery
+/// command — a human or agent reading either channel learns exactly how to
+/// retry without guessing. The leading reason prefix stays stable so existing
+/// assertions on `"auto-flush to JSONL failed"` keep matching.
+fn flush_failed_warning(err: &anyhow::Error) -> String {
+    format!(
+        "auto-flush to JSONL failed: {err}; run \"bf sync --flush-only\" to retry"
+    )
+}
+
 /// Run auto-flush after a mutation, honoring a pre-resolved `enabled` decision,
 /// and return an outcome whose [`FlushOutcome::warning`] bridges into the
 /// JSON/stderr warning channel.
 ///
 /// A failed flush is intentionally non-fatal: the mutation already succeeded,
-/// so the caller degrades to a warning rather than an error.
+/// so the caller degrades to a warning rather than an error. The dirty marks
+/// are retained (see [`crate::sync::flush_dirty`]: `clear_dirty` only runs after
+/// the export succeeds), so the next mutation or an explicit
+/// `bf sync --flush-only` recovers automatically.
 pub fn after_mutation(workspace_dir: &Path, enabled: bool) -> FlushOutcome {
     if !enabled {
         return FlushOutcome::Disabled;
     }
     match run(workspace_dir) {
         Ok(count) => FlushOutcome::Flushed(count),
-        Err(e) => FlushOutcome::Failed(format!("auto-flush to JSONL failed: {e}")),
+        Err(e) => FlushOutcome::Failed(flush_failed_warning(&e)),
     }
 }
 
@@ -102,7 +119,7 @@ pub fn after_delete(workspace_dir: &Path, enabled: bool, removed_ids: &[String])
     }
     match flush_after_delete(workspace_dir, removed_ids) {
         Ok(count) => FlushOutcome::Flushed(count),
-        Err(e) => FlushOutcome::Failed(format!("auto-flush to JSONL failed: {e}")),
+        Err(e) => FlushOutcome::Failed(flush_failed_warning(&e)),
     }
 }
 
@@ -190,6 +207,18 @@ mod tests {
         assert!(
             warning.contains("auto-flush to JSONL failed"),
             "warning must describe the auto-flush failure, got: {warning}"
+        );
+        // The warning is actionable: it names the recovery command on both the
+        // stderr line and the --json `warning` field.
+        assert!(
+            warning.contains("bf sync --flush-only"),
+            "warning must carry the recovery command, got: {warning}"
+        );
+        // Dirty marks are retained across the failed flush so recovery can retry.
+        let dirty = storage.list_dirty_issues().expect("list_dirty_issues");
+        assert!(
+            dirty.iter().any(|i| i.id == "bf-1"),
+            "dirty mark must survive the failed flush, got dirty={dirty:?}"
         );
     }
 

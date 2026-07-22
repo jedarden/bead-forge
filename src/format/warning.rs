@@ -6,6 +6,23 @@
 //! already-built JSON value ([`with_warning`]) and emit the same message to
 //! stderr on the human path ([`warn_stderr`]). The auto-flush layer bridges a
 //! failed flush into this channel (see [`crate::autoflush::FlushOutcome`]).
+//!
+//! # Stable shape (failure contract — bf-3jc66)
+//!
+//! There is ONE shape for a flush warning across every mutation command, so
+//! agent consumers (NEEDLE workers) detect it uniformly:
+//!
+//! * **stderr** — a single line prefixed `warning: <message>`. Emitted by
+//!   [`warn_stderr`] (via [`crate::autoflush`]'s outcome surfacing) and NEVER
+//!   written to stdout, so `bf <mutation> --json | jq .` always parses.
+//! * **`--json`** — a top-level `"warning"` key holding the same `<message>`
+//!   as a non-null string, injected by [`with_warning`]. The key is **absent on
+//!   the clean path** (successful flush, or auto-flush disabled); it appears
+//!   only when a flush was attempted and failed. Detect with a presence /
+//!   truthiness check: `if let Some(w) = obj.get("warning")`.
+//!
+//! A flush failure never fails the mutation — the write already committed and
+//! the dirty marks are retained, so the next flush recovers.
 
 use serde_json::Value;
 
