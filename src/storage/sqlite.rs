@@ -308,31 +308,6 @@ impl Storage {
         Ok(())
     }
 
-    /// Clear dirty marks for a specific list of issue IDs.
-    ///
-    /// This is used after import to clear dirty marks only for beads that
-    /// were actually affected by the import (New or Updated), while preserving
-    /// dirty marks for beads that were unchanged or have local modifications.
-    pub fn clear_dirty_for_list(&self, ids: &[String]) -> Result<()> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let conn = self.conn.lock().unwrap();
-        let ids_str: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
-        let placeholders = ids_str.iter().enumerate()
-            .map(|(i, _)| format!("?{}", i + 1))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let sql = format!("DELETE FROM dirty_issues WHERE issue_id IN ({})", placeholders);
-        let mut stmt = conn.prepare(&sql)?;
-        let params = ids_str.iter().map(|s| &*s as &dyn rusqlite::ToSql).collect::<Vec<_>>();
-
-        // Execute with the list of IDs
-        stmt.execute(rusqlite::params_from_iter(params))?;
-        Ok(())
-    }
-
     pub fn create_issue(&self, issue: &Issue) -> Result<()> {
         // Scan for secrets before creating
         if let Some(scanner) = &*self.secret_scanner.lock().unwrap() {

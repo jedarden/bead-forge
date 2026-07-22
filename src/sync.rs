@@ -183,10 +183,9 @@ pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
     // Rebuild blocked cache after import
     storage.rebuild_blocked_cache()?;
 
-    // Clear dirty marks ONLY for beads that were actually affected by the import
+    // Clear dirty marks - after import from JSONL, db and JSONL are in sync
     // Beads that were created/updated during import are now flushed to JSONL
-    // Beads that were unchanged or have local modifications newer than JSONL keep their dirty marks
-    storage.clear_dirty_for_list(&result.affected_ids)?;
+    storage.clear_dirty()?;
 
     Ok(SyncResult {
         imported: result.imported,

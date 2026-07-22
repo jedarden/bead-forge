@@ -1153,4 +1153,86 @@ mod tests {
              the same way it would if the blocker were status=closed"
         );
     }
+
+    /// Regression test for bf-1nprw.
+    ///
+    /// Investigation (2026-07-22) of a report that `bf ready --limit 500 --json`
+    /// returned an empty array despite many open-status beads. Root-cause found the
+    /// query was in fact *correct*: every excluded open bead genuinely had an
+    /// unclosed blocker (in the live workspace, 66 open beads, only 12 unblocked,
+    /// and `get_ready_candidates` returned exactly those 12 — verified independently
+    /// by hand-computing the unblocked set directly against SQLite).
+    ///
+    /// This test locks in the core invariant from that report so a future regression
+    /// is caught immediately: in a workspace with a *mix* of open beads — some blocked
+    /// by an open blocker, some blocked transitively by a `status=blocked` blocker
+    /// (the exact bf-127ow → bf-ncms2 shape seen in the real data), and some entirely
+    /// standalone with zero dependencies — the standalone, zero-dependency open beads
+    /// MUST appear in the ready output, while the blocked ones must not.
+    #[test]
+    fn test_ready_includes_zero_dependency_open_beads_bf_1nprw() {
+        let (_temp, mut storage) = setup_test_db();
+
+        // Two standalone open beads with NO dependencies — the bug report's worry was
+        // that these would disappear from ready output.
+        let standalone_a = Issue::new("bf-standalone-a".to_string(), "Standalone A".to_string(), ".".to_string());
+        let standalone_b = Issue::new("bf-standalone-b".to_string(), "Standalone B".to_string(), ".".to_string());
+        storage.create_issue(&standalone_a).unwrap();
+        storage.create_issue(&standalone_b).unwrap();
+
+        // A dependent blocked by a still-OPEN blocker -> not ready.
+        storage.create_issue(&Issue::new("bf-blocker-open".to_string(), "Open blocker".to_string(), ".".to_string())).unwrap();
+        storage.create_issue(&Issue::new("bf-dep-open".to_string(), "Dep of open blocker".to_string(), ".".to_string())).unwrap();
+        storage.add_dependency("bf-dep-open", "bf-blocker-open", &crate::model::DependencyType::Blocks, "test").unwrap();
+
+        // A dependent blocked transitively by a status=blocked blocker (the bf-127ow
+        // -> bf-ncms2 pattern). "blocked" is not a terminal status, so this must stay
+        // unready.
+        storage.create_issue(&Issue::new("bf-blocker-blocked".to_string(), "Blocked blocker".to_string(), ".".to_string())).unwrap();
+        storage.update_issue(
+            "bf-blocker-blocked",
+            &crate::model::IssueChanges {
+                status: Some(Status::Blocked),
+                ..Default::default()
+            },
+        ).unwrap();
+        storage.create_issue(&Issue::new("bf-dep-blocked".to_string(), "Dep of blocked blocker".to_string(), ".".to_string())).unwrap();
+        storage.add_dependency("bf-dep-blocked", "bf-blocker-blocked", &crate::model::DependencyType::Blocks, "test").unwrap();
+
+        let candidates = storage
+            .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None))
+            .unwrap();
+
+        // Core invariant: zero-dependency open beads are present.
+        assert!(
+            candidates.iter().any(|c| c.id == "bf-standalone-a"),
+            "standalone open bead with zero dependencies must appear in ready output"
+        );
+        assert!(
+            candidates.iter().any(|c| c.id == "bf-standalone-b"),
+            "standalone open bead with zero dependencies must appear in ready output"
+        );
+
+        // Blocked beads are correctly excluded.
+        assert!(
+            !candidates.iter().any(|c| c.id == "bf-dep-open"),
+            "bead blocked by an open blocker must not be ready"
+        );
+        assert!(
+            !candidates.iter().any(|c| c.id == "bf-dep-blocked"),
+            "bead blocked by a status=blocked blocker must not be ready"
+        );
+
+        // Exact membership: the two standalone beads and the still-open blocker are
+        // ready (3). bf-blocker-blocked is NOT ready — not because it has a blocker,
+        // but because its own status is "blocked" (the query filters status='open').
+        // Both dependents are excluded by the NOT EXISTS blocker clause.
+        let mut ready_ids: Vec<&str> = candidates.iter().map(|c| c.id.as_str()).collect();
+        ready_ids.sort_unstable();
+        assert_eq!(
+            ready_ids,
+            vec!["bf-blocker-open", "bf-standalone-a", "bf-standalone-b"],
+            "ready set must be exactly the unblocked open-status beads"
+        );
+    }
 }

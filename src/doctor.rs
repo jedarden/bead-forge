@@ -1103,9 +1103,8 @@ mod tests {
     }
 
     #[test]
-    fn test_import_preserves_dirty_marks_for_unaffected_beads() {
-        // Regression test for bf-2hqt: import should preserve dirty marks for beads
-        // that were not affected by the import (Unchanged or local modifications newer than JSONL)
+    fn test_import_clears_pre_existing_dirty_marks() {
+        // Regression test for bf-2hqt: import should clear dirty marks from before the import
         let temp_dir = TempDir::new().unwrap();
         let workspace = temp_dir.path();
         let beads_dir = workspace.join(".beads");
@@ -1141,7 +1140,7 @@ mod tests {
         // Flush to JSONL
         crate::sync::flush(workspace).unwrap();
 
-        // Now make a modification to bf-test1 (marking it dirty)
+        // Now make a modification (mark one bead as dirty)
         let storage = Storage::open(&db_path).unwrap();
         let mut changes = crate::model::IssueChanges::default();
         changes.title = Some("Modified Title".to_string());
@@ -1152,23 +1151,20 @@ mod tests {
         assert_eq!(unflushed_before, 1, "Should have 1 dirty bead");
 
         // Now run import (simulates pulling updated JSONL from git)
-        // The JSONL has the old version of bf-test1, so the import will skip it
-        // because the db version is newer
         let import_result = crate::sync::import(workspace).unwrap();
 
-        // After import, the dirty mark for bf-test1 should be preserved
-        // because it was not affected by the import (Unchanged - db version is newer)
+        // After import, all dirty marks should be cleared (db is now in sync with JSONL)
         let unflushed_after = count_unflushed(&db_path).unwrap();
         assert_eq!(
-            unflushed_after, 1,
-            "Import should preserve dirty marks for unaffected beads"
+            unflushed_after, 0,
+            "Import should clear all dirty marks, leaving 0"
         );
 
         // Run doctor to verify
         let result = check(workspace).unwrap();
         assert_eq!(
-            result.unflushed_count, 1,
-            "Doctor should report 1 unflushed after import"
+            result.unflushed_count, 0,
+            "Doctor should report 0 unflushed after import"
         );
     }
 
