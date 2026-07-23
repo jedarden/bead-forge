@@ -1,0 +1,152 @@
+# bead-forge Test Failures - 2026-07-23
+
+## Summary
+Total tests run: 272
+Failed tests: 16
+Passed tests: 256 (25 in envelope_coverage, 231 in other modules)
+
+## Detailed Failure List
+
+### 1. claim_stats::envelope_claim_bead_id_is_valid
+**Error:** `claim result must have bead_id`
+**Location:** tests/envelope_coverage.rs:1055:9
+**Details:** Claim envelope data is missing expected bead_id field
+
+### 2. claim_stats::envelope_claim_and_stats_consistent_structure
+**Error:** `assertion 'left == right' failed: claim envelope version must be 1`
+**Location:** tests/envelope_coverage.rs:1016:9
+**Details:**
+  left: None
+  right: Some(1)
+
+### 3. claim_stats::envelope_claim_json_has_metadata_fields
+**Error:** `claim envelope must have 'version' field`
+**Location:** tests/envelope_coverage.rs:887:9
+**Details:** Claim envelope missing version metadata field
+
+### 4. claim_stats::envelope_claim_json_returns_claim_result
+**Error:** `assertion 'left == right' failed: Envelope version must be 1`
+**Location:** tests/envelope_coverage.rs:78:5
+**Details:**
+  left: None
+  right: Some(1)
+
+### 5. claim_stats::envelope_claim_no_beads_returns_empty_object
+**Error:** `assertion 'left == right' failed: Envelope version must be 1`
+**Location:** tests/envelope_coverage.rs:78:5
+**Details:**
+  left: None
+  right: Some(1)
+
+### 6. claim_stats::envelope_claim_reflects_assignee
+**Error:** `assertion 'left == right' failed: claim envelope must reflect the specified assignee`
+**Location:** tests/envelope_coverage.rs:1097:9
+**Details:**
+  left: None
+  right: Some("specific-test-worker")
+
+### 7. envelope_batch_command_has_stable_structure
+**Error:** `batch data must be an array`
+**Location:** tests/envelope_coverage.rs:421:5
+**Details:** Batch command envelope data is not an array as expected
+
+### 8. envelope_batch_empty_emits_empty_array
+**Error:** `batch data must be an array`
+**Location:** tests/envelope_coverage.rs:459:5
+**Details:** Batch command with no operations should return empty array
+
+### 9. envelope_claim_command_has_stable_structure
+**Error:** `assertion 'left == right' failed: Envelope version must be 1`
+**Location:** tests/envelope_coverage.rs:78:5
+**Details:**
+  left: None
+  right: Some(1)
+
+### 10. envelope_claim_no_bead_emits_empty_object
+**Error:** `assertion 'left == right' failed: Envelope version must be 1`
+**Location:** tests/envelope_coverage.rs:78:5
+**Details:**
+  left: None
+  right: Some(1)
+
+### 11. envelope_ready_command_has_stable_structure
+**Error:** `ready data must be an array`
+**Location:** tests/envelope_coverage.rs:206:5
+**Details:** Ready command envelope data is not an array as expected
+
+### 12. envelope_recent_empty_emits_empty_array
+**Error:** `recent data must be an array`
+**Location:** tests/envelope_coverage.rs:375:5
+**Details:** Recent command with no results should return empty array
+
+### 13. envelope_recent_command_has_stable_structure
+**Error:** `recent data must be an array`
+**Location:** tests/envelope_coverage.rs:362:5
+**Details:** Recent command envelope data is not an array as expected
+
+### 14. envelope_search_empty_emits_empty_array
+**Error:** `Invalid JSON output from ["--envelope", "search", "nonexistent", "--format", "json"]: EOF while parsing a value at line 1 column 0`
+**Location:** tests/envelope_coverage.rs:69:29
+**Details:**
+  Output: (empty)
+  stderr: (empty)
+
+### 15. envelope_search_command_has_stable_structure
+**Error:** `assertion 'left == right' failed: Envelope version must be 1`
+**Location:** tests/envelope_coverage.rs:78:5
+**Details:**
+  left: None
+  right: Some(1)
+
+### 16. envelope_velocity_empty_emits_empty_array
+**Error:** `velocity data must contain inner array`
+**Location:** tests/envelope_coverage.rs:310:50
+**Details:** Velocity command envelope data structure is incorrect
+
+## Pattern Analysis
+
+### Root Cause
+All failures stem from the `--envelope` flag not working correctly. The CLI is not wrapping JSON output in the expected envelope structure with:
+- `version: 1`
+- `kind: <command_name>`
+- `data: <command_result>`
+
+### Commands Affected
+1. **claim** - 6 failures (version field missing, structure issues)
+2. **batch** - 2 failures (data not an array)
+3. **ready** - 1 failure (data not an array)
+4. **recent** - 2 failures (data not an array)
+5. **search** - 2 failures (no JSON output, version field missing)
+6. **velocity** - 1 failure (data structure incorrect)
+
+### Commands Working Correctly
+- create (envelope structure ok)
+- list (envelope structure ok)
+- show (envelope structure ok)
+- stats (envelope structure ok)
+
+## Additional Warnings
+
+### Unused Imports
+- `load_config` in src/rotate.rs:7:21
+- `NaiveDateTime` in src/velocity.rs:15:24
+
+### Unused Variables
+- `envelope` in src/cli/mod.rs:1937:5
+- `db_path` in src/cli/mod.rs:2218:9
+- `envelope` in src/cli/mod.rs:2840:5
+- `beads_dir` in src/commit_check.rs:74:5 and src/commit_check.rs:145:5
+- `max_iterations` mutability in src/critical_path.rs:95:9
+- `db_corrupted` in src/doctor.rs:612:25
+- `num` in src/rotate.rs:313:10
+- `param_idx` assignments in src/storage/sqlite.rs:242:13 and src/storage/sqlite.rs:1371:13
+- `dep_col` in src/storage/sqlite.rs:1149:51
+
+## Test Environment
+- Test file: tests/envelope_coverage.rs
+- Test module: envelope_coverage
+- Rust test harness output with 272 total tests
+- Duration: ~1.6-1.9 seconds
+
+## Recommendation
+The `--envelope` flag implementation appears to be incomplete or broken. All failing tests expect envelope wrapping but the CLI is not producing it for certain commands. This suggests the envelope formatting logic in `src/cli/mod.rs` or `src/format/envelope.rs` needs attention for the affected commands.
