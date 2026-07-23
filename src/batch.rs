@@ -25,6 +25,30 @@ pub enum BatchOp {
         #[serde(default)]
         labels: Vec<String>,
     },
+    #[serde(rename = "update")]
+    Update {
+        id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        design: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        acceptance_criteria: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        notes: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        priority: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        assignee: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        owner: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        issue_type: Option<String>,
+    },
     #[serde(rename = "dep_add_blocker")]
     DepAddBlocker {
         /// The bead being blocked (must close after blocker closes)
@@ -33,6 +57,32 @@ pub enum BatchOp {
         /// The bead that blocks (must close before id can close)
         #[serde(alias = "parent")]
         blocker: String,
+    },
+    #[serde(rename = "dep_remove")]
+    DepRemove {
+        /// The bead that has the dependency
+        id: String,
+        /// The bead that is being depended on (to remove the dependency from)
+        depends_on: String,
+    },
+    #[serde(rename = "label_add")]
+    LabelAdd {
+        id: String,
+        #[serde(default)]
+        labels: Vec<String>,
+    },
+    #[serde(rename = "label_remove")]
+    LabelRemove {
+        id: String,
+        #[serde(default)]
+        labels: Vec<String>,
+    },
+    #[serde(rename = "comment")]
+    Comment {
+        id: String,
+        #[serde(default = "default_comment_author")]
+        author: String,
+        text: String,
     },
     #[serde(rename = "close")]
     Close {
@@ -52,6 +102,10 @@ fn default_priority() -> i32 {
 
 fn default_close_reason() -> String {
     "Completed".to_string()
+}
+
+fn default_comment_author() -> String {
+    "batch".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,7 +132,25 @@ fn get_allowed_fields(op_name: &str) -> &'static [&'static str] {
             "assignee",
             "labels",
         ],
+        "update" => &[
+            "op",
+            "id",
+            "title",
+            "description",
+            "design",
+            "acceptance_criteria",
+            "notes",
+            "status",
+            "priority",
+            "assignee",
+            "owner",
+            "issue_type",
+        ],
         "dep_add_blocker" => &["op", "id", "blocker", "parent", "child"],
+        "dep_remove" => &["op", "id", "depends_on"],
+        "label_add" => &["op", "id", "labels"],
+        "label_remove" => &["op", "id", "labels"],
+        "comment" => &["op", "id", "author", "text"],
         "close" => &["op", "id", "reason"],
         _ => &[],
     }
@@ -178,6 +250,130 @@ pub fn execute_batch(
                                 "ok: {} blocked by {}",
                                 id_resolved, blocker_resolved
                             )),
+                        },
+                        Err(e) => BatchResult {
+                            op: idx,
+                            status: "error".to_string(),
+                            id: None,
+                            error: Some(e.to_string()),
+                            message: None,
+                        },
+                    }
+                }
+                BatchOp::Update {
+                    id,
+                    title,
+                    description,
+                    design,
+                    acceptance_criteria,
+                    notes,
+                    status,
+                    priority,
+                    assignee,
+                    owner,
+                    issue_type,
+                } => {
+                    let id_resolved = resolve_reference(id, &created_ids);
+                    match execute_update(
+                        tx,
+                        &id_resolved,
+                        title,
+                        description,
+                        design,
+                        acceptance_criteria,
+                        notes,
+                        status,
+                        *priority,
+                        assignee,
+                        owner,
+                        issue_type,
+                    ) {
+                        Ok(_) => BatchResult {
+                            op: idx,
+                            status: "ok".to_string(),
+                            id: None,
+                            error: None,
+                            message: Some(format!("Updated bead {}", id_resolved)),
+                        },
+                        Err(e) => BatchResult {
+                            op: idx,
+                            status: "error".to_string(),
+                            id: None,
+                            error: Some(e.to_string()),
+                            message: None,
+                        },
+                    }
+                }
+                BatchOp::DepRemove { id, depends_on } => {
+                    let id_resolved = resolve_reference(id, &created_ids);
+                    let depends_on_resolved = resolve_reference(depends_on, &created_ids);
+                    match execute_dep_remove(tx, &id_resolved, &depends_on_resolved) {
+                        Ok(_) => BatchResult {
+                            op: idx,
+                            status: "ok".to_string(),
+                            id: None,
+                            error: None,
+                            message: Some(format!(
+                                "Removed dependency: {} -> {}",
+                                id_resolved, depends_on_resolved
+                            )),
+                        },
+                        Err(e) => BatchResult {
+                            op: idx,
+                            status: "error".to_string(),
+                            id: None,
+                            error: Some(e.to_string()),
+                            message: None,
+                        },
+                    }
+                }
+                BatchOp::LabelAdd { id, labels } => {
+                    let id_resolved = resolve_reference(id, &created_ids);
+                    match execute_label_add(tx, &id_resolved, labels) {
+                        Ok(_) => BatchResult {
+                            op: idx,
+                            status: "ok".to_string(),
+                            id: None,
+                            error: None,
+                            message: Some(format!("Added labels to {}", id_resolved)),
+                        },
+                        Err(e) => BatchResult {
+                            op: idx,
+                            status: "error".to_string(),
+                            id: None,
+                            error: Some(e.to_string()),
+                            message: None,
+                        },
+                    }
+                }
+                BatchOp::LabelRemove { id, labels } => {
+                    let id_resolved = resolve_reference(id, &created_ids);
+                    match execute_label_remove(tx, &id_resolved, labels) {
+                        Ok(_) => BatchResult {
+                            op: idx,
+                            status: "ok".to_string(),
+                            id: None,
+                            error: None,
+                            message: Some(format!("Removed labels from {}", id_resolved)),
+                        },
+                        Err(e) => BatchResult {
+                            op: idx,
+                            status: "error".to_string(),
+                            id: None,
+                            error: Some(e.to_string()),
+                            message: None,
+                        },
+                    }
+                }
+                BatchOp::Comment { id, author, text } => {
+                    let id_resolved = resolve_reference(id, &created_ids);
+                    match execute_comment(tx, &id_resolved, author, text) {
+                        Ok(_) => BatchResult {
+                            op: idx,
+                            status: "ok".to_string(),
+                            id: None,
+                            error: None,
+                            message: Some(format!("Added comment to {}", id_resolved)),
                         },
                         Err(e) => BatchResult {
                             op: idx,
@@ -567,6 +763,260 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
     Ok(())
 }
 
+/// Execute an update operation
+fn execute_update(
+    tx: &Connection,
+    id: &str,
+    title: &Option<String>,
+    description: &Option<String>,
+    design: &Option<String>,
+    acceptance_criteria: &Option<String>,
+    notes: &Option<String>,
+    status: &Option<String>,
+    priority: Option<i32>,
+    assignee: &Option<String>,
+    owner: &Option<String>,
+    issue_type: &Option<String>,
+) -> Result<()> {
+    // Verify bead exists
+    let exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+            &[id],
+            |row| row.get(0),
+        )?;
+
+    if !exists {
+        return Err(anyhow!("Bead not found: {}", id));
+    }
+
+    let mut updates = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(ref title) = title {
+        updates.push("title = ?");
+        params.push(Box::new(title.clone()));
+    }
+    if let Some(ref description) = description {
+        updates.push("description = ?");
+        params.push(Box::new(description.clone()));
+    }
+    if let Some(ref design) = design {
+        updates.push("design = ?");
+        params.push(Box::new(design.clone()));
+    }
+    if let Some(ref acceptance_criteria) = acceptance_criteria {
+        updates.push("acceptance_criteria = ?");
+        params.push(Box::new(acceptance_criteria.clone()));
+    }
+    if let Some(ref notes) = notes {
+        updates.push("notes = ?");
+        params.push(Box::new(notes.clone()));
+    }
+    if let Some(ref status) = status {
+        updates.push("status = ?");
+        params.push(Box::new(status.clone()));
+    }
+    if let Some(priority) = priority {
+        updates.push("priority = ?");
+        params.push(Box::new(priority));
+    }
+    if let Some(ref assignee) = assignee {
+        if assignee.trim().is_empty() {
+            updates.push("assignee = NULL");
+        } else {
+            updates.push("assignee = ?");
+            params.push(Box::new(assignee.clone()));
+        }
+    }
+    if let Some(ref owner) = owner {
+        updates.push("owner = ?");
+        params.push(Box::new(owner.clone()));
+    }
+    if let Some(ref issue_type) = issue_type {
+        updates.push("issue_type = ?");
+        params.push(Box::new(issue_type.clone()));
+    }
+
+    if !updates.is_empty() {
+        updates.push("updated_at = ?");
+        params.push(Box::new(Utc::now().to_rfc3339()));
+
+        let query = format!("UPDATE issues SET {} WHERE id = ?", updates.join(", "));
+        let mut all_params: Vec<Box<dyn rusqlite::ToSql>> = params.into_iter().collect();
+        all_params.push(Box::new(id.to_string()));
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            all_params.iter().map(|p| p.as_ref()).collect();
+
+        tx.execute(&query, param_refs.as_slice())?;
+
+        // Mark dirty for export
+        mark_dirty_tx(tx, id)?;
+
+        // Invalidate critical path cache if status changed
+        if status.is_some() {
+            crate::critical_path::invalidate_cache(tx)?;
+            crate::critical_path::compute_all_critical_paths(tx)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Execute a dep_remove operation
+fn execute_dep_remove(tx: &Connection, id: &str, depends_on: &str) -> Result<()> {
+    // Verify both beads exist
+    let id_exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+            &[id],
+            |row| row.get(0),
+        )?;
+
+    let depends_on_exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+            &[depends_on],
+            |row| row.get(0),
+        )?;
+
+    if !id_exists {
+        return Err(anyhow!("Bead not found: {}", id));
+    }
+    if !depends_on_exists {
+        return Err(anyhow!("Bead not found: {}", depends_on));
+    }
+
+    // Check if dependency exists
+    let exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2)",
+            &[id, depends_on],
+            |row| row.get(0),
+        )?;
+
+    if !exists {
+        return Err(anyhow!(
+            "Dependency does not exist: {} depends on {}",
+            id,
+            depends_on
+        ));
+    }
+
+    // Remove dependency
+    tx.execute(
+        "DELETE FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2",
+        rusqlite::params![id, depends_on],
+    )?;
+
+    // Both endpoints' exported records reflect the removed edge; mark both dirty
+    mark_dirty_tx(tx, id)?;
+    mark_dirty_tx(tx, depends_on)?;
+
+    // Rebuild blocked_issues_cache and invalidate critical path cache
+    tx.execute("DELETE FROM blocked_issues_cache", [])?;
+    tx.execute(
+        "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+         SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+         FROM dependencies d
+         INNER JOIN issues i ON i.id = d.depends_on_id
+         WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+         AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+         GROUP BY d.issue_id",
+        rusqlite::params![Utc::now().to_rfc3339()],
+    )?;
+
+    crate::critical_path::invalidate_cache(tx)?;
+    crate::critical_path::compute_all_critical_paths(tx)?;
+
+    Ok(())
+}
+
+/// Execute a label_add operation
+fn execute_label_add(tx: &Connection, id: &str, labels: &[String]) -> Result<()> {
+    // Verify bead exists
+    let exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+            &[id],
+            |row| row.get(0),
+        )?;
+
+    if !exists {
+        return Err(anyhow!("Bead not found: {}", id));
+    }
+
+    // Add labels (INSERT OR IGNORE handles duplicates)
+    for label in labels {
+        tx.execute(
+            "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
+            rusqlite::params![id, label],
+        )?;
+    }
+
+    // Mark dirty for export
+    mark_dirty_tx(tx, id)?;
+
+    Ok(())
+}
+
+/// Execute a label_remove operation
+fn execute_label_remove(tx: &Connection, id: &str, labels: &[String]) -> Result<()> {
+    // Verify bead exists
+    let exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+            &[id],
+            |row| row.get(0),
+        )?;
+
+    if !exists {
+        return Err(anyhow!("Bead not found: {}", id));
+    }
+
+    // Remove labels
+    for label in labels {
+        tx.execute(
+            "DELETE FROM labels WHERE issue_id = ?1 AND label = ?2",
+            rusqlite::params![id, label],
+        )?;
+    }
+
+    // Mark dirty for export
+    mark_dirty_tx(tx, id)?;
+
+    Ok(())
+}
+
+/// Execute a comment operation
+fn execute_comment(tx: &Connection, id: &str, author: &str, text: &str) -> Result<()> {
+    // Verify bead exists
+    let exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+            &[id],
+            |row| row.get(0),
+        )?;
+
+    if !exists {
+        return Err(anyhow!("Bead not found: {}", id));
+    }
+
+    // Generate comment ID (using current timestamp)
+    let comment_id = Utc::now().timestamp_micros();
+
+    // Insert comment
+    tx.execute(
+        "INSERT INTO comments (id, issue_id, author, text, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![comment_id, id, author, text, Utc::now().to_rfc3339()],
+    )?;
+
+    // Mark dirty for export
+    mark_dirty_tx(tx, id)?;
+
+    Ok(())
+}
+
 /// Mitosis: split a parent bead into multiple child beads atomically.
 ///
 /// This function constructs a batch of operations that:
@@ -708,8 +1158,18 @@ pub fn parse_stdin() -> Result<Vec<BatchOp>> {
         // Simple parsing for: create --title "X" --type Y
         if let Some(rest) = line.strip_prefix("create ") {
             ops.push(parse_create(rest)?);
+        } else if let Some(rest) = line.strip_prefix("update ") {
+            ops.push(parse_update(rest)?);
         } else if let Some(rest) = line.strip_prefix("dep add-blocker ") {
             ops.push(parse_dep_add(rest)?);
+        } else if let Some(rest) = line.strip_prefix("dep remove ") {
+            ops.push(parse_dep_remove(rest)?);
+        } else if let Some(rest) = line.strip_prefix("label add ") {
+            ops.push(parse_label_add(rest)?);
+        } else if let Some(rest) = line.strip_prefix("label remove ") {
+            ops.push(parse_label_remove(rest)?);
+        } else if let Some(rest) = line.strip_prefix("comment ") {
+            ops.push(parse_comment(rest)?);
         } else if let Some(rest) = line.strip_prefix("close ") {
             ops.push(parse_close(rest)?);
         } else {
@@ -801,6 +1261,122 @@ fn parse_close(input: &str) -> Result<BatchOp> {
     Ok(BatchOp::Close {
         id: id.to_string(),
         reason,
+    })
+}
+
+fn parse_update(input: &str) -> Result<BatchOp> {
+    // Simple parsing: update <id> --status X --priority Y --assignee Z
+    let parts = shell_words::split(input)?;
+    if parts.is_empty() {
+        return Err(anyhow!("Missing ID for update operation"));
+    }
+
+    let id = parts[0].clone();
+    let mut status = None;
+    let mut priority = None;
+    let mut assignee = None;
+    let mut title = None;
+
+    let mut i = 1;
+    while i < parts.len() {
+        match parts[i].as_str() {
+            "--status" => {
+                i += 1;
+                if i < parts.len() {
+                    status = Some(parts[i].clone());
+                }
+            }
+            "--priority" => {
+                i += 1;
+                if i < parts.len() {
+                    priority = Some(parts[i].parse().unwrap_or(2));
+                }
+            }
+            "--assignee" => {
+                i += 1;
+                if i < parts.len() {
+                    assignee = Some(parts[i].clone());
+                }
+            }
+            "--title" => {
+                i += 1;
+                if i < parts.len() {
+                    title = Some(parts[i].clone());
+                }
+            }
+            _ => {
+                i += 1;
+            }
+        }
+        i += 1;
+    }
+
+    Ok(BatchOp::Update {
+        id,
+        title,
+        description: None,
+        design: None,
+        acceptance_criteria: None,
+        notes: None,
+        status,
+        priority,
+        assignee,
+        owner: None,
+        issue_type: None,
+    })
+}
+
+fn parse_dep_remove(input: &str) -> Result<BatchOp> {
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    if parts.len() != 2 {
+        return Err(anyhow!(
+            "dep remove requires <id> <depends_on>. Usage: dep remove <bead> <depends-on-bead>"
+        ));
+    }
+    Ok(BatchOp::DepRemove {
+        id: parts[0].to_string(),
+        depends_on: parts[1].to_string(),
+    })
+}
+
+fn parse_label_add(input: &str) -> Result<BatchOp> {
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    if parts.len() < 2 {
+        return Err(anyhow!(
+            "label add requires <id> <label>... Usage: label add <bead> <label1> <label2> ..."
+        ));
+    }
+    let id = parts[0].to_string();
+    let labels = parts[1..].iter().map(|s| s.to_string()).collect();
+    Ok(BatchOp::LabelAdd { id, labels })
+}
+
+fn parse_label_remove(input: &str) -> Result<BatchOp> {
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    if parts.len() < 2 {
+        return Err(anyhow!(
+            "label remove requires <id> <label>... Usage: label remove <bead> <label1> <label2> ..."
+        ));
+    }
+    let id = parts[0].to_string();
+    let labels = parts[1..].iter().map(|s| s.to_string()).collect();
+    Ok(BatchOp::LabelRemove { id, labels })
+}
+
+fn parse_comment(input: &str) -> Result<BatchOp> {
+    // comment <id> <text...>
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    if parts.len() < 2 {
+        return Err(anyhow!(
+            "comment requires <id> <text>. Usage: comment <bead> <comment text>"
+        ));
+    }
+    let id = parts[0].to_string();
+    let text = parts[1..].join(" ");
+    Ok(BatchOp::Comment {
+        id,
+        author: default_comment_author(),
+        text,
     })
 }
 
