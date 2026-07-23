@@ -1,10 +1,17 @@
-use crate::format::{ClaimResultOutput, Formatter, StatsOutput};
+use crate::format::{ClaimResultOutput, Formatter, StatsOutput, JsonEnvelope};
 use crate::model::Issue;
 use crate::velocity::VelocityStats;
 use serde_json::{self, Map, Value};
 
 #[derive(Debug, Clone, Copy)]
 pub struct JsonFormatter;
+
+impl JsonFormatter {
+    /// Create a JsonFormatter with envelope mode enabled.
+    pub fn with_envelope_enabled() -> Self {
+        JsonFormatter
+    }
+}
 
 /// Serialize a single issue to a JSON object, stripping the bulky
 /// dependencies/comments relations for `br` compatibility, and guaranteeing
@@ -69,6 +76,17 @@ impl Formatter for JsonFormatter {
 
     fn format_velocity(&self, stats: &[VelocityStats]) -> String {
         serde_json::to_string(stats).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    fn format_with_envelope(&self, kind: &str, data: &str) -> String {
+        // Parse the data string as JSON
+        let json_value: Value = serde_json::from_str(data)
+            .unwrap_or_else(|_| Value::String(data.to_string()));
+
+        // Wrap in envelope and serialize
+        JsonEnvelope::new(kind, json_value)
+            .to_json_compact()
+            .unwrap_or_else(|_| "{}".to_string())
     }
 }
 

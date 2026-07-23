@@ -72,6 +72,12 @@ impl Formatter for TextFormatter {
     fn format_velocity(&self, stats: &[VelocityStats]) -> String {
         format_velocity_text(stats)
     }
+
+    fn format_with_envelope(&self, _kind: &str, data: &str) -> String {
+        // Text formatter doesn't support envelope wrapping
+        // Return the data as-is
+        data.to_string()
+    }
 }
 
 /// Human-readable rendering of a `stats` result shared by the text and toon
