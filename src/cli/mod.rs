@@ -23,6 +23,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Parser)]
 #[command(name = "bf")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(disable_version_flag = true)]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 pub struct Cli {
     /// Workspace directory (defaults to current directory's .beads/)
