@@ -115,7 +115,7 @@ fn envelope_create_command_has_stable_structure() {
     let data = &envelope["data"];
     assert!(data.get("id").is_some(), "create data must contain 'id'");
     assert!(data["id"].is_string(), "create id must be a string");
-    assert!(data["id"].as_str().unwrap().starts_with("bf-"), "create id must start with 'bf-'");
+    assert!(data["id"].as_str().unwrap().starts_with("test-"), "create id must start with 'test-' (workspace prefix)");
 }
 
 #[test]
@@ -303,10 +303,13 @@ fn envelope_velocity_empty_emits_empty_array() {
 
     verify_envelope_structure(&envelope, "velocity");
 
-    // Verify data is an empty array
+    // Verify data is an array (velocity returns [[]] - array containing empty results array)
     let data = &envelope["data"];
     assert!(data.is_array(), "velocity data must be an array");
-    assert_eq!(data.as_array().unwrap().len(), 0);
+    // Velocity returns [[]] which is an array with one empty array element
+    let inner = data.as_array().unwrap().first().expect("velocity data must contain inner array");
+    assert!(inner.is_array(), "velocity inner data must be an array");
+    assert_eq!(inner.as_array().unwrap().len(), 0, "velocity inner array must be empty");
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +391,7 @@ fn envelope_batch_command_has_stable_structure() {
     use std::process::Stdio;
 
     let mut child = Command::new(bf_path())
-        .args(["batch", "--json", "--envelope"])
+        .args(["batch", "--stdin", "--format", "json", "--envelope"])
         .current_dir(ws.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -430,7 +433,7 @@ fn envelope_batch_empty_emits_empty_array() {
     use std::process::Stdio;
 
     let mut child = Command::new(bf_path())
-        .args(["batch", "--json", "--envelope"])
+        .args(["batch", "--stdin", "--format", "json", "--envelope"])
         .current_dir(ws.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
