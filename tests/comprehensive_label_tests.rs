@@ -760,3 +760,290 @@ fn test_labels_cli_text_format_labels_are_comma_separated_in_all_mode() {
     assert!(line.contains("label2"));
     assert!(line.contains("label3"));
 }
+
+//
+// MARK: Comprehensive JSON Format Tests
+//
+
+#[test]
+fn test_labels_json_format_parseability() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-json-parse-1", vec!["label1", "label2", "label3"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let labels = storage.get_labels("bf-json-parse-1").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+
+    // Verify JSON is parseable
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert!(parsed.is_array());
+
+    // Verify it's an array of strings
+    let parsed_array = parsed.as_array().unwrap();
+    assert_eq!(parsed_array.len(), 3);
+    for item in parsed_array {
+        assert!(item.is_string());
+    }
+}
+
+#[test]
+fn test_labels_json_format_single_label() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with single label
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-json-single", vec!["only-label"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let labels = storage.get_labels("bf-json-single").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+
+    // Verify JSON format
+    let parsed: Vec<String> = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.len(), 1);
+    assert_eq!(parsed[0], "only-label");
+}
+
+#[test]
+fn test_labels_json_format_multiple_labels() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with multiple labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let labels = vec!["bug", "urgent", "backend", "performance", "security"];
+    let issue = create_issue_with_labels("bf-json-multi", labels.clone());
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let retrieved_labels = storage.get_labels("bf-json-multi").unwrap();
+    let json = serde_json::to_string(&retrieved_labels).unwrap();
+
+    // Verify JSON format
+    let parsed: Vec<String> = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.len(), 5);
+
+    // Verify all labels are present
+    for label in &labels {
+        assert!(parsed.contains(&label.to_string()));
+    }
+}
+
+#[test]
+fn test_labels_json_format_empty_labels() {
+    let ws = TestWorkspace::new();
+
+    // Create bead without labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-json-empty-2", vec![]);
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let labels = storage.get_labels("bf-json-empty-2").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+
+    // Verify JSON format
+    let parsed: Vec<String> = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.len(), 0);
+
+    // Verify JSON represents empty array
+    assert_eq!(json, "[]");
+}
+
+#[test]
+fn test_labels_json_format_structure_validation_single_bead() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-json-struct-1", vec!["label1", "label2"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let labels = storage.get_labels("bf-json-struct-1").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+
+    // Verify schema: JSON array of strings
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    // Must be an array
+    assert!(parsed.is_array(), "JSON output must be an array");
+
+    let array = parsed.as_array().unwrap();
+    for item in array {
+        // Each item must be a string
+        assert!(item.is_string(), "Each label must be a string");
+    }
+
+    // Verify expected structure
+    assert_eq!(array.len(), 2);
+    assert_eq!(array[0].as_str().unwrap(), "label1");
+    assert_eq!(array[1].as_str().unwrap(), "label2");
+}
+
+#[test]
+fn test_labels_json_format_all_beads_jsonl_structure() {
+    let ws = TestWorkspace::new();
+
+    // Create multiple beads
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    storage.create_issue(&create_issue_with_labels("bf-jsonl-1", vec!["label1"])).unwrap();
+    storage.create_issue(&create_issue_with_labels("bf-jsonl-2", vec!["label2", "label3"])).unwrap();
+    storage.create_issue(&create_issue_with_labels("bf-jsonl-3", vec![])).unwrap();
+
+    // List all issues
+    let issues = storage.list_all_issues().unwrap();
+    let test_issues: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-jsonl")).collect();
+
+    // Verify each can be serialized to JSON with required fields
+    for issue in test_issues {
+        let json_obj = serde_json::json!({
+            "id": issue.id,
+            "title": issue.title,
+            "labels": issue.labels
+        });
+
+        let json_str = serde_json::to_string(&json_obj).unwrap();
+
+        // Verify JSON is parseable
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        // Verify required fields exist
+        assert!(parsed.get("id").is_some(), "JSON must contain 'id' field");
+        assert!(parsed.get("title").is_some(), "JSON must contain 'title' field");
+        assert!(parsed.get("labels").is_some(), "JSON must contain 'labels' field");
+
+        // Verify field types
+        assert!(parsed["id"].is_string(), "id must be a string");
+        assert!(parsed["title"].is_string(), "title must be a string");
+        assert!(parsed["labels"].is_array(), "labels must be an array");
+
+        // Verify values
+        assert_eq!(parsed["id"].as_str().unwrap(), issue.id);
+        assert_eq!(parsed["title"].as_str().unwrap(), issue.title);
+        assert_eq!(parsed["labels"].as_array().unwrap().len(), issue.labels.len());
+    }
+}
+
+#[test]
+fn test_labels_json_format_includes_all_required_fields() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-json-fields", vec!["urgent", "backend"]);
+    storage.create_issue(&issue).unwrap();
+
+    // For all beads mode, verify JSON object has all required fields
+    let issues = storage.list_all_issues().unwrap();
+    let test_issue = issues.iter().find(|i| i.id == "bf-json-fields").unwrap();
+
+    let json_obj = serde_json::json!({
+        "id": test_issue.id,
+        "title": test_issue.title,
+        "labels": test_issue.labels
+    });
+
+    let parsed = serde_json::from_value::<serde_json::Value>(json_obj).unwrap();
+
+    // Check all required fields are present
+    assert!(parsed.get("id").is_some(), "Missing required field: id");
+    assert!(parsed.get("title").is_some(), "Missing required field: title");
+    assert!(parsed.get("labels").is_some(), "Missing required field: labels");
+
+    // Verify no extra fields at top level (for clean schema)
+    let obj = parsed.as_object().unwrap();
+    assert_eq!(obj.len(), 3, "JSON object should have exactly 3 fields: id, title, labels");
+
+    // Verify field values are correct types
+    assert!(parsed["id"].is_string());
+    assert!(parsed["title"].is_string());
+    assert!(parsed["labels"].is_array());
+}
+
+#[test]
+fn test_labels_json_format_special_characters() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with special character labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = Issue {
+        id: "bf-json-special".to_string(),
+        title: "Special Characters".to_string(),
+        labels: vec![
+            "high-priority".to_string(),
+            "needs-review".to_string(),
+            "API:breaking".to_string(),
+            "test@example.com".to_string(),
+        ],
+        ..Default::default()
+    };
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let labels = storage.get_labels("bf-json-special").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+
+    // Verify JSON is parseable and contains special characters
+    let parsed: Vec<String> = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.len(), 4);
+    assert!(parsed.contains(&"high-priority".to_string()));
+    assert!(parsed.contains(&"needs-review".to_string()));
+    assert!(parsed.contains(&"API:breaking".to_string()));
+    assert!(parsed.contains(&"test@example.com".to_string()));
+}
+
+#[test]
+fn test_labels_json_format_unicode() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with unicode labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = Issue {
+        id: "bf-json-unicode".to_string(),
+        title: "Unicode Labels".to_string(),
+        labels: vec![
+            "🐛-bug".to_string(),
+            "高优先级".to_string(),
+            "critique-ça".to_string(),
+        ],
+        ..Default::default()
+    };
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let labels = storage.get_labels("bf-json-unicode").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+
+    // Verify JSON is parseable and contains unicode
+    let parsed: Vec<String> = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.len(), 3);
+    assert!(parsed.contains(&"🐛-bug".to_string()));
+    assert!(parsed.contains(&"高优先级".to_string()));
+    assert!(parsed.contains(&"critique-ça".to_string()));
+}
+
+#[test]
+fn test_labels_jsonl_format_empty_bead_list() {
+    let ws = TestWorkspace::new();
+
+    // Don't create any beads - should have empty list
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issues = storage.list_all_issues().unwrap();
+
+    // Filter to test beads (should be empty)
+    let test_issues: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-empty-test")).collect();
+
+    // When empty, JSONL should output []
+    assert_eq!(test_issues.len(), 0);
+
+    // Verify that empty array is valid JSON
+    let empty_json = "[]";
+    let parsed: serde_json::Value = serde_json::from_str(empty_json).unwrap();
+    assert!(parsed.is_array());
+    assert_eq!(parsed.as_array().unwrap().len(), 0);
+}
