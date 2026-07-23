@@ -526,6 +526,10 @@ pub enum Commands {
         /// Output format (text, json)
         #[arg(short, long, default_value = "text")]
         format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 
     /// Manage comments
@@ -1317,7 +1321,10 @@ pub fn run(cli: Cli) -> Result<()> {
             harness,
             format,
         } => cmd_velocity(&beads_dir, model, harness, &format),
-        Commands::Labels { id, format } => cmd_labels(&beads_dir, id.as_deref(), &format),
+        Commands::Labels { id, format, json } => {
+            let format = if json { "json".to_string() } else { format };
+            cmd_labels(&beads_dir, id.as_deref(), &format)
+        }
         Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate, no_auto_flush),
         Commands::Log {
             id,
