@@ -114,355 +114,163 @@ fn run_command(workspace: &Path, args: &[&str]) -> anyhow::Result<()> {
     bead_forge::cli::run(cli)
 }
 
-// Tests for each read-only command
+/// Macro to generate a read-only command test.
+///
+/// # Parameters
+/// * `$test_name` - Name of the test function (must be unique)
+/// * `$command_args` - Array of command arguments to test
+/// * `$label` - Label for assertion messages
+///
+/// # Example
+/// ```rust
+/// test_readonly_command!(test_list_basic, ["list"], "bf list");
+/// ```
+macro_rules! test_readonly_command {
+    ($test_name:ident, $command_args:expr, $label:expr) => {
+        #[test]
+        fn $test_name() {
+            let temp_dir = setup_test_workspace();
+            let workspace = temp_dir.path();
+            let jsonl_path = workspace.join(".beads/issues.jsonl");
 
-#[test]
-fn test_list_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf list
-    let _ = run_command(workspace, &["list"]);
-    before.assert_unchanged(&jsonl_path, "bf list");
-
-    // Run bf list with filters
-    let _ = run_command(workspace, &["list", "--status", "open"]);
-    before.assert_unchanged(&jsonl_path, "bf list --status open");
-
-    // Run bf list --format json
-    let _ = run_command(workspace, &["list", "--format", "json"]);
-    before.assert_unchanged(&jsonl_path, "bf list --format json");
+            let before = FileSnapshot::snapshot(&jsonl_path);
+            let _ = run_command(workspace, &$command_args);
+            before.assert_unchanged(&jsonl_path, $label);
+        }
+    };
 }
 
-#[test]
-fn test_show_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
+/// Macro to generate a test with special handling for commands that use process::exit.
+///
+/// Some commands (like commit-check) call process::exit(0) on success, which
+/// causes a panic in our test context. We catch the panic and still verify
+/// that issues.jsonl wasn't modified.
+macro_rules! test_readonly_command_with_exit {
+    ($test_name:ident, $command_args:expr, $label:expr) => {
+        #[test]
+        fn $test_name() {
+            let temp_dir = setup_test_workspace();
+            let workspace = temp_dir.path();
+            let jsonl_path = workspace.join(".beads/issues.jsonl");
 
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf show bf-open
-    let _ = run_command(workspace, &["show", "bf-open"]);
-    before.assert_unchanged(&jsonl_path, "bf show");
-
-    // Run bf show --format json
-    let _ = run_command(workspace, &["show", "bf-open", "--format", "json"]);
-    before.assert_unchanged(&jsonl_path, "bf show --format json");
+            let before = FileSnapshot::snapshot(&jsonl_path);
+            let _ = std::panic::catch_unwind(|| {
+                run_command(workspace, &$command_args)
+            });
+            before.assert_unchanged(&jsonl_path, $label);
+        }
+    };
 }
 
-#[test]
-fn test_ready_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
+/// Macro to generate a test that runs multiple command variants.
+///
+/// # Parameters
+/// * `$test_name` - Name of the test function
+/// * `$test_variants` - Array of (command_args, label) tuples
+macro_rules! test_readonly_variants {
+    ($test_name:ident, [$(($command_args:expr, $label:expr)),+ $(,)?]) => {
+        #[test]
+        fn $test_name() {
+            let temp_dir = setup_test_workspace();
+            let workspace = temp_dir.path();
+            let jsonl_path = workspace.join(".beads/issues.jsonl");
 
-    let before = FileSnapshot::snapshot(&jsonl_path);
+            let before = FileSnapshot::snapshot(&jsonl_path);
 
-    // Run bf ready
-    let _ = run_command(workspace, &["ready"]);
-    before.assert_unchanged(&jsonl_path, "bf ready");
-
-    // Run bf ready --format json
-    let _ = run_command(workspace, &["ready", "--format", "json"]);
-    before.assert_unchanged(&jsonl_path, "bf ready --format json");
+            $(
+                let _ = run_command(workspace, &$command_args);
+                before.assert_unchanged(&jsonl_path, $label);
+            )+
+        }
+    };
 }
 
-#[test]
-fn test_critical_path_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf critical-path bf-inprog (has a dependency)
-    let _ = run_command(workspace, &["critical-path", "bf-inprog"]);
-    before.assert_unchanged(&jsonl_path, "bf critical-path");
-}
-
-#[test]
-fn test_stats_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf stats
-    let _ = run_command(workspace, &["stats"]);
-    before.assert_unchanged(&jsonl_path, "bf stats");
-
-    // Run bf stats --by-type
-    let _ = run_command(workspace, &["stats", "--by-type"]);
-    before.assert_unchanged(&jsonl_path, "bf stats --by-type");
-
-    // Run bf stats --format json
-    let _ = run_command(workspace, &["stats", "--format", "json"]);
-    before.assert_unchanged(&jsonl_path, "bf stats --format json");
-}
-
-#[test]
-fn test_velocity_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf velocity
-    let _ = run_command(workspace, &["velocity"]);
-    before.assert_unchanged(&jsonl_path, "bf velocity");
-
-    // Run bf velocity --format json
-    let _ = run_command(workspace, &["velocity", "--format", "json"]);
-    before.assert_unchanged(&jsonl_path, "bf velocity --format json");
-}
-
-#[test]
-fn test_commit_check_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf commit-check (no staged changes, so should exit 0)
-    // Note: commit-check exits with process::exit(0) on success, which will
-    // panic in our test context. We just need to verify issues.jsonl wasn't modified.
-    let result = std::panic::catch_unwind(|| {
-        run_command(workspace, &["commit-check"])
-    });
-
-    // Should succeed (no secrets found in workspace)
-    // Either Ok(()) or panic from process::exit(0) - both are acceptable for read-only invariant
-    let _ = result;
-    before.assert_unchanged(&jsonl_path, "bf commit-check");
-}
-
-#[test]
-fn test_doctor_check_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf doctor (health check only, no --repair)
-    let _ = run_command(workspace, &["doctor"]);
-    before.assert_unchanged(&jsonl_path, "bf doctor");
-}
-
-#[test]
-fn test_labels_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf labels bf-open
-    let _ = run_command(workspace, &["labels", "bf-open"]);
-    before.assert_unchanged(&jsonl_path, "bf labels");
-
-    // Run bf labels --format json
-    let _ = run_command(workspace, &["labels", "bf-open", "--format", "json"]);
-    before.assert_unchanged(&jsonl_path, "bf labels --format json");
-}
-
-#[test]
-fn test_comments_list_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf comments list bf-open
-    let _ = run_command(workspace, &["comments", "list", "bf-open"]);
-    before.assert_unchanged(&jsonl_path, "bf comments list");
-}
-
-#[test]
-fn test_search_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf search "Open"
-    let _ = run_command(workspace, &["search", "Open"]);
-    before.assert_unchanged(&jsonl_path, "bf search");
-}
-
-#[test]
-fn test_count_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf count
-    let _ = run_command(workspace, &["count"]);
-    before.assert_unchanged(&jsonl_path, "bf count");
-}
-
-#[test]
-fn test_log_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf log
-    let _ = run_command(workspace, &["log"]);
-    before.assert_unchanged(&jsonl_path, "bf log");
-}
-
-#[test]
-fn test_recent_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf recent
-    let _ = run_command(workspace, &["recent"]);
-    before.assert_unchanged(&jsonl_path, "bf recent");
-}
-
-#[test]
-fn test_dep_list_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf dep list bf-inprog
-    let _ = run_command(workspace, &["dep", "list", "bf-inprog"]);
-    before.assert_unchanged(&jsonl_path, "bf dep list");
-}
-
-#[test]
-fn test_dep_tree_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf dep tree bf-inprog
-    let _ = run_command(workspace, &["dep", "tree", "bf-inprog"]);
-    before.assert_unchanged(&jsonl_path, "bf dep tree");
-}
-
-#[test]
-fn test_label_list_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf label list
-    let _ = run_command(workspace, &["label", "list"]);
-    before.assert_unchanged(&jsonl_path, "bf label list");
-}
-
-#[test]
-fn test_annotate_get_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf annotate get bf-open test-key
-    let _ = run_command(workspace, &["annotate", "get", "bf-open", "test-key"]);
-    before.assert_unchanged(&jsonl_path, "bf annotate get");
-}
-
-#[test]
-fn test_annotate_list_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf annotate list bf-open
-    let _ = run_command(workspace, &["annotate", "list", "bf-open"]);
-    before.assert_unchanged(&jsonl_path, "bf annotate list");
-}
-
-#[test]
-fn test_config_commands_do_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf config list
-    let _ = run_command(workspace, &["config", "list"]);
-    before.assert_unchanged(&jsonl_path, "bf config list");
-
-    // Run bf config get
-    let _ = run_command(workspace, &["config", "get", "default_priority"]);
-    before.assert_unchanged(&jsonl_path, "bf config get");
-
-    // Run bf config path
-    let _ = run_command(workspace, &["config", "path"]);
-    before.assert_unchanged(&jsonl_path, "bf config path");
-}
-
-#[test]
-fn test_schema_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf schema all
-    let _ = run_command(workspace, &["schema", "all"]);
-    before.assert_unchanged(&jsonl_path, "bf schema all");
-}
-
-#[test]
-fn test_status_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf status
-    let _ = run_command(workspace, &["status"]);
-    before.assert_unchanged(&jsonl_path, "bf status");
-
-    // Run bf status --format json
-    let _ = run_command(workspace, &["status", "--format", "json"]);
-    before.assert_unchanged(&jsonl_path, "bf status --format json");
-}
-
-#[test]
-fn test_sync_status_command_does_not_modify_jsonl() {
-    let temp_dir = setup_test_workspace();
-    let workspace = temp_dir.path();
-    let jsonl_path = workspace.join(".beads/issues.jsonl");
-
-    let before = FileSnapshot::snapshot(&jsonl_path);
-
-    // Run bf sync --status
-    let _ = run_command(workspace, &["sync", "--status"]);
-    before.assert_unchanged(&jsonl_path, "bf sync --status");
-}
+// Parametric test cases: each test is generated from the specification below
+// This makes it easy to add new read-only commands - just add an entry to the list
+
+// Basic single-variant tests
+test_readonly_command!(test_critical_path, ["critical-path", "bf-inprog"], "bf critical-path");
+test_readonly_command!(test_doctor, ["doctor"], "bf doctor");
+test_readonly_command!(test_comments_list, ["comments", "list", "bf-open"], "bf comments list");
+test_readonly_command!(test_search, ["search", "Open"], "bf search");
+test_readonly_command!(test_count, ["count"], "bf count");
+test_readonly_command!(test_log, ["log"], "bf log");
+test_readonly_command!(test_recent, ["recent"], "bf recent");
+test_readonly_command!(test_dep_list, ["dep", "list", "bf-inprog"], "bf dep list");
+test_readonly_command!(test_dep_tree, ["dep", "tree", "bf-inprog"], "bf dep tree");
+test_readonly_command!(test_label_list, ["label", "list"], "bf label list");
+test_readonly_command!(test_annotate_get, ["annotate", "get", "bf-open", "test-key"], "bf annotate get");
+test_readonly_command!(test_annotate_list, ["annotate", "list", "bf-open"], "bf annotate list");
+test_readonly_command!(test_schema, ["schema", "all"], "bf schema all");
+test_readonly_command!(test_sync_status, ["sync", "--status"], "bf sync --status");
+
+// Special handling for commit-check (uses process::exit)
+test_readonly_command_with_exit!(test_commit_check, ["commit-check"], "bf commit-check");
+
+// Multi-variant tests (multiple invocations in a single test)
+test_readonly_variants!(
+    test_list_variants,
+    [
+        (["list"], "bf list"),
+        (["list", "--status", "open"], "bf list --status open"),
+        (["list", "--format", "json"], "bf list --format json")
+    ]
+);
+
+test_readonly_variants!(
+    test_show_variants,
+    [
+        (["show", "bf-open"], "bf show"),
+        (["show", "bf-open", "--format", "json"], "bf show --format json")
+    ]
+);
+
+test_readonly_variants!(
+    test_ready_variants,
+    [
+        (["ready"], "bf ready"),
+        (["ready", "--format", "json"], "bf ready --format json")
+    ]
+);
+
+test_readonly_variants!(
+    test_stats_variants,
+    [
+        (["stats"], "bf stats"),
+        (["stats", "--by-type"], "bf stats --by-type"),
+        (["stats", "--format", "json"], "bf stats --format json")
+    ]
+);
+
+test_readonly_variants!(
+    test_velocity_variants,
+    [
+        (["velocity"], "bf velocity"),
+        (["velocity", "--format", "json"], "bf velocity --format json")
+    ]
+);
+
+test_readonly_variants!(
+    test_labels_variants,
+    [
+        (["labels", "bf-open"], "bf labels"),
+        (["labels", "bf-open", "--format", "json"], "bf labels --format json")
+    ]
+);
+
+test_readonly_variants!(
+    test_config_variants,
+    [
+        (["config", "list"], "bf config list"),
+        (["config", "get", "default_priority"], "bf config get"),
+        (["config", "path"], "bf config path")
+    ]
+);
+
+test_readonly_variants!(
+    test_status_variants,
+    [
+        (["status"], "bf status"),
+        (["status", "--format", "json"], "bf status --format json")
+    ]
+);
