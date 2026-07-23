@@ -372,6 +372,9 @@ impl Storage {
             for label in &issue.labels {
                 tx.execute("INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
             }
+            for label in &issue.labels {
+                tx.execute("INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+            }
             for dep in &issue.dependencies {
                 tx.execute(
                     "INSERT INTO dependencies (issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by)
@@ -620,6 +623,13 @@ impl Storage {
                         params![id, label],
                     )?;
                 }
+                tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![id])?;
+                for label in labels {
+                    tx.execute(
+                        "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
+                        params![id, label],
+                    )?;
+                }
             }
             // Handle annotation updates separately
             if let Some(ref annotations) = changes.annotations {
@@ -658,6 +668,7 @@ impl Storage {
         self.with_immediate_transaction(|tx| {
             // Delete existing related data
             tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
+            tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![&issue.id])?;
             tx.execute("DELETE FROM dependencies WHERE issue_id = ?1", params![&issue.id])?;
             tx.execute("DELETE FROM comments WHERE issue_id = ?1", params![&issue.id])?;
 
@@ -701,6 +712,9 @@ impl Storage {
             // Re-insert labels, dependencies, and comments
             for label in &issue.labels {
                 tx.execute("INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+            }
+            for label in &issue.labels {
+                tx.execute("INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
             }
             for dep in &issue.dependencies {
                 tx.execute(
@@ -1837,6 +1851,12 @@ impl Storage {
                 params![&issue.id, label],
             )?;
         }
+        for label in &issue.labels {
+            tx.execute(
+                "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
+                params![&issue.id, label],
+            )?;
+        }
         for dep in &issue.dependencies {
             tx.execute(
                 "INSERT INTO dependencies (issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by)
@@ -1876,6 +1896,7 @@ impl Storage {
             .unwrap_or_else(|| issue.content_hash());
 
         tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
+        tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![&issue.id])?;
         tx.execute(
             "DELETE FROM dependencies WHERE issue_id = ?1",
             params![&issue.id],
@@ -1944,6 +1965,12 @@ impl Storage {
         for label in &issue.labels {
             tx.execute(
                 "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
+                params![&issue.id, label],
+            )?;
+        }
+        for label in &issue.labels {
+            tx.execute(
+                "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
                 params![&issue.id, label],
             )?;
         }
