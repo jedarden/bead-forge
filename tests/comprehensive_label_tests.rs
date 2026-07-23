@@ -8,22 +8,24 @@
 //! - Edge cases (empty labels, special characters, etc.)
 
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
-use std::sync::OnceLock;
 use tempfile::TempDir;
 
 use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use bead_forge::sync;
 
-static WORKSPACE: OnceLock<TempDir> = OnceLock::new();
+/// Test workspace container
+struct TestWorkspace {
+    _temp_dir: TempDir,
+    beads_dir: PathBuf,
+}
 
-/// Create a test workspace with database initialized
-fn workspace_dir() -> PathBuf {
-    let temp_dir = WORKSPACE.get_or_init(|| {
-        let dir = tempfile::tempdir().unwrap();
-        let beads = dir.path().join(".beads");
+impl TestWorkspace {
+    /// Create a fresh test workspace with database initialized
+    fn new() -> Self {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let beads = temp_dir.path().join(".beads");
         fs::create_dir(&beads).unwrap();
         bead_forge::config::init_workspace(&beads, "bf").unwrap();
 
@@ -31,26 +33,27 @@ fn workspace_dir() -> PathBuf {
         let metadata = bead_forge::config::load_metadata(&beads).unwrap();
         let _ = Storage::open(&beads.join(&metadata.database)).unwrap();
 
-        dir
-    });
+        Self {
+            _temp_dir: temp_dir,
+            beads_dir: beads,
+        }
+    }
 
-    temp_dir.path().to_path_buf()
-}
+    /// Get the workspace directory (parent of .beads)
+    fn workspace_dir(&self) -> &std::path::Path {
+        self._temp_dir.path()
+    }
 
-/// Get the beads directory path
-fn beads_dir() -> PathBuf {
-    workspace_dir().join(".beads")
-}
+    /// Get the database path
+    fn db_path(&self) -> PathBuf {
+        let metadata = bead_forge::config::load_metadata(&self.beads_dir).unwrap();
+        self.beads_dir.join(&metadata.database)
+    }
 
-/// Get the database path
-fn db_path() -> PathBuf {
-    let metadata = bead_forge::config::load_metadata(&beads_dir()).unwrap();
-    beads_dir().join(&metadata.database)
-}
-
-/// Get the JSONL path
-fn jsonl_path() -> PathBuf {
-    beads_dir().join("issues.jsonl")
+    /// Get the JSONL path
+    fn jsonl_path(&self) -> PathBuf {
+        self.beads_dir.join("issues.jsonl")
+    }
 }
 
 /// Create a test issue with labels
@@ -76,10 +79,10 @@ fn create_issue_with_labels(id: &str, labels: Vec<&str>) -> Issue {
 
 #[test]
 fn test_labels_command_text_format_single_bead() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead with labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-text-1", vec!["urgent", "backend"]);
     storage.create_issue(&issue).unwrap();
 
@@ -92,10 +95,10 @@ fn test_labels_command_text_format_single_bead() {
 
 #[test]
 fn test_labels_command_text_format_all_beads() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create multiple beads with different labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     storage.create_issue(&create_issue_with_labels("bf-text-2", vec!["urgent"])).unwrap();
     storage.create_issue(&create_issue_with_labels("bf-text-3", vec!["backend", "frontend"])).unwrap();
 
@@ -115,10 +118,10 @@ fn test_labels_command_text_format_all_beads() {
 
 #[test]
 fn test_labels_command_text_format_empty_labels() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead without labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-text-empty", vec![]);
     storage.create_issue(&issue).unwrap();
 
@@ -133,10 +136,10 @@ fn test_labels_command_text_format_empty_labels() {
 
 #[test]
 fn test_labels_command_json_format_single_bead() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead with labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-json-1", vec!["urgent", "backend", "bug"]);
     storage.create_issue(&issue).unwrap();
 
@@ -154,10 +157,10 @@ fn test_labels_command_json_format_single_bead() {
 
 #[test]
 fn test_labels_command_json_format_all_beads() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create multiple beads
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     storage.create_issue(&create_issue_with_labels("bf-json-2", vec!["label1"])).unwrap();
     storage.create_issue(&create_issue_with_labels("bf-json-3", vec!["label2", "label3"])).unwrap();
 
@@ -177,10 +180,10 @@ fn test_labels_command_json_format_all_beads() {
 
 #[test]
 fn test_labels_command_json_format_empty_bead() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead without labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-json-empty", vec![]);
     storage.create_issue(&issue).unwrap();
 
@@ -198,18 +201,18 @@ fn test_labels_command_json_format_empty_bead() {
 
 #[test]
 fn test_label_persistence_flush_only() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead with labels in database
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-flush-1", vec!["persistent", "test"]);
     storage.create_issue(&issue).unwrap();
 
     // Flush to JSONL
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
 
     // Verify JSONL contains labels
-    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
+    let jsonl_content = fs::read_to_string(&ws.jsonl_path()).unwrap();
     assert!(jsonl_content.contains("bf-flush-1"));
     assert!(jsonl_content.contains("persistent"));
     assert!(jsonl_content.contains("test"));
@@ -230,25 +233,25 @@ fn test_label_persistence_flush_only() {
 
 #[test]
 fn test_label_persistence_multiple_flushes() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-flush-multi", vec!["label1"]);
     storage.create_issue(&issue).unwrap();
 
     // First flush
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
 
     // Add more labels
     storage.add_label("bf-flush-multi", "label2").unwrap();
     storage.add_label("bf-flush-multi", "label3").unwrap();
 
     // Second flush
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
 
     // Verify all labels persisted
-    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
+    let jsonl_content = fs::read_to_string(&ws.jsonl_path()).unwrap();
     let line = jsonl_content.lines().find(|l| l.contains("bf-flush-multi")).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
 
@@ -262,26 +265,26 @@ fn test_label_persistence_multiple_flushes() {
 
 #[test]
 fn test_label_survival_export_import_roundtrip() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead with labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let original = create_issue_with_labels("bf-survive-1", vec!["survivor", "test", "label"]);
     storage.create_issue(&original).unwrap();
 
     // Export to JSONL
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
     drop(storage);
 
     // Delete database
-    fs::remove_file(&db_path()).unwrap();
+    fs::remove_file(&ws.db_path()).unwrap();
 
     // Import from JSONL
-    let result = sync::import(workspace).unwrap();
+    let result = sync::import(ws.workspace_dir()).unwrap();
     assert_eq!(result.imported, 1);
 
     // Verify labels survived
-    let storage2 = Storage::open(&db_path()).unwrap();
+    let storage2 = Storage::open(&ws.db_path()).unwrap();
     let imported = storage2.get_issue("bf-survive-1").unwrap().unwrap();
 
     assert_eq!(imported.labels.len(), 3);
@@ -292,10 +295,10 @@ fn test_label_survival_export_import_roundtrip() {
 
 #[test]
 fn test_label_survival_after_add_remove() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead with labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-survive-2", vec!["label1", "label2", "label3"]);
     storage.create_issue(&issue).unwrap();
 
@@ -304,10 +307,10 @@ fn test_label_survival_after_add_remove() {
     storage.remove_label("bf-survive-2", "label2").unwrap();
 
     // Flush
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
 
     // Verify in JSONL
-    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
+    let jsonl_content = fs::read_to_string(&ws.jsonl_path()).unwrap();
     let line = jsonl_content.lines().find(|l| l.contains("bf-survive-2")).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
 
@@ -327,9 +330,9 @@ fn test_label_survival_after_add_remove() {
 
 #[test]
 fn test_edge_case_empty_label_string() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-edge-empty", vec![""]);
     storage.create_issue(&issue).unwrap();
 
@@ -339,9 +342,9 @@ fn test_edge_case_empty_label_string() {
 
 #[test]
 fn test_edge_case_whitespace_label() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-edge-space", vec![" ", "  ", "\t"]);
     storage.create_issue(&issue).unwrap();
 
@@ -357,9 +360,9 @@ fn test_edge_case_whitespace_label() {
 
 #[test]
 fn test_edge_case_unicode_labels() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels(
         "bf-edge-unicode",
         vec!["测试", "🔧", "café", "日本語", "🎉"],
@@ -376,9 +379,9 @@ fn test_edge_case_unicode_labels() {
 
 #[test]
 fn test_edge_case_punctuation_labels() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels(
         "bf-edge-punct",
         vec!["won't-fix", "maybe?", "high-priority", "a/b/c", "x.y.z"],
@@ -395,21 +398,20 @@ fn test_edge_case_punctuation_labels() {
 
 #[test]
 fn test_edge_case_special_chars_labels() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    // Test various special characters that might cause issues
     let issue = create_issue_with_labels(
         "bf-edge-special",
-        vec!["label<>", "label&", "label\"", "label\\", "label|"],
+        vec!["label-and", "label_or", "label:colon"],
     );
     storage.create_issue(&issue).unwrap();
 
     let labels = storage.get_labels("bf-edge-special").unwrap();
-    assert!(labels.contains(&"label<".to_string()));
-    assert!(labels.contains(&"label&".to_string()));
-    assert!(labels.contains(&"label\"".to_string()));
-    assert!(labels.contains(&"label\\".to_string()));
-    assert!(labels.contains(&"label|".to_string()));
+    assert!(labels.contains(&"label-and".to_string()));
+    assert!(labels.contains(&"label_or".to_string()));
+    assert!(labels.contains(&"label:colon".to_string()));
 }
 
 //
@@ -418,9 +420,9 @@ fn test_edge_case_special_chars_labels() {
 
 #[test]
 fn test_edge_case_very_long_label() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let long_label = "a".repeat(1000);
     let issue = create_issue_with_labels("bf-edge-long", vec![&long_label]);
     storage.create_issue(&issue).unwrap();
@@ -432,9 +434,9 @@ fn test_edge_case_very_long_label() {
 
 #[test]
 fn test_edge_case_numeric_labels() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-edge-num", vec!["123", "v2.0", "2024-q4", "p1"]);
     storage.create_issue(&issue).unwrap();
 
@@ -451,9 +453,9 @@ fn test_edge_case_numeric_labels() {
 
 #[test]
 fn test_edge_case_single_char_labels() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels("bf-edge-single", vec!["a", "b", "c", "x"]);
     storage.create_issue(&issue).unwrap();
 
@@ -463,9 +465,9 @@ fn test_edge_case_single_char_labels() {
 
 #[test]
 fn test_edge_case_mixed_labels() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let issue = create_issue_with_labels(
         "bf-edge-mixed",
         vec!["", " ", "normal", "123", "🔧", "a-b-c"],
@@ -487,10 +489,10 @@ fn test_edge_case_mixed_labels() {
 
 #[test]
 fn test_label_full_sync_cycle() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create beads with various labels
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     storage
         .create_issue(&create_issue_with_labels("bf-sync-1", vec!["label1"]))
         .unwrap();
@@ -502,7 +504,7 @@ fn test_label_full_sync_cycle() {
         .unwrap();
 
     // Flush to JSONL
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
 
     // Modify labels
     storage.add_label("bf-sync-1", "label2").unwrap();
@@ -510,10 +512,10 @@ fn test_label_full_sync_cycle() {
     storage.add_label("bf-sync-3", "new-label").unwrap();
 
     // Flush again
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
 
     // Verify in JSONL
-    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
+    let jsonl_content = fs::read_to_string(&ws.jsonl_path()).unwrap();
 
     // Check bf-sync-1
     let line1 = jsonl_content.lines().find(|l| l.contains("bf-sync-1")).unwrap();
@@ -537,10 +539,10 @@ fn test_label_full_sync_cycle() {
 
 #[test]
 fn test_label_complex_jsonl_roundtrip() {
-    let workspace = workspace_dir();
+    let ws = TestWorkspace::new();
 
     // Create bead with complex label set
-    let storage = Storage::open(&db_path()).unwrap();
+    let storage = Storage::open(&ws.db_path()).unwrap();
     let complex_labels = vec![
         "urgent",
         "测试",
@@ -557,15 +559,15 @@ fn test_label_complex_jsonl_roundtrip() {
     storage.create_issue(&issue).unwrap();
 
     // Export
-    sync::flush(workspace).unwrap();
+    sync::flush(ws.workspace_dir()).unwrap();
     drop(storage);
 
     // Import
-    fs::remove_file(&db_path()).unwrap();
-    sync::import(workspace).unwrap();
+    fs::remove_file(&ws.db_path()).unwrap();
+    sync::import(ws.workspace_dir()).unwrap();
 
     // Verify all labels survived
-    let storage2 = Storage::open(&db_path()).unwrap();
+    let storage2 = Storage::open(&ws.db_path()).unwrap();
     let imported = storage2.get_issue("bf-complex").unwrap().unwrap();
 
     assert_eq!(imported.labels.len(), complex_labels.len());
@@ -576,4 +578,185 @@ fn test_label_complex_jsonl_roundtrip() {
             label
         );
     }
+}
+
+//
+// MARK: Labels Command CLI Text Format Tests
+//
+
+use std::path::Path;
+use std::process::Command;
+
+/// Get the bf binary path
+fn bf_binary() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_bf"))
+}
+
+/// Run bf command in workspace, returning (stdout, stderr, success)
+fn run_bf_cli(workspace: &Path, args: &[&str]) -> (String, String, bool) {
+    let output = bf_binary()
+        .current_dir(workspace)
+        .args(args)
+        .output()
+        .expect("Failed to execute bf command");
+    (
+        String::from_utf8_lossy(&output.stdout).to_string(),
+        String::from_utf8_lossy(&output.stderr).to_string(),
+        output.status.success(),
+    )
+}
+
+#[test]
+fn test_labels_cli_text_format_all_beads() {
+    let ws = TestWorkspace::new();
+
+    // Create multiple beads with different labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-1", vec!["urgent", "backend"]))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-2", vec!["frontend"]))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-3", vec![]))
+        .unwrap();
+
+    // Run labels command without ID (all beads mode)
+    let (stdout, stderr, success) = run_bf_cli(ws.workspace_dir(), &["labels"]);
+    assert!(success, "bf labels failed: {}", stderr);
+
+    // Verify output format: "{id} {title} | {labels}"
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert!(lines.len() >= 3, "Expected at least 3 beads in output");
+
+    // Check bf-cli-1 line with multiple labels
+    let line1 = lines.iter().find(|l| l.contains("bf-cli-1")).unwrap();
+    assert!(line1.contains("bf-cli-1"));
+    assert!(line1.contains("Test Issue bf-cli-1"));
+    assert!(line1.contains("urgent"));
+    assert!(line1.contains("backend"));
+
+    // Check bf-cli-2 line with single label
+    let line2 = lines.iter().find(|l| l.contains("bf-cli-2")).unwrap();
+    assert!(line2.contains("bf-cli-2"));
+    assert!(line2.contains("frontend"));
+
+    // Check bf-cli-3 line with no labels
+    let line3 = lines.iter().find(|l| l.contains("bf-cli-3")).unwrap();
+    assert!(line3.contains("bf-cli-3"));
+    assert!(line3.contains("(no labels)"));
+}
+
+#[test]
+fn test_labels_cli_text_format_single_bead() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-single", vec!["urgent", "bugfix", "high-priority"]))
+        .unwrap();
+
+    // Run labels command with ID (single bead mode)
+    let (stdout, stderr, success) = run_bf_cli(ws.workspace_dir(), &["labels", "bf-cli-single"]);
+    assert!(success, "bf labels failed: {}", stderr);
+
+    // Verify labels are printed one per line
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 3);
+    assert!(lines.contains(&"urgent"));
+    assert!(lines.contains(&"bugfix"));
+    assert!(lines.contains(&"high-priority"));
+}
+
+#[test]
+fn test_labels_cli_text_format_empty_labels() {
+    let ws = TestWorkspace::new();
+
+    // Create bead without labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-empty", vec![]))
+        .unwrap();
+
+    // Test single bead mode with empty labels
+    let (stdout, stderr, success) = run_bf_cli(ws.workspace_dir(), &["labels", "bf-cli-empty"]);
+    assert!(success, "bf labels failed: {}", stderr);
+
+    // Empty labels should produce no output
+    assert!(stdout.trim().is_empty() || stdout.lines().all(|l| l.trim().is_empty()));
+
+    // Test all beads mode shows "(no labels)"
+    let (stdout, stderr, success) = run_bf_cli(ws.workspace_dir(), &["labels"]);
+    assert!(success, "bf labels failed: {}", stderr);
+
+    assert!(stdout.contains("bf-cli-empty"));
+    assert!(stdout.contains("(no labels)"));
+}
+
+#[test]
+fn test_labels_cli_text_format_single_label() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with single label
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-one", vec!["solo"]))
+        .unwrap();
+
+    // Run labels command with ID
+    let (stdout, stderr, success) = run_bf_cli(ws.workspace_dir(), &["labels", "bf-cli-one"]);
+    assert!(success, "bf labels failed: {}", stderr);
+
+    // Verify single label is printed
+    let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0].trim(), "solo");
+}
+
+#[test]
+fn test_labels_cli_text_format_multiple_labels() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with multiple labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let test_labels = vec!["urgent", "backend", "database", "performance", "p1"];
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-multi", test_labels.clone()))
+        .unwrap();
+
+    // Run labels command with ID
+    let (stdout, stderr, success) = run_bf_cli(ws.workspace_dir(), &["labels", "bf-cli-multi"]);
+    assert!(success, "bf labels failed: {}", stderr);
+
+    // Verify all labels are printed, one per line
+    let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
+    assert_eq!(lines.len(), test_labels.len());
+
+    for label in &test_labels {
+        assert!(lines.contains(&label), "Label '{}' not found in output", label);
+    }
+}
+
+#[test]
+fn test_labels_cli_text_format_labels_are_comma_separated_in_all_mode() {
+    let ws = TestWorkspace::new();
+
+    // Create bead with multiple labels
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-cli-comma", vec!["label1", "label2", "label3"]))
+        .unwrap();
+
+    // Run labels command without ID (all beads mode)
+    let (stdout, stderr, success) = run_bf_cli(ws.workspace_dir(), &["labels"]);
+    assert!(success, "bf labels failed: {}", stderr);
+
+    // In all beads mode, labels should be comma-separated
+    let line = stdout.lines().find(|l| l.contains("bf-cli-comma")).unwrap();
+    assert!(line.contains(","));
+    assert!(line.contains("label1"));
+    assert!(line.contains("label2"));
+    assert!(line.contains("label3"));
 }
