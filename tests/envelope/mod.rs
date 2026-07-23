@@ -4,3 +4,4 @@
 //! command or command group.
 
 mod claim_stats;
+mod text_format;
