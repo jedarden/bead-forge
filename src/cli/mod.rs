@@ -469,6 +469,10 @@ pub enum Commands {
         /// Read from stdin
         #[arg(long, default_value = "false")]
         stdin: bool,
+
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        format: String,
     },
 
     /// Mitosis: split a bead into children atomically
@@ -1248,7 +1252,7 @@ pub fn run(cli: Cli) -> Result<()> {
         ),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
-        Commands::Batch { file, json, stdin } => {
+        Commands::Batch { file, json, stdin, format } => {
             cmd_batch(&beads_dir, file, json, stdin, no_auto_flush)
         }
         Commands::Mitosis {
@@ -1526,11 +1530,13 @@ fn cmd_create(
     let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
 
     if json {
-        let out = crate::format::with_warning(
+        let formatter = get_formatter(OutputFormat::Json);
+        let data = crate::format::with_warning(
             serde_json::json!({ "id": id }),
             warning.as_deref(),
         );
-        println!("{}", serde_json::to_string(&out)?);
+        let json_str = serde_json::to_string(&data)?;
+        println!("{}", formatter.format_with_envelope("create", &json_str));
     } else {
         println!("{}", id);
     }
@@ -2808,7 +2814,15 @@ fn cmd_search(
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_issues(&issues));
+    match output_format {
+        OutputFormat::Json => {
+            let json_str = formatter.format_issues(&issues);
+            println!("{}", formatter.format_with_envelope("search", &json_str));
+        }
+        _ => {
+            print!("{}", formatter.format_issues(&issues));
+        }
+    }
 
     Ok(())
 }
@@ -3100,7 +3114,15 @@ fn cmd_velocity(
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_velocity(&stats));
+    match output_format {
+        OutputFormat::Json => {
+            let json_str = formatter.format_velocity(&stats);
+            println!("{}", formatter.format_with_envelope("velocity", &json_str));
+        }
+        _ => {
+            print!("{}", formatter.format_velocity(&stats));
+        }
+    }
 
     Ok(())
 }
@@ -3514,7 +3536,15 @@ fn cmd_recent(
     // Format output
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_issues(&issues));
+    match output_format {
+        OutputFormat::Json => {
+            let json_str = formatter.format_issues(&issues);
+            println!("{}", formatter.format_with_envelope("recent", &json_str));
+        }
+        _ => {
+            print!("{}", formatter.format_issues(&issues));
+        }
+    }
 
     Ok(())
 }

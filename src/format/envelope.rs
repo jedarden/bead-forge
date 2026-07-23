@@ -88,39 +88,254 @@ impl JsonEnvelope {
     }
 }
 
+// Unit tests for envelope structure and metadata
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
 
+    // === Envelope creation tests ===
+
     #[test]
-    fn envelope_has_required_fields() {
-        let env = JsonEnvelope::new("list", json!([]));
-        let v = serde_json::to_value(&env).unwrap();
-        assert_eq!(v["version"], 1);
-        assert_eq!(v["kind"], "list");
-        assert!(v.get("warning").is_none() || v["warning"].is_null());
+    fn envelope_new_creates_valid_structure() {
+        let env = JsonEnvelope::new("test", json!({"key": "value"}));
+        assert_eq!(env.version, VERSION);
+        assert_eq!(env.kind, "test");
+        assert_eq!(env.data, json!({"key": "value"}));
+        assert!(env.warning.is_none());
     }
 
     #[test]
-    fn envelope_with_optional_warning() {
+    fn envelope_new_accepts_various_kind_types() {
+        // String slice
+        let env1 = JsonEnvelope::new("list", json!([]));
+        assert_eq!(env1.kind, "list");
+
+        // String
+        let env2 = JsonEnvelope::new(String::from("ready"), json!([]));
+        assert_eq!(env2.kind, "ready");
+
+        // Cow-like behavior
+        let kind = String::from("search");
+        let env3 = JsonEnvelope::new(kind.clone(), json!([]));
+        assert_eq!(env3.kind, kind);
+    }
+
+    #[test]
+    fn envelope_new_with_empty_data() {
+        let env = JsonEnvelope::new("ready", json!([]));
+        assert!(env.data.is_array());
+        assert_eq!(env.data.as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn envelope_new_with_null_data() {
+        let env = JsonEnvelope::new("custom", json!(null));
+        assert!(env.data.is_null());
+    }
+
+    // === Version field tests ===
+
+    #[test]
+    fn envelope_version_is_always_current() {
+        let env = JsonEnvelope::new("any", json!([]));
+        assert_eq!(env.version, VERSION);
+        assert_eq!(env.version, 1);
+    }
+
+    #[test]
+    fn envelope_version_is_present_in_serialization() {
+        let env = JsonEnvelope::new("stats", json!({"total": 42}));
+        let s = env.to_json().unwrap();
+        let v: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(v["version"], 1);
+        assert!(v["version"].is_number());
+        assert!(v["version"].is_u64());
+    }
+
+    #[test]
+    fn envelope_version_constant_matches_serialized_value() {
+        let env = JsonEnvelope::new("list", json!([]));
+        let serialized = serde_json::to_value(&env).unwrap();
+        assert_eq!(serialized["version"].as_u64().unwrap() as u32, VERSION);
+    }
+
+    // === Kind field tests ===
+
+    #[test]
+    fn envelope_kind_identifies_command() {
+        let commands = vec!["list", "ready", "show", "claim", "create", "update", "close", "stats", "search"];
+        for cmd in commands {
+            let env = JsonEnvelope::new(cmd, json!(null));
+            assert_eq!(env.kind, cmd);
+        }
+    }
+
+    #[test]
+    fn envelope_kind_is_required_field() {
+        let env = JsonEnvelope::new("required", json!(null));
+        let v = serde_json::to_value(&env).unwrap();
+        assert!(v.get("kind").is_some());
+        assert_eq!(v["kind"], "required");
+    }
+
+    #[test]
+    fn envelope_kind_preserves_original_value() {
+        let kind = "very_specific_command_name";
+        let env = JsonEnvelope::new(kind, json!([]));
+        let s = env.to_json_compact().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.kind, kind);
+    }
+
+    // === Data field tests ===
+
+    #[test]
+    fn envelope_data_can_be_object() {
+        let data = json!({"id": "bf-123", "title": "Test"});
+        let env = JsonEnvelope::new("show", data);
+        assert!(env.data.is_object());
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.data["id"], "bf-123");
+        assert_eq!(parsed.data["title"], "Test");
+    }
+
+    #[test]
+    fn envelope_data_can_be_array() {
+        let data = json!([1, 2, 3, 4, 5]);
+        let env = JsonEnvelope::new("list", data);
+        assert!(env.data.is_array());
+        let s = env.to_json_compact().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.data.as_array().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn envelope_data_can_be_string() {
+        let env = JsonEnvelope::new("message", json!("output text"));
+        assert!(env.data.is_string());
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.data.as_str().unwrap(), "output text");
+    }
+
+    #[test]
+    fn envelope_data_can_be_number() {
+        let env = JsonEnvelope::new("count", json!(42));
+        assert!(env.data.is_number());
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.data.as_i64().unwrap(), 42);
+    }
+
+    #[test]
+    fn envelope_data_can_be_boolean() {
+        let env = JsonEnvelope::new("success", json!(true));
+        assert!(env.data.is_boolean());
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert!(parsed.data.as_bool().unwrap());
+    }
+
+    #[test]
+    fn envelope_data_can_be_nested_structure() {
+        let data = json!({
+            "bead": {
+                "id": "bf-123",
+                "metadata": {
+                    "created": "2024-01-01",
+                    "tags": ["urgent", "backend"]
+                }
+            }
+        });
+        let env = JsonEnvelope::new("show", data.clone());
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.data, data);
+        assert_eq!(parsed.data["bead"]["metadata"]["tags"][0], "urgent");
+    }
+
+    #[test]
+    fn envelope_data_preserves_exact_value() {
+        let original = json!({"complex": [1, 2, {"nested": "value"}]});
+        let env = JsonEnvelope::new("preserve", original.clone());
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.data, original);
+    }
+
+    // === Warning field tests (metadata) ===
+
+    #[test]
+    fn envelope_warning_is_optional() {
+        let env = JsonEnvelope::new("list", json!([]));
+        assert!(env.warning.is_none());
+    }
+
+    #[test]
+    fn envelope_with_warning_adds_message() {
         let env = JsonEnvelope::new("create", json!({"id": "bf-test"}))
             .with_warning("auto-flush failed");
-        let v = serde_json::to_value(&env).unwrap();
-        assert_eq!(v["warning"], "auto-flush failed");
+        assert_eq!(env.warning, Some("auto-flush failed".to_string()));
     }
 
     #[test]
-    fn envelope_skips_warning_when_none() {
+    fn envelope_warning_can_be_empty_string() {
+        let env = JsonEnvelope::new("update", json!({}))
+            .with_warning("");
+        assert_eq!(env.warning, Some("".to_string()));
+    }
+
+    #[test]
+    fn envelope_warning_can_contain_any_text() {
+        let warning = "Warning: multiple unflushed beads in workspace";
+        let env = JsonEnvelope::new("claim", json!({}))
+            .with_warning(warning);
+        assert_eq!(env.warning.unwrap(), warning);
+    }
+
+    #[test]
+    fn envelope_with_warning_preserves_other_fields() {
+        let data = json!({"id": "bf-456"});
+        let env = JsonEnvelope::new("close", data.clone())
+            .with_warning("partial flush failure");
+        assert_eq!(env.kind, "close");
+        assert_eq!(env.data, data);
+        assert_eq!(env.warning, Some("partial flush failure".to_string()));
+    }
+
+    #[test]
+    fn envelope_warning_serializes_when_present() {
+        let env = JsonEnvelope::new("delete", json!({"id": "bf-789"}))
+            .with_warning("archive failed");
+        let s = env.to_json().unwrap();
+        let v: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(v["warning"], "archive failed");
+        assert!(v["warning"].is_string());
+    }
+
+    #[test]
+    fn envelope_warning_omitted_when_none_in_serialization() {
         let env = JsonEnvelope::new("list", json!([]));
         let s = env.to_json().unwrap();
-        // When warning is None, the key should not be present (not just null)
         let v: Value = serde_json::from_str(&s).unwrap();
-        assert!(v.get("warning").is_none() || v["warning"].is_null());
+        // Key should not be present (not just null)
+        assert!(v.get("warning").is_none());
     }
 
     #[test]
-    fn envelope_parses_as_valid_json() {
+    fn envelope_warning_omitted_in_compact_serialization() {
+        let env = JsonEnvelope::new("ready", json!([]));
+        let compact = env.to_json_compact().unwrap();
+        let v: Value = serde_json::from_str(&compact).unwrap();
+        assert!(v.get("warning").is_none());
+    }
+
+    // === Serialization tests ===
+
+    #[test]
+    fn envelope_to_json_produces_valid_json() {
         let env = JsonEnvelope::new("stats", json!({"total": 42}));
         let s = env.to_json().unwrap();
         let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
@@ -129,7 +344,17 @@ mod tests {
     }
 
     #[test]
-    fn envelope_serializes_compactly() {
+    fn envelope_to_json_pretty_prints() {
+        let env = JsonEnvelope::new("list", json!([]));
+        let s = env.to_json().unwrap();
+        // Pretty-printed JSON has newlines
+        assert!(s.contains('\n'));
+        // And indentation
+        assert!(s.contains("  "));
+    }
+
+    #[test]
+    fn envelope_to_json_compact_produces_valid_json() {
         let env = JsonEnvelope::new("claim", json!({"bead_id": "bf-123"}));
         let compact = env.to_json_compact().unwrap();
         // Compact JSON has no newlines
@@ -140,7 +365,32 @@ mod tests {
     }
 
     #[test]
-    fn list_command_with_multiple_items() {
+    fn envelope_serialization_roundtrip() {
+        let original = JsonEnvelope::new("search", json!([{"id": "1"}, {"id": "2"}]))
+            .with_warning("test warning");
+        let serialized = serde_json::to_string(&original).unwrap();
+        let deserialized: JsonEnvelope = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.version, original.version);
+        assert_eq!(deserialized.kind, original.kind);
+        assert_eq!(deserialized.data, original.data);
+        assert_eq!(deserialized.warning, original.warning);
+    }
+
+    #[test]
+    fn envelope_compact_roundtrip_with_warning() {
+        let env = JsonEnvelope::new("velocity", json!({"avg_days": 3.5}))
+            .with_warning("incomplete data");
+        let compact = env.to_json_compact().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&compact).unwrap();
+        assert_eq!(parsed.kind, "velocity");
+        assert_eq!(parsed.warning, Some("incomplete data".to_string()));
+        assert_eq!(parsed.data["avg_days"], 3.5);
+    }
+
+    // === Command-specific data shape tests ===
+
+    #[test]
+    fn list_command_emits_array() {
         let data = json!([
             {"id": "bf-1", "title": "First"},
             {"id": "bf-2", "title": "Second"}
@@ -159,5 +409,151 @@ mod tests {
         let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
         assert!(parsed.data.is_array());
         assert_eq!(parsed.data.as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn show_command_emits_single_object() {
+        let data = json!({"id": "bf-123", "title": "Test Bead", "status": "open"});
+        let env = JsonEnvelope::new("show", data);
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert!(parsed.data.is_object());
+        assert_eq!(parsed.data["id"], "bf-123");
+    }
+
+    #[test]
+    fn claim_command_emits_result_object() {
+        let data = json!({"bead_id": "bf-456", "assignee": "agent-1"});
+        let env = JsonEnvelope::new("claim", data);
+        let s = env.to_json_compact().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert!(parsed.data.is_object());
+        assert_eq!(parsed.data["bead_id"], "bf-456");
+        assert_eq!(parsed.data["assignee"], "agent-1");
+    }
+
+    #[test]
+    fn create_command_emits_id_only() {
+        let data = json!({"id": "bf-new-123"});
+        let env = JsonEnvelope::new("create", data);
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert!(parsed.data.is_object());
+        assert!(parsed.data.get("id").is_some());
+        assert_eq!(parsed.data["id"], "bf-new-123");
+    }
+
+    #[test]
+    fn stats_command_emits_aggregate_counts() {
+        let data = json!({"total": 100, "open": 50, "in_progress": 30, "closed": 20});
+        let env = JsonEnvelope::new("stats", data);
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.data["total"], 100);
+        assert_eq!(parsed.data["open"], 50);
+        assert_eq!(parsed.data["in_progress"], 30);
+        assert_eq!(parsed.data["closed"], 20);
+    }
+
+    #[test]
+    fn search_command_emits_results_array() {
+        let data = json!([
+            {"id": "bf-1", "title": "First result"},
+            {"id": "bf-2", "title": "Second result"}
+        ]);
+        let env = JsonEnvelope::new("search", data);
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert!(parsed.data.is_array());
+        assert_eq!(parsed.data.as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn batch_command_emits_operations_array() {
+        let data = json!([
+            {"op": "create", "result": {"id": "bf-1"}},
+            {"op": "close", "result": {"id": "bf-2"}}
+        ]);
+        let env = JsonEnvelope::new("batch", data);
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert!(parsed.data.is_array());
+        assert_eq!(parsed.data.as_array().unwrap().len(), 2);
+        assert_eq!(parsed.data[0]["op"], "create");
+    }
+
+    // === Metadata/field presence tests ===
+
+    #[test]
+    fn envelope_has_required_fields() {
+        let env = JsonEnvelope::new("list", json!([]));
+        let v = serde_json::to_value(&env).unwrap();
+        assert!(v.get("version").is_some());
+        assert!(v.get("kind").is_some());
+        assert!(v.get("data").is_some());
+        // warning is optional
+    }
+
+    #[test]
+    fn envelope_allows_arbitrary_kind_values() {
+        let custom_commands = ["custom-1", "my_command", "SPECIAL_CMD"];
+        for cmd in custom_commands {
+            let env = JsonEnvelope::new(cmd, json!(null));
+            assert_eq!(env.kind, cmd);
+            let s = env.to_json().unwrap();
+            let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+            assert_eq!(parsed.kind, cmd);
+        }
+    }
+
+    #[test]
+    fn envelope_field_order_is_stable() {
+        let env = JsonEnvelope::new("test", json!([]));
+        let s = env.to_json().unwrap();
+        // Verify fields are present in serialized form
+        assert!(s.contains("\"version\""));
+        assert!(s.contains("\"kind\""));
+        assert!(s.contains("\"data\""));
+    }
+
+    // === Edge cases and error conditions ===
+
+    #[test]
+    fn envelope_with_large_data_serializes_correctly() {
+        let large_array: Vec<Value> = (0..1000)
+            .map(|i| json!({"id": format!("bf-{}", i), "value": i}))
+            .collect();
+        let env = JsonEnvelope::new("list", json!(large_array));
+        let s = env.to_json_compact().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert!(parsed.data.is_array());
+        assert_eq!(parsed.data.as_array().unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn envelope_with_unicode_warning() {
+        let env = JsonEnvelope::new("update", json!({}))
+            .with_warning("⚠️  Warning: café Münchën");
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.warning, Some("⚠️  Warning: café Münchën".to_string()));
+    }
+
+    #[test]
+    fn envelope_with_special_chars_in_kind() {
+        let env = JsonEnvelope::new("cmd-with_special.chars", json!(null));
+        assert_eq!(env.kind, "cmd-with_special.chars");
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.kind, "cmd-with_special.chars");
+    }
+
+    #[test]
+    fn envelope_with_newlines_in_warning() {
+        let env = JsonEnvelope::new("sync", json!({}))
+            .with_warning("Line 1\nLine 2\nLine 3");
+        let s = env.to_json().unwrap();
+        let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.warning, Some("Line 1\nLine 2\nLine 3".to_string()));
     }
 }
