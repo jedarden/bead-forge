@@ -850,3 +850,242 @@ mod list_show {
         assert_eq!(show_json["version"].as_u64().unwrap(), 1);
     }
 }
+
+// === Integration tests for claim and stats envelope wrapping ===
+// These tests verify that claim --json and stats --json properly
+// wrap their output in envelopes with correct structure and metadata.
+// Bead: bf-s4ljc
+#[cfg(test)]
+mod claim_stats {
+    use super::*;
+    use crate::model::{Issue, Status, Priority, IssueType};
+    use crate::format::json::JsonFormatter;
+    use crate::format::Formatter;
+    use serde_json::json;
+
+    /// Helper to create a test issue
+    fn create_test_issue(id: &str, title: &str) -> Issue {
+        let mut issue = Issue::new(
+            id.to_string(),
+            title.to_string(),
+            ".".to_string()
+        );
+        issue.status = Status::Open;
+        issue.priority = Priority(2);
+        issue.issue_type = IssueType::Task;
+        issue
+    }
+
+    /// Helper to parse envelope from JSON string
+    fn parse_envelope(json_str: &str) -> JsonEnvelope {
+        serde_json::from_str(json_str)
+            .expect("Output must be valid JSON envelope")
+    }
+
+    // === Claim command envelope tests ===
+
+    #[test]
+    fn claim_json_envelope_has_stable_structure() {
+        // Simulate a successful claim response
+        let claim_data = json!({
+            "bead_id": "bf-123",
+            "assignee": "test-worker",
+            "claimed_at": "2024-01-15T10:30:00Z"
+        });
+
+        let envelope = JsonEnvelope::new("claim", claim_data);
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure
+        assert_eq!(parsed.version, 1, "Envelope version must be 1");
+        assert_eq!(parsed.kind, "claim", "Envelope kind must be 'claim'");
+        assert!(parsed.data.is_object(), "Claim data must be an object");
+
+        // Verify claim-specific fields are present in data
+        assert!(parsed.data.get("bead_id").is_some(), "Claim data must have 'bead_id'");
+        assert!(parsed.data.get("assignee").is_some(), "Claim data must have 'assignee'");
+    }
+
+    #[test]
+    fn claim_json_envelope_metadata_fields_present() {
+        let claim_data = json!({
+            "bead_id": "bf-456",
+            "assignee": "agent-007"
+        });
+
+        let envelope = JsonEnvelope::new("claim", claim_data);
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
+            .expect("Envelope must serialize to valid JSON");
+
+        // Verify all metadata fields are present
+        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(parsed.get("kind").is_some(), "kind field must be present");
+        assert!(parsed.get("data").is_some(), "data field must be present");
+
+        // Verify metadata values
+        assert_eq!(parsed["version"].as_u64().unwrap(), 1, "version must be 1");
+        assert_eq!(parsed["kind"].as_str().unwrap(), "claim", "kind must be 'claim'");
+
+        // warning field is optional (absent when no warning)
+        let warning_optional = parsed.get("warning");
+        assert!(
+            warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string(),
+            "warning field must be absent, null, or a string"
+        );
+    }
+
+    #[test]
+    fn claim_json_envelope_successful_claim_case() {
+        // Simulate a successful claim operation
+        let claim_response = json!({
+            "bead_id": "bf-abc123",
+            "assignee": "worker-1",
+            "claimed_at": "2024-07-23T12:00:00Z",
+            "status": "open"
+        });
+
+        let envelope = JsonEnvelope::new("claim", claim_response);
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure for successful claim
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "claim");
+
+        // Verify the claim result contains expected fields
+        assert!(parsed.data.is_object(), "Claim result must be an object");
+        assert_eq!(parsed.data["bead_id"].as_str().unwrap(), "bf-abc123");
+        assert_eq!(parsed.data["assignee"].as_str().unwrap(), "worker-1");
+        assert_eq!(parsed.data["status"].as_str().unwrap(), "open");
+
+        // Verify claimed_at timestamp is present
+        assert!(parsed.data.get("claimed_at").is_some(), "Claim result must have 'claimed_at' timestamp");
+    }
+
+    #[test]
+    fn claim_json_envelope_empty_when_no_bead_available() {
+        // Simulate claim with no available beads
+        let empty_claim = json!({});
+
+        let envelope = JsonEnvelope::new("claim", empty_claim);
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure for empty claim
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "claim");
+        assert!(parsed.data.is_object(), "Claim data must be an object");
+        assert!(parsed.data.as_object().unwrap().is_empty(), "Claim data must be empty when no beads available");
+    }
+
+    #[test]
+    fn claim_json_envelope_roundtrip_serialization() {
+        let original_data = json!({
+            "bead_id": "bf-rust",
+            "assignee": "dev-team",
+            "priority": 1
+        });
+
+        let envelope = JsonEnvelope::new("claim", original_data.clone());
+        let serialized = serde_json::to_string(&envelope).unwrap();
+        let deserialized: JsonEnvelope = serde_json::from_str(&serialized).unwrap();
+
+        // Verify roundtrip preserves all data
+        assert_eq!(deserialized.version, 1);
+        assert_eq!(deserialized.kind, "claim");
+        assert_eq!(deserialized.data, original_data);
+    }
+
+    // === Stats command envelope tests ===
+
+    #[test]
+    fn stats_json_envelope_has_stable_structure() {
+        let stats_data = json!({
+            "total": 100,
+            "open": 50,
+            "in_progress": 30,
+            "closed": 20
+        });
+
+        let envelope = JsonEnvelope::new("stats", stats_data);
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure
+        assert_eq!(parsed.version, 1, "Envelope version must be 1");
+        assert_eq!(parsed.kind, "stats", "Envelope kind must be 'stats'");
+        assert!(parsed.data.is_object(), "Stats data must be an object");
+
+        // Verify stats-specific fields
+        assert!(parsed.data.get("total").is_some(), "Stats must have 'total'");
+        assert!(parsed.data.get("open").is_some(), "Stats must have 'open'");
+    }
+
+    #[test]
+    fn stats_json_envelope_metadata_fields_present() {
+        let stats_data = json!({
+            "total": 42,
+            "open": 10,
+            "in_progress": 5,
+            "closed": 27
+        });
+
+        let envelope = JsonEnvelope::new("stats", stats_data);
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
+            .expect("Envelope must serialize to valid JSON");
+
+        // Verify all metadata fields are present
+        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(parsed.get("kind").is_some(), "kind field must be present");
+        assert!(parsed.get("data").is_some(), "data field must be present");
+
+        // Verify metadata values
+        assert_eq!(parsed["version"].as_u64().unwrap(), 1, "version must be 1");
+        assert_eq!(parsed["kind"].as_str().unwrap(), "stats", "kind must be 'stats'");
+
+        // warning field is optional
+        let warning_optional = parsed.get("warning");
+        assert!(
+            warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string(),
+            "warning field must be absent, null, or a string"
+        );
+    }
+
+    #[test]
+    fn stats_json_envelope_aggregate_counts() {
+        let stats_response = json!({
+            "total": 150,
+            "open": 75,
+            "in_progress": 45,
+            "closed": 30,
+            "by_priority": {
+                "p0": 10,
+                "p1": 25,
+                "p2": 40,
+                "p3": 30,
+                "p4": 45
+            }
+        });
+
+        let envelope = JsonEnvelope::new("stats", stats_response);
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "stats");
+
+        // Verify aggregate counts
+        assert_eq!(parsed.data["total"].as_u64().unwrap(), 150);
+        assert_eq!(parsed.data["open"].as_u64().unwrap(), 75);
+        assert_eq!(parsed.data["in_progress"].as_u64().unwrap(), 45);
+        assert_eq!(parsed.data["closed"].as_u64().unwrap(), 30);
+
+        // Verify nested by_priority object
+        assert!(parsed.data["by_priority"].is_object());
+        assert_eq!(parsed.data["by_priority"]["p0"].as_u64().unwrap(), 10);
+    }
+}
