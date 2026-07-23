@@ -88,6 +88,22 @@ impl Formatter for JsonFormatter {
             .to_json_compact()
             .unwrap_or_else(|_| "{}".to_string())
     }
+
+    fn format_with_envelope_and_warning(&self, kind: &str, data: &str, warning: Option<&str>) -> String {
+        // Parse the data string as JSON
+        let json_value: Value = serde_json::from_str(data)
+            .unwrap_or_else(|_| Value::String(data.to_string()));
+
+        // Wrap in envelope with optional warning and serialize
+        let envelope = JsonEnvelope::new(kind, json_value);
+        let envelope_with_warning = match warning {
+            Some(w) => envelope.with_warning(w),
+            None => envelope,
+        };
+        envelope_with_warning
+            .to_json_compact()
+            .unwrap_or_else(|_| "{}".to_string())
+    }
 }
 
 #[cfg(test)]
