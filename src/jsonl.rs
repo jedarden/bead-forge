@@ -303,4 +303,59 @@ mod tests {
         assert!(after.contains("not json at all"), "orphan line must be preserved");
         assert!(after.contains("\"bf-z\""), "new bead merged in");
     }
+
+    #[test]
+    fn labels_are_exported_to_jsonl() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create an issue with labels
+        let mut issue = issue("bf-labels", "Test Labels");
+        issue.labels = vec!["phase-1".to_string(), "storage".to_string(), "critical".to_string()];
+
+        // Export to JSONL
+        export_jsonl_merge(&path, &[issue.clone()], &[]).unwrap();
+
+        // Read back and verify labels are present
+        let contents = std::fs::read_to_string(&path).unwrap();
+        let parsed: Issue = serde_json::from_str(&contents.trim()).unwrap();
+        assert_eq!(parsed.labels, vec!["phase-1", "storage", "critical"]);
+    }
+
+    #[test]
+    fn labels_roundtrip_through_jsonl() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create an issue with labels
+        let mut issue = issue("bf-roundtrip", "Roundtrip Test");
+        issue.labels = vec!["label1".to_string(), "label2".to_string(), "label3".to_string()];
+
+        // Export to JSONL
+        export_jsonl(&path, || Ok(vec![issue.clone()])).unwrap();
+
+        // Read and parse
+        let contents = std::fs::read_to_string(&path).unwrap();
+        let parsed: Issue = serde_json::from_str(&contents.trim()).unwrap();
+
+        // Verify labels survived the roundtrip
+        assert_eq!(parsed.labels, vec!["label1", "label2", "label3"]);
+    }
+
+    #[test]
+    fn empty_labels_array_skipped_in_jsonl() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create an issue without labels
+        let issue = issue("bf-nolabels", "No Labels");
+
+        // Export to JSONL
+        export_jsonl(&path, || Ok(vec![issue.clone()])).unwrap();
+
+        // Read back and verify empty labels array is skipped
+        let contents = std::fs::read_to_string(&path).unwrap();
+        // Empty arrays should be skipped due to skip_serializing_if
+        assert!(!contents.contains("\"labels\""), "empty labels should be skipped in JSON");
+    }
 }

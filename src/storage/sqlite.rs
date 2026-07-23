@@ -1015,7 +1015,7 @@ impl Storage {
     }
 
     fn load_labels_conn(conn: &Connection, issue_id: &str) -> Result<Vec<String>> {
-        let mut stmt = conn.prepare("SELECT label FROM labels WHERE issue_id = ?1")?;
+        let mut stmt = conn.prepare("SELECT label FROM bead_labels WHERE bead_id = ?1")?;
         let mut rows = stmt.query(params![issue_id])?;
         let mut labels = Vec::new();
         while let Some(row) = rows.next()? {
