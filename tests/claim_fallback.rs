@@ -392,13 +392,20 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
                 String::from_utf8_lossy(&output.stderr)
             );
 
-            // Parse JSON output
+            // Parse JSON output (may be wrapped in envelope)
             let stdout = String::from_utf8(output.stdout).unwrap();
             let json: serde_json::Value =
                 serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
+            // Handle envelope format: {version, kind, data}
+            let data = if json.get("version").is_some() && json.get("data").is_some() {
+                &json["data"]
+            } else {
+                &json
+            };
+
             // Verify a bead was claimed
-            let bead_id = json["bead_id"].as_str();
+            let bead_id = data["bead_id"].as_str();
             assert!(
                 bead_id.is_some(),
                 "Expected 'bead_id' in JSON output, got: {}",
@@ -414,7 +421,7 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
             );
 
             // Verify workspace is in output (should be workspace B's path)
-            let workspace_path = json["workspace"].as_str();
+            let workspace_path = data["workspace"].as_str();
             assert!(
                 workspace_path.is_some(),
                 "Expected 'workspace' in JSON output when claiming via fallback"
