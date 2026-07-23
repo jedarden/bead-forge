@@ -1285,6 +1285,10 @@ impl Storage {
                 "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
                 params![issue_id, label],
             )?;
+            tx.execute(
+                "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
+                params![issue_id, label],
+            )?;
             mark_dirty_tx(tx, issue_id)?;
             Ok(())
         })
@@ -1294,6 +1298,10 @@ impl Storage {
         self.with_immediate_transaction(|tx| {
             tx.execute(
                 "DELETE FROM labels WHERE issue_id = ?1 AND label = ?2",
+                params![issue_id, label],
+            )?;
+            tx.execute(
+                "DELETE FROM bead_labels WHERE bead_id = ?1 AND label = ?2",
                 params![issue_id, label],
             )?;
             mark_dirty_tx(tx, issue_id)?;
