@@ -1,9 +1,12 @@
-//! Integration tests for stats command envelope wrapping.
+//! Integration tests for claim and stats command envelope wrapping.
 //!
-//! Tests verify that the stats command's JSON output is properly wrapped
+//! Tests verify that claim and stats commands' JSON output is properly wrapped
 //! in an envelope with correct structure and metadata fields.
 //!
-//! Test command: cargo test envelope::claim_stats::stats
+//! Test commands:
+//!   - cargo test envelope::claim_stats::stats
+//!   - cargo test envelope::claim_stats::claim
+//!   - cargo test envelope::claim_stats
 
 use std::process::Command;
 use tempfile::TempDir;
@@ -241,4 +244,190 @@ fn stats_envelope_version_always_one() {
         Some(1),
         "stats envelope version must always be 1"
     );
+}
+
+// ============================================================================
+// Claim Command Envelope Tests
+// ============================================================================
+
+/// Test: claim --json --envelope has stable envelope structure
+#[test]
+fn claim_envelope_has_stable_structure() {
+    let ws = init_workspace();
+    create_bead(ws.path(), "claim test");
+
+    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "test-worker", "--json"]);
+
+    // Verify envelope structure
+    verify_envelope_structure(&envelope, "claim");
+
+    // Verify data contains claim result
+    let data = &envelope["data"];
+    assert!(data.is_object(), "claim data must be an object");
+
+    // Should have bead_id and assignee
+    assert!(data.get("bead_id").is_some(), "claim data must have 'bead_id'");
+    assert!(data.get("assignee").is_some(), "claim data must have 'assignee'");
+}
+
+/// Test: claim --json --envelope has correct metadata fields
+#[test]
+fn claim_envelope_metadata_fields() {
+    let ws = init_workspace();
+    create_bead(ws.path(), "claim metadata test");
+
+    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "metadata-worker", "--json"]);
+
+    // Verify all required metadata fields are present
+    assert!(envelope.get("version").is_some(), "claim envelope must have 'version' field");
+    assert!(envelope.get("kind").is_some(), "claim envelope must have 'kind' field");
+    assert!(envelope.get("data").is_some(), "claim envelope must have 'data' field");
+
+    // Verify version value
+    assert_eq!(
+        envelope.get("version").and_then(|v| v.as_u64()),
+        Some(1),
+        "claim envelope version must be 1"
+    );
+
+    // Verify kind value
+    assert_eq!(
+        envelope.get("kind").and_then(|k| k.as_str()),
+        Some("claim"),
+        "claim envelope kind must be 'claim'"
+    );
+
+    // Verify data field is present
+    assert!(
+        envelope.get("data").is_some(),
+        "claim envelope must have 'data' field"
+    );
+
+    // Verify data is an object
+    let data = &envelope["data"];
+    assert!(data.is_object(), "claim data must be an object");
+}
+
+/// Test: claim --json --envelope successful case returns valid claim
+#[test]
+fn claim_envelope_successful_case() {
+    let ws = init_workspace();
+    let bead_id = create_bead(ws.path(), "claimable bead");
+
+    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "test-assignee", "--json"]);
+
+    // Verify envelope structure
+    verify_envelope_structure(&envelope, "claim");
+
+    // Verify claim data is accurate
+    let data = &envelope["data"];
+    assert!(data.is_object(), "claim data must be an object");
+
+    // Check bead_id matches
+    let claimed_bead_id = data.get("bead_id").and_then(|id| id.as_str());
+    assert_eq!(claimed_bead_id, Some(bead_id.as_str()), "claim bead_id must match created bead");
+
+    // Check assignee matches
+    let assignee = data.get("assignee").and_then(|a| a.as_str());
+    assert_eq!(assignee, Some("test-assignee"), "claim assignee must match input");
+}
+
+/// Test: claim --json --envelope with empty workspace
+#[test]
+fn claim_envelope_empty_workspace() {
+    let ws = init_workspace();
+
+    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "empty-worker", "--json"]);
+
+    // Verify envelope structure even when empty
+    verify_envelope_structure(&envelope, "claim");
+
+    // Verify data is an empty object
+    let data = &envelope["data"];
+    assert!(data.is_object(), "claim data must be an object");
+    assert!(data.as_object().unwrap().is_empty(), "claim data must be empty when no beads available");
+}
+
+/// Test: claim --json --envelope data contains expected fields
+#[test]
+fn claim_envelope_data_fields() {
+    let ws = init_workspace();
+    create_bead(ws.path(), "claim fields test");
+
+    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "fields-worker", "--json"]);
+
+    let data = &envelope["data"];
+
+    // Verify data is an object
+    assert!(data.is_object(), "claim data must be an object");
+
+    // Verify bead_id field is present and is a string
+    if let Some(bead_id) = data.get("bead_id") {
+        assert!(bead_id.is_string(), "claim 'bead_id' must be a string");
+    }
+
+    // Verify assignee field is present and is a string
+    if let Some(assignee) = data.get("assignee") {
+        assert!(assignee.is_string(), "claim 'assignee' must be a string");
+    }
+
+    // Verify data object contains expected fields
+    assert!(data.as_object().unwrap().contains_key("bead_id"), "claim data must contain 'bead_id'");
+    assert!(data.as_object().unwrap().contains_key("assignee"), "claim data must contain 'assignee'");
+}
+
+/// Test: claim --json --envelope kind field matches command
+#[test]
+fn claim_envelope_kind_matches_command() {
+    let ws = init_workspace();
+    create_bead(ws.path(), "claim kind test");
+
+    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "kind-worker", "--json"]);
+
+    // Verify kind field is exactly 'claim'
+    assert_eq!(
+        envelope.get("kind").and_then(|k| k.as_str()),
+        Some("claim"),
+        "claim envelope kind must be 'claim'"
+    );
+}
+
+/// Test: claim --json --envelope version is always 1
+#[test]
+fn claim_envelope_version_always_one() {
+    let ws = init_workspace();
+    create_bead(ws.path(), "claim version test");
+
+    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "version-worker", "--json"]);
+
+    // Verify version is exactly 1
+    assert_eq!(
+        envelope.get("version").and_then(|v| v.as_u64()),
+        Some(1),
+        "claim envelope version must always be 1"
+    );
+}
+
+/// Test: claim --json --envelope returns consistent structure across calls
+#[test]
+fn claim_envelope_structure_consistency() {
+    let ws = init_workspace();
+
+    // First claim
+    create_bead(ws.path(), "first bead");
+    let envelope1 = run_envelope_command(ws.path(), &["claim", "--assignee", "consistency-worker", "--json"]);
+    verify_envelope_structure(&envelope1, "claim");
+
+    // Second claim (should have same structure)
+    create_bead(ws.path(), "second bead");
+    let envelope2 = run_envelope_command(ws.path(), &["claim", "--assignee", "consistency-worker", "--json"]);
+    verify_envelope_structure(&envelope2, "claim");
+
+    // Both envelopes have same structure
+    assert!(envelope1.get("version").is_some());
+    assert!(envelope2.get("version").is_some());
+    assert!(envelope1.get("kind").is_some());
+    assert!(envelope2.get("kind").is_some());
+    assert!(envelope1.get("data").is_some());
+    assert!(envelope2.get("data").is_some());
 }
