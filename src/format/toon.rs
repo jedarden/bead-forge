@@ -91,6 +91,12 @@ impl Formatter for ToonFormatter {
         // Return the data as-is
         data.to_string()
     }
+
+    fn format_with_envelope_and_warning(&self, _kind: &str, data: &str, _warning: Option<&str>) -> String {
+        // Toon formatter doesn't support envelope wrapping
+        // Return the data as-is
+        data.to_string()
+    }
 }
 
 fn format_toon_issue_line(issue: &Issue) -> String {

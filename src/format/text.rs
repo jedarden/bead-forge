@@ -78,6 +78,12 @@ impl Formatter for TextFormatter {
         // Return the data as-is
         data.to_string()
     }
+
+    fn format_with_envelope_and_warning(&self, _kind: &str, data: &str, _warning: Option<&str>) -> String {
+        // Text formatter doesn't support envelope wrapping
+        // Return the data as-is
+        data.to_string()
+    }
 }
 
 /// Human-readable rendering of a `stats` result shared by the text and toon
