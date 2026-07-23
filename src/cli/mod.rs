@@ -2344,12 +2344,7 @@ fn cmd_batch(
         return Err(anyhow!("Must provide --file, --json, or --stdin"));
     };
 
-    let results = execute_batch(&storage, ops, beads_dir)?;
-
-    // Single end-of-transaction flush: execute_batch marked every touched bead
-    // dirty inside one transaction, so one surgical flush exports them all at
-    // once (no per-op write amplification).
-    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
+    let results = execute_batch(&storage, ops, beads_dir, no_auto_flush)?;
 
     // Print results
     for result in results {
@@ -2391,7 +2386,7 @@ fn cmd_mitosis(
     let ops = mitosis_ex(id, children_defs, Some(reason.to_string()))?;
 
     // Execute atomically
-    let results = execute_batch(&storage, ops, beads_dir)?;
+    let results = execute_batch(&storage, ops, beads_dir, false /* enable auto-flush */)?;
 
     // One surgical flush after the whole mitosis transaction commits (parent
     // close + all children + dep edges were marked dirty together).

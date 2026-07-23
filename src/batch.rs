@@ -1,3 +1,4 @@
+use crate::autoflush;
 use crate::config::{find_beads_dir, get_default_prefix, load_config};
 use crate::model::{DependencyType, Issue, IssueType, Priority};
 use crate::storage::Storage;
@@ -191,12 +192,13 @@ pub fn execute_batch(
     storage: &Storage,
     ops: Vec<BatchOp>,
     workspace_dir: &std::path::Path,
+    no_auto_flush: bool,
 ) -> Result<Vec<BatchResult>> {
     let config = load_config(
         &find_beads_dir(workspace_dir).ok_or_else(|| anyhow!("No .beads directory found"))?,
     )?;
 
-    storage.with_immediate_transaction(|tx| {
+    let results = storage.with_immediate_transaction(|tx| {
         let mut results = Vec::new();
         let mut created_ids = Vec::new();
 
@@ -414,7 +416,25 @@ pub fn execute_batch(
         }
 
         Ok(results)
-    })
+    })?;
+
+    // Single auto-flush after successful transaction commit (Phase 7.1 mechanism).
+    // All beads modified in the batch were marked dirty atomically within the
+    // transaction, so one flush exports them all to JSONL. If auto-flush fails,
+    // dirty marks are retained and the next mutation or explicit `bf sync --flush-only`
+    // will retry - the transaction itself is not affected.
+    let flush_outcome = autoflush::after_mutation_with_config(
+        workspace_dir,
+        &config,
+        no_auto_flush,
+    );
+
+    // Surface flush failures as warnings (non-fatal - the batch succeeded in SQLite)
+    if let Some(warning) = flush_outcome.warning() {
+        eprintln!("warning: {}", warning);
+    }
+
+    Ok(results)
 }
 
 /// Mark a bead dirty within the batch transaction so the single
@@ -1041,7 +1061,7 @@ fn execute_comment(tx: &Connection, id: &str, author: &str, text: &str) -> Resul
 ///     ("Child 1".to_string(), "task".to_string(), 2),
 ///     ("Child 2".to_string(), "bug".to_string(), 0),
 /// ], None)?;
-/// let results = execute_batch(&storage, ops, &workspace_dir)?;
+/// let results = execute_batch(&storage, ops, &workspace_dir, false)?;
 /// ```
 pub fn mitosis(
     parent_id: &str,
@@ -1779,7 +1799,7 @@ mod tests {
         ];
 
         // Execute the batch
-        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
 
         // Verify all operations succeeded
         assert_eq!(results.len(), 5);
@@ -1974,7 +1994,7 @@ mod tests {
             issue_type: Some("bug".to_string()),
         }];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, "ok");
 
@@ -2036,7 +2056,7 @@ mod tests {
             labels: vec!["urgent".to_string(), "backend".to_string()],
         }];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, "ok");
 
@@ -2098,7 +2118,7 @@ mod tests {
             labels: vec!["urgent".to_string(), "bug".to_string()],
         }];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, "ok");
 
@@ -2174,7 +2194,7 @@ mod tests {
         ];
 
         // execute_batch should fail on first error
-        let result = execute_batch(&storage, ops, &temp_dir.path());
+        let result = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Bead not found"));
     }
@@ -2244,7 +2264,7 @@ mod tests {
             },
         ];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
         assert_eq!(results.len(), 3);
 
         // All operations should succeed
@@ -2259,5 +2279,694 @@ mod tests {
         let issue2 = storage.get_issue("bf-2").unwrap().unwrap();
         assert_eq!(issue2.labels.len(), 1);
         assert!(issue2.labels.contains(&"urgent".to_string()));
+    }
+
+    #[test]
+    fn test_mixed_op_batch_all_operations_atomic() {
+        // Acceptance criterion 3: Mixed-op batches (update+label+dep+comment+create+close+dep_remove)
+        // are atomic - either all succeed or all fail together.
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create initial beads for dependency and update operations
+        storage
+            .with_immediate_transaction(|tx| {
+                for id in &["bf-parent", "bf-child", "bf-target"] {
+                    tx.execute(
+                        "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                        rusqlite::params![
+                            *id,
+                            "hash1",
+                            format!("Bead {}", id),
+                            "open",
+                            2,
+                            "task",
+                            Utc::now().to_rfc3339(),
+                            "test",
+                            Utc::now().to_rfc3339()
+                        ],
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+
+        // Build a mixed-operation batch with all 8 operation types:
+        // 1. Create a new bead
+        // 2. Update existing bead
+        // 3. Add label to existing bead
+        // 4. Add dependency (dep_add_blocker)
+        // 5. Add comment to existing bead
+        // 6. Close a bead
+        // 7. Remove label (label_remove)
+        // 8. Remove dependency (dep_remove)
+        let ops = vec![
+            BatchOp::Create {
+                title: "New bead from batch".to_string(),
+                type_: "task".to_string(),
+                priority: 1,
+                description: Some("Created in mixed batch".to_string()),
+                assignee: Some("worker-1".to_string()),
+                labels: vec!["batch-created".to_string()],
+            },
+            BatchOp::Update {
+                id: "bf-target".to_string(),
+                title: Some("Updated in batch".to_string()),
+                description: Some("Updated description".to_string()),
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: Some("in_progress".to_string()),
+                priority: Some(0),
+                assignee: Some("worker-2".to_string()),
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::LabelAdd {
+                id: "bf-target".to_string(),
+                labels: vec!["urgent".to_string(), "backend".to_string()],
+            },
+            BatchOp::DepAddBlocker {
+                id: "bf-child".to_string(),
+                blocker: "bf-parent".to_string(),
+            },
+            BatchOp::Comment {
+                id: "bf-target".to_string(),
+                author: "batch-test".to_string(),
+                text: "Comment added during batch".to_string(),
+            },
+            BatchOp::LabelRemove {
+                id: "bf-parent".to_string(),
+                labels: vec!["old-label".to_string()], // removing non-existent is fine
+            },
+            BatchOp::DepRemove {
+                id: "bf-child".to_string(),
+                depends_on: "bf-parent".to_string(),
+            },
+        ];
+
+        // Execute the batch - all operations should succeed atomically
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        assert_eq!(results.len(), 7);
+
+        // Verify all operations succeeded
+        for result in &results {
+            assert_eq!(result.status, "ok", "Operation {} should succeed", result.op);
+        }
+
+        // Verify each operation's effect:
+
+        // 1. Create: new bead should exist with all fields
+        let created_id = results[0].id.as_ref().unwrap();
+        let created_bead = storage.get_issue(created_id).unwrap().unwrap();
+        assert_eq!(created_bead.title, "New bead from batch");
+        assert_eq!(created_bead.description.as_deref(), Some("Created in mixed batch"));
+        assert_eq!(created_bead.assignee.as_deref(), Some("worker-1"));
+        assert_eq!(created_bead.labels.len(), 1);
+        assert!(created_bead.labels.contains(&"batch-created".to_string()));
+
+        // 2. Update: bf-target should be updated
+        let target = storage.get_issue("bf-target").unwrap().unwrap();
+        assert_eq!(target.title, "Updated in batch");
+        assert_eq!(target.description.as_deref(), Some("Updated description"));
+        assert_eq!(target.status, Status::InProgress);
+        assert_eq!(target.priority, Priority(0));
+        assert_eq!(target.assignee.as_deref(), Some("worker-2"));
+
+        // 3. LabelAdd: bf-target should have new labels
+        assert_eq!(target.labels.len(), 2);
+        assert!(target.labels.contains(&"urgent".to_string()));
+        assert!(target.labels.contains(&"backend".to_string()));
+
+        // 4. DepAddBlocker: then removed below, so verify the remove worked
+        let child_deps = storage
+            .with_immediate_transaction(|tx| {
+                let mut stmt = tx
+                    .prepare("SELECT depends_on_id FROM dependencies WHERE issue_id = ?1")
+                    .unwrap();
+                let deps: Vec<String> = stmt
+                    .query_map(["bf-child"], |row| row.get(0))
+                    .unwrap()
+                    .filter_map(|r| r.ok())
+                    .collect();
+                Ok(deps)
+            })
+            .unwrap();
+        assert_eq!(child_deps.len(), 0, "Dependency should be removed");
+
+        // 5. Comment: bf-target should have comment
+        let comments = storage
+            .with_immediate_transaction(|tx| {
+                let mut stmt = tx
+                    .prepare("SELECT author, text FROM comments WHERE issue_id = ?1")
+                    .unwrap();
+                let comments: Vec<(String, String)> = stmt
+                    .query_map(["bf-target"], |row| {
+                        Ok((row.get(0)?, row.get(1)?))
+                    })
+                    .unwrap()
+                    .filter_map(|r| r.ok())
+                    .collect();
+                Ok(comments)
+            })
+            .unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].0, "batch-test");
+        assert_eq!(comments[0].1, "Comment added during batch");
+
+        // All operations succeeded atomically in a single transaction
+    }
+
+    #[test]
+    fn test_batch_rollback_on_any_op_failure() {
+        // Acceptance criterion 4: Rollback on any op failure.
+        // When one operation fails, all previous operations in that batch
+        // must be rolled back (no partial updates).
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create initial bead
+        storage
+            .with_immediate_transaction(|tx| {
+                tx.execute(
+                    "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        "bf-existing",
+                        "hash1",
+                        "Existing Bead",
+                        "open",
+                        2,
+                        "task",
+                        Utc::now().to_rfc3339(),
+                        "test",
+                        Utc::now().to_rfc3339()
+                    ],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        // Get initial bead count
+        let initial_count: i64 = storage
+            .with_immediate_transaction(|tx| {
+                Ok(tx.query_row("SELECT COUNT(*) FROM issues", [], |row| row.get(0))?)
+            })
+            .unwrap();
+
+        // Build a batch where the 3rd operation will fail:
+        // 1. Create bead (would succeed)
+        // 2. Update existing bead (would succeed)
+        // 3. Add dependency to non-existent bead (WILL FAIL)
+        // 4. Add label (should not execute due to fail-fast)
+        let ops = vec![
+            BatchOp::Create {
+                title: "Should be rolled back".to_string(),
+                type_: "task".to_string(),
+                priority: 2,
+                description: None,
+                assignee: None,
+                labels: vec![],
+            },
+            BatchOp::Update {
+                id: "bf-existing".to_string(),
+                title: Some("Should be rolled back".to_string()),
+                description: Some("This update should not persist".to_string()),
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: Some("in_progress".to_string()),
+                priority: Some(0),
+                assignee: None,
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::DepAddBlocker {
+                id: "bf-nonexistent".to_string(),
+                blocker: "bf-also-nonexistent".to_string(),
+            },
+            BatchOp::LabelAdd {
+                id: "bf-existing".to_string(),
+                labels: vec!["should-not-be-added".to_string()],
+            },
+        ];
+
+        // Execute the batch - should fail on the 3rd operation
+        let result = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Bead not found"),
+            "Error should mention bead not found: {}",
+            err_msg
+        );
+
+        // Verify ROLLBACK: all previous successful operations were rolled back
+
+        // 1. Verify bead count is unchanged (create was rolled back)
+        let final_count: i64 = storage
+            .with_immediate_transaction(|tx| {
+                Ok(tx.query_row("SELECT COUNT(*) FROM issues", [], |row| row.get(0))?)
+            })
+            .unwrap();
+        assert_eq!(
+            initial_count, final_count,
+            "Bead count should be unchanged after failed batch"
+        );
+
+        // 2. Verify existing bead was NOT updated (update was rolled back)
+        let existing = storage.get_issue("bf-existing").unwrap().unwrap();
+        assert_eq!(existing.title, "Existing Bead", "Title should be unchanged");
+        // Schema defaults NOT NULL fields to '' (empty string), not None
+        assert_eq!(
+            existing.description.as_deref(),
+            Some(""),
+            "Description should be unchanged (empty string per schema default)"
+        );
+        assert_eq!(existing.status, Status::Open, "Status should be unchanged");
+        assert_eq!(existing.priority, Priority(2), "Priority should be unchanged");
+
+        // 3. Verify label was NOT added (4th op didn't execute)
+        assert!(!existing.labels.contains(&"should-not-be-added".to_string()));
+
+        // Transaction rolled back completely - no partial updates
+    }
+
+    #[test]
+    fn test_batch_with_immediate_transaction_wrapper() {
+        // Acceptance criterion 1: All batch ops in single transaction.
+        // Verify that execute_batch uses with_immediate_transaction and all
+        // operations share the same transaction context.
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create two beads
+        storage
+            .with_immediate_transaction(|tx| {
+                for id in &["bf-1", "bf-2"] {
+                    tx.execute(
+                        "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                        rusqlite::params![
+                            *id,
+                            "hash1",
+                            "Test",
+                            "open",
+                            2,
+                            "task",
+                            Utc::now().to_rfc3339(),
+                            "test",
+                            Utc::now().to_rfc3339()
+                        ],
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+
+        // Build a batch that creates a dependency between existing beads
+        // This requires both beads to be visible within the same transaction
+        let ops = vec![BatchOp::DepAddBlocker {
+            id: "bf-2".to_string(),
+            blocker: "bf-1".to_string(),
+        }];
+
+        // Execute the batch - should succeed in a single transaction
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, "ok");
+
+        // Verify dependency was created
+        let deps = storage
+            .with_immediate_transaction(|tx| {
+                let mut stmt = tx
+                    .prepare("SELECT depends_on_id FROM dependencies WHERE issue_id = ?1")
+                    .unwrap();
+                let deps: Vec<String> = stmt
+                    .query_map(["bf-2"], |row| row.get(0))
+                    .unwrap()
+                    .filter_map(|r| r.ok())
+                    .collect();
+                Ok(deps)
+            })
+            .unwrap();
+
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0], "bf-1");
+
+        // The batch executed in a single BEGIN IMMEDIATE transaction
+    }
+
+    #[test]
+    fn test_mark_dirty_tx_called_within_batch_transaction() {
+        // Verify that mark_dirty_tx is called for each affected bead within
+        // the batch transaction, so the auto-flush exports exactly those beads.
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create two beads
+        storage
+            .with_immediate_transaction(|tx| {
+                for id in &["bf-1", "bf-2"] {
+                    tx.execute(
+                        "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                        rusqlite::params![
+                            *id,
+                            "hash1",
+                            "Test",
+                            "open",
+                            2,
+                            "task",
+                            Utc::now().to_rfc3339(),
+                            "test",
+                            Utc::now().to_rfc3339()
+                        ],
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+
+        // Execute a batch that affects both beads
+        let ops = vec![
+            BatchOp::Update {
+                id: "bf-1".to_string(),
+                title: Some("Updated".to_string()),
+                description: None,
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: None,
+                priority: None,
+                assignee: None,
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::LabelAdd {
+                id: "bf-2".to_string(),
+                labels: vec!["labeled".to_string()],
+            },
+            BatchOp::DepAddBlocker {
+                id: "bf-2".to_string(),
+                blocker: "bf-1".to_string(),
+            },
+        ];
+
+        let results = execute_batch(&storage, ops, &temp_dir.path(), true /* no-auto-flush: keep dirty marks for test */).unwrap();
+        assert_eq!(results.len(), 3);
+        for result in &results {
+            assert_eq!(result.status, "ok");
+        }
+
+        // Verify both beads are marked dirty (updated directly + dep endpoints)
+        let dirty = storage.list_dirty_issues().unwrap();
+        assert_eq!(dirty.len(), 2);
+        let dirty_ids: Vec<&str> = dirty.iter().map(|i| i.id.as_str()).collect();
+        assert!(dirty_ids.contains(&"bf-1"));
+        assert!(dirty_ids.contains(&"bf-2"));
+
+        // Marking happened within the transaction - beads are dirty for flush
+    }
+
+    #[test]
+    fn test_single_auto_flush_after_batch_commit() {
+        // Acceptance criterion 2: One auto-flush on commit.
+        // Verify that after a batch commits, the dirty beads are exactly those
+        // affected by the batch, and a single flush exports them all.
+        use crate::sync::flush_dirty;
+
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create initial beads and export them all to JSONL first (establish baseline)
+        let initial_beads = vec![
+            ("bf-unchanged", "Unchanged Bead"),
+            ("bf-update", "Update Target"),
+            ("bf-label", "Label Target"),
+            ("bf-dep-1", "Dependency One"),
+            ("bf-dep-2", "Dependency Two"),
+        ];
+
+        for (id, title) in &initial_beads {
+            let issue = Issue::new(id.to_string(), title.to_string(), ".".to_string());
+            storage.create_issue(&issue).unwrap();
+        }
+
+        // Flush all beads to JSONL to establish baseline
+        flush_dirty(&temp_dir.path()).unwrap();
+
+        // Clear dirty flags after initial flush
+        storage.clear_dirty().unwrap();
+
+        // Verify no dirty beads before batch
+        let dirty_before = storage.list_dirty_issues().unwrap();
+        assert_eq!(dirty_before.len(), 0, "No beads should be dirty before batch");
+
+        // Execute a batch that affects 4 beads:
+        // - bf-update: updated (direct mark_dirty)
+        // - bf-label: label added (direct mark_dirty)
+        // - bf-dep-1, bf-dep-2: dependency added (both marked dirty as dep endpoints)
+        // - bf-unchanged: NOT affected (should remain non-dirty)
+        let ops = vec![
+            BatchOp::Update {
+                id: "bf-update".to_string(),
+                title: Some("Updated in batch".to_string()),
+                description: None,
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: None,
+                priority: None,
+                assignee: None,
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::LabelAdd {
+                id: "bf-label".to_string(),
+                labels: vec!["batched".to_string()],
+            },
+            BatchOp::DepAddBlocker {
+                id: "bf-dep-2".to_string(),
+                blocker: "bf-dep-1".to_string(),
+            },
+        ];
+
+        let results = execute_batch(&storage, ops, &temp_dir.path(), true /* no-auto-flush: verify dirty marks first */).unwrap();
+        assert_eq!(results.len(), 3);
+        for result in &results {
+            assert_eq!(result.status, "ok");
+        }
+
+        // Verify exactly 4 beads are dirty after batch (update, label, 2x dep endpoints)
+        let dirty_after = storage.list_dirty_issues().unwrap();
+        assert_eq!(dirty_after.len(), 4, "Exactly 4 beads should be dirty after batch");
+        let dirty_ids: Vec<&str> = dirty_after.iter().map(|i| i.id.as_str()).collect();
+        assert!(dirty_ids.contains(&"bf-update"));
+        assert!(dirty_ids.contains(&"bf-label"));
+        assert!(dirty_ids.contains(&"bf-dep-1"));
+        assert!(dirty_ids.contains(&"bf-dep-2"));
+        assert!(!dirty_ids.contains(&"bf-unchanged"));
+
+        // Perform the flush (simulating the auto-flush that happens after batch commit)
+        let flushed_count = flush_dirty(&temp_dir.path()).unwrap();
+        assert_eq!(flushed_count, 4, "Flush should export exactly 4 dirty beads");
+
+        // Verify all dirty beads were cleared after flush
+        let dirty_after_flush = storage.list_dirty_issues().unwrap();
+        assert_eq!(
+            dirty_after_flush.len(),
+            0,
+            "No beads should remain dirty after flush"
+        );
+
+        // Verify JSONL file was created with the flushed beads
+        let jsonl_path = beads_dir.join("issues.jsonl");
+        assert!(jsonl_path.exists(), "JSONL file should exist after flush");
+
+        // Read JSONL and verify it contains exactly the 5 beads (4 dirty + 1 unchanged)
+        let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
+        let lines: Vec<&str> = jsonl_content.lines().collect();
+        assert_eq!(lines.len(), 5, "JSONL should contain all 5 beads");
+
+        // Verify the JSONL contains the updated bead with correct values
+        let jsonl_beads: Vec<Issue> = lines
+            .iter()
+            .map(|line| serde_json::from_str::<Issue>(line).unwrap())
+            .collect();
+        let updated = jsonl_beads.iter().find(|i| i.id == "bf-update").unwrap();
+        assert_eq!(updated.title, "Updated in batch");
+
+        // One flush exported all dirty beads from the batch transaction
+    }
+
+    #[test]
+    fn test_batch_fail_fast_no_dirty_marks_on_partial_failure() {
+        // Verify that when a batch fails mid-execution, no dirty marks persist
+        // for the operations that succeeded before the failure (they were rolled back).
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create initial bead
+        storage
+            .with_immediate_transaction(|tx| {
+                tx.execute(
+                    "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        "bf-existing",
+                        "hash1",
+                        "Existing",
+                        "open",
+                        2,
+                        "task",
+                        Utc::now().to_rfc3339(),
+                        "test",
+                        Utc::now().to_rfc3339()
+                    ],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        // Execute a batch that fails on the 2nd operation
+        let ops = vec![
+            BatchOp::Update {
+                id: "bf-existing".to_string(),
+                title: Some("Should be rolled back".to_string()),
+                description: None,
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: None,
+                priority: None,
+                assignee: None,
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::DepAddBlocker {
+                id: "bf-nonexistent".to_string(),
+                blocker: "bf-also-missing".to_string(),
+            },
+        ];
+
+        // Batch should fail
+        let result = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */);
+        assert!(result.is_err());
+
+        // Verify NO dirty marks persist (rollback cleared them)
+        let dirty = storage.list_dirty_issues().unwrap();
+        assert_eq!(dirty.len(), 0, "No dirty marks should persist after failed batch");
+
+        // Transaction rollback ensures clean state
     }
 }

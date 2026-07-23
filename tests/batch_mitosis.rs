@@ -70,7 +70,7 @@ fn test_mitosis_atomic_batch() {
         },
     ];
 
-    let results = execute_batch(&storage, ops, temp_dir.path()).unwrap();
+    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush */).unwrap();
 
     // All operations should succeed
     assert_eq!(results.len(), 5);
@@ -145,7 +145,7 @@ fn test_batch_rollback_on_error() {
         },
     ];
 
-    let result = execute_batch(&storage, ops, temp_dir.path());
+    let result = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush */);
 
     // Should fail
     assert!(result.is_err());

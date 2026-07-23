@@ -131,7 +131,7 @@ fn execute_batch_performs_no_jsonl_write() {
             labels: vec![],
         },
     ];
-    let results = execute_batch(&storage, ops, ws.path()).unwrap();
+    let results = execute_batch(&storage, ops, ws.path(), false /* enable auto-flush **/).unwrap();
     assert_eq!(results.len(), 2);
 
     // execute_batch wrote to SQLite only — issues.jsonl is byte-identical.
