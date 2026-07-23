@@ -1614,7 +1614,17 @@ fn cmd_list(
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_issues(&issues));
+
+    match output_format {
+        OutputFormat::Json => {
+            // Wrap in envelope with kind="list"
+            let json_array = serde_json::to_string(&issues).unwrap_or_else(|_| "[]".to_string());
+            println!("{}", formatter.format_with_envelope("list", &json_array));
+        }
+        _ => {
+            print!("{}", formatter.format_issues(&issues));
+        }
+    }
 
     Ok(())
 }
