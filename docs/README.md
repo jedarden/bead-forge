@@ -98,32 +98,241 @@ claude-haiku-4-5       needle    task     23       35m    2h10m
 
 ### Atomic Batch Operations
 
-Replaces NEEDLE's crash-unsafe create+dep chains:
+Replaces NEEDLE's crash-unsafe create+dep chains. All operations execute in one `BEGIN IMMEDIATE` transaction. A crash mid-batch leaves zero partial state — SQLite rolls back automatically.
 
+#### Batch Operation JSON Schema
+
+Batch operations are specified as a JSON array of operation objects. Each operation must have an `op` field that specifies the operation type, followed by type-specific fields.
+
+**Operation types:**
+
+| Operation | `op` value | Description |
+|-----------|------------|-------------|
+| Create bead | `create` | Create a new bead with specified properties |
+| Update bead | `update` | Modify fields of an existing bead |
+| Close bead | `close` | Close a bead with optional reason |
+| Add dependency | `dep_add_blocker` | Create a blocking dependency (A blocks B) |
+| Remove dependency | `dep_remove` | Remove a dependency between beads |
+| Add labels | `label_add` | Add labels to a bead |
+| Remove labels | `label_remove` | Remove labels from a bead |
+| Add comment | `comment` | Add a comment to a bead |
+
+**Placeholder references**: `@0`, `@1`, etc. resolve to the IDs of beads created at that position in the batch. You don't need to know child IDs in advance — `bf` substitutes them automatically.
+
+#### Operation Schema Details
+
+##### 1. Create (`create`)
+
+Creates a new bead. Returns the generated bead ID in the batch result.
+
+**Required fields:**
+- `op`: `"create"`
+- `title`: `string` — Bead title
+
+**Optional fields:**
+- `type`: `string` — Issue type (default: `"task"`)
+- `priority`: `number` — Priority level 0-4 (default: `2`)
+- `description`: `string | null` — Bead description
+- `assignee`: `string | null` — Assignee username
+- `labels`: `string[]` — Labels to apply (default: `[]`)
+
+**Example:**
+```json
+{"op": "create", "title": "Implement auth", "type": "task", "priority": 1, "labels": ["urgent"]}
+```
+
+##### 2. Update (`update`)
+
+Updates fields of an existing bead. Only specified fields are modified.
+
+**Required fields:**
+- `op`: `"update"`
+- `id`: `string` — Bead ID (can use placeholder like `@0`)
+
+**Optional fields:**
+- `title`: `string | null` — New title
+- `description`: `string | null` — New description
+- `design`: `string | null` — Design document
+- `acceptance_criteria`: `string | null` — Acceptance criteria
+- `notes`: `string | null` — Notes
+- `status`: `string` — New status (`open|in_progress|blocked|closed|...`)
+- `priority`: `number` — New priority 0-4
+- `assignee`: `string | null` — New assignee (empty string clears)
+- `owner`: `string | null` — New owner
+- `issue_type`: `string` — New issue type
+
+**Example:**
+```json
+{"op": "update", "id": "bf-123", "status": "in_progress", "priority": 0}
+```
+
+##### 3. Close (`close`)
+
+Closes a bead. Idempotent — succeeds if already closed.
+
+**Required fields:**
+- `op`: `"close"`
+- `id`: `string` — Bead ID (can use placeholder like `@0`)
+
+**Optional fields:**
+- `reason`: `string` — Close reason (default: `"Completed"`)
+
+**Example:**
+```json
+{"op": "close", "id": "bf-123", "reason": "Fixed in PR #45"}
+```
+
+##### 4. Add Dependency (`dep_add_blocker`)
+
+Creates a blocking dependency: the blocker must close before the blocked bead can close. Validates against cycles and duplicates.
+
+**Required fields:**
+- `op`: `"dep_add_blocker"`
+- `id`: `string` — The bead being blocked (can use placeholder)
+- `blocker`: `string` — The bead that blocks (can use placeholder)
+
+**Legacy aliases (deprecated but supported):**
+- `parent` → `blocker` (the bead that blocks)
+- `child` → `id` (the bead being blocked)
+
+**Direction:** Creates dependency: `id depends_on blocker` (blocker blocks id)
+
+**Example:**
+```json
+{"op": "dep_add_blocker", "id": "bf-child", "blocker": "bf-parent"}
+```
+
+##### 5. Remove Dependency (`dep_remove`)
+
+Removes a dependency between two beads.
+
+**Required fields:**
+- `op`: `"dep_remove"`
+- `id`: `string` — The bead that has the dependency
+- `depends_on`: `string` — The bead to remove dependency from
+
+**Example:**
+```json
+{"op": "dep_remove", "id": "bf-child", "depends_on": "bf-parent"}
+```
+
+##### 6. Add Labels (`label_add`)
+
+Adds labels to a bead. Duplicate labels are ignored (idempotent).
+
+**Required fields:**
+- `op`: `"label_add"`
+- `id`: `string` — Bead ID (can use placeholder)
+- `labels`: `string[]` — Labels to add
+
+**Example:**
+```json
+{"op": "label_add", "id": "bf-123", "labels": ["urgent", "backend"]}
+```
+
+##### 7. Remove Labels (`label_remove`)
+
+Removes labels from a bead.
+
+**Required fields:**
+- `op`: `"label_remove"`
+- `id`: `string` — Bead ID (can use placeholder)
+- `labels`: `string[]` — Labels to remove
+
+**Example:**
+```json
+{"op": "label_remove", "id": "bf-123", "labels": ["deprecated"]}
+```
+
+##### 8. Add Comment (`comment`)
+
+Adds a comment to a bead.
+
+**Required fields:**
+- `op`: `"comment"`
+- `id`: `string` — Bead ID (can use placeholder)
+- `text`: `string` — Comment text
+
+**Optional fields:**
+- `author`: `string` — Comment author (default: `"batch"`)
+
+**Example:**
+```json
+{"op": "comment", "id": "bf-123", "text": "Found edge case in login flow", "author": "worker-7"}
+```
+
+#### Batch Execution Examples
+
+**NEEDLE mitosis: split 1 bead into N children atomically**
+
+Method 1: Dedicated mitosis command (recommended)
 ```bash
-# NEEDLE mitosis: split 1 bead into N children atomically
-# Method 1: Dedicated mitosis command (recommended)
 bf mitosis bf-a3f8 \
   --children '[
     {"title": "Implement login handler", "type": "task", "priority": 2},
     {"title": "Add session tests", "type": "task", "priority": 2}
   ]' \
   --reason "Split into children"
+```
 
-# Method 2: Direct batch with placeholder references
-# Use @0, @1, ... to reference beads created earlier in the batch
+Method 2: Direct batch with placeholder references
+```bash
 bf batch --json '[
   {"op": "create", "title": "Implement login handler", "type": "task"},
   {"op": "create", "title": "Add session tests", "type": "task"},
-  {"op": "dep_add_blocker", "parent": "@0", "child": "bf-a3f8"},
-  {"op": "dep_add_blocker", "parent": "@1", "child": "bf-a3f8"},
+  {"op": "dep_add_blocker", "id": "bf-a3f8", "blocker": "@0"},
+  {"op": "dep_add_blocker", "id": "bf-a3f8", "blocker": "@1"},
   {"op": "close", "id": "bf-a3f8", "reason": "Split into children"}
 ]'
 ```
 
-**Placeholder references**: `@0`, `@1`, etc. resolve to the IDs of beads created earlier in the batch. You don't need to know the child IDs in advance — `bf` substitutes them automatically.
+**Bulk status update:**
+```bash
+bf batch --json '[
+  {"op": "update", "id": "bf-123", "status": "in_progress"},
+  {"op": "update", "id": "bf-456", "status": "in_progress"},
+  {"op": "comment", "id": "bf-123", "text": "Started work"}
+]'
+```
 
-All operations execute in one `BEGIN IMMEDIATE` transaction. A crash mid-batch leaves zero partial state — SQLite rolls back automatically.
+**Label management:**
+```bash
+bf batch --json '[
+  {"op": "label_add", "id": "bf-123", "labels": ["urgent", "backend"]},
+  {"op": "label_remove", "id": "bf-456", "labels": ["deprecated"]}
+]'
+```
+
+#### Batch Response Format
+
+Returns a JSON array of results, one per operation:
+
+```json
+[
+  {"op": 0, "status": "ok", "id": "bf-new1", "message": "Created bead bf-new1"},
+  {"op": 1, "status": "ok", "id": "bf-new2", "message": "Created bead bf-new2"},
+  {"op": 2, "status": "ok", "message": "ok: bf-parent blocked by bf-new1"},
+  {"op": 3, "status": "ok", "message": "Closed bead bf-parent"}
+]
+```
+
+On error, the transaction rolls back and no partial state is committed:
+
+```json
+[
+  {"op": 0, "status": "ok", "id": "bf-new1", "message": "Created bead bf-new1"},
+  {"op": 1, "status": "error", "error": "Bead not found: bf-missing", "message": null}
+]
+```
+
+#### Field Validation
+
+Unknown fields in any operation are rejected with a clear error message listing allowed fields. This catches typos early:
+
+```bash
+bf batch --json '[{"op": "create", "titlle": " typo"}]'
+# Error: Unknown field 'titlle' in operation 'create'. Allowed fields: op, title, type, priority, description, assignee, labels
+```
 
 ### Extensible Annotations
 
