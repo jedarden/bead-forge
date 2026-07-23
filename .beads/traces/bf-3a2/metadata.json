@@ -1,0 +1,16 @@
+{
+  "bead_id": "bf-3a2",
+  "agent": "claude-print-opus",
+  "provider": "anthropic",
+  "model": "opus",
+  "exit_code": -1,
+  "outcome": "crash",
+  "duration_ms": 1052385,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-22T22:45:06.537466404Z",
+  "trace_format": "claude_json",
+  "pruned": false,
+  "template_version": null
+}

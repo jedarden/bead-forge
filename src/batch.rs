@@ -2892,6 +2892,125 @@ mod tests {
     }
 
     #[test]
+    fn test_auto_flush_enabled_writes_incremental_changes_to_jsonl() {
+        // Acceptance criterion 4: Test with mixed-op batch shows single JSONL write.
+        // Verify that when auto-flush is enabled (no_auto_flush=false), the batch
+        // automatically flushes dirty beads to JSONL exactly once after commit.
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\nsync:\n  auto_flush: true\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create initial beads and export them all to JSONL first (establish baseline)
+        let initial_beads = vec![
+            ("bf-unchanged", "Unchanged Bead"),
+            ("bf-update", "Update Target"),
+            ("bf-label", "Label Target"),
+            ("bf-dep-1", "Dependency One"),
+            ("bf-dep-2", "Dependency Two"),
+        ];
+
+        for (id, title) in &initial_beads {
+            let issue = Issue::new(id.to_string(), title.to_string(), ".".to_string());
+            storage.create_issue(&issue).unwrap();
+        }
+
+        // Flush all beads to JSONL to establish baseline
+        crate::sync::flush_dirty(&temp_dir.path()).unwrap();
+
+        // Clear dirty flags after initial flush
+        storage.clear_dirty().unwrap();
+
+        // Verify no dirty beads before batch
+        let dirty_before = storage.list_dirty_issues().unwrap();
+        assert_eq!(dirty_before.len(), 0, "No beads should be dirty before batch");
+
+        // Get JSONL mtime before batch (to verify it was updated)
+        let jsonl_path = beads_dir.join("issues.jsonl");
+        let mtime_before = fs::metadata(&jsonl_path).unwrap().modified().unwrap();
+
+        // Execute a mixed-operation batch with auto-flush ENABLED (no_auto_flush=false)
+        // This should: (1) commit transaction, (2) auto-flush dirty beads to JSONL
+        let ops = vec![
+            BatchOp::Update {
+                id: "bf-update".to_string(),
+                title: Some("Auto-flushed update".to_string()),
+                description: None,
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: None,
+                priority: None,
+                assignee: None,
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::LabelAdd {
+                id: "bf-label".to_string(),
+                labels: vec!["auto-flushed".to_string()],
+            },
+            BatchOp::DepAddBlocker {
+                id: "bf-dep-2".to_string(),
+                blocker: "bf-dep-1".to_string(),
+            },
+        ];
+
+        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* AUTO-FLUSH ENABLED */).unwrap();
+        assert_eq!(results.len(), 3);
+        for result in &results {
+            assert_eq!(result.status, "ok");
+        }
+
+        // Verify auto-flush happened: JSONL file was updated (mtime changed)
+        let mtime_after = fs::metadata(&jsonl_path).unwrap().modified().unwrap();
+        assert!(mtime_after > mtime_before, "JSONL file should have been updated by auto-flush");
+
+        // Verify all dirty beads were cleared by auto-flush (no manual flush needed)
+        let dirty_after = storage.list_dirty_issues().unwrap();
+        assert_eq!(
+            dirty_after.len(),
+            0,
+            "Auto-flush should have cleared all dirty marks"
+        );
+
+        // Verify JSONL contains the flushed beads with correct values
+        let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
+        let lines: Vec<&str> = jsonl_content.lines().collect();
+        assert_eq!(lines.len(), 5, "JSONL should contain all 5 beads");
+
+        let jsonl_beads: Vec<Issue> = lines
+            .iter()
+            .map(|line| serde_json::from_str::<Issue>(line).unwrap())
+            .collect();
+
+        // Verify updated bead was flushed
+        let updated = jsonl_beads.iter().find(|i| i.id == "bf-update").unwrap();
+        assert_eq!(updated.title, "Auto-flushed update");
+
+        // Verify label addition was flushed
+        let labeled = jsonl_beads.iter().find(|i| i.id == "bf-label").unwrap();
+        assert!(labeled.labels.contains(&"auto-flushed".to_string()));
+
+        // One auto-flush exported all dirty beads from the batch transaction
+    }
+
+    #[test]
     fn test_batch_fail_fast_no_dirty_marks_on_partial_failure() {
         // Verify that when a batch fails mid-execution, no dirty marks persist
         // for the operations that succeeded before the failure (they were rolled back).
