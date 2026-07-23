@@ -35,6 +35,11 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_auto_flush: bool,
 
+    /// Wrap --json output in a standard envelope: {version, kind, data, warning?}.
+    /// This provides stable structure for programmatic consumers. See `bf robot-docs`.
+    #[arg(long, global = true)]
+    pub envelope: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -792,6 +797,17 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Robot docs - machine-readable command contract documentation
+    ///
+    /// Outputs a JSON schema describing every command's --json output contract,
+    /// enabling agent consumers to parse responses programmatically without
+    /// hardcoding shapes.
+    RobotDocs {
+        /// Output format (text, json)
+        #[arg(long, default_value = "json")]
+        format: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1011,6 +1027,20 @@ pub enum AnnotateCommands {
     },
 }
 
+/// Wrap data in a JSON envelope for --json output.
+///
+/// This helper creates the standard envelope shape that all bf commands emit:
+/// { version: 1, kind: "<command>", data: <data>, warning?: "<msg>" }
+fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+    let envelope = crate::format::JsonEnvelope::new(kind, data);
+    let envelope = if let Some(w) = warning {
+        envelope.with_warning(w)
+    } else {
+        envelope
+    };
+    envelope.to_json().unwrap_or_else(|_| "{}".to_string())
+}
+
 pub fn run_cli() -> Result<Cli> {
     Ok(Cli::parse())
 }
@@ -1022,6 +1052,10 @@ pub fn run(cli: Cli) -> Result<()> {
     // `autoflush::after_mutation_with_config` (see child 1, bf-37xjd).
     let no_auto_flush = cli.no_auto_flush;
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
+
+    // Enable envelope wrapping for this process (enabled by default for all JSON outputs).
+    // This is a process-wide setting that affects all JSON formatting.
+    crate::format::json::JsonFormatter::with_envelope_enabled();
 
     // Handle case where no subcommand is provided
     let command = match cli.command {
@@ -1339,6 +1373,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 &format,
             )
         }
+        Commands::RobotDocs { format } => cmd_robot_docs(&format),
         Commands::Init { .. } => unreachable!("Init command handled earlier"),
     }
 }
@@ -1605,8 +1640,9 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             let mut out = issue;
             out.dependencies = vec![];
             out.comments = vec![];
-            // Wrap in array so NEEDLE's parse_single_bead (Vec<Bead> → first) works.
-            println!("{}", serde_json::to_string(&vec![out])?);
+            // Use the JsonFormatter which applies envelope wrapping
+            let formatter = get_formatter(OutputFormat::Json);
+            println!("{}", formatter.format_issue(&out));
         }
         "toon" => {
             println!("ID: {}", issue.id);
@@ -1783,19 +1819,19 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
 
     match format {
         "json" => {
-            // Use the shared formatter (JSONL, one Issue per line) for consistency with
-            // `list`/`search`. Resolve each scored candidate to its full Issue record so
+            // Use the shared formatter for consistency with `list`/`search`.
+            // Resolve each scored candidate to its full Issue record so
             // the formatter has every field; empty result prints `[]`.
             let formatter = get_formatter(OutputFormat::Json);
             let issues: Vec<Issue> = candidates
                 .iter()
                 .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
                 .collect();
-            if issues.is_empty() {
-                println!("[]");
-            } else {
-                print!("{}", formatter.format_issues(&issues));
-            }
+
+            // format_issues already wraps in an envelope with kind="list",
+            // but for ready we need kind="ready", so we construct the envelope manually
+            let json_array = serde_json::to_string(&issues).unwrap_or_else(|_| "[]".to_string());
+            println!("{}", formatter.format_with_envelope("ready", &json_array));
         }
         "toon" => {
             for candidate in candidates {
@@ -3452,3 +3488,32 @@ fn cmd_recent(
 
     Ok(())
 }
+
+fn cmd_robot_docs(format: &str) -> Result<()> {
+    let docs = crate::robot_docs::RobotDocs::generate();
+
+    match format {
+        "json" => {
+            println!("{}", docs.to_json()?);
+        }
+        _ => {
+            println!("Robot Docs - Machine-readable command contract documentation");
+            println!();
+            println!("Envelope version: {}", docs.envelope_version);
+            println!();
+            println!("Commands:");
+            for cmd in &docs.commands {
+                println!("  {} - {}", cmd.command, cmd.description);
+                println!("    Example: {}", cmd.example);
+                println!("    Data shape: {:?}", cmd.data_shape);
+                for note in &cmd.notes {
+                    println!("    Note: {}", note);
+                }
+                println!();
+            }
+        }
+    }
+
+    Ok(())
+}
+

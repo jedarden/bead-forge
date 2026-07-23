@@ -59,16 +59,22 @@ fn test_json_formatter_single_issue() {
 
     let output = formatter.format_issue(&issue);
 
-    // Parse and verify it's valid JSON
+    // Parse envelope and verify it's valid JSON
     let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
 
     eprintln!("JSON output: {}", output);
 
-    assert_eq!(parsed["id"], "bf-test1");
-    assert_eq!(parsed["title"], "Test Bead");
-    assert_eq!(parsed["status"], "open");
-    assert_eq!(parsed["priority"], 2);
-    assert_eq!(parsed["issue_type"], "task");
+    // Verify envelope structure
+    assert_eq!(parsed["version"], 1);
+    assert_eq!(parsed["kind"], "show");
+
+    // Data field contains the actual issue
+    let data = &parsed["data"];
+    assert_eq!(data["id"], "bf-test1");
+    assert_eq!(data["title"], "Test Bead");
+    assert_eq!(data["status"], "open");
+    assert_eq!(data["priority"], 2);
+    assert_eq!(data["issue_type"], "task");
 
     // Empty vectors are skipped in serialization (skip_serializing_if), so they may not be present
     // If present, they should be empty arrays
@@ -183,20 +189,23 @@ fn test_json_formatter_multiple_issues() {
 
     let output = formatter.format_issues(&issues);
 
-    // Verify JSONL format (newline-separated JSON objects)
-    let lines: Vec<&str> = output.lines().collect();
-    assert_eq!(lines.len(), 2);
+    // Parse envelope and verify it's valid JSON
+    let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
 
-    // Parse each line as JSON
-    let first: serde_json::Value =
-        serde_json::from_str(lines[0]).expect("Invalid JSON on first line");
-    let second: serde_json::Value =
-        serde_json::from_str(lines[1]).expect("Invalid JSON on second line");
+    // Verify envelope structure
+    assert_eq!(parsed["version"], 1);
+    assert_eq!(parsed["kind"], "list");
 
+    // Data field contains an array of issues
+    let data = parsed["data"].as_array().expect("data should be an array");
+    assert_eq!(data.len(), 2);
+
+    let first = &data[0];
     assert_eq!(first["id"], "bf-test1");
     assert_eq!(first["status"], "open");
     assert_eq!(first["priority"], 0);
 
+    let second = &data[1];
     assert_eq!(second["id"], "bf-test2");
     assert_eq!(second["status"], "in_progress");
     assert_eq!(second["priority"], 1);
@@ -210,8 +219,12 @@ fn test_json_formatter_empty_issues() {
 
     let output = formatter.format_issues(&issues);
 
-    // Empty result should be empty string (consistent with current behavior)
-    assert!(output.is_empty());
+    // Empty result should be an envelope with empty array
+    let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
+    assert_eq!(parsed["version"], 1);
+    assert_eq!(parsed["kind"], "list");
+    let data = parsed["data"].as_array().expect("data should be an array");
+    assert_eq!(data.len(), 0);
 }
 
 #[test]
@@ -289,17 +302,24 @@ fn test_json_formatter_strips_dependencies_and_comments() {
 
     eprintln!("JSON output with deps/comments: {}", output);
 
+    // Verify envelope structure
+    assert_eq!(parsed["version"], 1);
+    assert_eq!(parsed["kind"], "show");
+
+    // Data field contains the issue
+    let data = &parsed["data"];
+
     // Verify dependencies and comments are stripped (br compatibility)
     // Empty vectors are skipped in serialization (skip_serializing_if)
-    if parsed.get("dependencies").is_some() {
-        assert!(parsed["dependencies"].is_array());
-        assert_eq!(parsed["dependencies"].as_array().unwrap().len(), 0);
+    if data.get("dependencies").is_some() {
+        assert!(data["dependencies"].is_array());
+        assert_eq!(data["dependencies"].as_array().unwrap().len(), 0);
     } else {
         // If not present, that's also OK (skip_serializing_if removed them)
     }
-    if parsed.get("comments").is_some() {
-        assert!(parsed["comments"].is_array());
-        assert_eq!(parsed["comments"].as_array().unwrap().len(), 0);
+    if data.get("comments").is_some() {
+        assert!(data["comments"].is_array());
+        assert_eq!(data["comments"].as_array().unwrap().len(), 0);
     } else {
         // If not present, that's also OK (skip_serializing_if removed them)
     }
@@ -315,7 +335,12 @@ fn test_json_formatter_error_formatting() {
     let parsed: serde_json::Value =
         serde_json::from_str(&output).expect("Invalid JSON error output");
 
-    assert_eq!(parsed["error"], "Test error message");
+    // Verify envelope structure
+    assert_eq!(parsed["version"], 1);
+    assert_eq!(parsed["kind"], "error");
+
+    // Error message is in the data field
+    assert_eq!(parsed["data"]["error"], "Test error message");
 }
 
 #[test]
@@ -393,7 +418,10 @@ fn test_get_formatter() {
     let json_output = json_formatter.format_issue(&issue);
     let parsed_json: serde_json::Value =
         serde_json::from_str(&json_output).expect("JSON formatter should produce valid JSON");
-    assert_eq!(parsed_json["id"], "bf-test");
+    // Verify envelope structure and data field
+    assert_eq!(parsed_json["version"], 1);
+    assert_eq!(parsed_json["kind"], "show");
+    assert_eq!(parsed_json["data"]["id"], "bf-test");
 
     let text_output = text_formatter.format_issue(&issue);
     assert!(text_output.contains("bf-test"));
