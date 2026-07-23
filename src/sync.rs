@@ -722,4 +722,251 @@ mod tests {
         assert!(imported.labels.contains(&"phase-2".to_string()));
         assert!(imported.labels.contains(&"testing".to_string()));
     }
+
+    #[test]
+    fn test_labels_flush_import_roundtrip() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let jsonl_path = beads_dir.join("issues.jsonl");
+
+        // Create multiple issues with different label configurations
+        let issue_with_many_labels = Issue {
+            id: "bf-many-labels".to_string(),
+            title: "Issue with Many Labels".to_string(),
+            description: Some("Testing label persistence with multiple labels".to_string()),
+            status: Status::Open,
+            priority: Priority::CRITICAL,
+            issue_type: IssueType::Bug,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![
+                "phase-1".to_string(),
+                "storage".to_string(),
+                "critical".to_string(),
+                "database".to_string(),
+                "priority-p0".to_string(),
+            ],
+            ..Default::default()
+        };
+
+        let issue_with_one_label = Issue {
+            id: "bf-one-label".to_string(),
+            title: "Issue with One Label".to_string(),
+            status: Status::InProgress,
+            priority: Priority::HIGH,
+            issue_type: IssueType::Feature,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["phase-2".to_string()],
+            ..Default::default()
+        };
+
+        let issue_without_labels = Issue {
+            id: "bf-no-labels".to_string(),
+            title: "Issue without Labels".to_string(),
+            status: Status::Open,
+            priority: Priority::LOW,
+            issue_type: IssueType::Chore,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![],
+            ..Default::default()
+        };
+
+        // Create all issues in the database
+        let storage = Storage::open(&db_path).unwrap();
+        storage.create_issue(&issue_with_many_labels).unwrap();
+        storage.create_issue(&issue_with_one_label).unwrap();
+        storage.create_issue(&issue_without_labels).unwrap();
+
+        // Flush to JSONL
+        let exported = flush(workspace).unwrap();
+        assert_eq!(exported, 3, "All three issues should be exported");
+
+        // Verify JSONL file exists and contains the labels
+        assert!(jsonl_path.exists(), "JSONL file should exist after flush");
+        let jsonl_contents = std::fs::read_to_string(&jsonl_path).unwrap();
+
+        // Parse all lines and verify labels
+        let mut found_labels = std::collections::HashMap::new();
+        for line in jsonl_contents.lines() {
+            if let Ok(issue) = serde_json::from_str::<Issue>(line) {
+                found_labels.insert(issue.id.clone(), issue.labels.clone());
+            }
+        }
+
+        // Verify labels are in JSONL
+        assert_eq!(found_labels.get("bf-many-labels").unwrap().len(), 5);
+        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"phase-1".to_string()));
+        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"storage".to_string()));
+        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"critical".to_string()));
+        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"database".to_string()));
+        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"priority-p0".to_string()));
+
+        assert_eq!(found_labels.get("bf-one-label").unwrap().len(), 1);
+        assert_eq!(found_labels.get("bf-one-label").unwrap()[0], "phase-2");
+
+        assert_eq!(found_labels.get("bf-no-labels").unwrap().len(), 0);
+
+        // Clear the database and re-import
+        std::fs::remove_file(&db_path).unwrap();
+        let storage2 = Storage::open(&db_path).unwrap();
+
+        // Import from JSONL
+        let import_result = import(workspace).unwrap();
+        assert_eq!(import_result.imported, 3, "All three issues should be imported");
+
+        // Verify labels survived the roundtrip
+        let imported_many = storage2.get_issue("bf-many-labels").unwrap().unwrap();
+        assert_eq!(imported_many.labels.len(), 5);
+        assert!(imported_many.labels.contains(&"phase-1".to_string()));
+        assert!(imported_many.labels.contains(&"storage".to_string()));
+        assert!(imported_many.labels.contains(&"critical".to_string()));
+        assert!(imported_many.labels.contains(&"database".to_string()));
+        assert!(imported_many.labels.contains(&"priority-p0".to_string()));
+
+        let imported_one = storage2.get_issue("bf-one-label").unwrap().unwrap();
+        assert_eq!(imported_one.labels.len(), 1);
+        assert_eq!(imported_one.labels[0], "phase-2");
+
+        let imported_none = storage2.get_issue("bf-no-labels").unwrap().unwrap();
+        assert_eq!(imported_none.labels.len(), 0);
+
+        // Verify labels in bead_labels table
+        storage2.with_immediate_transaction(|tx| {
+            let mut stmt = tx.prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label").unwrap();
+            let labels: Vec<String> = stmt.query_map(params!["bf-many-labels"], |row| row.get::<_, String>(0)).unwrap()
+                .filter_map(|r| r.ok()).collect();
+            assert_eq!(labels, vec!["critical", "database", "phase-1", "priority-p0", "storage"]);
+            Ok(())
+        }).unwrap();
+    }
+
+    #[test]
+    fn test_labels_persist_through_flush_dirty() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let jsonl_path = beads_dir.join("issues.jsonl");
+
+        // Create initial issue
+        let issue1 = Issue {
+            id: "bf-dirty-1".to_string(),
+            title: "Issue 1".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["original".to_string()],
+            ..Default::default()
+        };
+
+        let storage = Storage::open(&db_path).unwrap();
+        storage.create_issue(&issue1).unwrap();
+
+        // Flush to JSONL
+        flush(workspace).unwrap();
+
+        // Update the issue with new labels
+        let changes = IssueChanges {
+            labels: Some(vec!["original".to_string(), "updated".to_string(), "dirty".to_string()]),
+            ..Default::default()
+        };
+        storage.update_issue("bf-dirty-1", &changes).unwrap();
+
+        // Flush dirty to JSONL
+        let exported_dirty = flush_dirty(workspace).unwrap();
+        assert_eq!(exported_dirty, 1, "One dirty issue should be flushed");
+
+        // Verify JSONL contains updated labels
+        let jsonl_contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        let imported: Issue = jsonl_contents.lines()
+            .find_map(|line| serde_json::from_str::<Issue>(line).ok())
+            .unwrap();
+
+        assert_eq!(imported.labels.len(), 3);
+        assert!(imported.labels.contains(&"original".to_string()));
+        assert!(imported.labels.contains(&"updated".to_string()));
+        assert!(imported.labels.contains(&"dirty".to_string()));
+
+        // Import and verify labels persisted
+        std::fs::remove_file(&db_path).unwrap();
+        let storage2 = Storage::open(&db_path).unwrap();
+        import(workspace).unwrap();
+
+        let final_issue = storage2.get_issue("bf-dirty-1").unwrap().unwrap();
+        assert_eq!(final_issue.labels.len(), 3);
+        assert!(final_issue.labels.contains(&"original".to_string()));
+        assert!(final_issue.labels.contains(&"updated".to_string()));
+        assert!(final_issue.labels.contains(&"dirty".to_string()));
+    }
+
+    #[test]
+    fn test_labels_persist_through_full_sync() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let jsonl_path = beads_dir.join("issues.jsonl");
+
+        // Create issue with labels
+        let issue = Issue {
+            id: "bf-sync-labels".to_string(),
+            title: "Sync Labels Test".to_string(),
+            status: Status::Open,
+            priority: Priority::HIGH,
+            issue_type: IssueType::Feature,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["sync-test".to_string(), "persistence".to_string()],
+            ..Default::default()
+        };
+
+        let storage = Storage::open(&db_path).unwrap();
+        storage.create_issue(&issue).unwrap();
+
+        // Run full sync
+        let sync_result = sync(workspace).unwrap();
+        assert_eq!(sync_result.imported, 0, "Nothing to import");
+        assert_eq!(sync_result.exported, 1, "One issue exported");
+
+        // Verify JSONL contains labels
+        let jsonl_contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        let parsed: Issue = serde_json::from_str(&jsonl_contents.trim()).unwrap();
+        assert_eq!(parsed.labels.len(), 2);
+        assert!(parsed.labels.contains(&"sync-test".to_string()));
+        assert!(parsed.labels.contains(&"persistence".to_string()));
+
+        // Clear DB and run full sync again (import from JSONL)
+        std::fs::remove_file(&db_path).unwrap();
+        let storage2 = Storage::open(&db_path).unwrap();
+
+        let sync_result2 = sync(workspace).unwrap();
+        assert_eq!(sync_result2.imported, 1, "One issue imported");
+        assert_eq!(sync_result2.exported, 1, "One issue exported");
+
+        // Verify labels survived full sync roundtrip
+        let final_issue = storage2.get_issue("bf-sync-labels").unwrap().unwrap();
+        assert_eq!(final_issue.labels.len(), 2);
+        assert!(final_issue.labels.contains(&"sync-test".to_string()));
+        assert!(final_issue.labels.contains(&"persistence".to_string()));
+    }
 }
