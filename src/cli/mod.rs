@@ -513,13 +513,15 @@ pub enum Commands {
     #[command(subcommand)]
     Label(LabelCommands),
 
-    /// List labels for a specific issue (direct SELECT, efficient)
+    /// List labels for beads
     ///
-    /// A lightweight single-SELECT variant of `bf label list` for one bead.
-    /// Prints one label per line, or JSON with --format json.
+    /// With a bead ID, lists that bead's labels (one per line). Without an ID,
+    /// lists all beads with their labels in a formatted table showing ID, title,
+    /// and comma-separated labels.
     Labels {
-        /// Bead ID
-        id: String,
+        /// Bead ID (optional - if omitted, shows all beads with their labels)
+        #[arg(required = false)]
+        id: Option<String>,
 
         /// Output format (text, json)
         #[arg(short, long, default_value = "text")]
@@ -1315,7 +1317,7 @@ pub fn run(cli: Cli) -> Result<()> {
             harness,
             format,
         } => cmd_velocity(&beads_dir, model, harness, &format),
-        Commands::Labels { id, format } => cmd_labels(&beads_dir, &id, &format),
+        Commands::Labels { id, format } => cmd_labels(&beads_dir, id.as_deref(), &format),
         Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate, no_auto_flush),
         Commands::Log {
             id,
@@ -2783,18 +2785,53 @@ fn cmd_label(beads_dir: &PathBuf, label: LabelCommands, no_auto_flush: bool) -> 
     Ok(())
 }
 
-fn cmd_labels(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
+fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
-    let labels = storage.get_labels(id)?;
-    if format == "json" {
-        println!("{}", serde_json::to_string_pretty(&labels)?);
+
+    if let Some(issue_id) = id {
+        // Single bead mode - show labels for one bead
+        let labels = storage.get_labels(issue_id)?;
+        if format == "json" {
+            println!("{}", serde_json::to_string_pretty(&labels)?);
+        } else {
+            for label in &labels {
+                println!("{}", label);
+            }
+        }
     } else {
-        for label in &labels {
-            println!("{}", label);
+        // All beads mode - show all beads with their labels
+        let filter = IssueFilter::default();
+        let mut issues = storage.list_issues(&filter)?;
+
+        // Sort by bead ID
+        issues.sort_by(|a, b| a.id.cmp(&b.id));
+
+        if format == "json" {
+            // Output JSON array of {id, title, labels} objects
+            let bead_labels: Vec<serde_json::Value> = issues
+                .iter()
+                .map(|issue| serde_json::json!({
+                    "id": issue.id,
+                    "title": issue.title,
+                    "labels": issue.labels
+                }))
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&bead_labels)?);
+        } else {
+            // Text format - display in a clean table
+            for issue in &issues {
+                let labels_str = if issue.labels.is_empty() {
+                    "(no labels)".to_string()
+                } else {
+                    issue.labels.join(", ")
+                };
+                println!("{} {} | {}", issue.id, issue.title, labels_str);
+            }
         }
     }
+
     Ok(())
 }
 
