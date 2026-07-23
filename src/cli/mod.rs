@@ -2801,7 +2801,8 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
         // Single bead mode - show labels for one bead
         let labels = storage.get_labels(issue_id)?;
         if format == "json" {
-            println!("{}", serde_json::to_string_pretty(&labels)?);
+            // Output labels array as compact JSON
+            println!("{}", serde_json::to_string(&labels)?);
         } else {
             for label in &labels {
                 println!("{}", label);
@@ -2816,16 +2817,20 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
         issues.sort_by(|a, b| a.id.cmp(&b.id));
 
         if format == "json" {
-            // Output JSON array of {id, title, labels} objects
-            let bead_labels: Vec<serde_json::Value> = issues
-                .iter()
-                .map(|issue| serde_json::json!({
-                    "id": issue.id,
-                    "title": issue.title,
-                    "labels": issue.labels
-                }))
-                .collect();
-            println!("{}", serde_json::to_string_pretty(&bead_labels)?);
+            // Output JSONL (one {id, title, labels} object per line)
+            // Empty bead set prints [] (matches list/ready convention)
+            if issues.is_empty() {
+                println!("[]");
+            } else {
+                for issue in &issues {
+                    let obj = serde_json::json!({
+                        "id": issue.id,
+                        "title": issue.title,
+                        "labels": issue.labels
+                    });
+                    println!("{}", serde_json::to_string(&obj)?);
+                }
+            }
         } else {
             // Text format - display in a clean table
             for issue in &issues {
