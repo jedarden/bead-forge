@@ -1,118 +1,107 @@
 # Epic Label Functionality Test Results
 
-## Bead Under Test
-- **ID**: bf-4yk8nn
-- **Title**: Test Epic with Labels 1784832346
-- **Type**: epic
-- **Status**: in_progress
+## Test Epic: bf-4yk8nn
+**Title:** Test Epic with Labels 1784832346
+**Type:** epic
+**Priority:** P0
+**Status:** in_progress
+
+## Test Summary
+
+This document summarizes comprehensive testing of epic label functionality in bead-forge.
 
 ## Test Results
 
-### ✅ 1. List Labels for Epic Bead
-**Command**: `br label list bf-4yk8nn`
-**Result**: PASSED
-- Labels displayed correctly: epic-test, integration-test, phase-1, test-epic
-- Labels shown in alphabetical order
-- Output format is clean and readable
-
-### ✅ 2. Add Labels to Epic Bead
-**Command**: `br label add bf-4yk8nn -l integration-test -l validation-test`
-**Result**: PASSED
-- Multiple labels added in single command
-- Confirmation messages printed for each label
-- Labels persisted correctly to database
-
-### ✅ 3. Remove Label from Epic Bead
-**Command**: `br label remove bf-4yk8nn -l validation-test`
-**Result**: PASSED
-- Label removed successfully
-- Confirmation message printed
-- Label no longer appears in list
-
-### ✅ 4. List All Labels in Workspace
-**Command**: `br label list`
-**Result**: PASSED
-- Shows all unique labels across workspace
-- Displays usage counts for each label
-- Sorted by count (descending)
-- epic-test: 17 beads, test-epic: 14 beads, integration-test: 3 beads
-
-### ✅ 5. `bf labels` Shortcut Command
-**Commands**:
-- `br labels bf-4yk8nn` (text format)
-- `br labels bf-4yk8nn --format json`
-**Result**: PASSED
-- Text format: One label per line
-- JSON format: Proper JSON array output
-- Both formats work correctly
-
-### ✅ 6. Search by Label
-**Command**: `br search --label epic-test --type epic`
-**Result**: PASSED
-- Returns beads matching the label filter
-- Type filter works in combination
-- bf-4yk8nn appears in search results
-
-### ✅ 7. Show Bead with Labels in JSON
-**Command**: `br show bf-4yk8nn --format json`
-**Result**: PASSED
-- Labels array included in JSON output
-- All 4 labels present: ['epic-test', 'integration-test', 'phase-1', 'test-epic']
-- Proper JSON array structure
-
-### ✅ 8. Duplicate Label Handling
-**Command**: `br label add bf-4yk8nn -l epic-test`
-**Result**: PASSED
-- INSERT OR IGNORE prevents duplicate entries
-- Command succeeds without error
-- Label appears only once in output (verified with grep -c)
-- Correct use of SQLite's INSERT OR IGNORE
-
-### ✅ 9. Label Persistence via JSONL Sync
-**Commands**:
-- `br sync --flush-only`
-- Verification in `.beads/issues.jsonl`
-**Result**: PASSED
-- Labels correctly written to JSONL export
-- JSONL contains all 4 labels
-- Auto-flush mechanism working correctly
-
-### ✅ 10. Labels in Text Output
-**Command**: `br show bf-4yk8nn` (default text format)
-**Result**: PASSED
-- Labels displayed in human-readable format
-- Labels shown as comma-separated list
-- Format: "Labels: epic-test, integration-test, phase-1, test-epic"
-
-## Label Storage Implementation
-
-Labels are stored in the `labels` table with schema:
-```sql
-CREATE TABLE IF NOT EXISTS labels (
-    issue_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
-    label TEXT NOT NULL,
-    PRIMARY KEY (issue_id, label)
-);
+### 1. Label Addition (✓ PASS)
+```bash
+bf label add bf-4yk8nn --label "test-label-1" --label "test-label-2"
 ```
+**Result:** Successfully added multiple labels to epic
+**Output:** Added label 'test-label-1' to bf-4yk8nn, Added label 'test-label-2' to bf-4yk8nn
 
-Key features:
-- Composite primary key prevents duplicate labels per bead
-- ON DELETE CASCADE cleans up labels when bead is deleted
-- INSERT OR IGNORE for idempotent add operations
-- Uses BEGIN IMMEDIATE transactions for atomicity
+### 2. Label Removal (✓ PASS)
+```bash
+bf label remove bf-4yk8nn --label "test-label-1"
+```
+**Result:** Successfully removed label from epic
+**Output:** Removed label 'test-label-1' from bf-4yk8nn
+
+### 3. Label Persistence (✓ PASS)
+```bash
+bf show bf-4yk8nn --format json
+```
+**Result:** Labels persisted correctly in database
+**Current Labels:** epic-test, failure-count:1, integration-test, phase-1, test-epic, test-label-2
+
+### 4. Child Bead Creation with Labels (✓ PASS)
+```bash
+bf create --title "Child task 1" --type task --priority 2 --label "child-label" --label "phase-1" --assignee "test-worker"
+```
+**Result:** Successfully created child bead with multiple labels
+**Output:** bf-36ka02
+
+### 5. Dependency Management (✓ PASS)
+```bash
+bf dep add bf-4yk8nn --blocks bf-36ka02
+```
+**Result:** Successfully added epic as blocker to child bead
+**Output:** Added dependency: bf-36ka02 depends on bf-4yk8nn (blocks)
+
+### 6. Batch Operations with Labels (✓ PASS)
+```bash
+bf batch --json '[
+  {"op": "create", "title": "Batch child 1", "type": "task", "priority": 2, "labels": ["batch-label", "phase-1"]},
+  {"op": "create", "title": "Batch child 2", "type": "task", "priority": 1, "labels": ["batch-label"]},
+  {"op": "dep_add_blocker", "id": "bf-4yk8nn", "blocker": "@0"},
+  {"op": "dep_add_blocker", "id": "@1", "blocker": "bf-4yk8nn"}
+]'
+```
+**Result:** Successfully created beads with labels and dependencies atomically
+**Output:** bf-2jr8d3, bf-4tyvoi
+
+### 7. Critical Path Computation (✓ PASS)
+```bash
+bf critical-path bf-4yk8nn --format text
+```
+**Result:** Successfully computed critical path with 1079 beads on critical path
+**Output:** Correctly identified epic bf-4yk8nn on critical path (float=0)
+
+### 8. Epic Filtering (✓ PASS)
+```bash
+bf list --type epic --format text
+```
+**Result:** Successfully filtered and displayed all epics including test epic
+**Count:** 95 epics found, including bf-4yk8nn
+
+## Limitations Found
+
+### 1. List Command Filter Limitation (⚠️ PARTIAL)
+```bash
+bf list --label "epic-test" --format json
+```
+**Result:** Command failed with "unexpected argument '--label'"
+**Issue:** The `bf list` command does not support label filtering directly
+**Workaround:** Use `bf search` or manual filtering after `bf list --format json`
+
+### 2. Batch Operations (⚠️ PARTIAL)
+```bash
+bf batch --json '[{"op": "label_add", "id": "bf-4yk8nn", "labels": ["batch-test-label"]}]'
+```
+**Result:** Command failed with "unknown variant `label_add`"
+**Issue:** Batch operations do not yet support label_add/label_remove operations
+**Supported ops:** create, dep_add_blocker, close
+
+## Recommendations
+
+1. **Add label filtering to bf list:** Implement `--label` filter for the list command to enable filtering by label
+2. **Extend batch operations:** Add label_add and label_remove operations to batch functionality
+3. **Add bf labels command:** Implement dedicated command to list labels for a specific bead (bf labels <id>)
+
+## Test Environment
+- **Workspace:** /home/coding/bead-forge
+- **bead-forge version:** Latest
+- **Test Date:** 2026-07-23
+- **Test Epic ID:** bf-4yk8nn
 
 ## Conclusion
-
-All epic label functionality tests passed successfully. The label system works correctly for:
-- Adding and removing labels
-- Listing labels per bead and across workspace
-- Searching by labels
-- JSON/text output formats
-- Duplicate handling (idempotent adds)
-- Persistence via JSONL sync
-
-The implementation correctly uses:
-- SQLite transactions with BEGIN IMMEDIATE
-- INSERT OR IGNORE for duplicate prevention
-- Proper foreign key constraints with CASCADE delete
-- Dirty marking for auto-flush synchronization
+Epic label functionality is **generally working** with successful label addition, removal, persistence, child bead creation, dependency management, and critical path computation. Minor limitations exist in list filtering and batch label operations that could be addressed in future updates.
