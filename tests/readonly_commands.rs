@@ -40,15 +40,31 @@ impl FileSnapshot {
     /// Assert the file is byte-identical and mtime-unchanged.
     fn assert_unchanged(&self, jsonl_path: &Path, label: &str) {
         let current = FileSnapshot::snapshot(jsonl_path);
+
+        // Primary invariant: content must not change
         assert_eq!(
             current.content, self.content,
             "{}: issues.jsonl content must not change after read-only command",
             label
         );
-        // Mtime comparison is tricky on some filesystems ( coarse-grained timestamps).
-        // We check content first (primary invariant), and mtime is a secondary signal.
-        // In CI environments with sub-second mtime precision, this can flake, so we
-        // only check it if the content assertion passes.
+
+        // Secondary invariant: mtime should not change (opt-in via env var)
+        // This is disabled by default due to coarse-grained filesystem timestamps
+        // in CI environments. Set BF_ENABLE_MTIME_CHECK=1 to enable.
+        let mtime_check_enabled = std::env::var("BF_ENABLE_MTIME_CHECK")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        if mtime_check_enabled {
+            // Compare mtimes - on coarse-grained filesystems, operations within
+            // the same granularity window (e.g., 1 second on FAT) may appear identical.
+            // We allow exact match here since read-only commands should never touch the file.
+            assert_eq!(
+                current.mtime, self.mtime,
+                "{}: issues.jsonl mtime must not change after read-only command (BF_ENABLE_MTIME_CHECK=1)",
+                label
+            );
+        }
     }
 }
 
