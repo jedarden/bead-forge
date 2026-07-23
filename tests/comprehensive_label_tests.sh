@@ -36,7 +36,7 @@ info() {
 # Set up test workspace
 setup_workspace() {
     mkdir -p "$BF_WORKSPACE"
-    $BF -w "$BF_WORKSPACE" config init 2>/dev/null || true
+    # No initialization needed - bf creates workspace on first use
 }
 
 # Cleanup
@@ -48,7 +48,7 @@ cleanup() {
 create_bead() {
     local title="$1"
     local labels="$2"
-    local cmd="$BF -w $BF_WORKSPACE create --title $title --type task --priority 2"
+    local cmd="$BF -w $BF_WORKSPACE create --title \"$title\" --type task --priority 2"
     if [ -n "$labels" ]; then
         cmd="$cmd $labels"
     fi
