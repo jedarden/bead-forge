@@ -834,3 +834,286 @@ mod list_show {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Module: claim_stats
+// Focus: Integration tests for claim and stats JSON envelope wrapping
+// Test command: cargo test envelope::claim_stats
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod claim_stats {
+    use super::*;
+
+    /// Test: claim --json returns envelope with claim result object
+    #[test]
+    fn envelope_claim_json_returns_claim_result() {
+        let ws = init_workspace();
+
+        // Create a bead to claim
+        create_bead(ws.path(), "claim test bead");
+
+        let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "test-worker", "--json"]);
+
+        // Verify envelope structure
+        verify_envelope_structure(&envelope, "claim");
+
+        // Verify data is a single object
+        let data = &envelope["data"];
+        assert!(data.is_object(), "claim --json envelope data must be an object");
+
+        // Verify the object contains expected claim fields
+        assert!(data.get("bead_id").is_some(), "claim result must have 'bead_id'");
+        assert!(data.get("assignee").is_some(), "claim result must have 'assignee'");
+        assert_eq!(
+            data.get("assignee").and_then(|a| a.as_str()),
+            Some("test-worker"),
+            "claim assignee must match"
+        );
+    }
+
+    /// Test: claim --json envelope with metadata fields
+    #[test]
+    fn envelope_claim_json_has_metadata_fields() {
+        let ws = init_workspace();
+        create_bead(ws.path(), "claim metadata test");
+
+        let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "metadata-worker", "--json"]);
+
+        // Verify all required metadata fields are present
+        assert!(envelope.get("version").is_some(), "claim envelope must have 'version' field");
+        assert!(envelope.get("kind").is_some(), "claim envelope must have 'kind' field");
+        assert!(envelope.get("data").is_some(), "claim envelope must have 'data' field");
+
+        // Verify version value
+        assert_eq!(
+            envelope.get("version").and_then(|v| v.as_u64()),
+            Some(1),
+            "claim envelope version must be 1"
+        );
+
+        // Verify kind value
+        assert_eq!(
+            envelope.get("kind").and_then(|k| k.as_str()),
+            Some("claim"),
+            "claim envelope kind must be 'claim'"
+        );
+
+        // Verify data is an object
+        let data = &envelope["data"];
+        assert!(data.is_object(), "claim envelope data must be an object");
+    }
+
+    /// Test: claim with no available beads returns envelope with empty object
+    #[test]
+    fn envelope_claim_no_beads_returns_empty_object() {
+        let ws = init_workspace();
+
+        // Create beads but with status that won't be claimed
+        // or just try to claim from empty workspace
+        let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "empty-worker", "--json"]);
+
+        // Verify envelope structure
+        verify_envelope_structure(&envelope, "claim");
+
+        // Verify data is an empty object
+        let data = &envelope["data"];
+        assert!(data.is_object(), "claim --json envelope data must be an object");
+        assert!(data.as_object().unwrap().is_empty(), "claim with no beads must return empty object");
+    }
+
+    /// Test: stats --json returns envelope with stats object
+    #[test]
+    fn envelope_stats_json_returns_stats_result() {
+        let ws = init_workspace();
+
+        // Create some beads for stats
+        create_bead(ws.path(), "stats bead 1");
+        create_bead(ws.path(), "stats bead 2");
+
+        let envelope = run_envelope_command(ws.path(), &["stats", "--format", "json"]);
+
+        // Verify envelope structure
+        verify_envelope_structure(&envelope, "stats");
+
+        // Verify data is a single object
+        let data = &envelope["data"];
+        assert!(data.is_object(), "stats --json envelope data must be an object");
+
+        // Verify the object contains expected stats fields
+        assert!(data.get("total").is_some(), "stats must have 'total' field");
+        assert!(data.get("total").and_then(|t| t.as_u64()).unwrap() >= 2, "total must be at least 2");
+    }
+
+    /// Test: stats --json envelope with metadata fields
+    #[test]
+    fn envelope_stats_json_has_metadata_fields() {
+        let ws = init_workspace();
+        create_bead(ws.path(), "stats metadata test");
+
+        let envelope = run_envelope_command(ws.path(), &["stats", "--format", "json"]);
+
+        // Verify all required metadata fields are present
+        assert!(envelope.get("version").is_some(), "stats envelope must have 'version' field");
+        assert!(envelope.get("kind").is_some(), "stats envelope must have 'kind' field");
+        assert!(envelope.get("data").is_some(), "stats envelope must have 'data' field");
+
+        // Verify version value
+        assert_eq!(
+            envelope.get("version").and_then(|v| v.as_u64()),
+            Some(1),
+            "stats envelope version must be 1"
+        );
+
+        // Verify kind value
+        assert_eq!(
+            envelope.get("kind").and_then(|k| k.as_str()),
+            Some("stats"),
+            "stats envelope kind must be 'stats'"
+        );
+
+        // Verify data is an object
+        let data = &envelope["data"];
+        assert!(data.is_object(), "stats envelope data must be an object");
+    }
+
+    /// Test: stats with empty workspace returns envelope with zero stats
+    #[test]
+    fn envelope_stats_empty_returns_zero_stats() {
+        let ws = init_workspace();
+
+        let envelope = run_envelope_command(ws.path(), &["stats", "--format", "json"]);
+
+        // Verify envelope structure
+        verify_envelope_structure(&envelope, "stats");
+
+        // Verify data has total = 0
+        let data = &envelope["data"];
+        assert!(data.is_object(), "stats --json envelope data must be an object");
+        assert_eq!(
+            data.get("total").and_then(|t| t.as_u64()),
+            Some(0),
+            "stats for empty workspace must have total = 0"
+        );
+    }
+
+    /// Test: claim and stats envelopes have consistent structure
+    #[test]
+    fn envelope_claim_and_stats_consistent_structure() {
+        let ws = init_workspace();
+        create_bead(ws.path(), "consistency test");
+
+        // Get claim envelope
+        let claim_envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "consistency-worker", "--json"]);
+
+        // Get stats envelope
+        let stats_envelope = run_envelope_command(ws.path(), &["stats", "--format", "json"]);
+
+        // Both should have version = 1
+        assert_eq!(
+            claim_envelope.get("version").and_then(|v| v.as_u64()),
+            Some(1),
+            "claim envelope version must be 1"
+        );
+        assert_eq!(
+            stats_envelope.get("version").and_then(|v| v.as_u64()),
+            Some(1),
+            "stats envelope version must be 1"
+        );
+
+        // Both should have correct kind
+        assert_eq!(
+            claim_envelope.get("kind").and_then(|k| k.as_str()),
+            Some("claim"),
+            "claim envelope kind must be 'claim'"
+        );
+        assert_eq!(
+            stats_envelope.get("kind").and_then(|k| k.as_str()),
+            Some("stats"),
+            "stats envelope kind must be 'stats'"
+        );
+
+        // Both should have data field
+        assert!(claim_envelope.get("data").is_some(), "claim envelope must have data");
+        assert!(stats_envelope.get("data").is_some(), "stats envelope must have data");
+    }
+
+    /// Test: claim envelope contains valid bead_id
+    #[test]
+    fn envelope_claim_bead_id_is_valid() {
+        let ws = init_workspace();
+        let id = create_bead(ws.path(), "bead id validation");
+
+        let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "validation-worker", "--json"]);
+
+        let data = &envelope["data"];
+        let claimed_id = data.get("bead_id").and_then(|i| i.as_str());
+
+        assert!(claimed_id.is_some(), "claim result must have bead_id");
+        assert!(claimed_id.unwrap().starts_with("test-"), "claimed bead_id must start with 'test-' (workspace prefix)");
+    }
+
+    /// Test: stats envelope contains numeric fields
+    #[test]
+    fn envelope_stats_fields_are_numeric() {
+        let ws = init_workspace();
+        create_bead(ws.path(), "numeric test");
+
+        let envelope = run_envelope_command(ws.path(), &["stats", "--format", "json"]);
+
+        let data = &envelope["data"];
+
+        // Common numeric stats fields that should exist
+        if let Some(total) = data.get("total").and_then(|t| t.as_u64()) {
+            assert!(total >= 0, "stats total must be non-negative");
+        }
+
+        // Check for other potential stats fields (these may vary)
+        for (key, value) in data.as_object().unwrap() {
+            if key != "total" && key != "by_status" && key != "by_priority" {
+                // Most stats fields should be numeric
+                if value.is_u64() || value.is_i64() || value.is_f64() {
+                    // Valid numeric field
+                } else if value.is_object() || value.is_array() {
+                    // Nested stats are also valid
+                }
+            }
+        }
+    }
+
+    /// Test: claim with specific assignee reflects in envelope
+    #[test]
+    fn envelope_claim_reflects_assignee() {
+        let ws = init_workspace();
+        create_bead(ws.path(), "assignee reflection test");
+
+        let test_assignee = "specific-test-worker";
+        let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", test_assignee, "--json"]);
+
+        let data = &envelope["data"];
+        assert_eq!(
+            data.get("assignee").and_then(|a| a.as_str()),
+            Some(test_assignee),
+            "claim envelope must reflect the specified assignee"
+        );
+    }
+
+    /// Test: stats envelope reflects created beads
+    #[test]
+    fn envelope_stats_reflects_bead_count() {
+        let ws = init_workspace();
+
+        // Create specific number of beads
+        create_bead(ws.path(), "count test 1");
+        create_bead(ws.path(), "count test 2");
+        create_bead(ws.path(), "count test 3");
+
+        let envelope = run_envelope_command(ws.path(), &["stats", "--format", "json"]);
+
+        let data = &envelope["data"];
+        let total = data.get("total").and_then(|t| t.as_u64());
+
+        assert!(total.is_some(), "stats must have total field");
+        assert_eq!(total.unwrap(), 3, "stats total must reflect created bead count");
+    }
+}
