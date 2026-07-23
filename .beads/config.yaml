@@ -17,4 +17,7 @@ rotate:
 secret_protection:
   enabled: true
   custom_patterns: []
-  allowlist: []
+  allowlist:
+    - test_json_formatter_strips_dependencies_and_
+    - test_json_formatter_assignee_and_labels_norm
+    - stats_emits_single_object_with_optional_brea
