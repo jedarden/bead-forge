@@ -1,0 +1,27 @@
+[default]
+output-dir = ".tarpaulin"
+output = ["html"]
+
+# Exclude files from coverage analysis (using glob patterns)
+exclude-files = [
+    "beads/*",
+    "target/*",
+    "deploy/*",
+    "scripts/*",
+    "systemd/*",
+    "docs/*",
+    "examples/*",
+    "notes/*",
+]
+
+# Timeout for tests (in seconds)
+timeout = "60s"
+
+# Types of tests to run
+run-types = ["Tests"]
+
+# Verbose output for debugging
+verbose = false
+
+# Skip clean to preserve build artifacts
+skip-clean = false
