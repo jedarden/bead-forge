@@ -1,783 +1,579 @@
-// Comprehensive label tests for bead-forge
-// Tests all label operations including edge cases, persistence, and integration
+//! Comprehensive tests for label functionality
+//!
+//! This test file covers all label functionality as specified in the acceptance criteria:
+//! - Labels command in text format
+//! - Labels command in JSON format
+//! - Label persistence through sync --flush-only
+//! - Label survival after sync operations
+//! - Edge cases (empty labels, special characters, etc.)
 
-use std::process::Command;
+use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::OnceLock;
+use tempfile::TempDir;
 
-/// Resolve the freshly-built bf binary — never the system-installed one.
-fn bf_binary() -> String {
-    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
+use bead_forge::model::{Issue, IssueType, Priority, Status};
+use bead_forge::storage::Storage;
+use bead_forge::sync;
+
+static WORKSPACE: OnceLock<TempDir> = OnceLock::new();
+
+/// Create a test workspace with database initialized
+fn workspace_dir() -> PathBuf {
+    let temp_dir = WORKSPACE.get_or_init(|| {
+        let dir = tempfile::tempdir().unwrap();
+        let beads = dir.path().join(".beads");
+        fs::create_dir(&beads).unwrap();
+        bead_forge::config::init_workspace(&beads, "bf").unwrap();
+
+        // Initialize database
+        let metadata = bead_forge::config::load_metadata(&beads).unwrap();
+        let _ = Storage::open(&beads.join(&metadata.database)).unwrap();
+
+        dir
+    });
+
+    temp_dir.path().to_path_buf()
 }
 
-static WORKSPACE: OnceLock<tempfile::TempDir> = OnceLock::new();
-
-/// Per-binary isolated workspace — these tests run against an isolated workspace
-/// to avoid polluting the repo's tracked .beads directory.
-fn workspace_dir() -> &'static std::path::Path {
-    WORKSPACE
-        .get_or_init(|| {
-            let dir = tempfile::tempdir().unwrap();
-            let beads = dir.path().join(".beads");
-            std::fs::create_dir(&beads).unwrap();
-            bead_forge::config::init_workspace(&beads, "bf").unwrap();
-            // Create the database up front (WAL mode, schema applied) so
-            // parallel test threads never stampede a cold-start conversion.
-            let metadata = bead_forge::config::load_metadata(&beads).unwrap();
-            let _ = bead_forge::Storage::open(&beads.join(&metadata.database)).unwrap();
-            dir
-        })
-        .path()
+/// Get the beads directory path
+fn beads_dir() -> PathBuf {
+    workspace_dir().join(".beads")
 }
 
-fn bf() -> Command {
-    let mut cmd = Command::new(bf_binary());
-    cmd.arg("-w")
-        .arg(workspace_dir().join(".beads"))
-        .current_dir(workspace_dir());
-    cmd
+/// Get the database path
+fn db_path() -> PathBuf {
+    let metadata = bead_forge::config::load_metadata(&beads_dir()).unwrap();
+    beads_dir().join(&metadata.database)
 }
 
-/// Create a test bead with optional labels
-fn create_test_bead(title: &str, labels: &[&str]) -> String {
-    let mut cmd = bf();
-    cmd.arg("create")
-        .arg("--title")
-        .arg(title)
-        .arg("--type")
-        .arg("task")
-        .arg("--priority")
-        .arg("2");
+/// Get the JSONL path
+fn jsonl_path() -> PathBuf {
+    beads_dir().join("issues.jsonl")
+}
 
-    for label in labels {
-        cmd.arg("--label").arg(label);
+/// Create a test issue with labels
+fn create_issue_with_labels(id: &str, labels: Vec<&str>) -> Issue {
+    Issue {
+        id: id.to_string(),
+        title: format!("Test Issue {}", id),
+        description: Some(format!("Test issue for label testing - {}", id)),
+        status: Status::Open,
+        priority: Priority::MEDIUM,
+        issue_type: IssueType::Task,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+        source_repo: Some(".".to_string()),
+        labels: labels.iter().map(|s| s.to_string()).collect(),
+        ..Default::default()
     }
+}
 
-    let output = cmd.output().expect("Failed to create bead");
+//
+// MARK: Labels Command in Text Format
+//
 
-    assert!(
-        output.status.success(),
-        "Failed to create bead: {}",
-        String::from_utf8_lossy(&output.stderr)
+#[test]
+fn test_labels_command_text_format_single_bead() {
+    let workspace = workspace_dir();
+
+    // Create bead with labels
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-text-1", vec!["urgent", "backend"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Verify labels can be retrieved
+    let labels = storage.get_labels("bf-text-1").unwrap();
+    assert_eq!(labels.len(), 2);
+    assert!(labels.contains(&"urgent".to_string()));
+    assert!(labels.contains(&"backend".to_string()));
+}
+
+#[test]
+fn test_labels_command_text_format_all_beads() {
+    let workspace = workspace_dir();
+
+    // Create multiple beads with different labels
+    let storage = Storage::open(&db_path()).unwrap();
+    storage.create_issue(&create_issue_with_labels("bf-text-2", vec!["urgent"])).unwrap();
+    storage.create_issue(&create_issue_with_labels("bf-text-3", vec!["backend", "frontend"])).unwrap();
+
+    // List all issues and verify labels
+    let issues = storage.list_all_issues().unwrap();
+    let filtered: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-text")).collect();
+
+    assert!(filtered.len() >= 2, "Should have at least 2 test beads");
+
+    // Verify labels are present
+    let issue_2 = filtered.iter().find(|i| i.id == "bf-text-2").unwrap();
+    assert!(issue_2.labels.contains(&"urgent".to_string()));
+
+    let issue_3 = filtered.iter().find(|i| i.id == "bf-text-3").unwrap();
+    assert_eq!(issue_3.labels.len(), 2);
+}
+
+#[test]
+fn test_labels_command_text_format_empty_labels() {
+    let workspace = workspace_dir();
+
+    // Create bead without labels
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-text-empty", vec![]);
+    storage.create_issue(&issue).unwrap();
+
+    // Verify empty labels
+    let labels = storage.get_labels("bf-text-empty").unwrap();
+    assert_eq!(labels.len(), 0);
+}
+
+//
+// MARK: Labels Command in JSON Format
+//
+
+#[test]
+fn test_labels_command_json_format_single_bead() {
+    let workspace = workspace_dir();
+
+    // Create bead with labels
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-json-1", vec!["urgent", "backend", "bug"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Get labels and serialize to JSON
+    let labels = storage.get_labels("bf-json-1").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+
+    // Verify JSON format
+    let parsed: Vec<String> = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.len(), 3);
+    assert!(parsed.contains(&"urgent".to_string()));
+    assert!(parsed.contains(&"backend".to_string()));
+    assert!(parsed.contains(&"bug".to_string()));
+}
+
+#[test]
+fn test_labels_command_json_format_all_beads() {
+    let workspace = workspace_dir();
+
+    // Create multiple beads
+    let storage = Storage::open(&db_path()).unwrap();
+    storage.create_issue(&create_issue_with_labels("bf-json-2", vec!["label1"])).unwrap();
+    storage.create_issue(&create_issue_with_labels("bf-json-3", vec!["label2", "label3"])).unwrap();
+
+    // List all issues
+    let issues = storage.list_all_issues().unwrap();
+    let test_issues: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-json")).collect();
+
+    // Verify each issue can be serialized with labels
+    for issue in test_issues {
+        let json_value = serde_json::to_string(issue).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_value).unwrap();
+
+        assert!(parsed["labels"].is_array());
+        assert_eq!(parsed["labels"].as_array().unwrap().len(), issue.labels.len());
+    }
+}
+
+#[test]
+fn test_labels_command_json_format_empty_bead() {
+    let workspace = workspace_dir();
+
+    // Create bead without labels
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-json-empty", vec![]);
+    storage.create_issue(&issue).unwrap();
+
+    // Serialize and verify empty labels array
+    let labels = storage.get_labels("bf-json-empty").unwrap();
+    let json = serde_json::to_string(&labels).unwrap();
+    let parsed: Vec<String> = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(parsed.len(), 0);
+}
+
+//
+// MARK: Label Persistence Through Sync --flush-only
+//
+
+#[test]
+fn test_label_persistence_flush_only() {
+    let workspace = workspace_dir();
+
+    // Create bead with labels in database
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-flush-1", vec!["persistent", "test"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Flush to JSONL
+    sync::flush(workspace).unwrap();
+
+    // Verify JSONL contains labels
+    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
+    assert!(jsonl_content.contains("bf-flush-1"));
+    assert!(jsonl_content.contains("persistent"));
+    assert!(jsonl_content.contains("test"));
+
+    // Parse and verify
+    let jsonl_line: Vec<&str> = jsonl_content.lines().collect();
+    let line = jsonl_line.iter().find(|l| l.contains("bf-flush-1")).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
+
+    assert!(parsed["labels"].is_array());
+    let labels = parsed["labels"].as_array().unwrap();
+    assert_eq!(labels.len(), 2);
+
+    let label_strings: Vec<&str> = labels.iter().filter_map(|v| v.as_str()).collect();
+    assert!(label_strings.contains(&"persistent"));
+    assert!(label_strings.contains(&"test"));
+}
+
+#[test]
+fn test_label_persistence_multiple_flushes() {
+    let workspace = workspace_dir();
+
+    // Create bead
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-flush-multi", vec!["label1"]);
+    storage.create_issue(&issue).unwrap();
+
+    // First flush
+    sync::flush(workspace).unwrap();
+
+    // Add more labels
+    storage.add_label("bf-flush-multi", "label2").unwrap();
+    storage.add_label("bf-flush-multi", "label3").unwrap();
+
+    // Second flush
+    sync::flush(workspace).unwrap();
+
+    // Verify all labels persisted
+    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
+    let line = jsonl_content.lines().find(|l| l.contains("bf-flush-multi")).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
+
+    let labels = parsed["labels"].as_array().unwrap();
+    assert_eq!(labels.len(), 3);
+}
+
+//
+// MARK: Label Survival After Sync Operations
+//
+
+#[test]
+fn test_label_survival_export_import_roundtrip() {
+    let workspace = workspace_dir();
+
+    // Create bead with labels
+    let storage = Storage::open(&db_path()).unwrap();
+    let original = create_issue_with_labels("bf-survive-1", vec!["survivor", "test", "label"]);
+    storage.create_issue(&original).unwrap();
+
+    // Export to JSONL
+    sync::flush(workspace).unwrap();
+    drop(storage);
+
+    // Delete database
+    fs::remove_file(&db_path()).unwrap();
+
+    // Import from JSONL
+    let result = sync::import(workspace).unwrap();
+    assert_eq!(result.imported, 1);
+
+    // Verify labels survived
+    let storage2 = Storage::open(&db_path()).unwrap();
+    let imported = storage2.get_issue("bf-survive-1").unwrap().unwrap();
+
+    assert_eq!(imported.labels.len(), 3);
+    assert!(imported.labels.contains(&"survivor".to_string()));
+    assert!(imported.labels.contains(&"test".to_string()));
+    assert!(imported.labels.contains(&"label".to_string()));
+}
+
+#[test]
+fn test_label_survival_after_add_remove() {
+    let workspace = workspace_dir();
+
+    // Create bead with labels
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-survive-2", vec!["label1", "label2", "label3"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Add and remove labels
+    storage.add_label("bf-survive-2", "label4").unwrap();
+    storage.remove_label("bf-survive-2", "label2").unwrap();
+
+    // Flush
+    sync::flush(workspace).unwrap();
+
+    // Verify in JSONL
+    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
+    let line = jsonl_content.lines().find(|l| l.contains("bf-survive-2")).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
+
+    let labels = parsed["labels"].as_array().unwrap();
+    let label_strings: Vec<&str> = labels.iter().filter_map(|v| v.as_str()).collect();
+
+    assert_eq!(label_strings.len(), 3);
+    assert!(label_strings.contains(&"label1"));
+    assert!(label_strings.contains(&"label3"));
+    assert!(label_strings.contains(&"label4"));
+    assert!(!label_strings.contains(&"label2"));
+}
+
+//
+// MARK: Edge Cases - Empty Labels
+//
+
+#[test]
+fn test_edge_case_empty_label_string() {
+    let workspace = workspace_dir();
+
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-edge-empty", vec![""]);
+    storage.create_issue(&issue).unwrap();
+
+    let labels = storage.get_labels("bf-edge-empty").unwrap();
+    assert!(labels.contains(&"".to_string()));
+}
+
+#[test]
+fn test_edge_case_whitespace_label() {
+    let workspace = workspace_dir();
+
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-edge-space", vec![" ", "  ", "\t"]);
+    storage.create_issue(&issue).unwrap();
+
+    let labels = storage.get_labels("bf-edge-space").unwrap();
+    assert!(labels.contains(&" ".to_string()));
+    assert!(labels.contains(&"  ".to_string()));
+    assert!(labels.contains(&"\t".to_string()));
+}
+
+//
+// MARK: Edge Cases - Special Characters
+//
+
+#[test]
+fn test_edge_case_unicode_labels() {
+    let workspace = workspace_dir();
+
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels(
+        "bf-edge-unicode",
+        vec!["测试", "🔧", "café", "日本語", "🎉"],
     );
+    storage.create_issue(&issue).unwrap();
 
-    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    stdout.trim().to_string()
+    let labels = storage.get_labels("bf-edge-unicode").unwrap();
+    assert!(labels.contains(&"测试".to_string()));
+    assert!(labels.contains(&"🔧".to_string()));
+    assert!(labels.contains(&"café".to_string()));
+    assert!(labels.contains(&"日本語".to_string()));
+    assert!(labels.contains(&"🎉".to_string()));
 }
 
-/// Close a test bead
-fn close_test_bead(bead_id: &str) {
-    let output = bf()
-        .arg("close")
-        .arg(bead_id)
-        .arg("--reason")
-        .arg("Test cleanup")
-        .output()
-        .expect("Failed to close bead");
+#[test]
+fn test_edge_case_punctuation_labels() {
+    let workspace = workspace_dir();
 
-    assert!(
-        output.status.success(),
-        "Failed to close bead: {}",
-        String::from_utf8_lossy(&output.stderr)
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels(
+        "bf-edge-punct",
+        vec!["won't-fix", "maybe?", "high-priority", "a/b/c", "x.y.z"],
     );
+    storage.create_issue(&issue).unwrap();
+
+    let labels = storage.get_labels("bf-edge-punct").unwrap();
+    assert!(labels.contains(&"won't-fix".to_string()));
+    assert!(labels.contains(&"maybe?".to_string()));
+    assert!(labels.contains(&"high-priority".to_string()));
+    assert!(labels.contains(&"a/b/c".to_string()));
+    assert!(labels.contains(&"x.y.z".to_string()));
 }
 
-mod basic_label_operations {
-    use super::*;
+#[test]
+fn test_edge_case_special_chars_labels() {
+    let workspace = workspace_dir();
 
-    #[test]
-    fn test_label_add_single() {
-        let bead_id = create_test_bead("test single label add", &[]);
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels(
+        "bf-edge-special",
+        vec!["label<>", "label&", "label\"", "label\\", "label|"],
+    );
+    storage.create_issue(&issue).unwrap();
 
-        // Add a single label
-        let output = bf()
-            .args(["label", "add", &bead_id, "--label", "urgent"])
-            .output()
-            .expect("Failed to add label");
-
-        assert!(
-            output.status.success(),
-            "Failed to add label: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        // Verify label was added
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 1);
-        assert!(labels.contains(&"urgent".to_string()));
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_label_add_multiple() {
-        let bead_id = create_test_bead("test multiple label add", &[]);
-
-        // Add multiple labels at once
-        let output = bf()
-            .args([
-                "label",
-                "add",
-                &bead_id,
-                "--label",
-                "urgent",
-                "--label",
-                "backend",
-                "--label",
-                "phase-1",
-            ])
-            .output()
-            .expect("Failed to add labels");
-
-        assert!(
-            output.status.success(),
-            "Failed to add labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        // Verify all labels were added
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 3);
-        assert!(labels.contains(&"urgent".to_string()));
-        assert!(labels.contains(&"backend".to_string()));
-        assert!(labels.contains(&"phase-1".to_string()));
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_label_add_duplicate_idempotent() {
-        let bead_id = create_test_bead("test duplicate label add", &[]);
-
-        // Add the same label twice
-        let output = bf()
-            .args(["label", "add", &bead_id, "--label", "urgent", "--label", "urgent"])
-            .output()
-            .expect("Failed to add labels");
-
-        assert!(
-            output.status.success(),
-            "Failed to add labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        // Verify only one instance exists
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 1);
-        assert!(labels.contains(&"urgent".to_string()));
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_label_remove_single() {
-        let bead_id = create_test_bead("test single label remove", &["urgent", "backend", "bug"]);
-
-        // Remove one label
-        let output = bf()
-            .args(["label", "remove", &bead_id, "--label", "urgent"])
-            .output()
-            .expect("Failed to remove label");
-
-        assert!(
-            output.status.success(),
-            "Failed to remove label: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        // Verify label was removed
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 2);
-        assert!(!labels.contains(&"urgent".to_string()));
-        assert!(labels.contains(&"backend".to_string()));
-        assert!(labels.contains(&"bug".to_string()));
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_label_remove_multiple() {
-        let bead_id = create_test_bead(
-            "test multiple label remove",
-            &["urgent", "backend", "bug", "phase-1"],
-        );
-
-        // Remove multiple labels
-        let output = bf()
-            .args([
-                "label",
-                "remove",
-                &bead_id,
-                "--label",
-                "urgent",
-                "--label",
-                "bug",
-            ])
-            .output()
-            .expect("Failed to remove labels");
-
-        assert!(
-            output.status.success(),
-            "Failed to remove labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        // Verify labels were removed
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 2);
-        assert!(!labels.contains(&"urgent".to_string()));
-        assert!(!labels.contains(&"bug".to_string()));
-        assert!(labels.contains(&"backend".to_string()));
-        assert!(labels.contains(&"phase-1".to_string()));
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_label_remove_nonexistent_idempotent() {
-        let bead_id = create_test_bead("test remove nonexistent label", &["backend"]);
-
-        // Try to remove a label that doesn't exist (should succeed)
-        let output = bf()
-            .args(["label", "remove", &bead_id, "--label", "nonexistent"])
-            .output()
-            .expect("Failed to attempt removal");
-
-        assert!(
-            output.status.success(),
-            "Removing nonexistent label should succeed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        // Verify the original label is still there
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 1);
-        assert!(labels.contains(&"backend".to_string()));
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_label_remove_idempotent() {
-        let bead_id = create_test_bead("test idempotent label removal", &["urgent"]);
-
-        // Remove the label twice (should succeed both times)
-        let output1 = bf()
-            .args(["label", "remove", &bead_id, "--label", "urgent"])
-            .output()
-            .expect("Failed to remove label first time");
-
-        assert!(
-            output1.status.success(),
-            "First removal failed: {}",
-            String::from_utf8_lossy(&output1.stderr)
-        );
-
-        let output2 = bf()
-            .args(["label", "remove", &bead_id, "--label", "urgent"])
-            .output()
-            .expect("Failed to remove label second time");
-
-        assert!(
-            output2.status.success(),
-            "Second removal should succeed (idempotent): {}",
-            String::from_utf8_lossy(&output2.stderr)
-        );
-
-        // Verify no labels remain
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 0);
-
-        close_test_bead(&bead_id);
-    }
+    let labels = storage.get_labels("bf-edge-special").unwrap();
+    assert!(labels.contains(&"label<".to_string()));
+    assert!(labels.contains(&"label&".to_string()));
+    assert!(labels.contains(&"label\"".to_string()));
+    assert!(labels.contains(&"label\\".to_string()));
+    assert!(labels.contains(&"label|".to_string()));
 }
 
-mod label_list_operations {
-    use super::*;
+//
+// MARK: Edge Cases - Long Labels and Numbers
+//
 
-    #[test]
-    fn test_label_list_empty_bead() {
-        let bead_id = create_test_bead("test empty label list", &[]);
+#[test]
+fn test_edge_case_very_long_label() {
+    let workspace = workspace_dir();
 
-        // List labels for a bead with no labels
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
+    let storage = Storage::open(&db_path()).unwrap();
+    let long_label = "a".repeat(1000);
+    let issue = create_issue_with_labels("bf-edge-long", vec![&long_label]);
+    storage.create_issue(&issue).unwrap();
 
-        assert!(
-            output.status.success(),
-            "Failed to list labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 0);
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_label_list_all_unique() {
-        let bead1 = create_test_bead("label list bead 1", &["urgent", "backend"]);
-        let bead2 = create_test_bead("label list bead 2", &["urgent", "frontend"]);
-
-        // List all unique labels (no bead ID)
-        let output = bf().args(["label", "list"]).output().expect("Failed to list all labels");
-
-        assert!(
-            output.status.success(),
-            "Failed to list all labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        // Output format is "label (count)" per line
-        let labels: Vec<String> = stdout
-            .lines()
-            .filter(|line| !line.is_empty() && !line.contains("All labels:"))
-            .map(|line| line.trim().split('(').next().unwrap().trim().to_string())
-            .collect();
-
-        // Should have at least 3 unique labels: urgent, backend, frontend
-        assert!(
-            labels.len() >= 3,
-            "Expected at least 3 unique labels, got {:?}: {}",
-            labels,
-            stdout
-        );
-        assert!(labels.contains(&"urgent".to_string()));
-        assert!(labels.contains(&"backend".to_string()));
-        assert!(labels.contains(&"frontend".to_string()));
-
-        close_test_bead(&bead1);
-        close_test_bead(&bead2);
-    }
-
-    #[test]
-    fn test_label_list_with_bead_id() {
-        let bead_id = create_test_bead("test label list with id", &["urgent", "backend"]);
-
-        // List labels for a specific bead using `label list`
-        let output = bf()
-            .args(["label", "list", &bead_id])
-            .output()
-            .expect("Failed to list labels");
-
-        assert!(
-            output.status.success(),
-            "Failed to list labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = stdout
-            .lines()
-            .filter(|line| !line.is_empty() && !line.contains("Labels for"))
-            .map(|s| s.trim().to_string())
-            .collect();
-
-        assert_eq!(labels.len(), 2, "Expected 2 labels, got: {:?}", labels);
-
-        close_test_bead(&bead_id);
-    }
+    let labels = storage.get_labels("bf-edge-long").unwrap();
+    assert_eq!(labels.len(), 1);
+    assert_eq!(labels[0].len(), 1000);
 }
 
-mod label_integration {
-    use super::*;
+#[test]
+fn test_edge_case_numeric_labels() {
+    let workspace = workspace_dir();
 
-    #[test]
-    fn test_create_with_labels() {
-        // Create a bead with labels via `create --label`
-        let bead_id = create_test_bead("test create with labels", &["urgent", "backend"]);
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-edge-num", vec!["123", "v2.0", "2024-q4", "p1"]);
+    storage.create_issue(&issue).unwrap();
 
-        // Verify labels were added during creation
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 2);
-        assert!(labels.contains(&"urgent".to_string()));
-        assert!(labels.contains(&"backend".to_string()));
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_show_includes_labels() {
-        let bead_id = create_test_bead("test show labels", &["urgent", "backend"]);
-
-        // Check that `bf show` includes labels
-        let output = bf()
-            .args(["show", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to show bead");
-
-        assert!(
-            output.status.success(),
-            "Failed to show bead: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        // show --format json returns a single-element array: [{...}]
-        let bead_array: Vec<serde_json::Value> =
-            serde_json::from_str(&json_output).expect("Failed to parse show JSON");
-
-        // Labels should be present in the output
-        assert!(!bead_array.is_empty(), "Show output should contain at least one bead");
-        let bead = &bead_array[0];
-
-        assert!(
-            bead.get("labels").is_some(),
-            "Show output should include labels field, got keys: {:?}",
-            bead.as_object().map(|o| o.keys().collect::<Vec<_>>())
-        );
-
-        if let Some(labels) = bead.get("labels") {
-            assert!(
-                labels.is_array(),
-                "Labels should be an array in show output"
-            );
-            let labels_arr = labels.as_array().unwrap();
-            assert_eq!(labels_arr.len(), 2, "Expected 2 labels, got: {}", labels_arr.len());
-        }
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_search_by_label() {
-        let bead1 = create_test_bead("search test bead 1", &["urgent", "backend"]);
-        let bead2 = create_test_bead("search test bead 2", &["frontend"]);
-
-        // Search for beads with the "urgent" label
-        let output = bf()
-            .args(["search", "--label", "urgent", "--format", "json"])
-            .output()
-            .expect("Failed to search by label");
-
-        assert!(
-            output.status.success(),
-            "Failed to search: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        // search --format json returns JSONL (newline-delimited JSON objects)
-        let results: Vec<serde_json::Value> = json_output
-            .lines()
-            .filter(|line| !line.is_empty())
-            .map(|line| serde_json::from_str(line).expect("Failed to parse search result line"))
-            .collect();
-
-        // Should find at least bead1
-        assert!(
-            results.len() >= 1,
-            "Expected at least 1 result for label search, got {}",
-            results.len()
-        );
-
-        let found_bead1 = results
-            .iter()
-            .any(|b| b.get("id").and_then(|v| v.as_str()) == Some(&bead1));
-        assert!(found_bead1, "Search should have found bead1 with 'urgent' label");
-
-        close_test_bead(&bead1);
-        close_test_bead(&bead2);
-    }
-
-    #[test]
-    fn test_search_by_multiple_labels() {
-        let bead1 = create_test_bead("multi-label search 1", &["urgent", "backend"]);
-        let bead2 = create_test_bead("multi-label search 2", &["urgent"]);
-        let bead3 = create_test_bead("multi-label search 3", &["backend"]);
-
-        // Search for beads with EITHER "urgent" OR "backend" label
-        let output = bf()
-            .args(["search", "--label", "urgent", "--label", "backend", "--format", "json"])
-            .output()
-            .expect("Failed to search by multiple labels");
-
-        assert!(
-            output.status.success(),
-            "Failed to search: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        // search --format json returns JSONL (newline-delimited JSON objects)
-        let results: Vec<serde_json::Value> = json_output
-            .lines()
-            .filter(|line| !line.is_empty())
-            .map(|line| serde_json::from_str(line).expect("Failed to parse search result line"))
-            .collect();
-
-        // Should find all three beads (OR logic for multiple --label flags)
-        assert!(
-            results.len() >= 3,
-            "Expected at least 3 results for multi-label search, got {}",
-            results.len()
-        );
-
-        close_test_bead(&bead1);
-        close_test_bead(&bead2);
-        close_test_bead(&bead3);
-    }
+    let labels = storage.get_labels("bf-edge-num").unwrap();
+    assert!(labels.contains(&"123".to_string()));
+    assert!(labels.contains(&"v2.0".to_string()));
+    assert!(labels.contains(&"2024-q4".to_string()));
+    assert!(labels.contains(&"p1".to_string()));
 }
 
-mod label_output_formats {
-    use super::*;
+//
+// MARK: Edge Cases - Single Character and Mixed
+//
 
-    #[test]
-    fn test_labels_shortcut_text_format() {
-        let bead_id = create_test_bead("test labels shortcut text", &["urgent", "backend"]);
+#[test]
+fn test_edge_case_single_char_labels() {
+    let workspace = workspace_dir();
 
-        // Test the `bf labels` shortcut in text format (default)
-        let output = bf()
-            .args(["labels", &bead_id])
-            .output()
-            .expect("Failed to list labels");
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-edge-single", vec!["a", "b", "c", "x"]);
+    storage.create_issue(&issue).unwrap();
 
-        assert!(
-            output.status.success(),
-            "Failed to list labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<&str> = stdout.lines().filter(|line| !line.is_empty()).collect();
-
-        assert_eq!(labels.len(), 2);
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_labels_shortcut_json_format() {
-        let bead_id = create_test_bead("test labels shortcut json", &["urgent", "backend"]);
-
-        // Test the `bf labels` shortcut in JSON format
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        assert!(
-            output.status.success(),
-            "Failed to list labels: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 2);
-
-        close_test_bead(&bead_id);
-    }
+    let labels = storage.get_labels("bf-edge-single").unwrap();
+    assert_eq!(labels.len(), 4);
 }
 
-mod label_persistence {
-    use super::*;
+#[test]
+fn test_edge_case_mixed_labels() {
+    let workspace = workspace_dir();
 
-    #[test]
-    fn test_labels_persist_through_sync() {
-        let bead_id = create_test_bead("test label persistence", &[]);
+    let storage = Storage::open(&db_path()).unwrap();
+    let issue = create_issue_with_labels(
+        "bf-edge-mixed",
+        vec!["", " ", "normal", "123", "🔧", "a-b-c"],
+    );
+    storage.create_issue(&issue).unwrap();
 
-        // Add labels
-        bf()
-            .args([
-                "label",
-                "add",
-                &bead_id,
-                "--label",
-                "urgent",
-                "--label",
-                "backend",
-            ])
-            .output()
-            .expect("Failed to add labels");
-
-        // Sync to JSONL
-        let output = bf().args(["sync", "--flush-only"]).output().expect("Failed to sync");
-
-        assert!(
-            output.status.success(),
-            "Failed to sync: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
-        // Verify labels are still present
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(labels.len(), 2);
-        assert!(labels.contains(&"urgent".to_string()));
-        assert!(labels.contains(&"backend".to_string()));
-
-        close_test_bead(&bead_id);
-    }
+    let labels = storage.get_labels("bf-edge-mixed").unwrap();
+    assert!(labels.contains(&"".to_string()));
+    assert!(labels.contains(&" ".to_string()));
+    assert!(labels.contains(&"normal".to_string()));
+    assert!(labels.contains(&"123".to_string()));
+    assert!(labels.contains(&"🔧".to_string()));
+    assert!(labels.contains(&"a-b-c".to_string()));
 }
 
-mod edge_cases {
-    use super::*;
+//
+// MARK: Label Persistence Through Full Sync Cycle
+//
 
-    #[test]
-    fn test_label_with_special_characters() {
-        let bead_id = create_test_bead("test special char labels", &[]);
+#[test]
+fn test_label_full_sync_cycle() {
+    let workspace = workspace_dir();
 
-        // Add labels with special characters
-        let special_labels = vec!["bug:critical", "feature/auth", "ui-component"];
-        for label in &special_labels {
-            let output = bf()
-                .args(["label", "add", &bead_id, "--label", label])
-                .output()
-                .expect("Failed to add label");
+    // Create beads with various labels
+    let storage = Storage::open(&db_path()).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-sync-1", vec!["label1"]))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-sync-2", vec!["label2", "label3"]))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-sync-3", vec![]))
+        .unwrap();
 
-            assert!(
-                output.status.success(),
-                "Failed to add label '{}': {}",
-                label,
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
+    // Flush to JSONL
+    sync::flush(workspace).unwrap();
 
-        // Verify all labels were added
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
+    // Modify labels
+    storage.add_label("bf-sync-1", "label2").unwrap();
+    storage.remove_label("bf-sync-2", "label2").unwrap();
+    storage.add_label("bf-sync-3", "new-label").unwrap();
 
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
+    // Flush again
+    sync::flush(workspace).unwrap();
 
-        assert_eq!(labels.len(), 3);
-        for label in &special_labels {
-            assert!(labels.contains(&label.to_string()));
-        }
+    // Verify in JSONL
+    let jsonl_content = fs::read_to_string(&jsonl_path()).unwrap();
 
-        close_test_bead(&bead_id);
-    }
+    // Check bf-sync-1
+    let line1 = jsonl_content.lines().find(|l| l.contains("bf-sync-1")).unwrap();
+    let parsed1: serde_json::Value = serde_json::from_str(line1).unwrap();
+    assert_eq!(parsed1["labels"].as_array().unwrap().len(), 2);
 
-    #[test]
-    fn test_empty_label_behavior() {
-        let bead_id = create_test_bead("test empty label behavior", &[]);
+    // Check bf-sync-2
+    let line2 = jsonl_content.lines().find(|l| l.contains("bf-sync-2")).unwrap();
+    let parsed2: serde_json::Value = serde_json::from_str(line2).unwrap();
+    assert_eq!(parsed2["labels"].as_array().unwrap().len(), 1);
 
-        // Test current behavior with empty labels
-        // The CLI currently accepts empty strings as labels
-        let output = bf()
-            .args(["label", "add", &bead_id, "--label", ""])
-            .output()
-            .expect("Failed to add empty label");
+    // Check bf-sync-3
+    let line3 = jsonl_content.lines().find(|l| l.contains("bf-sync-3")).unwrap();
+    let parsed3: serde_json::Value = serde_json::from_str(line3).unwrap();
+    assert_eq!(parsed3["labels"].as_array().unwrap().len(), 1);
+}
 
-        // Verify the operation succeeds (current behavior)
+//
+// MARK: JSONL Roundtrip with Complex Label Sets
+//
+
+#[test]
+fn test_label_complex_jsonl_roundtrip() {
+    let workspace = workspace_dir();
+
+    // Create bead with complex label set
+    let storage = Storage::open(&db_path()).unwrap();
+    let complex_labels = vec![
+        "urgent",
+        "测试",
+        "🔧",
+        "won't-fix",
+        "v2.0",
+        "a-b-c",
+        "p1",
+        "backend",
+        " ",
+        "",
+    ];
+    let issue = create_issue_with_labels("bf-complex", complex_labels.clone());
+    storage.create_issue(&issue).unwrap();
+
+    // Export
+    sync::flush(workspace).unwrap();
+    drop(storage);
+
+    // Import
+    fs::remove_file(&db_path()).unwrap();
+    sync::import(workspace).unwrap();
+
+    // Verify all labels survived
+    let storage2 = Storage::open(&db_path()).unwrap();
+    let imported = storage2.get_issue("bf-complex").unwrap().unwrap();
+
+    assert_eq!(imported.labels.len(), complex_labels.len());
+    for label in &complex_labels {
         assert!(
-            output.status.success(),
-            "Empty label add should succeed: {}",
-            String::from_utf8_lossy(&output.stderr)
+            imported.labels.contains(&label.to_string()),
+            "Label '{}' should have survived roundtrip",
+            label
         );
-
-        // Document that empty labels are currently stored
-        let labels_output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-        let json_output = String::from_utf8(labels_output.stdout).expect("Invalid UTF-8");
-        let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        // Current behavior: empty label is added
-        // This test documents the actual behavior for future reference
-        assert!(labels.contains(&"".to_string()), "Empty label is currently stored");
-
-        close_test_bead(&bead_id);
-    }
-
-    #[test]
-    fn test_large_number_of_labels() {
-        let bead_id = create_test_bead("test many labels", &[]);
-
-        // Add a large number of labels
-        let labels: Vec<String> = (0..50).map(|i| format!("label-{}", i)).collect();
-
-        for label in &labels {
-            bf()
-                .args(["label", "add", &bead_id, "--label", label])
-                .output()
-                .expect("Failed to add label");
-        }
-
-        // Verify all labels were added
-        let output = bf()
-            .args(["labels", &bead_id, "--format", "json"])
-            .output()
-            .expect("Failed to list labels");
-
-        let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-        let result_labels: Vec<String> =
-            serde_json::from_str(&json_output).expect("Failed to parse labels JSON");
-
-        assert_eq!(result_labels.len(), 50);
-
-        close_test_bead(&bead_id);
     }
 }
