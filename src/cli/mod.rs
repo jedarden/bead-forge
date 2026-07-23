@@ -1053,9 +1053,11 @@ pub fn run(cli: Cli) -> Result<()> {
     let no_auto_flush = cli.no_auto_flush;
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
 
-    // Enable envelope wrapping for this process (enabled by default for all JSON outputs).
+    // Enable envelope wrapping for this process if --envelope flag is set.
     // This is a process-wide setting that affects all JSON formatting.
-    crate::format::json::JsonFormatter::with_envelope_enabled();
+    if cli.envelope {
+        crate::format::json::JsonFormatter::with_envelope_enabled();
+    }
 
     // Handle case where no subcommand is provided
     let command = match cli.command {

@@ -1,8 +1,10 @@
+pub mod envelope;
 pub mod json;
 pub mod text;
 pub mod toon;
 pub mod warning;
 
+pub use envelope::{JsonEnvelope, VERSION as ENVELOPE_VERSION};
 pub use json::JsonFormatter;
 pub use text::TextFormatter;
 pub use toon::ToonFormatter;
@@ -120,6 +122,9 @@ pub trait Formatter {
     /// Render velocity statistics — a JSON array for JSON, a table for text,
     /// a per-stat block for toon (mirrors how `format_stats` renders `StatsOutput`).
     fn format_velocity(&self, stats: &[VelocityStats]) -> String;
+    /// Format data with envelope wrapping (JSON formatters only).
+    /// Text and Toon formatters return the data as-is.
+    fn format_with_envelope(&self, kind: &str, data: &str) -> String;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
