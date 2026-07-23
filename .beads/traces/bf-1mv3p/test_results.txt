@@ -1,0 +1,2839 @@
+
+running 272 tests
+....................................................................................... 87/272
+....................................................................................... 174/272
+....................................................................................... 261/272
+...........
+test result: ok. 272 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.07s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
+
+
+running 3 tests
+create_json_succeeds_warns_retains_dirty_and_recovers --- FAILED
+..
+failures:
+
+---- create_json_succeeds_warns_retains_dirty_and_recovers stdout ----
+
+thread 'create_json_succeeds_warns_retains_dirty_and_recovers' (3995335) panicked at tests/autoflush_failure_contract.rs:122:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    create_json_succeeds_warns_retains_dirty_and_recovers
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+
+running 12 tests
+..... 5/12
+flush_failure_nonfatal_json_warning_and_dirty_retained --- FAILED
+......
+failures:
+
+---- flush_failure_nonfatal_json_warning_and_dirty_retained stdout ----
+
+thread 'flush_failure_nonfatal_json_warning_and_dirty_retained' (3995376) panicked at tests/autoflush_mutation.rs:271:10:
+create --json missing id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_nonfatal_json_warning_and_dirty_retained
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.28s
+
+
+running 11 tests
+..... 5/11
+flush_failure_does_not_fail_mutation_and_warns_json --- FAILED
+.....
+failures:
+
+---- flush_failure_does_not_fail_mutation_and_warns_json stdout ----
+
+thread 'flush_failure_does_not_fail_mutation_and_warns_json' (3995549) panicked at tests/autoflush_wiring.rs:266:51:
+id present
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_does_not_fail_mutation_and_warns_json
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+
+running 33 tests
+.................................
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 41 tests
+claim_stats::envelope_claim_bead_id_is_valid --- FAILED
+claim_stats::envelope_claim_and_stats_consistent_structure --- FAILED
+claim_stats::envelope_claim_json_has_metadata_fields --- FAILED
+claim_stats::envelope_claim_json_returns_claim_result --- FAILED
+claim_stats::envelope_claim_no_beads_returns_empty_object --- FAILED
+. 6/41
+claim_stats::envelope_claim_reflects_assignee --- FAILED
+... 10/41
+envelope_batch_command_has_stable_structure --- FAILED
+. 12/41
+envelope_batch_empty_emits_empty_array --- FAILED
+envelope_claim_no_bead_emits_empty_object --- FAILED
+envelope_claim_command_has_stable_structure --- FAILED
+.. 17/41
+envelope_data_field_always_present --- FAILED
+envelope_kind_matches_command --- FAILED
+.... 23/41
+envelope_ready_command_has_stable_structure --- FAILED
+envelope_recent_empty_emits_empty_array --- FAILED
+envelope_recent_command_has_stable_structure --- FAILED
+envelope_search_empty_emits_empty_array --- FAILED
+envelope_search_command_has_stable_structure --- FAILED
+.. 30/41
+envelope_velocity_command_has_stable_structure --- FAILED
+. 32/41
+envelope_velocity_empty_emits_empty_array --- FAILED
+envelope_version_is_always_one --- FAILED
+.......
+failures:
+
+---- claim_stats::envelope_claim_bead_id_is_valid stdout ----
+
+thread 'claim_stats::envelope_claim_bead_id_is_valid' (3996751) panicked at tests/envelope_coverage.rs:1055:9:
+claim result must have bead_id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- claim_stats::envelope_claim_and_stats_consistent_structure stdout ----
+
+thread 'claim_stats::envelope_claim_and_stats_consistent_structure' (3996750) panicked at tests/envelope_coverage.rs:1016:9:
+assertion `left == right` failed: claim envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_json_has_metadata_fields stdout ----
+
+thread 'claim_stats::envelope_claim_json_has_metadata_fields' (3996779) panicked at tests/envelope_coverage.rs:887:9:
+claim envelope must have 'version' field
+
+---- claim_stats::envelope_claim_json_returns_claim_result stdout ----
+
+thread 'claim_stats::envelope_claim_json_returns_claim_result' (3996782) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_no_beads_returns_empty_object stdout ----
+
+thread 'claim_stats::envelope_claim_no_beads_returns_empty_object' (3996807) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_reflects_assignee stdout ----
+
+thread 'claim_stats::envelope_claim_reflects_assignee' (3996810) panicked at tests/envelope_coverage.rs:1097:9:
+assertion `left == right` failed: claim envelope must reflect the specified assignee
+  left: None
+ right: Some("specific-test-worker")
+
+---- envelope_batch_command_has_stable_structure stdout ----
+
+thread 'envelope_batch_command_has_stable_structure' (3996895) panicked at tests/envelope_coverage.rs:421:5:
+batch data must be an array
+
+---- envelope_batch_empty_emits_empty_array stdout ----
+
+thread 'envelope_batch_empty_emits_empty_array' (3996918) panicked at tests/envelope_coverage.rs:459:5:
+batch data must be an array
+
+---- envelope_claim_no_bead_emits_empty_object stdout ----
+
+thread 'envelope_claim_no_bead_emits_empty_object' (3996944) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_claim_command_has_stable_structure stdout ----
+
+thread 'envelope_claim_command_has_stable_structure' (3996922) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_data_field_always_present stdout ----
+
+thread 'envelope_data_field_always_present' (3996975) panicked at tests/envelope_coverage.rs:568:17:
+Data field must be present for command: ["velocity", "--format", "json"]
+
+---- envelope_kind_matches_command stdout ----
+
+thread 'envelope_kind_matches_command' (3996978) panicked at tests/envelope_coverage.rs:530:17:
+assertion `left == right` failed: Kind mismatch for command ["velocity", "--format", "json"], expected 'velocity'
+  left: None
+ right: Some("velocity")
+
+---- envelope_ready_command_has_stable_structure stdout ----
+
+thread 'envelope_ready_command_has_stable_structure' (3997063) panicked at tests/envelope_coverage.rs:206:5:
+ready data must be an array
+
+---- envelope_recent_empty_emits_empty_array stdout ----
+
+thread 'envelope_recent_empty_emits_empty_array' (3997093) panicked at tests/envelope_coverage.rs:375:5:
+recent data must be an array
+
+---- envelope_recent_command_has_stable_structure stdout ----
+
+thread 'envelope_recent_command_has_stable_structure' (3997079) panicked at tests/envelope_coverage.rs:362:5:
+recent data must be an array
+
+---- envelope_search_empty_emits_empty_array stdout ----
+
+thread 'envelope_search_empty_emits_empty_array' (3997109) panicked at tests/envelope_coverage.rs:69:29:
+Invalid JSON output from ["--envelope", "search", "nonexistent", "--format", "json"]: EOF while parsing a value at line 1 column 0
+Output: 
+stderr: 
+
+---- envelope_search_command_has_stable_structure stdout ----
+
+thread 'envelope_search_command_has_stable_structure' (3997106) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_velocity_command_has_stable_structure stdout ----
+
+thread 'envelope_velocity_command_has_stable_structure' (3997157) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_velocity_empty_emits_empty_array stdout ----
+
+thread 'envelope_velocity_empty_emits_empty_array' (3997169) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_version_is_always_one stdout ----
+
+thread 'envelope_version_is_always_one' (3997172) panicked at tests/envelope_coverage.rs:493:17:
+assertion `left == right` failed: Version must be 1 for command: ["velocity", "--format", "json"]
+  left: None
+ right: Some(1)
+
+
+failures:
+    claim_stats::envelope_claim_and_stats_consistent_structure
+    claim_stats::envelope_claim_bead_id_is_valid
+    claim_stats::envelope_claim_json_has_metadata_fields
+    claim_stats::envelope_claim_json_returns_claim_result
+    claim_stats::envelope_claim_no_beads_returns_empty_object
+    claim_stats::envelope_claim_reflects_assignee
+    envelope_batch_command_has_stable_structure
+    envelope_batch_empty_emits_empty_array
+    envelope_claim_command_has_stable_structure
+    envelope_claim_no_bead_emits_empty_object
+    envelope_data_field_always_present
+    envelope_kind_matches_command
+    envelope_ready_command_has_stable_structure
+    envelope_recent_command_has_stable_structure
+    envelope_recent_empty_emits_empty_array
+    envelope_search_command_has_stable_structure
+    envelope_search_empty_emits_empty_array
+    envelope_velocity_command_has_stable_structure
+    envelope_velocity_empty_emits_empty_array
+    envelope_version_is_always_one
+
+test result: FAILED. 21 passed; 20 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+
+running 26 tests
+..........................
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 65 tests
+envelope::claim_stats::claim_envelope_empty_workspace --- FAILED
+envelope::claim_stats::claim_envelope_data_fields --- FAILED
+envelope::claim_stats::claim_envelope_has_stable_structure --- FAILED
+envelope::claim_stats::claim_envelope_kind_matches_command --- FAILED
+envelope::claim_stats::claim_envelope_metadata_fields --- FAILED
+envelope::claim_stats::claim_envelope_structure_consistency --- FAILED
+envelope::claim_stats::claim_envelope_successful_case --- FAILED
+envelope::claim_stats::claim_envelope_version_always_one --- FAILED
+.........................................................
+failures:
+
+---- envelope::claim_stats::claim_envelope_empty_workspace stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_empty_workspace' (3997249) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- envelope::claim_stats::claim_envelope_data_fields stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_data_fields' (3997248) panicked at tests/envelope/claim_stats.rs:362:5:
+claim data must be an object
+
+---- envelope::claim_stats::claim_envelope_has_stable_structure stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_has_stable_structure' (3997261) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope::claim_stats::claim_envelope_kind_matches_command stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_kind_matches_command' (3997265) panicked at tests/envelope/claim_stats.rs:388:5:
+assertion `left == right` failed: claim envelope kind must be 'claim'
+  left: None
+ right: Some("claim")
+
+---- envelope::claim_stats::claim_envelope_metadata_fields stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_metadata_fields' (3997269) panicked at tests/envelope/claim_stats.rs:282:5:
+claim envelope must have 'version' field
+
+---- envelope::claim_stats::claim_envelope_structure_consistency stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_structure_consistency' (3997275) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope::claim_stats::claim_envelope_successful_case stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_successful_case' (3997279) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope::claim_stats::claim_envelope_version_always_one stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_version_always_one' (3997283) panicked at tests/envelope/claim_stats.rs:404:5:
+assertion `left == right` failed: claim envelope version must always be 1
+  left: None
+ right: Some(1)
+
+
+failures:
+    envelope::claim_stats::claim_envelope_data_fields
+    envelope::claim_stats::claim_envelope_empty_workspace
+    envelope::claim_stats::claim_envelope_has_stable_structure
+    envelope::claim_stats::claim_envelope_kind_matches_command
+    envelope::claim_stats::claim_envelope_metadata_fields
+    envelope::claim_stats::claim_envelope_structure_consistency
+    envelope::claim_stats::claim_envelope_successful_case
+    envelope::claim_stats::claim_envelope_version_always_one
+
+test result: FAILED. 57 passed; 8 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.63s
+
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.50s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 30 tests
+..............................
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 7 tests
+..... 5/7
+flush_failure_surfaces_warning_in_json_output --- FAILED
+.
+failures:
+
+---- flush_failure_surfaces_warning_in_json_output stdout ----
+
+thread 'flush_failure_surfaces_warning_in_json_output' (3999345) panicked at tests/kill_worker_preserves_beads.rs:379:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_surfaces_warning_in_json_output
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 11 tests
+........ 8/11
+test_remove_label_from_nonexistent_issue_fails_gracefully --- FAILED
+..
+failures:
+
+---- test_remove_label_from_nonexistent_issue_fails_gracefully stdout ----
+
+thread 'test_remove_label_from_nonexistent_issue_fails_gracefully' (3999391) panicked at tests/label_removal_test.rs:136:5:
+assertion failed: result.is_ok()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_remove_label_from_nonexistent_issue_fails_gracefully
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 21 tests
+.....................
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 20 tests
+....................
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 5 tests
+.. 2/5
+flush_failure_carries_json_warning --- FAILED
+..
+failures:
+
+---- flush_failure_carries_json_warning stdout ----
+
+thread 'flush_failure_carries_json_warning' (3999580) panicked at tests/recovery_and_exit_criteria.rs:346:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_carries_json_warning
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+
+running 27 tests
+...........................
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 76 tests
+............................ 28/76
+integration_refuses_azure_key --- FAILED
+... 32/76
+integration_refuses_github_gho_token --- FAILED
+integration_refuses_github_ghr_token --- FAILED
+integration_refuses_github_ghs_token --- FAILED
+integration_refuses_github_ghu_token --- FAILED
+integration_refuses_github_pat_token --- FAILED
+.......................................
+failures:
+
+---- integration_refuses_azure_key stdout ----
+
+thread 'integration_refuses_azure_key' (3999713) panicked at tests/secret_scanning.rs:1159:5:
+create_issue must reject Azure key
+
+---- integration_refuses_github_gho_token stdout ----
+
+thread 'integration_refuses_github_gho_token' (3999717) panicked at tests/secret_scanning.rs:1180:5:
+create_issue must reject GitHub gho_ token
+
+---- integration_refuses_github_ghr_token stdout ----
+
+thread 'integration_refuses_github_ghr_token' (3999718) panicked at tests/secret_scanning.rs:1246:5:
+create_issue must reject GitHub ghr_ token
+
+---- integration_refuses_github_ghs_token stdout ----
+
+thread 'integration_refuses_github_ghs_token' (3999719) panicked at tests/secret_scanning.rs:1224:5:
+create_issue must reject GitHub ghs_ token
+
+---- integration_refuses_github_ghu_token stdout ----
+
+thread 'integration_refuses_github_ghu_token' (3999720) panicked at tests/secret_scanning.rs:1202:5:
+create_issue must reject GitHub ghu_ token
+
+---- integration_refuses_github_pat_token stdout ----
+
+thread 'integration_refuses_github_pat_token' (3999721) panicked at tests/secret_scanning.rs:943:5:
+create_issue must reject GitHub PAT token
+
+
+failures:
+    integration_refuses_azure_key
+    integration_refuses_github_gho_token
+    integration_refuses_github_ghr_token
+    integration_refuses_github_ghs_token
+    integration_refuses_github_ghu_token
+    integration_refuses_github_pat_token
+
+test result: FAILED. 70 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.97s
+
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 33 tests
+.................................
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 20 tests
+....................
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 34 tests
+....... 7/34
+test_cli_update_description_file_missing_file_errors --- FAILED
+..........................
+failures:
+
+---- test_cli_update_description_file_missing_file_errors stdout ----
+
+thread 'test_cli_update_description_file_missing_file_errors' (4002754) panicked at tests/update_flags.rs:909:5:
+description should remain unset after a failed --description-file, got String("")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_cli_update_description_file_missing_file_errors
+
+test result: FAILED. 33 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+i...
+test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2216:9
+     |
+2216 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2838:5
+     |
+2838 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:242:13
+    |
+242 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1149:51
+     |
+1149 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1371:13
+     |
+1371 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1511:13
+     |
+1511 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1042:4
+     |
+1042 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `cleanup_old_archives` is never used
+   --> src/rotate.rs:284:4
+    |
+284 | fn cleanup_old_archives(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:324:4
+    |
+324 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (lib) generated 19 warnings (run `cargo fix --lib -p bead-forge` to apply 10 suggestions)
+warning: unused variable: `storage`
+   --> tests/secret_scanning.rs:156:9
+    |
+156 |     let storage = ws.storage().unwrap();
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_storage`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:167:9
+    |
+167 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:188:9
+    |
+188 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:208:9
+    |
+208 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:224:9
+    |
+224 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: variable does not need to be mutable
+   --> tests/secret_scanning.rs:318:17
+    |
+318 |             let mut bead = bead_forge::Issue::new(
+    |                 ----^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:440:9
+    |
+440 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:460:9
+    |
+460 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: field `temp_dir` is never read
+  --> tests/common.rs:16:9
+   |
+14 | pub struct TempWorkspace {
+   |            ------------- field in this struct
+15 |     /// Temp directory that holds the workspace (cleaned up on drop)
+16 |     pub temp_dir: TempDir,
+   |         ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated items `from_fixture`, `workspace_path`, `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 91 |     pub fn workspace_path(&self) -> &Path {
+    |            ^^^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+
+warning: function `sample_closed_bead_jsonl` is never used
+   --> tests/common.rs:162:8
+    |
+162 | pub fn sample_closed_bead_jsonl(id: &str, title: &str, close_reason: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_deps_jsonl` is never used
+   --> tests/common.rs:170:8
+    |
+170 | pub fn sample_bead_with_deps_jsonl(id: &str, title: &str, deps: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_labels_jsonl` is never used
+   --> tests/common.rs:179:8
+    |
+179 | pub fn sample_bead_with_labels_jsonl(id: &str, title: &str, labels: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_jsonl_eq` is never used
+   --> tests/common.rs:190:8
+    |
+190 | pub fn assert_jsonl_eq(jsonl1: &str, jsonl2: &str) -> anyhow::Result<()> {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (test "secret_scanning") generated 14 warnings (run `cargo fix --test "secret_scanning" -p bead-forge` to apply 8 suggestions)
+warning: unused import: `std::path::PathBuf`
+ --> tests/test_bf_5sw6.rs:3:5
+  |
+3 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> tests/test_bf_5sw6.rs:23:9
+   |
+23 |     let mut cmd = Command::new(bf_path);
+   |         ----^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `bf_cmd` is never used
+ --> tests/test_bf_5sw6.rs:6:4
+  |
+6 | fn bf_cmd() -> Command {
+  |    ^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_bf_5sw6") generated 3 warnings (run `cargo fix --test "test_bf_5sw6" -p bead-forge` to apply 2 suggestions)
+warning: unused variable: `stdout`
+   --> tests/test_assignee_validation.rs:320:19
+    |
+320 |     let (success, stdout, _stderr) = run_bf_create(
+    |                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `stdout`
+   --> tests/test_assignee_validation.rs:328:19
+    |
+328 |     let (success, stdout, _stderr) = run_bf_create(
+    |                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: `bead-forge` (test "test_assignee_validation") generated 2 warnings (run `cargo fix --test "test_assignee_validation" -p bead-forge` to apply 2 suggestions)
+warning: associated items `from_fixture`, `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "doctor_repair_unflushed") generated 5 warnings (4 duplicates)
+warning: methods `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:96:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ methods in this implementation
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_jsonl") generated 5 warnings (4 duplicates)
+warning: associated items `from_fixture`, `workspace_path`, `config`, `metadata`, `export_jsonl`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 91 |     pub fn workspace_path(&self) -> &Path {
+    |            ^^^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+112 |     pub fn export_jsonl(&self, dirty_only: bool) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+
+warning: `bead-forge` (test "claim_race") generated 6 warnings (5 duplicates)
+warning: associated items `from_fixture`, `config`, `metadata`, `export_jsonl`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+112 |     pub fn export_jsonl(&self, dirty_only: bool) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "claim_fallback") generated 5 warnings (4 duplicates)
+warning: unused import: `Priority`
+ --> tests/label_list.rs:4:57
+  |
+4 | use bead_forge::model::{Issue, IssueChanges, IssueType, Priority, Status};
+  |                                                         ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `chrono::Utc`
+ --> tests/label_list.rs:6:5
+  |
+6 | use chrono::Utc;
+  |     ^^^^^^^^^^^
+
+warning: unused variable: `label`
+  --> tests/label_list.rs:91:10
+   |
+91 |     for (label, count) in &labels {
+   |          ^^^^^ help: if this is intentional, prefix it with an underscore: `_label`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "label_list") generated 3 warnings (run `cargo fix --test "label_list" -p bead-forge` to apply 3 suggestions)
+warning: associated function `from_fixture` is never used
+  --> tests/common.rs:73:12
+   |
+25 | impl TempWorkspace {
+   | ------------------ associated function in this implementation
+...
+73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+   |            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "br_isolation") generated 5 warnings (4 duplicates)
+warning: unused import: `std::io::Write`
+   --> tests/batch_atomic.rs:616:9
+    |
+616 |     use std::io::Write;
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "batch_atomic") generated 1 warning (run `cargo fix --test "batch_atomic" -p bead-forge` to apply 1 suggestion)
+warning: associated items `from_fixture`, `workspace_path`, `config`, and `metadata` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 91 |     pub fn workspace_path(&self) -> &Path {
+    |            ^^^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+
+warning: unused variable: `stdout`
+   --> tests/test_close_reopen_integration.rs:261:18
+    |
+261 |             let (stdout, stderr, success) = run_bf(
+    |                  ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `stdout`
+   --> tests/test_close_reopen_integration.rs:275:18
+    |
+275 |             let (stdout, stderr, success) =
+    |                  ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stdout`
+   --> tests/test_close_reopen_integration.rs:323:14
+    |
+323 |         let (stdout, stderr, success) =
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: `bead-forge` (test "jsonl_compat") generated 5 warnings (4 duplicates)
+warning: `bead-forge` (test "test_close_reopen_integration") generated 3 warnings (run `cargo fix --test "test_close_reopen_integration" -p bead-forge` to apply 3 suggestions)
+warning: `bead-forge` (test "migrate_git_reconstruction") generated 6 warnings (6 duplicates)
+warning: unused variable: `value`
+   --> tests/epic_p0_labels.rs:446:20
+    |
+446 |     for (priority, value, id) in &priorities {
+    |                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_value`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "epic_p0_labels") generated 1 warning (run `cargo fix --test "epic_p0_labels" -p bead-forge` to apply 1 suggestion)
+warning: unused variable: `result`
+   --> tests/epic_complex_labels.rs:787:9
+    |
+787 |     let result = storage.remove_label("epic-empty-removal", "nonexistent");
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "epic_complex_labels") generated 1 warning (run `cargo fix --test "epic_complex_labels" -p bead-forge` to apply 1 suggestion)
+warning: unused variable: `type_`
+  --> tests/schema_compat.rs:84:20
+   |
+84 |     for (i, (name, type_)) in columns.iter().enumerate() {
+   |                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_type_`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `expected_type`
+  --> tests/schema_compat.rs:85:29
+   |
+85 |         let (expected_name, expected_type) = &expected_columns[i];
+   |                             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_expected_type`
+
+warning: unused variable: `result`
+   --> tests/schema_compat.rs:352:9
+    |
+352 |     let result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `cache_count`
+   --> tests/schema_compat.rs:399:9
+    |
+399 |     let cache_count: i64 = storage
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cache_count`
+
+warning: unused imports: `find_beads_dir`, `load_config`, and `load_metadata`
+ --> tests/test_update_command.rs:1:26
+  |
+1 | use bead_forge::config::{find_beads_dir, load_config, load_metadata};
+  |                          ^^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `result`
+  --> tests/test_update_command.rs:90:9
+   |
+90 |     let result = storage.update_issue("bf-nonexistent", &changes);
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "schema_compat") generated 9 warnings (5 duplicates) (run `cargo fix --test "schema_compat" -p bead-forge` to apply 4 suggestions)
+warning: `bead-forge` (test "test_update_command") generated 2 warnings (run `cargo fix --test "test_update_command" -p bead-forge` to apply 2 suggestions)
+warning: variable does not need to be mutable
+   --> tests/test_epic_p1_creation.rs:276:9
+    |
+276 |     let mut epic1 = Issue {
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_epic_p1_creation") generated 1 warning (run `cargo fix --test "test_epic_p1_creation" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `std::path::PathBuf`
+ --> tests/test_bf_23vs_basic_functionality.rs:7:9
+  |
+7 |     use std::path::PathBuf;
+  |         ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::path::PathBuf`
+  --> tests/label_removal_test.rs:13:5
+   |
+13 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_bf_23vs_basic_functionality") generated 1 warning (run `cargo fix --test "test_bf_23vs_basic_functionality" -p bead-forge` to apply 1 suggestion)
+warning: `bead-forge` (test "label_removal_test") generated 1 warning (run `cargo fix --test "label_removal_test" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `std::path::PathBuf`
+ --> tests/envelope_coverage.rs:9:5
+  |
+9 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `id`
+    --> tests/envelope_coverage.rs:1048:13
+     |
+1048 |         let id = create_bead(ws.path(), "bead id validation");
+     |             ^^ help: if this is intentional, prefix it with an underscore: `_id`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: comparison is useless due to type limits
+    --> tests/envelope_coverage.rs:1071:21
+     |
+1071 |             assert!(total >= 0, "stats total must be non-negative");
+     |                     ^^^^^^^^^^
+     |
+     = note: `#[warn(unused_comparisons)]` on by default
+
+warning: `bead-forge` (test "envelope_coverage") generated 3 warnings (run `cargo fix --test "envelope_coverage" -p bead-forge` to apply 2 suggestions)
+warning: associated items `from_fixture`, `config`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "doctor_safety_stack") generated 5 warnings (4 duplicates)
+warning: unused variable: `errors_clone`
+  --> tests/concurrent_claim.rs:66:13
+   |
+66 |         let errors_clone = Arc::clone(&worker_errors);
+   |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_errors_clone`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "concurrent_claim") generated 1 warning (run `cargo fix --test "concurrent_claim" -p bead-forge` to apply 1 suggestion)
+warning: unused variable: `bead_id`
+   --> tests/test_special_chars.rs:273:13
+    |
+273 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_special_chars") generated 1 warning (run `cargo fix --test "test_special_chars" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `std::io::BufRead`
+  --> tests/test_blocked_cascade.rs:93:13
+   |
+93 |         use std::io::BufRead;
+   |             ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_blocked_cascade") generated 1 warning (run `cargo fix --test "test_blocked_cascade" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `bead_forge::config::load_config`
+  --> tests/close_reopen.rs:11:5
+   |
+11 | use bead_forge::config::load_config;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `IssueChanges`
+  --> tests/close_reopen.rs:12:43
+   |
+12 | use bead_forge::model::{EventType, Issue, IssueChanges, IssueType, Priority, Status};
+   |                                           ^^^^^^^^^^^^
+
+warning: unused import: `DateTime`
+  --> tests/close_reopen.rs:14:14
+   |
+14 | use chrono::{DateTime, Utc};
+   |              ^^^^^^^^
+
+warning: `bead-forge` (test "close_reopen") generated 3 warnings (run `cargo fix --test "close_reopen" -p bead-forge` to apply 3 suggestions)
+warning: unused import: `Priority`
+ --> tests/duplicate_label_test.rs:4:43
+  |
+4 | use bead_forge::model::{Issue, IssueType, Priority, Status};
+  |                                           ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "duplicate_label_test") generated 1 warning (run `cargo fix --test "duplicate_label_test" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `crate::storage::schema`
+   --> src/claim.rs:883:13
+    |
+883 |         use crate::storage::schema;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::format::json::JsonFormatter`
+   --> src/format/envelope.rs:862:9
+    |
+862 |     use crate::format::json::JsonFormatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::format::Formatter`
+   --> src/format/envelope.rs:863:9
+    |
+863 |     use crate::format::Formatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+
+warning: unused imports: `Priority` and `Status`
+   --> src/secrets.rs:316:31
+    |
+316 |     use crate::model::{Issue, Priority, Status};
+    |                               ^^^^^^^^  ^^^^^^
+
+warning: unused import: `Status`
+   --> src/velocity.rs:396:42
+    |
+396 |     use crate::model::{Issue, IssueType, Status};
+    |                                          ^^^^^^
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:403:32
+    |
+403 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:417:32
+    |
+417 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+    --> src/batch.rs:1766:13
+     |
+1766 |         let mut ops = vec![
+     |             ----^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:728:21
+    |
+728 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:756:21
+    |
+756 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:768:21
+    |
+768 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:885:21
+    |
+885 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:981:21
+    |
+981 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1045:21
+     |
+1045 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1072:21
+     |
+1072 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1101:21
+     |
+1101 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1174:21
+     |
+1174 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `critical`
+   --> src/critical_path.rs:558:13
+    |
+558 |         let critical: Vec<&str> = result
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_critical`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1547:13
+     |
+1547 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1653:13
+     |
+1653 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1702:13
+     |
+1702 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `import_result`
+    --> src/doctor.rs:1741:13
+     |
+1741 |         let import_result = crate::sync::import(workspace).unwrap();
+     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_import_result`
+
+warning: variable does not need to be mutable
+    --> src/model.rs:1220:13
+     |
+1220 |         let mut issue1 = Issue {
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: function `create_test_issue` is never used
+   --> src/format/envelope.rs:867:8
+    |
+867 |     fn create_test_issue(id: &str, title: &str) -> Issue {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (lib test) generated 42 warnings (16 duplicates) (run `cargo fix --lib -p bead-forge --tests` to apply 23 suggestions)
+warning: unused import: `std::path::PathBuf`
+  --> tests/bf_520v_json_format.rs:11:5
+   |
+11 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:126:13
+    |
+126 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:154:13
+    |
+154 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:182:13
+    |
+182 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:211:13
+    |
+211 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:501:13
+    |
+501 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: `bead-forge` (test "bf_520v_json_format") generated 1 warning (run `cargo fix --test "bf_520v_json_format" -p bead-forge` to apply 1 suggestion)
+warning: `bead-forge` (test "test_create") generated 5 warnings (run `cargo fix --test "test_create" -p bead-forge` to apply 5 suggestions)
+warning: unused import: `std::path::PathBuf`
+  --> tests/test_bf_5id.rs:10:5
+   |
+10 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_bf_5id") generated 1 warning (run `cargo fix --test "test_bf_5id" -p bead-forge` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (target/debug/deps/bead_forge-fd73a99e4eed0cab)
+
+running 272 tests
+....................................................................................... 87/272
+....................................................................................... 174/272
+....................................................................................... 261/272
+...........
+test result: ok. 272 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
+
+     Running unittests src/main.rs (target/debug/deps/bf-7129a27402094b4b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/autoflush_batch_claim_delete.rs (target/debug/deps/autoflush_batch_claim_delete-191f4afadfcb4224)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests/autoflush_diagnostics_and_rotation.rs (target/debug/deps/autoflush_diagnostics_and_rotation-d9b3625ec4afcecf)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
+
+     Running tests/autoflush_failure_contract.rs (target/debug/deps/autoflush_failure_contract-37012de1aacb0230)
+
+running 3 tests
+. 1/3
+create_json_succeeds_warns_retains_dirty_and_recovers --- FAILED
+.
+failures:
+
+---- create_json_succeeds_warns_retains_dirty_and_recovers stdout ----
+
+thread 'create_json_succeeds_warns_retains_dirty_and_recovers' (4004330) panicked at tests/autoflush_failure_contract.rs:122:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    create_json_succeeds_warns_retains_dirty_and_recovers
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `--test autoflush_failure_contract`
+     Running tests/autoflush_mutation.rs (target/debug/deps/autoflush_mutation-e9d32167d102ace4)
+
+running 12 tests
+..... 5/12
+flush_failure_nonfatal_json_warning_and_dirty_retained --- FAILED
+......
+failures:
+
+---- flush_failure_nonfatal_json_warning_and_dirty_retained stdout ----
+
+thread 'flush_failure_nonfatal_json_warning_and_dirty_retained' (4004372) panicked at tests/autoflush_mutation.rs:271:10:
+create --json missing id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_nonfatal_json_warning_and_dirty_retained
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+error: test failed, to rerun pass `--test autoflush_mutation`
+     Running tests/autoflush_readonly.rs (target/debug/deps/autoflush_readonly-de0963818f393a4a)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.28s
+
+     Running tests/autoflush_wiring.rs (target/debug/deps/autoflush_wiring-9821e3820f02bac7)
+
+running 11 tests
+..... 5/11
+flush_failure_does_not_fail_mutation_and_warns_json --- FAILED
+.....
+failures:
+
+---- flush_failure_does_not_fail_mutation_and_warns_json stdout ----
+
+thread 'flush_failure_does_not_fail_mutation_and_warns_json' (4004473) panicked at tests/autoflush_wiring.rs:266:51:
+id present
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_does_not_fail_mutation_and_warns_json
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+error: test failed, to rerun pass `--test autoflush_wiring`
+     Running tests/batch_atomic.rs (target/debug/deps/batch_atomic-028a3c00ed4bbebc)
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/batch_cascade_and_rotation.rs (target/debug/deps/batch_cascade_and_rotation-9124d6dc6d3be769)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
+
+     Running tests/batch_mitosis.rs (target/debug/deps/batch_mitosis-812ca8d6974b49e4)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/bf_520v_json_format.rs (target/debug/deps/bf_520v_json_format-0dd23ce57a13ce4f)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/br_isolation.rs (target/debug/deps/br_isolation-9342556aac7957ce)
+
+running 33 tests
+.................................
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/bug_default_priority.rs (target/debug/deps/bug_default_priority-61ee1ade4a6d1f17)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/claim_fallback.rs (target/debug/deps/claim_fallback-7f9ec026acdc2980)
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/claim_race.rs (target/debug/deps/claim_race-ef7bfdb52ad56998)
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/close_reopen.rs (target/debug/deps/close_reopen-6a01592d918674b6)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/comments_cli.rs (target/debug/deps/comments_cli-462e6813bb057144)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/common.rs (target/debug/deps/common-248a70ba5ea81015)
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/concurrent_claim.rs (target/debug/deps/concurrent_claim-eeedf901745241dc)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/count_command.rs (target/debug/deps/count_command-5470cd2cfafbf16c)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/description_update_test_infrastructure.rs (target/debug/deps/description_update_test_infrastructure-3dbaaa21a6c36f3b)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/dirty_tracking.rs (target/debug/deps/dirty_tracking-11fc3ad5857ada65)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/doctor_repair_unflushed.rs (target/debug/deps/doctor_repair_unflushed-5762bed90a018dc1)
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/doctor_safety_stack.rs (target/debug/deps/doctor_safety_stack-b8a26be196841aa7)
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/duplicate_label_test.rs (target/debug/deps/duplicate_label_test-d7e20c139b68b2ab)
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/envelope_coverage.rs (target/debug/deps/envelope_coverage-5c3e0b4039b2d2c4)
+
+running 41 tests
+claim_stats::envelope_claim_bead_id_is_valid --- FAILED
+claim_stats::envelope_claim_and_stats_consistent_structure --- FAILED
+claim_stats::envelope_claim_json_has_metadata_fields --- FAILED
+claim_stats::envelope_claim_json_returns_claim_result --- FAILED
+claim_stats::envelope_claim_no_beads_returns_empty_object --- FAILED
+. 6/41
+claim_stats::envelope_claim_reflects_assignee --- FAILED
+... 10/41
+envelope_batch_command_has_stable_structure --- FAILED
+. 12/41
+envelope_batch_empty_emits_empty_array --- FAILED
+envelope_claim_no_bead_emits_empty_object --- FAILED
+envelope_claim_command_has_stable_structure --- FAILED
+.. 17/41
+envelope_data_field_always_present --- FAILED
+envelope_kind_matches_command --- FAILED
+.... 23/41
+envelope_ready_command_has_stable_structure --- FAILED
+envelope_recent_empty_emits_empty_array --- FAILED
+envelope_recent_command_has_stable_structure --- FAILED
+envelope_search_empty_emits_empty_array --- FAILED
+envelope_search_command_has_stable_structure --- FAILED
+.. 30/41
+envelope_velocity_command_has_stable_structure --- FAILED
+. 32/41
+envelope_velocity_empty_emits_empty_array --- FAILED
+envelope_version_is_always_one --- FAILED
+.......
+failures:
+
+---- claim_stats::envelope_claim_bead_id_is_valid stdout ----
+
+thread 'claim_stats::envelope_claim_bead_id_is_valid' (4005118) panicked at tests/envelope_coverage.rs:1055:9:
+claim result must have bead_id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- claim_stats::envelope_claim_and_stats_consistent_structure stdout ----
+
+thread 'claim_stats::envelope_claim_and_stats_consistent_structure' (4005117) panicked at tests/envelope_coverage.rs:1016:9:
+assertion `left == right` failed: claim envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_json_has_metadata_fields stdout ----
+
+thread 'claim_stats::envelope_claim_json_has_metadata_fields' (4005181) panicked at tests/envelope_coverage.rs:887:9:
+claim envelope must have 'version' field
+
+---- claim_stats::envelope_claim_json_returns_claim_result stdout ----
+
+thread 'claim_stats::envelope_claim_json_returns_claim_result' (4005185) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_no_beads_returns_empty_object stdout ----
+
+thread 'claim_stats::envelope_claim_no_beads_returns_empty_object' (4005205) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_reflects_assignee stdout ----
+
+thread 'claim_stats::envelope_claim_reflects_assignee' (4005207) panicked at tests/envelope_coverage.rs:1097:9:
+assertion `left == right` failed: claim envelope must reflect the specified assignee
+  left: None
+ right: Some("specific-test-worker")
+
+---- envelope_batch_command_has_stable_structure stdout ----
+
+thread 'envelope_batch_command_has_stable_structure' (4005250) panicked at tests/envelope_coverage.rs:421:5:
+batch data must be an array
+
+---- envelope_batch_empty_emits_empty_array stdout ----
+
+thread 'envelope_batch_empty_emits_empty_array' (4005254) panicked at tests/envelope_coverage.rs:459:5:
+batch data must be an array
+
+---- envelope_claim_no_bead_emits_empty_object stdout ----
+
+thread 'envelope_claim_no_bead_emits_empty_object' (4005263) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_claim_command_has_stable_structure stdout ----
+
+thread 'envelope_claim_command_has_stable_structure' (4005258) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_data_field_always_present stdout ----
+
+thread 'envelope_data_field_always_present' (4005282) panicked at tests/envelope_coverage.rs:568:17:
+Data field must be present for command: ["velocity", "--format", "json"]
+
+---- envelope_kind_matches_command stdout ----
+
+thread 'envelope_kind_matches_command' (4005285) panicked at tests/envelope_coverage.rs:530:17:
+assertion `left == right` failed: Kind mismatch for command ["velocity", "--format", "json"], expected 'velocity'
+  left: None
+ right: Some("velocity")
+
+---- envelope_ready_command_has_stable_structure stdout ----
+
+thread 'envelope_ready_command_has_stable_structure' (4005303) panicked at tests/envelope_coverage.rs:206:5:
+ready data must be an array
+
+---- envelope_recent_empty_emits_empty_array stdout ----
+
+thread 'envelope_recent_empty_emits_empty_array' (4005314) panicked at tests/envelope_coverage.rs:375:5:
+recent data must be an array
+
+---- envelope_recent_command_has_stable_structure stdout ----
+
+thread 'envelope_recent_command_has_stable_structure' (4005311) panicked at tests/envelope_coverage.rs:362:5:
+recent data must be an array
+
+---- envelope_search_empty_emits_empty_array stdout ----
+
+thread 'envelope_search_empty_emits_empty_array' (4005331) panicked at tests/envelope_coverage.rs:69:29:
+Invalid JSON output from ["--envelope", "search", "nonexistent", "--format", "json"]: EOF while parsing a value at line 1 column 0
+Output: 
+stderr: 
+
+---- envelope_search_command_has_stable_structure stdout ----
+
+thread 'envelope_search_command_has_stable_structure' (4005323) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_velocity_command_has_stable_structure stdout ----
+
+thread 'envelope_velocity_command_has_stable_structure' (4005345) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_velocity_empty_emits_empty_array stdout ----
+
+thread 'envelope_velocity_empty_emits_empty_array' (4005349) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_version_is_always_one stdout ----
+
+thread 'envelope_version_is_always_one' (4005353) panicked at tests/envelope_coverage.rs:493:17:
+assertion `left == right` failed: Version must be 1 for command: ["velocity", "--format", "json"]
+  left: None
+ right: Some(1)
+
+
+failures:
+    claim_stats::envelope_claim_and_stats_consistent_structure
+    claim_stats::envelope_claim_bead_id_is_valid
+    claim_stats::envelope_claim_json_has_metadata_fields
+    claim_stats::envelope_claim_json_returns_claim_result
+    claim_stats::envelope_claim_no_beads_returns_empty_object
+    claim_stats::envelope_claim_reflects_assignee
+    envelope_batch_command_has_stable_structure
+    envelope_batch_empty_emits_empty_array
+    envelope_claim_command_has_stable_structure
+    envelope_claim_no_bead_emits_empty_object
+    envelope_data_field_always_present
+    envelope_kind_matches_command
+    envelope_ready_command_has_stable_structure
+    envelope_recent_command_has_stable_structure
+    envelope_recent_empty_emits_empty_array
+    envelope_search_command_has_stable_structure
+    envelope_search_empty_emits_empty_array
+    envelope_velocity_command_has_stable_structure
+    envelope_velocity_empty_emits_empty_array
+    envelope_version_is_always_one
+
+test result: FAILED. 21 passed; 20 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+error: test failed, to rerun pass `--test envelope_coverage`
+     Running tests/envelope_helpers.rs (target/debug/deps/envelope_helpers-a60a61ebd8df8111)
+
+running 26 tests
+..........................
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/envelope_integration_tests.rs (target/debug/deps/envelope_integration_tests-148f186903f91799)
+
+running 65 tests
+envelope::claim_stats::claim_envelope_empty_workspace --- FAILED
+envelope::claim_stats::claim_envelope_data_fields --- FAILED
+envelope::claim_stats::claim_envelope_has_stable_structure --- FAILED
+envelope::claim_stats::claim_envelope_kind_matches_command --- FAILED
+envelope::claim_stats::claim_envelope_metadata_fields --- FAILED
+envelope::claim_stats::claim_envelope_structure_consistency --- FAILED
+envelope::claim_stats::claim_envelope_successful_case --- FAILED
+envelope::claim_stats::claim_envelope_version_always_one --- FAILED
+.........................................................
+failures:
+
+---- envelope::claim_stats::claim_envelope_empty_workspace stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_empty_workspace' (4005418) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- envelope::claim_stats::claim_envelope_data_fields stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_data_fields' (4005417) panicked at tests/envelope/claim_stats.rs:362:5:
+claim data must be an object
+
+---- envelope::claim_stats::claim_envelope_has_stable_structure stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_has_stable_structure' (4005423) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope::claim_stats::claim_envelope_kind_matches_command stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_kind_matches_command' (4005427) panicked at tests/envelope/claim_stats.rs:388:5:
+assertion `left == right` failed: claim envelope kind must be 'claim'
+  left: None
+ right: Some("claim")
+
+---- envelope::claim_stats::claim_envelope_metadata_fields stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_metadata_fields' (4005431) panicked at tests/envelope/claim_stats.rs:282:5:
+claim envelope must have 'version' field
+
+---- envelope::claim_stats::claim_envelope_structure_consistency stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_structure_consistency' (4005435) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope::claim_stats::claim_envelope_successful_case stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_successful_case' (4005439) panicked at tests/envelope/claim_stats.rs:79:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope::claim_stats::claim_envelope_version_always_one stdout ----
+
+thread 'envelope::claim_stats::claim_envelope_version_always_one' (4005443) panicked at tests/envelope/claim_stats.rs:404:5:
+assertion `left == right` failed: claim envelope version must always be 1
+  left: None
+ right: Some(1)
+
+
+failures:
+    envelope::claim_stats::claim_envelope_data_fields
+    envelope::claim_stats::claim_envelope_empty_workspace
+    envelope::claim_stats::claim_envelope_has_stable_structure
+    envelope::claim_stats::claim_envelope_kind_matches_command
+    envelope::claim_stats::claim_envelope_metadata_fields
+    envelope::claim_stats::claim_envelope_structure_consistency
+    envelope::claim_stats::claim_envelope_successful_case
+    envelope::claim_stats::claim_envelope_version_always_one
+
+test result: FAILED. 57 passed; 8 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+
+error: test failed, to rerun pass `--test envelope_integration_tests`
+     Running tests/epic_cli.rs (target/debug/deps/epic_cli-1f803f7cb36e7618)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/epic_cli_label_creation.rs (target/debug/deps/epic_cli_label_creation-25d2e8e0b0e840d9)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/epic_cli_label_display.rs (target/debug/deps/epic_cli_label_display-946aa9e04a1d4af4)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/epic_cli_label_mutate.rs (target/debug/deps/epic_cli_label_mutate-4570aa5ec2e85ec1)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/epic_cli_label_sort_filter.rs (target/debug/deps/epic_cli_label_sort_filter-4d775fbdff602c5a)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/epic_complex_labels.rs (target/debug/deps/epic_complex_labels-7f253c4c0deb9267)
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/epic_comprehensive.rs (target/debug/deps/epic_comprehensive-3b94093b2e5d93eb)
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/epic_default_priority.rs (target/debug/deps/epic_default_priority-b0a88070e241ef2f)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/epic_json_format.rs (target/debug/deps/epic_json_format-f62025d9d468d29f)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/epic_p0_labels.rs (target/debug/deps/epic_p0_labels-d365534ee1aa5c60)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/epic_type_basic.rs (target/debug/deps/epic_type_basic-bc917b404fc4e859)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/epic_with_labels.rs (target/debug/deps/epic_with_labels-d6d92066ab18b328)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/feature_default_priority.rs (target/debug/deps/feature_default_priority-b05d3a8fb5f1aa7e)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/fleet_concurrency.rs (target/debug/deps/fleet_concurrency-8b4794ab3601e110)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+
+     Running tests/json_formatter_verification.rs (target/debug/deps/json_formatter_verification-771f3709dd417ffb)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/jsonl_compat.rs (target/debug/deps/jsonl_compat-2043129147515883)
+
+running 30 tests
+..............................
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/kill_worker_preserves_beads.rs (target/debug/deps/kill_worker_preserves_beads-4a7bd9b2e4a9f377)
+
+running 7 tests
+..... 5/7
+flush_failure_surfaces_warning_in_json_output --- FAILED
+.
+failures:
+
+---- flush_failure_surfaces_warning_in_json_output stdout ----
+
+thread 'flush_failure_surfaces_warning_in_json_output' (4006252) panicked at tests/kill_worker_preserves_beads.rs:379:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_surfaces_warning_in_json_output
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+error: test failed, to rerun pass `--test kill_worker_preserves_beads`
+     Running tests/label_list.rs (target/debug/deps/label_list-fabecfd212370e51)
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/label_removal_test.rs (target/debug/deps/label_removal_test-2581ec7b38d66fcc)
+
+running 11 tests
+........ 8/11
+test_remove_label_from_nonexistent_issue_fails_gracefully --- FAILED
+..
+failures:
+
+---- test_remove_label_from_nonexistent_issue_fails_gracefully stdout ----
+
+thread 'test_remove_label_from_nonexistent_issue_fails_gracefully' (4006298) panicked at tests/label_removal_test.rs:136:5:
+assertion failed: result.is_ok()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_remove_label_from_nonexistent_issue_fails_gracefully
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--test label_removal_test`
+     Running tests/label_storage.rs (target/debug/deps/label_storage-3e1d0c1612aa1f80)
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/limit_zero.rs (target/debug/deps/limit_zero-84307d886f6aa634)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/migrate_git_reconstruction.rs (target/debug/deps/migrate_git_reconstruction-9ca0da9551ab30fb)
+
+running 21 tests
+.....................
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/p0_epic_creation.rs (target/debug/deps/p0_epic_creation-8ddb974ff40214a6)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/p0_epic_labels.rs (target/debug/deps/p0_epic_labels-acaa60b8564d9fdb)
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/p1_epic_creation.rs (target/debug/deps/p1_epic_creation-fe63ff5dc03e96d2)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/priority_p0_validation.rs (target/debug/deps/priority_p0_validation-e355006104fc5558)
+
+running 20 tests
+....................
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ready_json_fields.rs (target/debug/deps/ready_json_fields-f7ea3ce581cc5074)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/recovery_and_exit_criteria.rs (target/debug/deps/recovery_and_exit_criteria-e09113b7ef7fcbaf)
+
+running 5 tests
+.. 2/5
+flush_failure_carries_json_warning --- FAILED
+..
+failures:
+
+---- flush_failure_carries_json_warning stdout ----
+
+thread 'flush_failure_carries_json_warning' (4006435) panicked at tests/recovery_and_exit_criteria.rs:346:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    flush_failure_carries_json_warning
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `--test recovery_and_exit_criteria`
+     Running tests/schema_compat.rs (target/debug/deps/schema_compat-5cd8082ed98b7e48)
+
+running 27 tests
+...........................
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/search_command.rs (target/debug/deps/search_command-81401249330a3970)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/secret_scanning.rs (target/debug/deps/secret_scanning-6edd9762406cbfdd)
+
+running 76 tests
+............................ 28/76
+integration_refuses_azure_key --- FAILED
+... 32/76
+integration_refuses_github_gho_token --- FAILED
+integration_refuses_github_ghr_token --- FAILED
+integration_refuses_github_ghs_token --- FAILED
+integration_refuses_github_ghu_token --- FAILED
+integration_refuses_github_pat_token --- FAILED
+.......................................
+failures:
+
+---- integration_refuses_azure_key stdout ----
+
+thread 'integration_refuses_azure_key' (4006628) panicked at tests/secret_scanning.rs:1159:5:
+create_issue must reject Azure key
+
+---- integration_refuses_github_gho_token stdout ----
+
+thread 'integration_refuses_github_gho_token' (4006637) panicked at tests/secret_scanning.rs:1180:5:
+create_issue must reject GitHub gho_ token
+
+---- integration_refuses_github_ghr_token stdout ----
+
+thread 'integration_refuses_github_ghr_token' (4006648) panicked at tests/secret_scanning.rs:1246:5:
+create_issue must reject GitHub ghr_ token
+
+---- integration_refuses_github_ghs_token stdout ----
+
+thread 'integration_refuses_github_ghs_token' (4006658) panicked at tests/secret_scanning.rs:1224:5:
+create_issue must reject GitHub ghs_ token
+
+---- integration_refuses_github_ghu_token stdout ----
+
+thread 'integration_refuses_github_ghu_token' (4006659) panicked at tests/secret_scanning.rs:1202:5:
+create_issue must reject GitHub ghu_ token
+
+---- integration_refuses_github_pat_token stdout ----
+
+thread 'integration_refuses_github_pat_token' (4006660) panicked at tests/secret_scanning.rs:943:5:
+create_issue must reject GitHub PAT token
+
+
+failures:
+    integration_refuses_azure_key
+    integration_refuses_github_gho_token
+    integration_refuses_github_ghr_token
+    integration_refuses_github_ghs_token
+    integration_refuses_github_ghu_token
+    integration_refuses_github_pat_token
+
+test result: FAILED. 70 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.19s
+
+error: test failed, to rerun pass `--test secret_scanning`
+     Running tests/task_default_priority.rs (target/debug/deps/task_default_priority-d214f61bc9af928b)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/test_assignee.rs (target/debug/deps/test_assignee-10480ca315128adc)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/test_assignee_validation.rs (target/debug/deps/test_assignee_validation-bd952f43abdd8300)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/test_basic_workflow.rs (target/debug/deps/test_basic_workflow-8da45458870f2375)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/test_bf_1dbvv_roundtrip_description_ac.rs (target/debug/deps/test_bf_1dbvv_roundtrip_description_ac-344d2bdd5aac820b)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/test_bf_23vs_basic_functionality.rs (target/debug/deps/test_bf_23vs_basic_functionality-8e13b7c84f605952)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/test_bf_2hqt.rs (target/debug/deps/test_bf_2hqt-baef5b3f00dbe018)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/test_bf_2l7_help_flag.rs (target/debug/deps/test_bf_2l7_help_flag-b3dfd3ba96054319)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/test_bf_32zd.rs (target/debug/deps/test_bf_32zd-26dbf7feeaa26554)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/test_bf_52is_smoke.rs (target/debug/deps/test_bf_52is_smoke-810e5a63c4647edd)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/test_bf_5id.rs (target/debug/deps/test_bf_5id-98c9e588b14fff4e)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/test_bf_5sw6.rs (target/debug/deps/test_bf_5sw6-37ac5a6745d7f97c)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+     Running tests/test_blocked_cascade.rs (target/debug/deps/test_blocked_cascade-179691809ce21184)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/test_close_reopen.rs (target/debug/deps/test_close_reopen-7c9758e5aeef490a)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/test_close_reopen_integration.rs (target/debug/deps/test_close_reopen_integration-9216a219835b1a7b)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/test_comprehensive_labels.rs (target/debug/deps/test_comprehensive_labels-01a9107e577f76f8)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/test_create.rs (target/debug/deps/test_create-bbcfc33636f63dba)
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/test_create_command.rs (target/debug/deps/test_create_command-32f2ff1c76318d2e)
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running tests/test_critical_path_cache_invalidation.rs (target/debug/deps/test_critical_path_cache_invalidation-4a2529984186db5a)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/test_dirty_repair.rs (target/debug/deps/test_dirty_repair-f0737579f8944765)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/test_envelope_helpers_usage.rs (target/debug/deps/test_envelope_helpers_usage-ae794a73699b1d6f)
+
+running 33 tests
+.................................
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/test_epic_child_1.rs (target/debug/deps/test_epic_child_1-f6748babf8cb2c3e)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/test_epic_default_priority.rs (target/debug/deps/test_epic_default_priority-c4c7ec961ea031a0)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/test_epic_p0_creation.rs (target/debug/deps/test_epic_p0_creation-b66104a554cbcc44)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/test_epic_p1_comprehensive.rs (target/debug/deps/test_epic_p1_comprehensive-48f26a3b2209b9f9)
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/test_epic_p1_creation.rs (target/debug/deps/test_epic_p1_creation-3586e335f535c196)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/test_epic_single_label.rs (target/debug/deps/test_epic_single_label-2237f944d23a154d)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/test_epic_type_creation.rs (target/debug/deps/test_epic_type_creation-07324b408f50e81f)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/test_epic_type_validation.rs (target/debug/deps/test_epic_type_validation-3a720219bdbd5f9d)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running tests/test_epic_with_description.rs (target/debug/deps/test_epic_with_description-03d63d896c5d30ff)
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/test_invalid_type.rs (target/debug/deps/test_invalid_type-7ddd74504bc00b23)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/test_json_formatter.rs (target/debug/deps/test_json_formatter-9665cdbbe57b7122)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/test_jsonl.rs (target/debug/deps/test_jsonl-e61eac68202e3b17)
+
+running 20 tests
+....................
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/test_labels.rs (target/debug/deps/test_labels-b7b7de404e2d8cdb)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/test_show_command.rs (target/debug/deps/test_show_command-3c0b4c13a8e4b795)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/test_special_chars.rs (target/debug/deps/test_special_chars-8a364a6130e56629)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/test_update_command.rs (target/debug/deps/test_update_command-7468a51e82b4d3dc)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/test_version_display.rs (target/debug/deps/test_version_display-4f047afae4d82660)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/update_flags.rs (target/debug/deps/update_flags-6d75e55724b19318)
+
+running 34 tests
+....... 7/34
+test_cli_update_description_file_missing_file_errors --- FAILED
+..........................
+failures:
+
+---- test_cli_update_description_file_missing_file_errors stdout ----
+
+thread 'test_cli_update_description_file_missing_file_errors' (4008794) panicked at tests/update_flags.rs:909:5:
+description should remain unset after a failed --description-file, got String("")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_cli_update_description_file_missing_file_errors
+
+test result: FAILED. 33 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+
+error: test failed, to rerun pass `--test update_flags`
+     Running tests/velocity_close_integration.rs (target/debug/deps/velocity_close_integration-3afa746af3485d97)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/velocity_seed_integration.rs (target/debug/deps/velocity_seed_integration-17d560e04513b92e)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/verify_epic_implementation.rs (target/debug/deps/verify_epic_implementation-1077f54aa65b802f)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests bead_forge
+
+running 4 tests
+i...
+test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+error: 10 targets failed:
+    `--test autoflush_failure_contract`
+    `--test autoflush_mutation`
+    `--test autoflush_wiring`
+    `--test envelope_coverage`
+    `--test envelope_integration_tests`
+    `--test kill_worker_preserves_beads`
+    `--test label_removal_test`
+    `--test recovery_and_exit_criteria`
+    `--test secret_scanning`
+    `--test update_flags`
