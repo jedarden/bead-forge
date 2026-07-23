@@ -264,3 +264,326 @@ fn test_label_import_atomic_transaction() {
     let issue2 = storage.get_issue("bf-atomic-2").unwrap().unwrap();
     assert_eq!(issue2.labels, vec!["label2"]);
 }
+
+#[test]
+fn test_label_roundtrip_verification_comprehensive() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    bead_forge::config::init_workspace(&beads_dir, "bf").unwrap();
+
+    let db_path = beads_dir.join("beads.db");
+    let jsonl_path = beads_dir.join("issues.jsonl");
+
+    // Create test cases covering various label scenarios
+    let test_cases = vec![
+        // Empty labels
+        Issue {
+            id: "bf-empty-labels".to_string(),
+            title: "Empty Labels Test".to_string(),
+            description: Some("Issue with no labels".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![],
+            ..Default::default()
+        },
+        // Single label
+        Issue {
+            id: "bf-single-label".to_string(),
+            title: "Single Label Test".to_string(),
+            description: Some("Issue with one label".to_string()),
+            status: Status::Open,
+            priority: Priority::HIGH,
+            issue_type: IssueType::Bug,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["urgent".to_string()],
+            ..Default::default()
+        },
+        // Multiple labels
+        Issue {
+            id: "bf-multi-labels".to_string(),
+            title: "Multiple Labels Test".to_string(),
+            description: Some("Issue with multiple labels".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![
+                "phase-1".to_string(),
+                "storage".to_string(),
+                "critical".to_string(),
+                "backend".to_string()
+            ],
+            ..Default::default()
+        },
+        // Labels with special characters - spaces
+        Issue {
+            id: "bf-space-label".to_string(),
+            title: "Space in Label Test".to_string(),
+            description: Some("Label with spaces".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["needs review".to_string(), "in progress".to_string()],
+            ..Default::default()
+        },
+        // Labels with special characters - unicode
+        Issue {
+            id: "bf-unicode-label".to_string(),
+            title: "Unicode Label Test".to_string(),
+            description: Some("Label with unicode characters".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["bugfix🔧".to_string(), "tést".to_string(), "café".to_string()],
+            ..Default::default()
+        },
+        // Labels with special characters - punctuation
+        Issue {
+            id: "bf-punct-label".to_string(),
+            title: "Punctuation Label Test".to_string(),
+            description: Some("Label with punctuation".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["high-priority".to_string(), "won't-fix".to_string(), "maybe?".to_string()],
+            ..Default::default()
+        },
+        // Labels with numbers
+        Issue {
+            id: "bf-number-label".to_string(),
+            title: "Number Label Test".to_string(),
+            description: Some("Label with numbers".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["p1".to_string(), "v2.0".to_string(), "2024-q4".to_string()],
+            ..Default::default()
+        },
+        // Long label
+        Issue {
+            id: "bf-long-label".to_string(),
+            title: "Long Label Test".to_string(),
+            description: Some("Very long label".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["this-is-a-very-long-label-name-that-might-be-used-in-some-organizations-to-describe-complex-hierarchical-relationships".to_string()],
+            ..Default::default()
+        },
+        // Mixed edge cases
+        Issue {
+            id: "bf-mixed-labels".to_string(),
+            title: "Mixed Edge Cases Test".to_string(),
+            description: Some("Mixed edge case labels".to_string()),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![
+                "empty".to_string(),
+                "".to_string(),  // Empty string label
+                " ".to_string(),  // Space-only label
+                "a-b-c".to_string(),
+                "x".to_string(),  // Single character
+            ],
+            ..Default::default()
+        },
+    ];
+
+    // Step 1: Create all beads with labels in the database
+    let storage = Storage::open(&db_path).unwrap();
+    for issue in &test_cases {
+        storage.create_issue(issue).unwrap();
+    }
+
+    // Verify they were created correctly
+    let all_issues = storage.list_all_issues().unwrap();
+    assert_eq!(all_issues.len(), test_cases.len(), "All test issues should be created");
+
+    // Step 2: Run sync --flush-only (export to JSONL)
+    let export_count = sync::flush(workspace).unwrap();
+    assert_eq!(export_count, test_cases.len(), "All issues should be exported");
+
+    // Verify JSONL file was created and contains our data
+    assert!(jsonl_path.exists(), "JSONL file should exist after flush");
+    let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
+    let lines: Vec<&str> = jsonl_content.lines().collect();
+    assert_eq!(lines.len(), test_cases.len(), "JSONL should have one line per issue");
+
+    // Verify labels are in the JSONL
+    for issue in &test_cases {
+        let json_line = lines.iter()
+            .find(|line| line.contains(&format!("\"id\":\"{}\"", issue.id)))
+            .expect(&format!("Issue {} should be in JSONL", issue.id));
+
+        // Parse and verify labels
+        let parsed: serde_json::Value = serde_json::from_str(json_line).unwrap();
+        let labels_array = parsed.get("labels").and_then(|v| v.as_array());
+
+        if issue.labels.is_empty() {
+            // Empty labels should either be missing or empty array
+            assert!(
+                labels_array.map_or(true, |arr| arr.is_empty()),
+                "Issue {} should have no labels in JSONL",
+                issue.id
+            );
+        } else {
+            assert!(
+                labels_array.is_some(),
+                "Issue {} should have labels array in JSONL",
+                issue.id
+            );
+            let labels = labels_array.unwrap();
+            assert_eq!(
+                labels.len(),
+                issue.labels.len(),
+                "Issue {} should have {} labels in JSONL",
+                issue.id,
+                issue.labels.len()
+            );
+
+            for label in &issue.labels {
+                assert!(
+                    labels.iter().any(|l| l.as_str() == Some(label)),
+                    "Label {} should be in JSONL for issue {}",
+                    label,
+                    issue.id
+                );
+            }
+        }
+    }
+
+    // Step 3: Clear database (simulate fresh workspace)
+    drop(storage);
+    fs::remove_file(&db_path).unwrap();
+    assert!(!db_path.exists(), "Database file should be deleted");
+
+    // Step 4: Run sync --import (restore from JSONL)
+    let result = sync::import(workspace).unwrap();
+    assert_eq!(result.imported, test_cases.len(), "All issues should be imported");
+
+    // Step 5: Verify all labels are restored correctly
+    let storage2 = Storage::open(&db_path).unwrap();
+    let imported_issues = storage2.list_all_issues().unwrap();
+    assert_eq!(
+        imported_issues.len(),
+        test_cases.len(),
+        "All issues should be imported"
+    );
+
+    // Verify each issue's labels survived the round-trip
+    for original_issue in &test_cases {
+        let imported = storage2
+            .get_issue(&original_issue.id)
+            .unwrap()
+            .expect(&format!("Issue {} should be imported", original_issue.id));
+
+        assert_eq!(
+            imported.id,
+            original_issue.id,
+            "Issue ID should match"
+        );
+        assert_eq!(
+            imported.title,
+            original_issue.title,
+            "Issue title should match for {}",
+            original_issue.id
+        );
+        assert_eq!(
+            imported.labels.len(),
+            original_issue.labels.len(),
+            "Issue {} should have {} labels, got {}",
+            original_issue.id,
+            original_issue.labels.len(),
+            imported.labels.len()
+        );
+
+        // Verify each label individually
+        for expected_label in &original_issue.labels {
+            assert!(
+                imported.labels.contains(expected_label),
+                "Issue {} should contain label '{}', got: {:?}",
+                original_issue.id,
+                expected_label,
+                imported.labels
+            );
+        }
+
+        // For deterministic comparison, sort and compare as arrays
+        let mut imported_labels_sorted = imported.labels.clone();
+        imported_labels_sorted.sort();
+        let mut original_labels_sorted = original_issue.labels.clone();
+        original_labels_sorted.sort();
+        assert_eq!(
+            imported_labels_sorted,
+            original_labels_sorted,
+            "Issue {} labels should match exactly after round-trip",
+            original_issue.id
+        );
+    }
+
+    // Verify the database bead_labels table directly
+    let conn = storage2.conn.lock().unwrap();
+
+    // Check total label count
+    let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
+    let total_labels: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+
+    let expected_total: usize = test_cases.iter()
+        .map(|issue| issue.labels.len())
+        .sum();
+
+    assert_eq!(
+        total_labels as usize,
+        expected_total,
+        "Total label count should match: expected {}, got {}",
+        expected_total,
+        total_labels
+    );
+
+    // Check each issue's label count in database
+    for issue in &test_cases {
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT COUNT(*) FROM bead_labels WHERE bead_id = '{}'",
+                issue.id
+            ))
+            .unwrap();
+        let count: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+
+        assert_eq!(
+            count as usize,
+            issue.labels.len(),
+            "Issue {} should have {} label entries in bead_labels table",
+            issue.id,
+            issue.labels.len()
+        );
+    }
+}
