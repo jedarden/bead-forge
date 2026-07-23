@@ -1130,7 +1130,7 @@ pub fn run(cli: Cli) -> Result<()> {
         } => {
             let format = if json { "json".to_string() } else { format };
             cmd_list(
-                &beads_dir, status, type_, assignee, priority, annotation, limit, all, &format,
+                &beads_dir, status, type_, assignee, priority, annotation, limit, all, &format, cli.envelope,
             )
         }
         Commands::Show { id, format, json } => {
@@ -1193,7 +1193,7 @@ pub fn run(cli: Cli) -> Result<()> {
             json,
         } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_ready(&beads_dir, limit, &format)
+            cmd_ready(&beads_dir, limit, &format, cli.envelope)
         }
         Commands::Claim {
             assignee,
@@ -1253,7 +1253,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
         Commands::Batch { file, json, stdin, format } => {
-            cmd_batch(&beads_dir, file, json, stdin, no_auto_flush)
+            cmd_batch(&beads_dir, file, json, stdin, &format, no_auto_flush)
         }
         Commands::Mitosis {
             id,
@@ -1285,6 +1285,7 @@ pub fn run(cli: Cli) -> Result<()> {
             priority_max,
             limit,
             &format,
+            cli.envelope,
         ),
         Commands::Stats {
             by_type,
@@ -1531,12 +1532,9 @@ fn cmd_create(
 
     if json {
         let formatter = get_formatter(OutputFormat::Json);
-        let data = crate::format::with_warning(
-            serde_json::json!({ "id": id }),
-            warning.as_deref(),
-        );
+        let data = serde_json::json!({ "id": id });
         let json_str = serde_json::to_string(&data)?;
-        println!("{}", formatter.format_with_envelope("create", &json_str));
+        println!("{}", formatter.format_with_envelope("create", &json_str, warning.as_deref()));
     } else {
         println!("{}", id);
     }
@@ -1553,6 +1551,7 @@ fn cmd_list(
     limit: Option<usize>,
     all: bool,
     format: &str,
+    envelope: bool,
 ) -> Result<()> {
     // Parse annotation filter (key=value format)
     let annotation_filter = match annotation {
@@ -1623,9 +1622,16 @@ fn cmd_list(
 
     match output_format {
         OutputFormat::Json => {
-            // Wrap in envelope with kind="list"
-            let json_array = serde_json::to_string(&issues).unwrap_or_else(|_| "[]".to_string());
-            println!("{}", formatter.format_with_envelope("list", &json_array));
+            let jsonl = formatter.format_issues(&issues);
+            if envelope {
+                // Wrap in envelope with kind="list"
+                println!("{}", formatter.format_with_envelope("list", &jsonl, None));
+            } else {
+                // Raw JSONL output; empty list prints nothing
+                if !jsonl.is_empty() {
+                    println!("{}", jsonl);
+                }
+            }
         }
         _ => {
             print!("{}", formatter.format_issues(&issues));
@@ -1661,7 +1667,7 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             // Serialize to JSON and wrap in envelope
             let formatter = get_formatter(OutputFormat::Json);
             let json_str = formatter.format_issue(&out);
-            println!("{}", formatter.format_with_envelope("show", &json_str));
+            println!("{}", formatter.format_with_envelope("show", &json_str, None));
         }
         "toon" => {
             println!("ID: {}", issue.id);
@@ -1827,7 +1833,7 @@ fn cmd_delete(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> 
     Ok(())
 }
 
-fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
+fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1847,10 +1853,18 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
                 .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
                 .collect();
 
-            // format_issues already wraps in an envelope with kind="list",
-            // but for ready we need kind="ready", so we construct the envelope manually
-            let json_array = serde_json::to_string(&issues).unwrap_or_else(|_| "[]".to_string());
-            println!("{}", formatter.format_with_envelope("ready", &json_array));
+            let jsonl = formatter.format_issues(&issues);
+            if envelope {
+                // Wrap in envelope with kind="ready"
+                println!("{}", formatter.format_with_envelope("ready", &jsonl, None));
+            } else {
+                // Raw JSONL output; empty ready prints `[]` as a special case
+                if jsonl.is_empty() {
+                    println!("[]");
+                } else {
+                    println!("{}", jsonl);
+                }
+            }
         }
         "toon" => {
             for candidate in candidates {
@@ -1983,10 +1997,10 @@ fn cmd_claim(
             out.workspace = Some(path.display().to_string());
             out.dry_run = Some(true);
             let json_str = formatter.format_claim_result(&out);
-            println!("{}", formatter.format_with_envelope("claim", &json_str));
+            println!("{}", formatter.format_with_envelope("claim", &json_str, None));
         } else {
             let json_str = formatter.format_no_claim();
-            println!("{}", formatter.format_with_envelope("claim", &json_str));
+            println!("{}", formatter.format_with_envelope("claim", &json_str, None));
         }
     } else if any {
         // Claim from any workspace
@@ -2012,11 +2026,11 @@ fn cmd_claim(
                 out.reclaimed = Some(reclaimed);
                 out.workspace = workspace_path.map(|p| p.display().to_string());
                 let json_str = formatter.format_claim_result(&out);
-                println!("{}", formatter.format_with_envelope("claim", &json_str));
+                println!("{}", formatter.format_with_envelope("claim", &json_str, None));
             }
             None => {
                 let json_str = formatter.format_no_claim();
-            println!("{}", formatter.format_with_envelope("claim", &json_str));
+            println!("{}", formatter.format_with_envelope("claim", &json_str, None));
             }
         }
     } else if fallback == Some("any") {
@@ -2038,7 +2052,7 @@ fn cmd_claim(
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
                 let json_str = formatter.format_claim_result(&out);
-                println!("{}", formatter.format_with_envelope("claim", &json_str));
+                println!("{}", formatter.format_with_envelope("claim", &json_str, None));
             }
             None => {
                 // Fallback to any workspace
@@ -2061,11 +2075,11 @@ fn cmd_claim(
                         out.reclaimed = Some(reclaimed);
                         out.workspace = workspace_path.map(|p| p.display().to_string());
                         let json_str = formatter.format_claim_result(&out);
-                        println!("{}", formatter.format_with_envelope("claim", &json_str));
+                        println!("{}", formatter.format_with_envelope("claim", &json_str, None));
                     }
                     None => {
                         let json_str = formatter.format_no_claim();
-            println!("{}", formatter.format_with_envelope("claim", &json_str));
+            println!("{}", formatter.format_with_envelope("claim", &json_str, None));
                     }
                 }
             }
@@ -2088,11 +2102,11 @@ fn cmd_claim(
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
                 let json_str = formatter.format_claim_result(&out);
-                println!("{}", formatter.format_with_envelope("claim", &json_str));
+                println!("{}", formatter.format_with_envelope("claim", &json_str, None));
             }
             None => {
                 let json_str = formatter.format_no_claim();
-            println!("{}", formatter.format_with_envelope("claim", &json_str));
+            println!("{}", formatter.format_with_envelope("claim", &json_str, None));
             }
         }
     }
@@ -2390,6 +2404,7 @@ fn cmd_batch(
     file: Option<PathBuf>,
     json: Option<String>,
     stdin: bool,
+    format: &str,
     no_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
@@ -2410,20 +2425,37 @@ fn cmd_batch(
 
     let results = execute_batch(&storage, ops, beads_dir, no_auto_flush)?;
 
-    // Print results
-    for result in results {
-        if result.status == "ok" {
-            if let Some(id) = result.id {
-                println!("[op {}] ok: {}", result.op, id);
-            } else {
-                println!("[op {}] ok", result.op);
+    // Check if we should output JSON
+    let output_format = crate::format::OutputFormat::from_str(format).unwrap_or(crate::format::OutputFormat::Text);
+    match output_format {
+        crate::format::OutputFormat::Json => {
+            let formatter = get_formatter(output_format);
+            // Convert Vec<BatchResult> to JSONL (newline-separated JSON objects)
+            let jsonl = results
+                .iter()
+                .map(|r| serde_json::to_string(r))
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap_or_default()
+                .join("\n");
+            println!("{}", formatter.format_with_envelope("batch", &jsonl, None));
+        }
+        _ => {
+            // Print results in human-readable format
+            for result in results {
+                if result.status == "ok" {
+                    if let Some(id) = result.id {
+                        println!("[op {}] ok: {}", result.op, id);
+                    } else {
+                        println!("[op {}] ok", result.op);
+                    }
+                } else {
+                    eprintln!(
+                        "[op {}] error: {}",
+                        result.op,
+                        result.error.unwrap_or_default()
+                    );
+                }
             }
-        } else {
-            eprintln!(
-                "[op {}] error: {}",
-                result.op,
-                result.error.unwrap_or_default()
-            );
         }
     }
 
@@ -2787,6 +2819,7 @@ fn cmd_search(
     priority_max: Option<i32>,
     limit: usize,
     format: &str,
+    envelope: bool,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -2817,7 +2850,7 @@ fn cmd_search(
     match output_format {
         OutputFormat::Json => {
             let json_str = formatter.format_issues(&issues);
-            println!("{}", formatter.format_with_envelope("search", &json_str));
+            println!("{}", formatter.format_with_envelope("search", &json_str, None));
         }
         _ => {
             print!("{}", formatter.format_issues(&issues));
@@ -2877,7 +2910,7 @@ fn cmd_stats(
     match output_format {
         OutputFormat::Json => {
             let json_str = formatter.format_stats(&output);
-            println!("{}", formatter.format_with_envelope("stats", &json_str));
+            println!("{}", formatter.format_with_envelope("stats", &json_str, None));
         }
         _ => {
             print!("{}", formatter.format_stats(&output));
@@ -3117,7 +3150,7 @@ fn cmd_velocity(
     match output_format {
         OutputFormat::Json => {
             let json_str = formatter.format_velocity(&stats);
-            println!("{}", formatter.format_with_envelope("velocity", &json_str));
+            println!("{}", formatter.format_with_envelope("velocity", &json_str, None));
         }
         _ => {
             print!("{}", formatter.format_velocity(&stats));
@@ -3539,7 +3572,7 @@ fn cmd_recent(
     match output_format {
         OutputFormat::Json => {
             let json_str = formatter.format_issues(&issues);
-            println!("{}", formatter.format_with_envelope("recent", &json_str));
+            println!("{}", formatter.format_with_envelope("recent", &json_str, None));
         }
         _ => {
             print!("{}", formatter.format_issues(&issues));
