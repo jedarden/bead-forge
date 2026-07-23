@@ -436,3 +436,33 @@ fn test_schema_command_does_not_modify_jsonl() {
     let _ = run_command(workspace, &["schema", "all"]);
     before.assert_unchanged(&jsonl_path, "bf schema all");
 }
+
+#[test]
+fn test_status_command_does_not_modify_jsonl() {
+    let temp_dir = setup_test_workspace();
+    let workspace = temp_dir.path();
+    let jsonl_path = workspace.join(".beads/issues.jsonl");
+
+    let before = FileSnapshot::snapshot(&jsonl_path);
+
+    // Run bf status
+    let _ = run_command(workspace, &["status"]);
+    before.assert_unchanged(&jsonl_path, "bf status");
+
+    // Run bf status --format json
+    let _ = run_command(workspace, &["status", "--format", "json"]);
+    before.assert_unchanged(&jsonl_path, "bf status --format json");
+}
+
+#[test]
+fn test_sync_status_command_does_not_modify_jsonl() {
+    let temp_dir = setup_test_workspace();
+    let workspace = temp_dir.path();
+    let jsonl_path = workspace.join(".beads/issues.jsonl");
+
+    let before = FileSnapshot::snapshot(&jsonl_path);
+
+    // Run bf sync --status
+    let _ = run_command(workspace, &["sync", "--status"]);
+    before.assert_unchanged(&jsonl_path, "bf sync --status");
+}
