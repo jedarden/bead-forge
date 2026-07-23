@@ -366,8 +366,11 @@ mod epic_label_cli_tests {
         let id = extract_id(&stdout);
 
         // Perform various label operations
-        bf_cmd(&["label", "add", "--label", "added", &id], dir).2.expect("Add label failed");
-        bf_cmd(&["label", "remove", "--label", "initial", &id], dir).2.expect("Remove label failed");
+        let (_, _, add_success) = bf_cmd(&["label", "add", "--label", "added", &id], dir);
+        assert!(add_success, "Add label failed");
+
+        let (_, _, remove_success) = bf_cmd(&["label", "remove", "--label", "initial", &id], dir);
+        assert!(remove_success, "Remove label failed");
 
         // Verify type is still epic
         let (stdout, _, _) = bf_cmd(&["show", &id, "--format", "json"], dir);
