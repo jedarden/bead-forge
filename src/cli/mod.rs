@@ -1652,9 +1652,10 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             let mut out = issue;
             out.dependencies = vec![];
             out.comments = vec![];
-            // Use the JsonFormatter which applies envelope wrapping
+            // Serialize to JSON and wrap in envelope
             let formatter = get_formatter(OutputFormat::Json);
-            println!("{}", formatter.format_issue(&out));
+            let json_str = formatter.format_issue(&out);
+            println!("{}", formatter.format_with_envelope("show", &json_str));
         }
         "toon" => {
             println!("ID: {}", issue.id);
@@ -1975,9 +1976,11 @@ fn cmd_claim(
             out.downstream_impact = Some(candidate.downstream_impact);
             out.workspace = Some(path.display().to_string());
             out.dry_run = Some(true);
-            println!("{}", formatter.format_claim_result(&out));
+            let json_str = formatter.format_claim_result(&out);
+            println!("{}", formatter.format_with_envelope("claim", &json_str));
         } else {
-            println!("{}", formatter.format_no_claim());
+            let json_str = formatter.format_no_claim();
+            println!("{}", formatter.format_with_envelope("claim", &json_str));
         }
     } else if any {
         // Claim from any workspace
@@ -2002,10 +2005,12 @@ fn cmd_claim(
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
                 out.workspace = workspace_path.map(|p| p.display().to_string());
-                println!("{}", formatter.format_claim_result(&out));
+                let json_str = formatter.format_claim_result(&out);
+                println!("{}", formatter.format_with_envelope("claim", &json_str));
             }
             None => {
-                println!("{}", formatter.format_no_claim());
+                let json_str = formatter.format_no_claim();
+            println!("{}", formatter.format_with_envelope("claim", &json_str));
             }
         }
     } else if fallback == Some("any") {
@@ -2026,7 +2031,8 @@ fn cmd_claim(
                 flush_claim(beads_dir);
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
-                println!("{}", formatter.format_claim_result(&out));
+                let json_str = formatter.format_claim_result(&out);
+                println!("{}", formatter.format_with_envelope("claim", &json_str));
             }
             None => {
                 // Fallback to any workspace
@@ -2048,10 +2054,12 @@ fn cmd_claim(
                         let mut out = ClaimResultOutput::new(&bead_id, assignee);
                         out.reclaimed = Some(reclaimed);
                         out.workspace = workspace_path.map(|p| p.display().to_string());
-                        println!("{}", formatter.format_claim_result(&out));
+                        let json_str = formatter.format_claim_result(&out);
+                        println!("{}", formatter.format_with_envelope("claim", &json_str));
                     }
                     None => {
-                        println!("{}", formatter.format_no_claim());
+                        let json_str = formatter.format_no_claim();
+            println!("{}", formatter.format_with_envelope("claim", &json_str));
                     }
                 }
             }
@@ -2073,10 +2081,12 @@ fn cmd_claim(
                 flush_claim(beads_dir);
                 let mut out = ClaimResultOutput::new(&bead_id, assignee);
                 out.reclaimed = Some(reclaimed);
-                println!("{}", formatter.format_claim_result(&out));
+                let json_str = formatter.format_claim_result(&out);
+                println!("{}", formatter.format_with_envelope("claim", &json_str));
             }
             None => {
-                println!("{}", formatter.format_no_claim());
+                let json_str = formatter.format_no_claim();
+            println!("{}", formatter.format_with_envelope("claim", &json_str));
             }
         }
     }
@@ -2850,7 +2860,15 @@ fn cmd_stats(
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_stats(&output));
+    match output_format {
+        OutputFormat::Json => {
+            let json_str = formatter.format_stats(&output);
+            println!("{}", formatter.format_with_envelope("stats", &json_str));
+        }
+        _ => {
+            print!("{}", formatter.format_stats(&output));
+        }
+    }
 
     Ok(())
 }
