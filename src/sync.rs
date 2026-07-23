@@ -596,4 +596,130 @@ mod tests {
         let exported = flush_dirty(workspace).unwrap();
         assert_eq!(exported, 0);
     }
+
+    #[test]
+    fn test_labels_import_from_jsonl() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let jsonl_path = beads_dir.join("issues.jsonl");
+
+        // Create JSONL with issues that have labels
+        let issue_with_labels = Issue {
+            id: "bf-labels".to_string(),
+            title: "Test Labels Import".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["phase-1".to_string(), "storage".to_string(), "critical".to_string()],
+            ..Default::default()
+        };
+
+        let issue_without_labels = Issue {
+            id: "bf-nolabels".to_string(),
+            title: "Test No Labels".to_string(),
+            status: Status::Open,
+            priority: Priority::LOW,
+            issue_type: IssueType::Chore,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![],
+            ..Default::default()
+        };
+
+        {
+            use std::io::Write;
+            let mut file = std::fs::File::create(&jsonl_path).unwrap();
+            writeln!(file, "{}", serde_json::to_string(&issue_with_labels).unwrap()).unwrap();
+            writeln!(file, "{}", serde_json::to_string(&issue_without_labels).unwrap()).unwrap();
+        }
+
+        // Import from JSONL
+        let result = import(workspace).unwrap();
+        assert_eq!(result.imported, 2);
+
+        // Verify labels were imported correctly
+        let storage = Storage::open(&db_path).unwrap();
+
+        let imported1 = storage.get_issue("bf-labels").unwrap().unwrap();
+        assert_eq!(imported1.labels.len(), 3);
+        assert!(imported1.labels.contains(&"phase-1".to_string()));
+        assert!(imported1.labels.contains(&"storage".to_string()));
+        assert!(imported1.labels.contains(&"critical".to_string()));
+
+        let imported2 = storage.get_issue("bf-nolabels").unwrap().unwrap();
+        assert_eq!(imported2.labels.len(), 0);
+
+        // Verify labels in bead_labels table
+        storage.with_immediate_transaction(|tx| {
+            let mut stmt = tx.prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label").unwrap();
+            let labels: Vec<String> = stmt.query_map(params!["bf-labels"], |row| row.get::<_, String>(0)).unwrap()
+                .filter_map(|r| r.ok()).collect();
+            assert_eq!(labels, vec!["critical", "phase-1", "storage"]);
+            Ok(())
+        }).unwrap();
+
+        // Verify no labels for the issue without labels
+        storage.with_immediate_transaction(|tx| {
+            let mut stmt = tx.prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1").unwrap();
+            let count: i64 = stmt.query_row(params!["bf-nolabels"], |row| row.get(0)).unwrap();
+            assert_eq!(count, 0);
+            Ok(())
+        }).unwrap();
+    }
+
+    #[test]
+    fn test_labels_import_idempotent() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+
+        init_workspace(&beads_dir, "bf").unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let jsonl_path = beads_dir.join("issues.jsonl");
+
+        // Create an issue with labels
+        let issue = Issue {
+            id: "bf-Idempotent".to_string(),
+            title: "Idempotent Labels Import".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["phase-2".to_string(), "testing".to_string()],
+            ..Default::default()
+        };
+
+        {
+            use std::io::Write;
+            let mut file = std::fs::File::create(&jsonl_path).unwrap();
+            writeln!(file, "{}", serde_json::to_string(&issue).unwrap()).unwrap();
+        }
+
+        // Import twice
+        let result1 = import(workspace).unwrap();
+        assert_eq!(result1.imported, 1);
+
+        let result2 = import(workspace).unwrap();
+        assert_eq!(result2.imported, 0);
+        assert_eq!(result2.skipped, 1);
+
+        // Verify labels are still correct after second import
+        let storage = Storage::open(&db_path).unwrap();
+        let imported = storage.get_issue("bf-Idempotent").unwrap().unwrap();
+        assert_eq!(imported.labels.len(), 2);
+        assert!(imported.labels.contains(&"phase-2".to_string()));
+        assert!(imported.labels.contains(&"testing".to_string()));
+    }
 }

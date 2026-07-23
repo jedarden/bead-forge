@@ -1,88 +1,80 @@
-# Label Import from JSONL - Already Implemented
+# Label Import from JSONL - Verification
 
-## Verification Summary
+## Bead: bf-4curdz
+**Status:** Already Implemented ✅
 
-Label import from JSONL checkpoint is **already fully implemented** in bead-forge.
+## Summary
 
-## Implementation Details
+Label import from JSONL checkpoint is **already fully implemented** in the codebase. This bead verified the existing implementation meets all acceptance criteria.
 
-### 1. Data Model (`src/model.rs`)
-- `Issue` struct includes `labels: Vec<String>` field (line 558)
-- Serde automatically deserializes this from JSONL during import
+## Implementation Location
 
-### 2. JSONL Import (`src/jsonl.rs`)
-- `import_jsonl()` function (line 37) deserializes each line into an `Issue`
-- The `labels` field is automatically populated from the JSON
+1. **Data Model** (`src/model.rs`):
+   - `Issue` struct has `labels: Vec<String>` field (line 558)
+   - Serde handles JSONL deserialization automatically
 
-### 3. Storage Layer (`src/storage/sqlite.rs`)
+2. **Storage Layer** (`src/storage/sqlite.rs`):
+   - `create_issue_tx()` (lines 1885-1896): Inserts labels into `bead_labels` table
+   - `update_issue_from_json_tx()` (lines 2002-2013): Updates labels in `bead_labels` table
 
-#### `create_issue_tx()` (lines 1885-1896)
-```rust
-for label in &issue.labels {
-    tx.execute(
-        "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
-        params![&issue.id, label],
-    )?;
-}
-for label in &issue.labels {
-    tx.execute(
-        "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
-        params![&issue.id, label],
-    )?;
-}
-```
-
-#### `update_issue_from_json_tx()` (lines 2002-2013)
-```rust
-// Delete old labels first
-tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
-tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![&issue.id])?;
-
-// Insert new labels
-for label in &issue.labels {
-    tx.execute(
-        "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
-        params![&issue.id, label],
-    )?;
-}
-for label in &issue.labels {
-    tx.execute(
-        "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
-        params![&issue.id, label],
-    )?;
-}
-```
-
-### 4. Sync Import Flow (`src/sync.rs`)
-
-The `import()` function (lines 181-265) handles label import as follows:
-
-1. Opens an immediate transaction: `storage.with_immediate_transaction()`
-2. Calls `import_jsonl()` which deserializes Issues (including labels)
-3. For new beads: calls `create_issue_tx()` which inserts labels
-4. For updated beads: calls `update_issue_from_json_tx()` which updates labels
-5. All operations are atomic within the transaction
+3. **Import Flow** (`src/sync.rs`):
+   - `import()` function (line 181): Uses `import_jsonl()` which parses JSONL
+   - Parsed `Issue` objects (with labels) are passed to `create_issue_tx()` or `update_issue_from_json_tx()`
+   - All operations within `with_immediate_transaction()` for atomicity
 
 ## Acceptance Criteria Verification
 
-All acceptance criteria are met:
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| Parse labels array from JSONL during import | ✅ | Serde auto-deserializes into `Issue.labels` field |
+| Insert label relationships into bead_labels table | ✅ | Both `create_issue_tx` and `update_issue_from_json_tx` insert into `bead_labels` (lines 1891-1895, 2008-2012) |
+| Handle beads with no labels (empty/missing labels field) | ✅ | Loop over `issue.labels` simply doesn't execute if empty; empty arrays are skipped in JSONL export (`skip_serializing_if`) |
+| Use transaction for atomic import of all bead data including labels | ✅ | `import()` uses `with_immediate_transaction()` (line 213) wrapping entire import operation |
+| Import is idempotent (can run multiple times safely) | ✅ | Uses `INSERT OR IGNORE` for labels; collision resolution preserves newer versions; unchanged beads are skipped |
 
-- ✅ **Parse labels array from JSONL during import**: Serde automatically deserializes the `labels` field
-- ✅ **Insert label relationships into bead_labels table**: Both `create_issue_tx()` and `update_issue_from_json_tx()` insert into `bead_labels`
-- ✅ **Handle beads with no labels**: Empty/missing `labels` field results in no insertions (loop doesn't iterate)
-- ✅ **Use transaction for atomic import**: All operations run within `with_immediate_transaction()`
-- ✅ **Import is idempotent**: `INSERT OR IGNORE` prevents duplicate labels; transaction ensures atomicity
+## Tests Added
 
-## Test Coverage
+Added comprehensive tests to `src/sync.rs` to verify label import:
 
-Created comprehensive test suite in `tests/test_label_import.rs` covering:
+1. **`test_labels_import_from_jsonl`**: Verifies:
+   - Issues with labels are imported correctly
+   - Labels are inserted into `bead_labels` table
+   - Issues without labels are handled (empty labels array)
+   - Multiple labels per issue work correctly
 
-1. Basic label import from JSONL
-2. Empty labels handling
-3. Export/import roundtrip
-4. Idempotent import (no duplicates)
-5. Atomic transaction verification
+2. **`test_labels_import_idempotent`**: Verifies:
+   - Running import multiple times is safe
+   - Second import skips unchanged beads
+   - Labels remain consistent across imports
+
+## Schema
+
+The `bead_labels` table schema (from `src/storage/schema.rs`, lines 270-276):
+```sql
+CREATE TABLE IF NOT EXISTS bead_labels (
+    bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    label    TEXT NOT NULL,
+    PRIMARY KEY (bead_id, label)
+);
+CREATE INDEX IF NOT EXISTS idx_bead_labels_label ON bead_labels(label);
+CREATE INDEX IF NOT EXISTS idx_bead_labels_issue ON bead_labels(bead_id);
+```
+
+## Export/Import Roundtrip
+
+Labels export to JSONL was already verified in `src/jsonl.rs` tests:
+- `labels_are_exported_to_jsonl` (line 308)
+- `labels_roundtrip_through_jsonl` (line 326)
+- `empty_labels_array_skipped_in_jsonl` (line 346)
+
+Import verification (this bead) completes the roundtrip test coverage.
 
 ## Conclusion
 
-The feature was already fully implemented in the existing codebase. No additional code changes were required. The test suite provides verification and regression coverage.
+No code changes were needed - the feature was already fully implemented. This bead:
+1. ✅ Verified existing implementation meets all acceptance criteria
+2. ✅ Added comprehensive tests for label import functionality
+3. ✅ Documented the implementation flow and components
+
+**Build Status:** ✅ Compiles cleanly
+**Tests Added:** 2 new tests in `src/sync.rs`
