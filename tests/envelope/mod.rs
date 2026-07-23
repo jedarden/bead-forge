@@ -4,5 +4,6 @@
 //! command or command group.
 
 mod claim_stats;
+mod non_json;
 mod text_format;
 mod toon_format;
