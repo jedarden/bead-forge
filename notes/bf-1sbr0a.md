@@ -1,42 +1,61 @@
-# bf-1sbr0a: Labels Export to JSONL Verification
+# Labels Export to JSONL - Verification (bf-1sbr0a)
 
-## Finding
-Labels export to JSONL during sync flush is **already fully implemented** and working correctly.
+## Task
+Export labels to JSONL during sync flush
+
+## Status: ✅ ALREADY IMPLEMENTED
 
 ## Implementation Details
 
-### Storage Layer (src/storage/sqlite.rs)
-- `list_all_issues()` uses `GROUP_CONCAT(bl.label) AS labels` with LEFT JOIN to bead_labels
-- `list_dirty_issues()` uses the same pattern for incremental exports
-- `row_to_issue_conn()` parses the GROUP_CONCAT result into `labels: Vec<String>`
+### 1. Database Layer (src/storage/sqlite.rs)
+- **Line 280, 191, 305**: All list queries include `GROUP_CONCAT(bl.label) AS labels`
+- **Lines 990-993**: Labels parsed from comma-separated GROUP_CONCAT result
+- **Lines 1039-1047**: `load_labels_conn()` helper for loading individual labels
 
-### Model Layer (src/model.rs)
-- `Issue` struct has `labels: Vec<String>` field with proper serde serialization
-- `#[serde(skip_serializing_if = "Vec::is_empty", default)]` ensures empty arrays are skipped
+### 2. Model Layer (src/model.rs) 
+- **Line 558**: `pub labels: Vec<String>` with serde serialization attributes
+- Uses `#[serde(skip_serializing_if = "Vec::is_empty", default)]` to skip empty arrays
 
-### Export Flow
-1. `flush()` calls `storage.list_all_issues()` → queries labels
-2. `flush_dirty()` calls `storage.list_dirty_issues()` → queries labels
-3. `export_jsonl()` serializes the full Issue struct including labels
-4. Labels are written to JSONL in standard array format: `"labels":["label1","label2"]`
+### 3. JSONL Export (src/jsonl.rs)
+- **Lines 308-360**: Comprehensive tests verify labels export and roundtrip
+- Labels are automatically included via Serde serialization of `Issue` struct
+- No special handling needed - just serializes the `labels` field
 
-## Verification Test
+### 4. Sync Layer (src/sync.rs)
+- **Lines 601-724**: Tests verify labels import from JSONL
+- **Lines 601-677**: `test_labels_import_from_jsonl()` confirms labels roundtrip
+
+## Acceptance Criteria Verification
+
+✅ **Labels queried from bead_labels table**: All queries use `LEFT JOIN bead_labels` + `GROUP_CONCAT`
+✅ **Labels included in JSONL output**: Serde automatically serializes `labels` field
+✅ **All labels exported (no truncation)**: GROUP_CONCAT doesn't truncate by default
+✅ **Atomic with bead data**: Labels are part of same `Issue` struct and transaction
+✅ **Backward-compatible with br**: Uses standard JSON array format
+
+## Test Coverage
+
+- `jsonl.rs::labels_are_exported_to_jsonl()` - Basic export test
+- `jsonl.rs::labels_roundtrip_through_jsonl()` - Roundtrip test  
+- `jsonl.rs::empty_labels_array_skipped_in_jsonl()` - Empty array handling
+- `sync.rs::test_labels_import_from_jsonl()` - Full sync with labels
+- `sync.rs::test_labels_import_idempotent()` - Import idempotence
+
+## Code Paths
+
+**Export path**:
 ```
-Created bead: bf-1bm
-Labels: critical, phase-1, storage
-Flushed 1 beads to JSONL
-JSONL output: {"labels":["critical","phase-1","storage"]}
+sync::flush() → storage.list_all_issues() → row_to_issue_conn() → export_jsonl() → Issue serde::serialize
 ```
 
-## Acceptance Criteria (All Met)
-- ✓ Labels queried from bead_labels table during export
-- ✓ Labels included in JSONL output format for each bead
-- ✓ All labels exported (no truncation)
-- ✓ Export atomic with rest of bead data
-- ✓ JSONL format backward-compatible with br
+**Labels flow**:
+1. `list_all_issues()` joins `bead_labels` table
+2. SQLite aggregates with `GROUP_CONCAT(bl.label)`  
+3. `row_to_issue_conn()` parses comma-separated result into `Vec<String>`
+4. `export_jsonl()` serializes entire `Issue` struct to JSONL
+5. Serde automatically includes `labels` array in JSON output
 
-## Related Commits
-- c6800c5 docs(bf-3ou3re): Verify labels export to JSONL is already implemented
-- 27944bd test(bf-4wmjb2): Add label export/import round-trip verification
-- 44f8def feat(bf-49v3i6): Query labels from bead_labels table during JSONL export
-- ce84ead feat(bf-3l64k2): Add labels field to Issue JSON serialization
+## Conclusion
+
+Labels export to JSONL during sync flush is **fully implemented and tested**. 
+No additional changes needed - the task requirements are already met by the existing codebase.
