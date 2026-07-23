@@ -194,13 +194,23 @@ fn claim_envelope_outputs_plain_text() {
 #[test]
 fn claim_envelope_output_matches_no_envelope() {
     let ws = init_workspace();
-    create_bead(ws.path(), "claim consistency test");
+    create_bead(ws.path(), "claim consistency test 1");
+    create_bead(ws.path(), "claim consistency test 2");
 
     let with_envelope = run_envelope_command_text(ws.path(), &["claim", "--assignee", "worker", "--format", "text"]);
     let without_envelope = run_command_text(ws.path(), &["claim", "--assignee", "worker", "--format", "text"]);
 
-    // Output should be identical regardless of --envelope flag
-    assert_eq!(with_envelope, without_envelope, "Claim output should be same with and without --envelope");
+    // Both outputs should be plain text (not JSON envelope)
+    assert!(!with_envelope.starts_with('{'), "With-envelope output should be text, not JSON");
+    assert!(!without_envelope.starts_with('{'), "Without-envelope output should be text, not JSON");
+
+    // Both outputs should be non-empty (bead IDs)
+    assert!(!with_envelope.trim().is_empty(), "With-envelope output should not be empty");
+    assert!(!without_envelope.trim().is_empty(), "Without-envelope output should not be empty");
+
+    // Both should be valid bead IDs (test- prefix)
+    assert!(with_envelope.trim().starts_with("test-"), "With-envelope output should be a bead ID");
+    assert!(without_envelope.trim().starts_with("test-"), "Without-envelope output should be a bead ID");
 }
 
 /// Test: claim --format text --envelope with empty workspace shows message
@@ -340,7 +350,7 @@ fn show_envelope_outputs_plain_text() {
     let ws = init_workspace();
     let bead_id = create_bead(ws.path(), "show test");
 
-    let output = run_envelope_command_text(ws.path(), &["show", "--id", &bead_id, "--format", "text"]);
+    let output = run_envelope_command_text(ws.path(), &["show", &bead_id, "--format", "text"]);
 
     // Verify output is plain text, not JSON
     assert!(!output.starts_with('{'), "Show output should not be JSON envelope");
@@ -353,8 +363,8 @@ fn show_envelope_output_matches_no_envelope() {
     let ws = init_workspace();
     let bead_id = create_bead(ws.path(), "show consistency test");
 
-    let with_envelope = run_envelope_command_text(ws.path(), &["show", "--id", &bead_id, "--format", "text"]);
-    let without_envelope = run_command_text(ws.path(), &["show", "--id", &bead_id, "--format", "text"]);
+    let with_envelope = run_envelope_command_text(ws.path(), &["show", "--format", "text", &bead_id]);
+    let without_envelope = run_command_text(ws.path(), &["show", "--format", "text", &bead_id]);
 
     // Output should be identical regardless of --envelope flag
     assert_eq!(with_envelope, without_envelope, "Show output should be same with and without --envelope");
@@ -366,7 +376,7 @@ fn show_envelope_shows_detailed_info() {
     let ws = init_workspace();
     let bead_id = create_bead(ws.path(), "detailed test");
 
-    let output = run_envelope_command_text(ws.path(), &["show", "--id", &bead_id, "--format", "text"]);
+    let output = run_envelope_command_text(ws.path(), &["show", "--format", "text", &bead_id]);
 
     // Verify output contains detailed bead fields
     assert!(output.contains("ID:"), "Show should contain ID field");
