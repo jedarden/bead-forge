@@ -117,7 +117,7 @@ fn batch_close_cascade_marked_dirty_and_exported_in_single_flush() {
         id: "bf-blk".into(),
         reason: "done".into(),
     }];
-    let results = execute_batch(&storage, ops, ws.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(&storage, ops, ws.path(), true /* no-auto-flush: test calls flush manually **/).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].status, "ok");
 
@@ -245,7 +245,7 @@ fn incremental_flush_targets_only_active_jsonl_not_archive() {
         assignee: None,
         labels: vec![],
     }];
-    let results = execute_batch(&storage, ops, ws.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(&storage, ops, ws.path(), true /* no-auto-flush: test calls flush manually **/).unwrap();
     let new_id = results[0].id.clone().expect("create op yields an id");
     let n = autoflush::run(ws.path()).unwrap();
     assert_eq!(n, 1, "the batch flush exports exactly the one new bead");
