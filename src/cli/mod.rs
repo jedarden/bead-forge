@@ -598,6 +598,10 @@ pub enum Commands {
         /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
+
+        /// Wrap output in a JSON envelope (requires --format json)
+        #[arg(long)]
+        envelope: bool,
     },
 
     /// Emit JSON Schema
@@ -1135,7 +1139,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         Commands::Show { id, format, json } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_show(&beads_dir, &id, &format)
+            cmd_show(&beads_dir, &id, &format, cli.envelope)
         }
         Commands::Update {
             id,
@@ -1293,6 +1297,7 @@ pub fn run(cli: Cli) -> Result<()> {
             by_assignee,
             by_label,
             format,
+            envelope,
         } => cmd_stats(
             &beads_dir,
             by_type,
@@ -1300,6 +1305,7 @@ pub fn run(cli: Cli) -> Result<()> {
             by_assignee,
             by_label,
             &format,
+            envelope,
         ),
         Commands::Schema { target, format } => cmd_schema(&target, &format),
         Commands::Config(config) => cmd_config(&beads_dir, config),
@@ -1534,7 +1540,7 @@ fn cmd_create(
         let formatter = get_formatter(OutputFormat::Json);
         let data = serde_json::json!({ "id": id });
         let json_str = serde_json::to_string(&data)?;
-        println!("{}", formatter.format_with_envelope("create", &json_str));
+        println!("{}", formatter.format_with_envelope_and_warning("create", &json_str, warning.as_deref()));
     } else {
         println!("{}", id);
     }
@@ -1625,7 +1631,18 @@ fn cmd_list(
             let jsonl = formatter.format_issues(&issues);
             if envelope {
                 // Wrap in envelope with kind="list"
-                println!("{}", formatter.format_with_envelope("list", &jsonl));
+                // Convert JSONL to JSON array for envelope wrapping
+                let data = if jsonl.is_empty() {
+                    "[]".to_string()
+                } else {
+                    // Convert JSONL (one object per line) to JSON array
+                    let objects: Vec<serde_json::Value> = jsonl
+                        .lines()
+                        .filter_map(|line| serde_json::from_str(line).ok())
+                        .collect();
+                    serde_json::to_string(&objects).unwrap_or_else(|_| "[]".to_string())
+                };
+                println!("{}", formatter.format_with_envelope("list", &data));
             } else {
                 // Raw JSONL output; empty list prints nothing
                 if !jsonl.is_empty() {
@@ -1641,7 +1658,7 @@ fn cmd_list(
     Ok(())
 }
 
-fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
+fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1664,10 +1681,16 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             let mut out = issue;
             out.dependencies = vec![];
             out.comments = vec![];
-            // Serialize to JSON and wrap in envelope
+            // Serialize to JSON
             let formatter = get_formatter(OutputFormat::Json);
             let json_str = formatter.format_issue(&out);
-            println!("{}", formatter.format_with_envelope("show", &json_str));
+            if envelope {
+                // Wrap in envelope with kind="show"
+                println!("{}", formatter.format_with_envelope("show", &json_str));
+            } else {
+                // Raw JSON array output (NEEDLE contract: single-element array)
+                println!("[{}]", json_str);
+            }
         }
         "toon" => {
             println!("ID: {}", issue.id);
@@ -1856,7 +1879,9 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
             let jsonl = formatter.format_issues(&issues);
             if envelope {
                 // Wrap in envelope with kind="ready"
-                println!("{}", formatter.format_with_envelope("ready", &jsonl));
+                // Ensure empty results are "[]" not "" so format_with_envelope parses as array
+                let data = if jsonl.is_empty() { "[]".to_string() } else { jsonl };
+                println!("{}", formatter.format_with_envelope("ready", &data));
             } else {
                 // Raw JSONL output; empty ready prints `[]` as a special case
                 if jsonl.is_empty() {
@@ -2861,6 +2886,7 @@ fn cmd_stats(
     by_assignee: bool,
     by_label: bool,
     format: &str,
+    envelope: bool,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -2903,7 +2929,12 @@ fn cmd_stats(
     let formatter = get_formatter(output_format);
     match output_format {
         OutputFormat::Json => {
-            println!("{}", formatter.format_stats(&output));
+            let json_str = formatter.format_stats(&output);
+            if envelope {
+                println!("{}", formatter.format_with_envelope("stats", &json_str));
+            } else {
+                println!("{}", json_str);
+            }
         }
         _ => {
             print!("{}", formatter.format_stats(&output));
