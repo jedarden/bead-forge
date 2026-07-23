@@ -5,3 +5,4 @@
 
 mod claim_stats;
 mod text_format;
+mod toon_format;
