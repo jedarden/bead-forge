@@ -1920,4 +1920,344 @@ mod tests {
             panic!("Expected Create with extended attributes");
         }
     }
+
+    #[test]
+    fn test_update_operation_modifies_bead_fields() {
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create a test bead
+        storage
+            .with_immediate_transaction(|tx| {
+                tx.execute(
+                    "INSERT INTO issues (id, content_hash, title, description, status, priority, issue_type, created_at, created_by, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    rusqlite::params![
+                        "bf-test", "hash1", "Test Bead", "Original description", "open", 2, "task",
+                        Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                    ],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        // Test update operation
+        let ops = vec![BatchOp::Update {
+            id: "bf-test".to_string(),
+            title: Some("Updated Title".to_string()),
+            description: Some("Updated description".to_string()),
+            design: Some("Design notes".to_string()),
+            acceptance_criteria: Some("Criteria".to_string()),
+            notes: Some("Notes".to_string()),
+            status: Some("in_progress".to_string()),
+            priority: Some(0),
+            assignee: Some("worker-1".to_string()),
+            owner: Some("owner-1".to_string()),
+            issue_type: Some("bug".to_string()),
+        }];
+
+        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, "ok");
+
+        // Verify all fields were updated
+        let issue = storage.get_issue("bf-test").unwrap().unwrap();
+        assert_eq!(issue.title, "Updated Title");
+        assert_eq!(issue.description.as_deref(), Some("Updated description"));
+        assert_eq!(issue.design.as_deref(), Some("Design notes"));
+        assert_eq!(issue.acceptance_criteria.as_deref(), Some("Criteria"));
+        assert_eq!(issue.notes.as_deref(), Some("Notes"));
+        assert_eq!(issue.status, Status::InProgress);
+        assert_eq!(issue.priority, Priority(0));
+        assert_eq!(issue.assignee.as_deref(), Some("worker-1"));
+        assert_eq!(issue.owner.as_deref(), Some("owner-1"));
+        assert_eq!(issue.issue_type, IssueType::Bug);
+    }
+
+    #[test]
+    fn test_label_add_adds_labels_to_bead() {
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create a test bead
+        storage
+            .with_immediate_transaction(|tx| {
+                tx.execute(
+                    "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        "bf-test", "hash1", "Test Bead", "open", 2, "task",
+                        Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                    ],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        // Test label_add operation
+        let ops = vec![BatchOp::LabelAdd {
+            id: "bf-test".to_string(),
+            labels: vec!["urgent".to_string(), "backend".to_string()],
+        }];
+
+        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, "ok");
+
+        // Verify labels were added
+        let issue = storage.get_issue("bf-test").unwrap().unwrap();
+        assert_eq!(issue.labels.len(), 2);
+        assert!(issue.labels.contains(&"urgent".to_string()));
+        assert!(issue.labels.contains(&"backend".to_string()));
+    }
+
+    #[test]
+    fn test_label_remove_removes_labels_from_bead() {
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create a test bead with labels
+        storage
+            .with_immediate_transaction(|tx| {
+                tx.execute(
+                    "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        "bf-test", "hash1", "Test Bead", "open", 2, "task",
+                        Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                    ],
+                )?;
+                // Add initial labels
+                for label in &["urgent", "backend", "bug"] {
+                    tx.execute(
+                        "INSERT INTO labels (issue_id, label) VALUES (?1, ?2)",
+                        rusqlite::params!["bf-test", label],
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+
+        // Test label_remove operation
+        let ops = vec![BatchOp::LabelRemove {
+            id: "bf-test".to_string(),
+            labels: vec!["urgent".to_string(), "bug".to_string()],
+        }];
+
+        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, "ok");
+
+        // Verify labels were removed
+        let issue = storage.get_issue("bf-test").unwrap().unwrap();
+        assert_eq!(issue.labels.len(), 1);
+        assert!(issue.labels.contains(&"backend".to_string()));
+        assert!(!issue.labels.contains(&"urgent".to_string()));
+        assert!(!issue.labels.contains(&"bug".to_string()));
+    }
+
+    #[test]
+    fn test_update_label_operations_return_result() {
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create a test bead
+        storage
+            .with_immediate_transaction(|tx| {
+                tx.execute(
+                    "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        "bf-test", "hash1", "Test Bead", "open", 2, "task",
+                        Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                    ],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        // Test that operations return Result (error case - non-existent bead)
+        let ops = vec![
+            BatchOp::Update {
+                id: "bf-nonexistent".to_string(),
+                title: Some("New Title".to_string()),
+                description: None,
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: None,
+                priority: None,
+                assignee: None,
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::LabelAdd {
+                id: "bf-nonexistent".to_string(),
+                labels: vec!["urgent".to_string()],
+            },
+            BatchOp::LabelRemove {
+                id: "bf-nonexistent".to_string(),
+                labels: vec!["urgent".to_string()],
+            },
+        ];
+
+        // execute_batch should fail on first error
+        let result = execute_batch(&storage, ops, &temp_dir.path());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Bead not found"));
+    }
+
+    #[test]
+    fn test_update_and_label_operations_wired_in_exec_loop() {
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        fs::create_dir_all(&beads_dir).unwrap();
+
+        let config_path = beads_dir.join("config.yaml");
+        fs::write(
+            &config_path,
+            "issue_prefixes: [bf]\ndefault_priority: 2\ndefault_type: task\nclaim_ttl_minutes: 30\n",
+        )
+        .unwrap();
+
+        let metadata_path = beads_dir.join("metadata.json");
+        fs::write(
+            &metadata_path,
+            r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
+        )
+        .unwrap();
+
+        let db_path = beads_dir.join("beads.db");
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create test beads
+        storage
+            .with_immediate_transaction(|tx| {
+                for id in &["bf-1", "bf-2", "bf-3"] {
+                    tx.execute(
+                        "INSERT INTO issues (id, content_hash, title, status, priority, issue_type, created_at, created_by, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                        rusqlite::params![
+                            *id, "hash1", "Test", "open", 2, "task",
+                            Utc::now().to_rfc3339(), "test", Utc::now().to_rfc3339()
+                        ],
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+
+        // Test multiple operations in a single batch
+        let ops = vec![
+            BatchOp::Update {
+                id: "bf-1".to_string(),
+                title: Some("Updated 1".to_string()),
+                description: None,
+                design: None,
+                acceptance_criteria: None,
+                notes: None,
+                status: None,
+                priority: None,
+                assignee: None,
+                owner: None,
+                issue_type: None,
+            },
+            BatchOp::LabelAdd {
+                id: "bf-2".to_string(),
+                labels: vec!["urgent".to_string()],
+            },
+            BatchOp::LabelRemove {
+                id: "bf-3".to_string(),
+                labels: vec!["bug".to_string()], // removing non-existent label is fine
+            },
+        ];
+
+        let results = execute_batch(&storage, ops, &temp_dir.path()).unwrap();
+        assert_eq!(results.len(), 3);
+
+        // All operations should succeed
+        for result in &results {
+            assert_eq!(result.status, "ok");
+        }
+
+        // Verify each operation
+        let issue1 = storage.get_issue("bf-1").unwrap().unwrap();
+        assert_eq!(issue1.title, "Updated 1");
+
+        let issue2 = storage.get_issue("bf-2").unwrap().unwrap();
+        assert_eq!(issue2.labels.len(), 1);
+        assert!(issue2.labels.contains(&"urgent".to_string()));
+    }
 }
