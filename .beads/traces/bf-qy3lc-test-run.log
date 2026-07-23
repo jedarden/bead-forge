@@ -1,0 +1,192 @@
+
+running 22 tests
+test test_annotate_get ... ok
+test test_annotate_list ... ok
+test test_comments_list ... ok
+test test_config_variants ... ok
+test test_count ... ok
+test test_critical_path ... ok
+test test_dep_list ... ok
+test test_dep_tree ... ok
+test test_label_list ... ok
+test test_doctor ... ok
+test test_labels_variants ... ok
+test test_list_variants ... ok
+test test_log ... ok
+test test_ready_variants ... ok
+test test_recent ... ok
+test test_schema ... ok
+test test_search ... ok
+test test_show_variants ... ok
+test test_stats_variants ... ok
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2216:9
+     |
+2216 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2838:5
+     |
+2838 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:242:13
+    |
+242 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1149:51
+     |
+1149 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1371:13
+     |
+1371 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1511:13
+     |
+1511 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1042:4
+     |
+1042 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `cleanup_old_archives` is never used
+   --> src/rotate.rs:284:4
+    |
+284 | fn cleanup_old_archives(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:324:4
+    |
+324 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (lib) generated 19 warnings (run `cargo fix --lib -p bead-forge` to apply 10 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests/readonly_commands.rs (target/debug/deps/readonly_commands-039b424973fda025)
+
+running 22 tests
+test test_annotate_get ... ok
+test test_annotate_list ... ok
+test test_comments_list ... ok
+test test_config_variants ... ok
+test test_count ... ok
+test test_critical_path ... ok
+test test_dep_list ... ok
+test test_dep_tree ... ok
+test test_label_list ... ok
+test test_doctor ... ok
+test test_labels_variants ... ok
+test test_list_variants ... ok
+test test_log ... ok
+test test_ready_variants ... ok
+test test_recent ... ok
+test test_schema ... ok
+test test_search ... ok
+test test_show_variants ... ok
+test test_stats_variants ... ok
+error: unrecognized subcommand 'status'
+
+  tip: a similar subcommand exists: 'stats'
+
+Usage: bf [OPTIONS] [COMMAND]
+
+For more information, try '--help'.
+error: test failed, to rerun pass `--test readonly_commands`
+
+Caused by:
+  process didn't exit successfully: `/home/coding/bead-forge/target/debug/deps/readonly_commands-039b424973fda025 --skip test_commit_check` (exit status: 2)
+note: test exited abnormally; to see the full output pass --no-capture to the harness.
