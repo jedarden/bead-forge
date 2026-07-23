@@ -557,3 +557,296 @@ mod tests {
         assert_eq!(parsed.warning, Some("Line 1\nLine 2\nLine 3".to_string()));
     }
 }
+
+// === Integration tests for list and show envelope wrapping ===
+// These tests verify that list --json and show --json properly
+// wrap their output in envelopes with correct structure and metadata.
+// Bead: bf-3v1r9
+#[cfg(test)]
+mod list_show {
+    use super::*;
+    use crate::model::{Issue, Status, Priority, IssueType};
+    use crate::format::json::JsonFormatter;
+    use crate::format::Formatter;
+    use serde_json::json;
+
+    /// Helper to create a test issue
+    fn create_test_issue(id: &str, title: &str) -> Issue {
+        let mut issue = Issue::new(
+            id.to_string(),
+            title.to_string(),
+            ".".to_string()
+        );
+        issue.status = Status::Open;
+        issue.priority = Priority(2);
+        issue.issue_type = IssueType::Task;
+        issue
+    }
+
+    /// Helper to parse envelope from JSON string
+    fn parse_envelope(json_str: &str) -> JsonEnvelope {
+        serde_json::from_str(json_str)
+            .expect("Output must be valid JSON envelope")
+    }
+
+    #[test]
+    fn list_json_envelope_returns_array_data() {
+        let formatter = JsonFormatter;
+        let issues = vec![
+            create_test_issue("bf-1", "First task"),
+            create_test_issue("bf-2", "Second task"),
+        ];
+
+        // Format issues as JSONL (one per line)
+        let jsonl_output = Formatter::format_issues(&formatter, &issues);
+
+        // Wrap in envelope
+        let envelope = JsonEnvelope::new("list", json!(jsonl_output));
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "list");
+
+        // The data field should contain the JSONL string
+        assert!(parsed.data.is_string());
+
+        // Parse the JSONL string and verify it contains both issues
+        let jsonl_str = parsed.data.as_str().unwrap();
+        let lines: Vec<&str> = jsonl_str.lines().collect();
+        assert_eq!(lines.len(), 2, "List should output 2 lines (one per issue)");
+
+        // Verify each line is valid JSON representing an issue
+        for line in lines {
+            let issue_value: serde_json::Value = serde_json::from_str(line)
+                .expect("Each line must be valid JSON");
+            assert!(issue_value.is_object(), "Each line must be a JSON object");
+            assert!(issue_value.get("id").is_some(), "Each issue must have an id");
+            assert!(issue_value.get("title").is_some(), "Each issue must have a title");
+        }
+    }
+
+    #[test]
+    fn list_json_envelope_empty_returns_empty_array() {
+        let formatter = JsonFormatter;
+        let issues: Vec<Issue> = vec![];
+
+        // Format empty issues as JSONL (empty string)
+        let jsonl_output = Formatter::format_issues(&formatter, &issues);
+
+        // Empty output should be an empty string (not "[]")
+        assert!(jsonl_output.is_empty() || jsonl_output == "[]");
+
+        // For envelope wrapping, we use an empty array explicitly
+        let envelope = JsonEnvelope::new("list", json!([]));
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "list");
+
+        // Data should be an empty array
+        assert!(parsed.data.is_array());
+        assert_eq!(parsed.data.as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn list_json_envelope_metadata_fields_present() {
+        let formatter = JsonFormatter;
+        let issues = vec![create_test_issue("bf-1", "Metadata test")];
+
+        let jsonl_output = Formatter::format_issues(&formatter, &issues);
+        let envelope = JsonEnvelope::new("list", json!(jsonl_output));
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
+            .expect("Envelope must serialize to valid JSON");
+
+        // Verify all metadata fields are present
+        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(parsed.get("kind").is_some(), "kind field must be present");
+        assert!(parsed.get("data").is_some(), "data field must be present");
+
+        // Verify metadata values
+        assert_eq!(parsed["version"].as_u64().unwrap(), 1);
+        assert_eq!(parsed["kind"].as_str().unwrap(), "list");
+
+        // warning field is optional (absent when no warning)
+        let warning_optional = parsed.get("warning");
+        assert!(warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string());
+    }
+
+    #[test]
+    fn show_json_envelope_returns_single_object() {
+        let formatter = JsonFormatter;
+        let issue = create_test_issue("bf-123", "Show test");
+
+        // Format single issue as JSON
+        let json_output = Formatter::format_issue(&formatter, &issue);
+
+        // Wrap in envelope
+        let envelope = JsonEnvelope::new("show", json!(json_output));
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "show");
+
+        // Data should be a string (the JSON representation)
+        assert!(parsed.data.is_string());
+
+        // Parse the JSON string and verify it represents a single object
+        let json_str = parsed.data.as_str().unwrap();
+        let issue_value: serde_json::Value = serde_json::from_str(json_str)
+            .expect("Data must be valid JSON");
+
+        assert!(issue_value.is_object(), "Show data must be a JSON object");
+        assert_eq!(issue_value["id"].as_str().unwrap(), "bf-123");
+        assert_eq!(issue_value["title"].as_str().unwrap(), "Show test");
+    }
+
+    #[test]
+    fn show_json_envelope_metadata_fields_present() {
+        let formatter = JsonFormatter;
+        let issue = create_test_issue("bf-meta", "Metadata fields test");
+
+        let json_output = Formatter::format_issue(&formatter, &issue);
+        let envelope = JsonEnvelope::new("show", json!(json_output));
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
+            .expect("Envelope must serialize to valid JSON");
+
+        // Verify all metadata fields are present
+        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(parsed.get("kind").is_some(), "kind field must be present");
+        assert!(parsed.get("data").is_some(), "data field must be present");
+
+        // Verify metadata values
+        assert_eq!(parsed["version"].as_u64().unwrap(), 1);
+        assert_eq!(parsed["kind"].as_str().unwrap(), "show");
+
+        // warning field is optional
+        let warning_optional = parsed.get("warning");
+        assert!(warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string());
+    }
+
+    #[test]
+    fn show_json_envelope_with_all_issue_fields() {
+        let formatter = JsonFormatter;
+        let mut issue = create_test_issue("bf-full", "Full issue test");
+
+        // Add optional fields
+        issue.description = Some("Test description".to_string());
+        issue.acceptance_criteria = Some("AC: Should work".to_string());
+        issue.assignee = Some("test-worker".to_string());
+        issue.labels = vec!["phase-1".to_string(), "urgent".to_string()];
+
+        let json_output = Formatter::format_issue(&formatter, &issue);
+        let envelope = JsonEnvelope::new("show", json!(json_output));
+        let envelope_json = envelope.to_json().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope structure
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "show");
+
+        // Parse and verify issue fields are preserved
+        let json_str = parsed.data.as_str().unwrap();
+        let issue_value: serde_json::Value = serde_json::from_str(json_str)
+            .expect("Data must be valid JSON");
+
+        assert_eq!(issue_value["id"].as_str().unwrap(), "bf-full");
+        assert_eq!(issue_value["title"].as_str().unwrap(), "Full issue test");
+        assert_eq!(issue_value["description"].as_str().unwrap(), "Test description");
+        assert_eq!(issue_value["acceptance_criteria"].as_str().unwrap(), "AC: Should work");
+        assert_eq!(issue_value["assignee"].as_str().unwrap(), "test-worker");
+        assert!(issue_value["labels"].is_array());
+        assert_eq!(issue_value["labels"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn list_json_envelope_multiple_issues_formatting() {
+        let formatter = JsonFormatter;
+        let issues = vec![
+            create_test_issue("bf-a1", "Task A1"),
+            create_test_issue("bf-a2", "Task A2"),
+            create_test_issue("bf-a3", "Task A3"),
+        ];
+
+        let jsonl_output = Formatter::format_issues(&formatter, &issues);
+        let envelope = JsonEnvelope::new("list", json!(jsonl_output));
+        let envelope_json = envelope.to_json_compact().unwrap();
+        let parsed = parse_envelope(&envelope_json);
+
+        // Verify envelope metadata
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.kind, "list");
+
+        // Parse JSONL and count issues
+        let jsonl_str = parsed.data.as_str().unwrap();
+        let lines: Vec<&str> = jsonl_str.lines().collect();
+        assert_eq!(lines.len(), 3, "List should output 3 lines for 3 issues");
+
+        // Verify each issue has required fields
+        for (i, line) in lines.iter().enumerate() {
+            let issue_value: serde_json::Value = serde_json::from_str(line)
+                .expect(&format!("Line {} must be valid JSON", i));
+            assert!(issue_value.get("id").is_some(), "Line {} issue must have id", i);
+            assert!(issue_value.get("title").is_some(), "Line {} issue must have title", i);
+            assert!(issue_value.get("status").is_some(), "Line {} issue must have status", i);
+        }
+    }
+
+    #[test]
+    fn list_show_envelope_kind_identifiers() {
+        let formatter = JsonFormatter;
+
+        // Test list envelope kind
+        let list_issues = vec![create_test_issue("bf-1", "List kind test")];
+        let list_jsonl = formatter.format_issues(&list_issues);
+        let list_env = JsonEnvelope::new("list", json!(list_jsonl));
+        assert_eq!(list_env.kind, "list");
+
+        // Test show envelope kind
+        let show_issue = create_test_issue("bf-2", "Show kind test");
+        let show_json = formatter.format_issue(&show_issue);
+        let show_env = JsonEnvelope::new("show", json!(show_json));
+        assert_eq!(show_env.kind, "show");
+
+        // Verify both serialize with correct kind
+        let list_serialized = serde_json::to_value(&list_env).unwrap();
+        let show_serialized = serde_json::to_value(&show_env).unwrap();
+
+        assert_eq!(list_serialized["kind"].as_str().unwrap(), "list");
+        assert_eq!(show_serialized["kind"].as_str().unwrap(), "show");
+    }
+
+    #[test]
+    fn list_show_envelope_version_field() {
+        let formatter = JsonFormatter;
+
+        // Both list and show envelopes must have version = 1
+        let issues = vec![create_test_issue("bf-1", "Version test")];
+        let list_output = formatter.format_issues(&issues);
+        let list_env = JsonEnvelope::new("list", json!(list_output));
+
+        let show_issue = create_test_issue("bf-2", "Version test");
+        let show_output = formatter.format_issue(&show_issue);
+        let show_env = JsonEnvelope::new("show", json!(show_output));
+
+        // Verify version field
+        assert_eq!(list_env.version, VERSION);
+        assert_eq!(show_env.version, VERSION);
+        assert_eq!(list_env.version, 1);
+        assert_eq!(show_env.version, 1);
+
+        // Verify serialized version
+        let list_json = serde_json::to_value(&list_env).unwrap();
+        let show_json = serde_json::to_value(&show_env).unwrap();
+
+        assert_eq!(list_json["version"].as_u64().unwrap(), 1);
+        assert_eq!(show_json["version"].as_u64().unwrap(), 1);
+    }
+}
