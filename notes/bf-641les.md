@@ -90,6 +90,17 @@ Labels in DB match labels in JSONL exactly.
 - Direct DB query: 4 rows in labels table for this bead
 - JSONL verification: Labels match exactly
 
+**Additional Search Query Tests:**
+```bash
+# Single label query on epic type
+$ bf search --label epic-test --type epic --format json
+# Returns 20+ epic beads with epic-test label, including bf-yitu4
+
+# Multi-label query (OR logic)
+$ bf search --label epic-test --label test --type epic --format json
+# Returns 25 epic beads with EITHER label (OR logic correctly implemented)
+```
+
 ## Implementation Details
 
 ### Command Handler
