@@ -168,6 +168,45 @@ impl TraceManager {
         Ok(bead_dir)
     }
 
+    /// Generate a unique bead trace directory name with timestamp suffix
+    ///
+    /// This ensures multiple test runs for the same bead create distinct trace files.
+    /// Format: `.beads/traces/{bead_id}-{timestamp}/`
+    ///
+    /// If a directory with the same timestamp already exists (rare, but possible
+    /// with rapid successive calls), a counter suffix is added.
+    ///
+    /// # Arguments
+    /// * `bead_id` - Base bead ID
+    ///
+    /// # Returns
+    /// * `PathBuf` - Path to the unique trace directory
+    pub fn unique_bead_trace_dir(&self, bead_id: &str) -> Result<PathBuf> {
+        self.ensure_traces_dir()?;
+
+        let timestamp = Utc::now().format("%Y%m%d-%H%M%S-%3f");
+        let mut unique_name = format!("{}-{}", bead_id, timestamp);
+        let mut bead_dir = self.traces_dir.join(&unique_name);
+
+        // Retry with counter suffix if directory already exists
+        let mut counter = 1;
+        while bead_dir.exists() {
+            unique_name = format!("{}-{}-{:02}", bead_id, timestamp, counter);
+            bead_dir = self.traces_dir.join(&unique_name);
+            counter += 1;
+        }
+
+        // Create the unique directory
+        fs::create_dir(&bead_dir).with_context(|| {
+            format!(
+                "Failed to create unique bead trace directory: {}",
+                bead_dir.display()
+            )
+        })?;
+
+        Ok(bead_dir)
+    }
+
     /// Write metadata.json for a bead trace
     pub fn write_metadata(&self, bead_id: &str, metadata: &TraceMetadata) -> Result<()> {
         let bead_dir = self.bead_trace_dir(bead_id)?;
@@ -221,6 +260,65 @@ impl TraceManager {
         self.write_metadata(bead_id, metadata)?;
         self.write_stdout(bead_id, stdout)?;
         self.write_stderr(bead_id, stderr)?;
+        Ok(())
+    }
+
+    /// Write a complete bead trace to a specific directory path
+    ///
+    /// This function writes trace files to an arbitrary directory path,
+    /// enabling support for unique timestamped trace directories.
+    ///
+    /// # Arguments
+    /// * `trace_dir` - Path to the trace directory
+    /// * `metadata` - Trace metadata to record
+    /// * `stdout` - Standard output content
+    /// * `stderr` - Standard error content
+    pub fn write_bead_trace_to_path(
+        &self,
+        trace_dir: &Path,
+        metadata: &TraceMetadata,
+        stdout: &str,
+        stderr: &str,
+    ) -> Result<()> {
+        // Ensure the directory exists
+        if !trace_dir.exists() {
+            fs::create_dir_all(trace_dir).with_context(|| {
+                format!(
+                    "Failed to create trace directory: {}",
+                    trace_dir.display()
+                )
+            })?;
+        }
+
+        // Write metadata.json
+        let metadata_path = trace_dir.join("metadata.json");
+        let metadata_json = serde_json::to_string_pretty(metadata)
+            .context("Failed to serialize metadata to JSON")?;
+        fs::write(&metadata_path, metadata_json).with_context(|| {
+            format!(
+                "Failed to write metadata file: {}",
+                metadata_path.display()
+            )
+        })?;
+
+        // Write stdout.txt
+        let stdout_path = trace_dir.join("stdout.txt");
+        fs::write(&stdout_path, stdout).with_context(|| {
+            format!(
+                "Failed to write stdout file: {}",
+                stdout_path.display()
+            )
+        })?;
+
+        // Write stderr.txt
+        let stderr_path = trace_dir.join("stderr.txt");
+        fs::write(&stderr_path, stderr).with_context(|| {
+            format!(
+                "Failed to write stderr file: {}",
+                stderr_path.display()
+            )
+        })?;
+
         Ok(())
     }
 
@@ -470,9 +568,12 @@ impl TraceManager {
     /// stdout and stderr, and writes the output to a bead-specific trace directory
     /// using the naming scheme from bf-177v7f (metadata.json, stdout.txt, stderr.txt).
     ///
+    /// Multiple test runs create distinct trace directories with timestamp suffixes
+    /// to preserve all execution history.
+    ///
     /// # Arguments
     /// * `workspace_dir` - Path to the directory where cargo test should be executed
-    /// * `bead_id` - Bead ID for the trace directory
+    /// * `bead_id` - Bead ID for the trace directory (will be suffixed with timestamp for uniqueness)
     /// * `metadata` - Trace metadata to record
     ///
     /// # Returns
@@ -542,10 +643,11 @@ impl TraceManager {
         };
         exec_metadata.captured_at = Utc::now().to_rfc3339();
 
-        // Write to bead trace directory
-        self.write_bead_trace(bead_id, &exec_metadata, &stdout, &stderr)?;
+        // Create unique trace directory with timestamp suffix
+        let bead_trace_dir = self.unique_bead_trace_dir(bead_id)?;
 
-        let bead_trace_dir = self.bead_trace_dir(bead_id)?;
+        // Write to unique bead trace directory
+        self.write_bead_trace_to_path(&bead_trace_dir, &exec_metadata, &stdout, &stderr)?;
 
         Ok(BeadTestResult {
             exit_code,
@@ -563,9 +665,12 @@ impl TraceManager {
     /// This function runs `cargo test` with additional arguments and writes
     /// the output to a bead-specific trace directory.
     ///
+    /// Multiple test runs create distinct trace directories with timestamp suffixes
+    /// to preserve all execution history.
+    ///
     /// # Arguments
     /// * `workspace_dir` - Path to the directory where cargo test should be executed
-    /// * `bead_id` - Bead ID for the trace directory
+    /// * `bead_id` - Bead ID for the trace directory (will be suffixed with timestamp for uniqueness)
     /// * `metadata` - Trace metadata to record
     /// * `args` - Additional arguments to pass to cargo test
     ///
@@ -619,10 +724,11 @@ impl TraceManager {
         };
         exec_metadata.captured_at = Utc::now().to_rfc3339();
 
-        // Write to bead trace directory
-        self.write_bead_trace(bead_id, &exec_metadata, &stdout, &stderr)?;
+        // Create unique trace directory with timestamp suffix
+        let bead_trace_dir = self.unique_bead_trace_dir(bead_id)?;
 
-        let bead_trace_dir = self.bead_trace_dir(bead_id)?;
+        // Write to unique bead trace directory
+        self.write_bead_trace_to_path(&bead_trace_dir, &exec_metadata, &stdout, &stderr)?;
 
         Ok(BeadTestResult {
             exit_code,
@@ -1022,9 +1128,9 @@ mod tests {
         assert!(!result.stderr.is_empty() || result.exit_code == 0, "stderr may be empty on success");
 
         // Verify all expected files exist in the bead trace directory
-        let metadata_path = manager.bead_metadata_path("bf-test-8ei6pa");
-        let stdout_path = manager.bead_stdout_path("bf-test-8ei6pa");
-        let stderr_path = manager.bead_stderr_path("bf-test-8ei6pa");
+        let metadata_path = result.bead_trace_dir.join("metadata.json");
+        let stdout_path = result.bead_trace_dir.join("stdout.txt");
+        let stderr_path = result.bead_trace_dir.join("stderr.txt");
 
         assert!(metadata_path.exists(), "metadata.json should exist");
         assert!(stdout_path.exists(), "stdout.txt should exist");
@@ -1099,7 +1205,7 @@ mod tests {
         assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
 
         // Verify metadata shows failure
-        let metadata_path = manager.bead_metadata_path("bf-test-fail");
+        let metadata_path = result.bead_trace_dir.join("metadata.json");
         let metadata_content = fs::read_to_string(&metadata_path).unwrap();
         let read_metadata: TraceMetadata = serde_json::from_str(&metadata_content).unwrap();
         assert_eq!(read_metadata.exit_code, Some(result.exit_code));
@@ -1167,8 +1273,144 @@ mod tests {
 
         // Verify stdout contains the filtered test output
         let stdout_content = fs::read_to_string(
-            &manager.bead_stdout_path("bf-test-args")
+            &result.bead_trace_dir.join("stdout.txt")
         ).unwrap();
         assert!(stdout_content.contains("first_test"), "stdout should mention the filtered test");
+    }
+
+    #[test]
+    fn test_unique_bead_trace_dir_naming() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create multiple unique directories for the same bead
+        let dir1 = manager.unique_bead_trace_dir("bf-repeat").unwrap();
+        let dir2 = manager.unique_bead_trace_dir("bf-repeat").unwrap();
+        let dir3 = manager.unique_bead_trace_dir("bf-repeat").unwrap();
+
+        // Verify all directories exist and are distinct
+        assert!(dir1.exists(), "first directory should exist");
+        assert!(dir2.exists(), "second directory should exist");
+        assert!(dir3.exists(), "third directory should exist");
+
+        assert_ne!(dir1, dir2, "directories should be unique");
+        assert_ne!(dir2, dir3, "directories should be unique");
+        assert_ne!(dir1, dir3, "directories should be unique");
+
+        // Verify naming convention: bf-repeat-{timestamp}
+        let dir1_name = dir1.file_name().unwrap().to_str().unwrap();
+        let dir2_name = dir2.file_name().unwrap().to_str().unwrap();
+        let dir3_name = dir3.file_name().unwrap().to_str().unwrap();
+
+        assert!(dir1_name.starts_with("bf-repeat-"), "first directory should have bf-repeat- prefix");
+        assert!(dir2_name.starts_with("bf-repeat-"), "second directory should have bf-repeat- prefix");
+        assert!(dir3_name.starts_with("bf-repeat-"), "third directory should have bf-repeat- prefix");
+    }
+
+    #[test]
+    fn test_multiple_runs_create_distinct_traces() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a minimal Rust project
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-multi-run"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}
+"#
+        ).unwrap();
+
+        // Create metadata for the trace
+        let metadata = TraceMetadata {
+            bead_id: Some("bf-multi-run".to_string()),
+            agent: "test-needle-worker".to_string(),
+            outcome: "success".to_string(),
+            ..Default::default()
+        };
+
+        // Run the same test multiple times
+        let result1 = manager.run_cargo_test_to_bead_trace(
+            temp_dir.path(),
+            "bf-multi-run",
+            &metadata
+        ).unwrap();
+
+        let result2 = manager.run_cargo_test_to_bead_trace(
+            temp_dir.path(),
+            "bf-multi-run",
+            &metadata
+        ).unwrap();
+
+        let result3 = manager.run_cargo_test_to_bead_trace(
+            temp_dir.path(),
+            "bf-multi-run",
+            &metadata
+        ).unwrap();
+
+        // Verify all runs created distinct directories
+        assert_ne!(result1.bead_trace_dir, result2.bead_trace_dir, "runs should create distinct directories");
+        assert_ne!(result2.bead_trace_dir, result3.bead_trace_dir, "runs should create distinct directories");
+        assert_ne!(result1.bead_trace_dir, result3.bead_trace_dir, "runs should create distinct directories");
+
+        // Verify all directories exist
+        assert!(result1.bead_trace_dir.exists(), "first run directory should exist");
+        assert!(result2.bead_trace_dir.exists(), "second run directory should exist");
+        assert!(result3.bead_trace_dir.exists(), "third run directory should exist");
+
+        // Verify naming convention: bf-multi-run-{timestamp}
+        let dir1_name = result1.bead_trace_dir.file_name().unwrap().to_str().unwrap();
+        let dir2_name = result2.bead_trace_dir.file_name().unwrap().to_str().unwrap();
+        let dir3_name = result3.bead_trace_dir.file_name().unwrap().to_str().unwrap();
+
+        assert!(dir1_name.starts_with("bf-multi-run-"), "first directory should have bf-multi-run- prefix");
+        assert!(dir2_name.starts_with("bf-multi-run-"), "second directory should have bf-multi-run- prefix");
+        assert!(dir3_name.starts_with("bf-multi-run-"), "third directory should have bf-multi-run- prefix");
+
+        // Verify all directories contain the expected files
+        for (i, result) in [result1, result2, result3].iter().enumerate() {
+            let metadata_path = result.bead_trace_dir.join("metadata.json");
+            let stdout_path = result.bead_trace_dir.join("stdout.txt");
+            let stderr_path = result.bead_trace_dir.join("stderr.txt");
+
+            assert!(metadata_path.exists(), "run {} metadata.json should exist", i + 1);
+            assert!(stdout_path.exists(), "run {} stdout.txt should exist", i + 1);
+            assert!(stderr_path.exists(), "run {} stderr.txt should exist", i + 1);
+
+            // Verify metadata is valid JSON
+            let content = fs::read_to_string(&metadata_path).unwrap();
+            let read_metadata: TraceMetadata = serde_json::from_str(&content).unwrap();
+            assert_eq!(read_metadata.bead_id, Some("bf-multi-run".to_string()));
+        }
+
+        // Verify we can list all bead traces
+        let all_beads = manager.list_bead_traces().unwrap();
+        assert!(all_beads.len() >= 3, "should have at least 3 bead trace directories");
+
+        // Verify all listed beads follow the bf- prefix convention
+        for bead in all_beads {
+            assert!(bead.starts_with("bf-") || bead.starts_with("needle-"),
+                "all bead IDs should start with bf- or needle- prefix, got: {}", bead);
+        }
     }
 }
