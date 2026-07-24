@@ -25,6 +25,10 @@ pub struct TraceMetadata {
     pub exit_code: Option<i32>,
     /// Outcome status
     pub outcome: String,
+    /// Execution start time (RFC3339)
+    pub start_time: Option<String>,
+    /// Execution end time (RFC3339)
+    pub end_time: Option<String>,
     /// Duration in milliseconds
     pub duration_ms: Option<u64>,
     /// Token usage (if applicable)
@@ -50,6 +54,8 @@ impl Default for TraceMetadata {
             model: None,
             exit_code: None,
             outcome: "unknown".to_string(),
+            start_time: None,
+            end_time: None,
             duration_ms: None,
             input_tokens: None,
             output_tokens: None,
@@ -349,8 +355,9 @@ impl TraceManager {
         // Ensure the traces directory exists
         self.ensure_traces_dir()?;
 
-        // Start timing
+        // Record start time
         let start = Instant::now();
+        let start_time = Utc::now().to_rfc3339();
 
         // Execute cargo test, capturing both stdout and stderr
         let output = Command::new("cargo")
@@ -364,7 +371,8 @@ impl TraceManager {
                 )
             })?;
 
-        // Calculate duration
+        // Record end time and calculate duration
+        let end_time = Utc::now().to_rfc3339();
         let duration_ms = start.elapsed().as_millis() as u64;
 
         // Combine stdout and stderr for the trace file
@@ -376,6 +384,12 @@ impl TraceManager {
         combined_output.push_str(&format!("\n=== EXIT CODE: {} ===\n",
             output.status.code().unwrap_or(-1)));
 
+        // Add execution timing information
+        combined_output.push_str(&format!("=== START TIME: {} ===\n", start_time));
+        combined_output.push_str(&format!("=== END TIME: {} ===\n", end_time));
+        combined_output.push_str(&format!("=== DURATION: {}ms ({:.2}s) ===\n",
+            duration_ms, duration_ms as f64 / 1000.0));
+
         // Write to trace file
         let trace_path = self.write_cargo_test_trace(&combined_output)?;
 
@@ -383,6 +397,8 @@ impl TraceManager {
             exit_code: output.status.code().unwrap_or(-1),
             duration_ms,
             trace_path,
+            start_time: Some(start_time),
+            end_time: Some(end_time),
         })
     }
 
@@ -401,8 +417,9 @@ impl TraceManager {
         // Ensure the traces directory exists
         self.ensure_traces_dir()?;
 
-        // Start timing
+        // Record start time
         let start = Instant::now();
+        let start_time = Utc::now().to_rfc3339();
 
         // Build the command with custom arguments
         let mut cmd = Command::new("cargo");
@@ -416,7 +433,8 @@ impl TraceManager {
             )
         })?;
 
-        // Calculate duration
+        // Record end time and calculate duration
+        let end_time = Utc::now().to_rfc3339();
         let duration_ms = start.elapsed().as_millis() as u64;
 
         // Combine stdout and stderr for the trace file
@@ -428,11 +446,19 @@ impl TraceManager {
         combined_output.push_str(&format!("\n=== EXIT CODE: {} ===\n",
             output.status.code().unwrap_or(-1)));
 
+        // Add execution timing information
+        combined_output.push_str(&format!("=== START TIME: {} ===\n", start_time));
+        combined_output.push_str(&format!("=== END TIME: {} ===\n", end_time));
+        combined_output.push_str(&format!("=== DURATION: {}ms ({:.2}s) ===\n",
+            duration_ms, duration_ms as f64 / 1000.0));
+
         // Write to trace file
         let trace_path = self.write_cargo_test_trace(&combined_output)?;
 
         Ok(CargoTestResult {
             exit_code: output.status.code().unwrap_or(-1),
+            start_time: Some(start_time),
+            end_time: Some(end_time),
             duration_ms,
             trace_path,
         })
@@ -478,8 +504,9 @@ impl TraceManager {
         // Ensure the traces directory exists
         self.ensure_traces_dir()?;
 
-        // Start timing
+        // Record start time
         let start = Instant::now();
+        let start_time = Utc::now().to_rfc3339();
 
         // Execute cargo test, capturing both stdout and stderr
         let output = Command::new("cargo")
@@ -493,7 +520,8 @@ impl TraceManager {
                 )
             })?;
 
-        // Calculate duration
+        // Record end time and calculate duration
+        let end_time = Utc::now().to_rfc3339();
         let duration_ms = start.elapsed().as_millis() as u64;
         let exit_code = output.status.code().unwrap_or(-1);
 
@@ -504,6 +532,8 @@ impl TraceManager {
         // Create updated metadata with execution results
         let mut exec_metadata = metadata.clone();
         exec_metadata.exit_code = Some(exit_code);
+        exec_metadata.start_time = Some(start_time.clone());
+        exec_metadata.end_time = Some(end_time.clone());
         exec_metadata.duration_ms = Some(duration_ms);
         exec_metadata.outcome = if exit_code == 0 {
             "success".to_string()
@@ -520,6 +550,8 @@ impl TraceManager {
         Ok(BeadTestResult {
             exit_code,
             duration_ms,
+            start_time: Some(start_time),
+            end_time: Some(end_time),
             bead_trace_dir,
             stdout,
             stderr,
@@ -549,8 +581,9 @@ impl TraceManager {
         // Ensure the traces directory exists
         self.ensure_traces_dir()?;
 
-        // Start timing
+        // Record start time
         let start = Instant::now();
+        let start_time = Utc::now().to_rfc3339();
 
         // Build the command with custom arguments
         let mut cmd = Command::new("cargo");
@@ -564,7 +597,8 @@ impl TraceManager {
             )
         })?;
 
-        // Calculate duration
+        // Record end time and calculate duration
+        let end_time = Utc::now().to_rfc3339();
         let duration_ms = start.elapsed().as_millis() as u64;
         let exit_code = output.status.code().unwrap_or(-1);
 
@@ -575,6 +609,8 @@ impl TraceManager {
         // Create updated metadata with execution results
         let mut exec_metadata = metadata.clone();
         exec_metadata.exit_code = Some(exit_code);
+        exec_metadata.start_time = Some(start_time.clone());
+        exec_metadata.end_time = Some(end_time.clone());
         exec_metadata.duration_ms = Some(duration_ms);
         exec_metadata.outcome = if exit_code == 0 {
             "success".to_string()
@@ -591,6 +627,8 @@ impl TraceManager {
         Ok(BeadTestResult {
             exit_code,
             duration_ms,
+            start_time: Some(start_time),
+            end_time: Some(end_time),
             bead_trace_dir,
             stdout,
             stderr,
@@ -603,6 +641,10 @@ impl TraceManager {
 pub struct CargoTestResult {
     /// Exit code from cargo test (0 = success, non-zero = tests failed or error)
     pub exit_code: i32,
+    /// Execution start time (RFC3339 format)
+    pub start_time: Option<String>,
+    /// Execution end time (RFC3339 format)
+    pub end_time: Option<String>,
     /// Duration in milliseconds
     pub duration_ms: u64,
     /// Path to the trace file containing captured output
@@ -614,6 +656,10 @@ pub struct CargoTestResult {
 pub struct BeadTestResult {
     /// Exit code from cargo test (0 = success, non-zero = tests failed or error)
     pub exit_code: i32,
+    /// Execution start time (RFC3339 format)
+    pub start_time: Option<String>,
+    /// Execution end time (RFC3339 format)
+    pub end_time: Option<String>,
     /// Duration in milliseconds
     pub duration_ms: u64,
     /// Path to the bead trace directory containing captured output
@@ -757,6 +803,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let result = CargoTestResult {
             exit_code: 0,
+            start_time: Some("2025-01-01T12:00:00Z".to_string()),
+            end_time: Some("2025-01-01T12:00:01.5Z".to_string()),
             duration_ms: 1500,
             trace_path: temp_dir.path().join("test.log"),
         };
@@ -764,6 +812,8 @@ mod tests {
         assert_eq!(result.exit_code, 0);
         assert_eq!(result.duration_ms, 1500);
         assert!(result.trace_path.ends_with("test.log"));
+        assert_eq!(result.start_time, Some("2025-01-01T12:00:00Z".to_string()));
+        assert_eq!(result.end_time, Some("2025-01-01T12:00:01.5Z".to_string()));
     }
 
     #[test]

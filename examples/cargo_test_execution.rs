@@ -27,7 +27,11 @@ fn main() -> Result<()> {
         Ok(result) => {
             println!("✓ Cargo test execution completed");
             println!("  Exit code: {}", result.exit_code);
-            println!("  Duration: {}ms", result.duration_ms);
+            if let (Some(start), Some(end)) = (&result.start_time, &result.end_time) {
+                println!("  Start time: {}", start);
+                println!("  End time: {}", end);
+            }
+            println!("  Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
             println!("  Trace file: {}", result.trace_path.display());
 
             if result.exit_code == 0 {
