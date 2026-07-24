@@ -1,5 +1,6 @@
 pub mod autoflush;
 pub mod batch;
+pub mod bead_store;
 pub mod claim;
 pub mod cli;
 pub mod close;
@@ -22,6 +23,7 @@ pub mod rotate;
 pub mod secrets;
 pub mod storage;
 pub mod sync;
+pub mod trace;
 pub mod validation;
 pub mod velocity;
 
@@ -48,3 +50,4 @@ pub use rotate::{
 };
 pub use storage::Storage;
 pub use sync::{flush, flush_after_delete, flush_dirty, import, sync, SyncResult};
+pub use trace::{TraceManager, TraceMetadata};
