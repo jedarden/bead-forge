@@ -24,6 +24,7 @@ pub mod secrets;
 pub mod storage;
 pub mod subprocess;
 pub mod sync;
+pub mod timing;
 pub mod trace;
 pub mod validation;
 pub mod velocity;
@@ -55,4 +56,8 @@ pub use subprocess::{
     SubprocessResult,
 };
 pub use sync::{flush, flush_after_delete, flush_dirty, import, sync, SyncResult};
+pub use timing::{
+    calculate_elapsed_from_file, format_duration, record_completion, record_start_time,
+    CompletionRecord, ExecutionTimer, TimerState,
+};
 pub use trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};
