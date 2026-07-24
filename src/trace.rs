@@ -5,7 +5,9 @@
 
 use anyhow::{Context, Result};
 use chrono::Utc;
+use rand::Rng;
 use serde_json;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -89,10 +91,67 @@ impl TraceManager {
         Ok(Self::new(&current_dir))
     }
 
+    /// Generate a trace file name with bf-{8-char-random} format
+    ///
+    /// This function generates a unique trace file identifier following the
+    /// naming convention: bf-{random} where the random suffix is exactly 8 characters.
+    ///
+    /// The implementation uses SHA-256 hashing of random bytes and base36 encoding
+    /// to ensure deterministic, relocatable, and collision-resistant identifiers.
+    ///
+    /// # Returns
+    /// * `String` - Trace file name in format `bf-{8-char-random}`
+    ///
+    /// # Examples
+    /// ```
+    /// let trace_name = TraceManager::generate_trace_name();
+    /// assert!(trace_name.starts_with("bf-"));
+    /// assert_eq!(trace_name.len(), 11); // "bf-" + 8 chars
+    /// ```
+    pub fn generate_trace_name() -> String {
+        // Generate 16 random bytes for entropy
+        let random_bytes: [u8; 16] = rand::thread_rng().gen();
+
+        // Hash using SHA-256 for deterministic output
+        let hash = Sha256::digest(&random_bytes);
+
+        // Convert to base36 and take first 8 characters
+        let hash_encoded = Self::base36_encode(&hash);
+        let random_suffix = hash_encoded.chars().take(8).collect::<String>();
+
+        format!("bf-{}", random_suffix)
+    }
+
+    /// Base36 encode bytes to string
+    fn base36_encode(data: &[u8]) -> String {
+        const BASE36_CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+        let mut result = String::new();
+        let mut num = u128::from_be_bytes(
+            data.get(0..16)
+                .unwrap_or(&[0u8; 16])
+                .try_into()
+                .unwrap_or([0u8; 16])
+        );
+
+        if num == 0 {
+            return "0".to_string();
+        }
+
+        let base = 36u128;
+        while num > 0 {
+            let remainder = (num % base) as usize;
+            result.insert(0, BASE36_CHARS[remainder] as char);
+            num /= base;
+        }
+
+        result
+    }
+
     /// Ensure the traces directory exists with proper error handling
     ///
     /// This function creates the `.beads/traces/` directory if it doesn't exist,
     /// with comprehensive error handling for permission issues, disk space, etc.
+    /// This function is idempotent and can be called multiple times safely.
     pub fn ensure_traces_dir(&self) -> Result<()> {
         // Check if directory already exists
         if self.traces_dir.exists() {
@@ -126,6 +185,67 @@ impl TraceManager {
                 self.traces_dir.display()
             )
         })
+    }
+
+    /// Create a new trace file with bf-{8-char-random} naming
+    ///
+    /// This function creates a new trace file in the `.beads/traces/` directory
+    /// with the naming convention `bf-{8-char-random}`. The trace file path is
+    /// deterministic and relocatable, and file creation is idempotent.
+    ///
+    /// # Returns
+    /// * `Result<PathBuf>` - Path to the created trace file
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let trace_path = manager.create_trace_file()?;
+    /// // trace_path will be like: /path/to/.beads/traces/bf-a1b2c3d4
+    /// ```
+    pub fn create_trace_file(&self) -> Result<PathBuf> {
+        // Ensure the traces directory exists (idempotent)
+        self.ensure_traces_dir()?;
+
+        // Generate unique trace file name
+        let trace_name = Self::generate_trace_name();
+        let trace_path = self.traces_dir.join(&trace_name);
+
+        // Create the trace file as an empty file
+        fs::File::create(&trace_path).with_context(|| {
+            format!(
+                "Failed to create trace file: {}. \
+                 Check permissions and disk space.",
+                trace_path.display()
+            )
+        })?;
+
+        Ok(trace_path)
+    }
+
+    /// Get the path for a trace file with a specific name
+    ///
+    /// This function returns the path for a trace file without creating it.
+    /// Useful for checking existence or constructing paths for existing files.
+    ///
+    /// # Arguments
+    /// * `trace_name` - Name of the trace file (e.g., "bf-a1b2c3d4")
+    ///
+    /// # Returns
+    /// * `PathBuf` - Path to the trace file
+    pub fn trace_path_for_name(&self, trace_name: &str) -> PathBuf {
+        self.traces_dir.join(trace_name)
+    }
+
+    /// Check if a trace file exists
+    ///
+    /// # Arguments
+    /// * `trace_name` - Name of the trace file (e.g., "bf-a1b2c3d4")
+    ///
+    /// # Returns
+    /// * `bool` - true if the trace file exists, false otherwise
+    pub fn has_trace_file(&self, trace_name: &str) -> bool {
+        let trace_path = self.trace_path_for_name(trace_name);
+        trace_path.exists() && trace_path.is_file()
     }
 
     /// Generate a timestamped filename for cargo test logs
@@ -823,6 +943,154 @@ mod tests {
         // Second call should also succeed (idempotent)
         manager.ensure_traces_dir().unwrap();
         assert!(manager.traces_dir.is_dir());
+    }
+
+    #[test]
+    fn test_generate_trace_name_format() {
+        // Generate multiple trace names to verify format consistency
+        for _ in 0..10 {
+            let trace_name = TraceManager::generate_trace_name();
+
+            // Verify prefix
+            assert!(trace_name.starts_with("bf-"), "Trace name must start with 'bf-'");
+
+            // Verify length: "bf-" + 8 characters = 11 total
+            assert_eq!(trace_name.len(), 11, "Trace name must be exactly 11 characters (bf- + 8 chars)");
+
+            // Verify characters after prefix are alphanumeric
+            let suffix = &trace_name[3..];
+            assert!(suffix.chars().all(|c| c.is_ascii_alphanumeric()),
+                    "Trace suffix must contain only alphanumeric characters");
+        }
+    }
+
+    #[test]
+    fn test_generate_trace_name_uniqueness() {
+        // Generate 1000 trace names and verify no collisions
+        let mut trace_names = std::collections::HashSet::new();
+
+        for _ in 0..1000 {
+            let trace_name = TraceManager::generate_trace_name();
+            trace_names.insert(trace_name);
+        }
+
+        // With 8 characters (36^8 possible combinations), collisions should be extremely rare
+        assert_eq!(trace_names.len(), 1000, "All generated trace names should be unique");
+    }
+
+    #[test]
+    fn test_create_trace_file_creates_in_correct_location() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create trace file
+        let trace_path = manager.create_trace_file().unwrap();
+
+        // Verify file exists in correct location
+        assert!(trace_path.exists(), "Trace file should exist");
+        assert!(trace_path.is_file(), "Trace should be a file, not directory");
+
+        // Verify path is under .beads/traces/
+        assert!(trace_path.starts_with(&manager.traces_dir),
+                "Trace file should be under .beads/traces/ directory");
+
+        // Verify filename follows bf-{8-char} format
+        let file_name = trace_path.file_name().unwrap().to_str().unwrap();
+        assert!(file_name.starts_with("bf-"), "Trace file name should start with 'bf-'");
+        assert_eq!(file_name.len(), 11, "Trace file name should be 11 characters (bf- + 8 chars)");
+    }
+
+    #[test]
+    fn test_create_trace_file_multiple_calls() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create multiple trace files
+        let trace_path1 = manager.create_trace_file().unwrap();
+        let trace_path2 = manager.create_trace_file().unwrap();
+        let trace_path3 = manager.create_trace_file().unwrap();
+
+        // Verify all files exist
+        assert!(trace_path1.exists(), "First trace file should exist");
+        assert!(trace_path2.exists(), "Second trace file should exist");
+        assert!(trace_path3.exists(), "Third trace file should exist");
+
+        // Verify they have different names (uniqueness)
+        let name1 = trace_path1.file_name().unwrap().to_str().unwrap();
+        let name2 = trace_path2.file_name().unwrap().to_str().unwrap();
+        let name3 = trace_path3.file_name().unwrap().to_str().unwrap();
+
+        assert_ne!(name1, name2, "Trace files should have unique names");
+        assert_ne!(name2, name3, "Trace files should have unique names");
+        assert_ne!(name1, name3, "Trace files should have unique names");
+    }
+
+    #[test]
+    fn test_create_trace_file_idempotent() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // First call creates directory and file
+        manager.ensure_traces_dir().unwrap();
+        let trace_path1 = manager.create_trace_file().unwrap();
+
+        // Second call should also succeed (idempotent directory creation)
+        let trace_path2 = manager.create_trace_file().unwrap();
+
+        // Both files should exist
+        assert!(trace_path1.exists(), "First trace file should exist");
+        assert!(trace_path2.exists(), "Second trace file should exist");
+    }
+
+    #[test]
+    fn test_trace_path_for_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let trace_name = "bf-test123";
+        let trace_path = manager.trace_path_for_name(trace_name);
+
+        // Verify path construction
+        assert!(trace_path.ends_with(trace_name), "Path should end with trace name");
+        assert!(trace_path.starts_with(&manager.traces_dir), "Path should be under traces directory");
+    }
+
+    #[test]
+    fn test_has_trace_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a trace file
+        let trace_path = manager.create_trace_file().unwrap();
+        let trace_name = trace_path.file_name().unwrap().to_str().unwrap();
+
+        // Check that it exists
+        assert!(manager.has_trace_file(trace_name), "Created trace file should exist");
+
+        // Check that non-existent file doesn't exist
+        assert!(!manager.has_trace_file("bf-nonexistent"), "Non-existent trace file should not exist");
+    }
+
+    #[test]
+    fn test_trace_file_path_deterministic_and_relocatable() {
+        let temp_dir1 = TempDir::new().unwrap();
+        let temp_dir2 = TempDir::new().unwrap();
+
+        let manager1 = TraceManager::new(temp_dir1.path());
+        let manager2 = TraceManager::new(temp_dir2.path());
+
+        // Create trace files in both locations
+        let trace_path1 = manager1.create_trace_file().unwrap();
+        let trace_path2 = manager2.create_trace_file().unwrap();
+
+        // Verify both are in their respective trace directories
+        assert!(trace_path1.starts_with(&manager1.traces_dir),
+                "Trace 1 should be under first manager's traces directory");
+        assert!(trace_path2.starts_with(&manager2.traces_dir),
+                "Trace 2 should be under second manager's traces directory");
+
+        // Verify the paths are different (different base directories)
+        assert_ne!(trace_path1, trace_path2, "Paths should be different for different base directories");
     }
 
     #[test]
