@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Test output capture script for bead-forge
 # Captures test output with timestamps to .beads/traces/
 
@@ -36,16 +36,9 @@ echo "Test command: ${TEST_CMD[*]}"
 echo ""
 
 # Run tests and capture output with timing
-# Use script command to capture with precise timing if available
-if command -v script &> /dev/null; then
-    # Linux with script command
-    script -q -c "${TEST_CMD[*]}" /dev/null > "${STDOUT_FILE}" 2> "${STDERR_FILE}" || true
-    EXIT_CODE=${?}
-else
-    # Fallback without script
-    "${TEST_CMD[@]}" > "${STDOUT_FILE}" 2> "${STDERR_FILE}" || true
-    EXIT_CODE=${?}
-fi
+# Capture stdout and stderr separately to ensure clean separation
+"${TEST_CMD[@]}" > "${STDOUT_FILE}" 2> "${STDERR_FILE}" || true
+EXIT_CODE=${?}
 
 # Record end time with high precision
 END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.%NZ")
