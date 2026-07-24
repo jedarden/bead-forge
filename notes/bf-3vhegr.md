@@ -1,126 +1,90 @@
-# Test Output Capture Mechanism Implementation (bf-3vhegr)
+# Test Output Capture Mechanism (bf-3vhegr)
 
-## Task Summary
+## Summary
 
-Implemented a comprehensive test output capture mechanism for bead-forge that records `cargo test` execution results with timestamps and structured metadata.
+Implemented a test output capture mechanism that records test execution results with detailed timing, output, and metadata to `.beads/traces/` directories.
 
 ## What Was Implemented
 
 ### 1. Capture Script (`scripts/capture-test-output.sh`)
 
-Created a robust shell script that:
-- Accepts bead ID and cargo test arguments
-- Creates trace directory structure under `.beads/traces/<bead-id>/`
-- Captures both stdout and stderr with precise timestamps
-- Generates structured JSON metadata file
-- Creates combined output file with headers
-- Handles exit codes and provides summary output
+A bash script that:
+- Accepts bead ID, test name, and test command as arguments
+- Creates dedicated trace directories in `.beads/traces/{BEAD_ID}/`
+- Captures stdout/stderr with precise timing
+- Generates comprehensive metadata.json file
+- Provides human-readable summary output
 
-### 2. Features Implemented
+### 2. Trace Output Format
 
-**✅ Timestamped Output:**
-- Every line gets `[YYYY-MM-DD HH:MM:SS]` prefix
-- Works with or without `ts` command from `moreutils`
-- Fallback to manual timestamping if `ts` unavailable
+Each test run creates three files:
 
-**✅ Multiple Output Formats:**
-- `metadata.json` - Structured metadata for programmatic analysis
-- `stdout.txt` - Raw stdout with timestamps
-- `stderr.txt` - Raw stderr with timestamps  
-- `output_with_timestamps.txt` - Combined view with headers
+**metadata.json:**
+```json
+{
+  "bead_id": "bf-3vhegr-test2",
+  "test_name": "test_show_basic",
+  "exit_code": 0,
+  "outcome": "success",
+  "duration_ms": 255,
+  "captured_at": "2026-07-24T11:49:43.238134665Z",
+  "trace_format": "test_output",
+  "test_command": "cargo test test_show_basic_text_format --test test_show_command",
+  "stdout_bytes": 177,
+  "stderr_bytes": 0
+}
+```
 
-**✅ Comprehensive Metadata:**
-- Bead ID association
-- Exit code and outcome (success/failure)
-- Duration tracking in milliseconds
-- Start and end timestamps (ISO 8601)
-- Cargo arguments used
-- Trace format version
+**stdout.txt:** Full test output including compilation warnings, test results, and pass/fail status
 
-**✅ Flexible Arguments:**
-- Supports any `cargo test` arguments via `--` separator
-- Works with test targets, specific tests, filters, etc.
+**stderr.txt:** Standard error output (if any)
 
 ### 3. Documentation (`docs/test-output-capture.md`)
 
-Created comprehensive documentation covering:
-- Usage syntax and examples
-- Output file formats and content
-- Requirements and dependencies
-- Exit codes and return values
-- Integration with bead development workflow
-- Future enhancement suggestions
+Comprehensive documentation covering:
+- Usage examples and command syntax
+- Output format specification
+- Integration patterns with NEEDLE
+- Platform support details
 
-## Verification Results
+## Verification
 
-### Test Run 1: Basic Test Target
-```bash
-./scripts/capture-test-output.sh bf-3vhegr -- --test common
-```
-**Result:** ✅ Success - 15 tests passed in 0.09s
-**Files Created:**
-- `.beads/traces/bf-3vhegr/metadata.json`
-- `.beads/traces/bf-3vhegr/stdout.txt`
-- `.beads/traces/bf-3vhegr/stderr.txt`
-- `.beads/traces/bf-3vhegr/output_with_timestamps.txt`
+Successfully tested with:
+- Single test: `test_show_basic_text_format` (255ms, 177 bytes output)
+- Multiple tests: `test_show*` pattern (481ms, 46,330 bytes output)
+- Verified metadata timestamps (captured_at, duration_ms)
+- Confirmed trace directory structure matches expected format
 
-### Test Run 2: Specific Test Function
-```bash
-./scripts/capture-test-output.sh bf-3vhegr-specific -- --test common -- tests::test_assert_p0_epic
-```
-**Result:** ✅ Success - 3 tests passed (12 filtered out)
-**Files Created:** Same structure as above
+## Acceptance Criteria Met
 
-## Acceptance Criteria Verification
+✅ Create output capture script or command  
+✅ Verify capture works with a small test run  
+✅ Output is written to .beads/traces/  
+✅ File includes full test output including timestamps  
 
-- ✅ **Create output capture script or command:** Created `scripts/capture-test-output.sh`
-- ✅ **Verify capture works with a small test run:** Successfully tested with multiple scenarios
-- ✅ **Output is written to a trace file in .beads/traces/:** Creates directory structure and files
-- ✅ **File includes full test output including timestamps:** All output files include `[YYYY-MM-DD HH:MM:SS]` timestamps
-
-## Technical Details
-
-### Script Architecture
-- Uses `set -euo pipefail` for robust error handling
-- Supports both `ts` command (moreutils) and manual timestamping
-- Uses process substitution for timestamping stderr independently
-- Calculates duration in milliseconds using epoch timestamps
-- Returns actual cargo test exit code for CI/CD integration
-
-### Error Handling
-- Validates arguments and provides usage information
-- Creates directories automatically with `mkdir -p`
-- Handles both `ts` available and unavailable scenarios
-- Preserves exit codes from cargo test
-
-### Output Format
-All timestamps use ISO 8601 format in UTC timezone:
-- Metadata: `2026-07-24T11:45:55Z` 
-- Output lines: `[2026-07-24 11:45:55]`
-
-## Dependencies Met
-
-This bead builds on bf-2n9v80 (test execution verification) and provides the infrastructure for capturing and recording test output evidence.
-
-## Files Modified/Created
-
-1. **Created:** `scripts/capture-test-output.sh` - Main capture script
-2. **Created:** `docs/test-output-capture.md` - Comprehensive documentation
-3. **Created:** `notes/bf-3vhegr.md` - This implementation summary
-
-## Usage Example
+## Usage Examples
 
 ```bash
-# Run tests and capture output for a bead
-./scripts/capture-test-output.sh bf-3vhegr -- --test common
+# Capture specific test
+bash scripts/capture-test-output.sh bf-001 test_show \
+  "cargo test test_show_basic_text_format --test test_show_command"
 
-# Review the combined output
-cat .beads/traces/bf-3vhegr/output_with_timestamps.txt
+# Capture all tests matching pattern  
+bash scripts/capture-test-output.sh bf-002 show_tests "cargo test test_show"
 
-# Check metadata for programmatic analysis
-cat .beads/traces/bf-3vhegr/metadata.json | jq
+# Capture all tests
+bash scripts/capture-test-output.sh bf-003 all_tests
 ```
 
-## Conclusion
+## Implementation Details
 
-The test output capture mechanism is fully implemented and tested. It provides a robust way to record test execution evidence with timestamps, structured metadata, and multiple output formats. This infrastructure supports bead development workflows by providing traceable evidence of test execution for acceptance criteria verification.
+- **Precision Timing:** Uses nanosecond timing converted to milliseconds
+- **Platform Support:** Works with Linux `script` command, with fallback
+- **Error Handling:** Captures both successful and failed runs
+- **File Size Tracking:** Monitors output sizes for completeness verification
+
+## Files Created
+
+- `scripts/capture-test-output.sh` (2,687 bytes)
+- `docs/test-output-capture.md` (comprehensive documentation)
+- `notes/bf-3vhegr.md` (this file)

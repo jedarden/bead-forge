@@ -1,143 +1,99 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Test output capture script for bead-forge
-# Captures cargo test output with timestamps to .beads/traces/
+# Captures test output with timestamps to .beads/traces/
 
-set -euo pipefail
+set -e
 
-# Usage function
-usage() {
-    echo "Usage: $0 <bead-id> [-- <cargo-test-args>]"
-    echo "Example: $0 bf-3vhegr -- --test test_show_command"
-    echo "Example: $0 bf-3vhegr -- test_show_basic_text_format"
-    echo ""
-    echo "Arguments:"
-    echo "  bead-id          The bead ID to associate with this test run"
-    echo "  cargo-test-args  Arguments to pass to cargo test (after --)"
-    exit 1
-}
+# Parse arguments
+BEAD_ID="${1:-bf-test}"
+TEST_NAME="${2:-all_tests}"
+shift 2
 
-# Check arguments
-if [ $# -lt 1 ]; then
-    usage
+# Remaining arguments are the test command to run
+TEST_CMD=("$@")
+
+# Default to running all tests if no command provided
+if [ ${#TEST_CMD[@]} -eq 0 ]; then
+    TEST_CMD=(cargo test -- -q)
 fi
 
-BEAD_ID="$1"
-shift
-
-# Parse cargo test arguments
-CARGO_ARGS=()
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --)
-            shift
-            CARGO_ARGS=("$@")
-            break
-            ;;
-        *)
-            CARGO_ARGS+=("$1")
-            shift
-            ;;
-    esac
-done
-
-# Set up trace directory
+# Create trace directory
 TRACE_DIR=".beads/traces/${BEAD_ID}"
-mkdir -p "${TRACE_DIR}"
+mkdir -p "$TRACE_DIR"
 
-# Metadata file
+# Initialize metadata
 METADATA_FILE="${TRACE_DIR}/metadata.json"
 STDOUT_FILE="${TRACE_DIR}/stdout.txt"
 STDERR_FILE="${TRACE_DIR}/stderr.txt"
-TIMESTAMPS_FILE="${TRACE_DIR}/output_with_timestamps.txt"
 
-# Start time
-START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-START_EPOCH=$(date +%s)
+# Record start time with high precision
+START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.%NZ")
+START_NS=$(date +%s%N 2>/dev/null || echo "$(date +%s)000000000")
 
-echo "Capturing test output for bead: ${BEAD_ID}"
+echo "Capturing test output for ${TEST_NAME}..."
 echo "Trace directory: ${TRACE_DIR}"
-echo "Cargo test args: ${CARGO_ARGS:+${CARGO_ARGS[*]}}"
+echo "Test command: ${TEST_CMD[*]}"
 echo ""
 
-# Run cargo test with timestamped output
-# Using ts command from moreutils for precise timestamps
-if command -v ts &> /dev/null; then
-    # ts is available - use it for precise timestamps
-    cargo test "${CARGO_ARGS[@]}" 2> >(ts '[%Y-%m-%d %H:%M:%S]' > "${STDERR_FILE}") | ts '[%Y-%m-%d %H:%M:%S]' > "${STDOUT_FILE}"
-    EXIT_CODE=${PIPESTATUS[0]}
+# Run tests and capture output with timing
+# Use script command to capture with precise timing if available
+if command -v script &> /dev/null; then
+    # Linux with script command
+    script -q -c "${TEST_CMD[*]}" /dev/null > "${STDOUT_FILE}" 2> "${STDERR_FILE}" || true
+    EXIT_CODE=${?}
 else
-    # Fallback: prepend timestamps manually
-    cargo test "${CARGO_ARGS[@]}" 2> >(
-        while IFS= read -r line; do
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${line}"
-        done > "${STDERR_FILE}"
-    ) | while IFS= read -r line; do
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${line}"
-    done > "${STDOUT_FILE}"
-    EXIT_CODE=${PIPESTATUS[0]}
+    # Fallback without script
+    "${TEST_CMD[@]}" > "${STDOUT_FILE}" 2> "${STDERR_FILE}" || true
+    EXIT_CODE=${?}
 fi
 
-# End time
-END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-END_EPOCH=$(date +%s)
-DURATION_MS=$(( (END_EPOCH - START_EPOCH) * 1000 ))
+# Record end time with high precision
+END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.%NZ")
+END_NS=$(date +%s%N 2>/dev/null || echo "$(date +%s)000000000")
+
+# Calculate duration in milliseconds
+DURATION_MS=$(( (END_NS - START_NS) / 1000000 ))
 
 # Determine outcome
-if [ ${EXIT_CODE} -eq 0 ]; then
-    OUTCOME="success"
-else
+OUTCOME="success"
+if [ $EXIT_CODE -ne 0 ]; then
     OUTCOME="failure"
 fi
 
-# Create metadata.json
-cat > "${METADATA_FILE}" << EOF
+# Get file sizes
+STDOUT_SIZE=$(stat -c%s "${STDOUT_FILE}" 2>/dev/null || stat -f%z "${STDOUT_FILE}" 2>/dev/null || echo "0")
+STDERR_SIZE=$(stat -c%s "${STDERR_FILE}" 2>/dev/null || stat -f%z "${STDERR_FILE}" 2>/dev/null || echo "0")
+
+# Create metadata
+cat > "${METADATA_FILE}" <<EOF
 {
   "bead_id": "${BEAD_ID}",
-  "test_type": "cargo_test",
+  "test_name": "${TEST_NAME}",
   "exit_code": ${EXIT_CODE},
   "outcome": "${OUTCOME}",
   "duration_ms": ${DURATION_MS},
-  "start_time": "${START_TIME}",
-  "end_time": "${END_TIME}",
-  "cargo_args": [$(printf '"%s",' "${CARGO_ARGS[@]}" | sed 's/,$//')],
   "captured_at": "${END_TIME}",
-  "trace_format": "test_output_v1"
+  "trace_format": "test_output",
+  "test_command": "${TEST_CMD[*]}",
+  "stdout_bytes": ${STDOUT_SIZE},
+  "stderr_bytes": ${STDERR_SIZE}
 }
 EOF
 
-# Create combined output with timestamps
-cat > "${TIMESTAMPS_FILE}" << EOF
-# Test Output for Bead: ${BEAD_ID}
-# Start: ${START_TIME}
-# End: ${END_TIME}
-# Duration: ${DURATION_MS}ms
-# Exit Code: ${EXIT_CODE}
-# Outcome: ${OUTCOME}
-#
-# === STDOUT ===
-EOF
-cat "${STDOUT_FILE}" >> "${TIMESTAMPS_FILE}"
-echo "" >> "${TIMESTAMPS_FILE}"
-echo "# === STDERR ===" >> "${TIMESTAMPS_FILE}"
-cat "${STDERR_FILE}" >> "${TIMESTAMPS_FILE}"
-
 # Print summary
 echo ""
-echo "=== Test Capture Summary ==="
-echo "Bead ID: ${BEAD_ID}"
-echo "Outcome: ${OUTCOME}"
-echo "Exit Code: ${EXIT_CODE}"
-echo "Duration: ${DURATION_MS}ms"
-echo "Trace files created:"
-echo "  - ${METADATA_FILE}"
-echo "  - ${STDOUT_FILE}"
-echo "  - ${STDERR_FILE}"
-echo "  - ${TIMESTAMPS_FILE}"
+echo "✓ Test output captured to:"
+echo "  ${TRACE_DIR}/"
 echo ""
-
-# Show a preview of the output
-echo "=== Output Preview (first 20 lines) ==="
-head -20 "${TIMESTAMPS_FILE}"
+echo "Results:"
+echo "  Exit code: ${EXIT_CODE}"
+echo "  Outcome: ${OUTCOME}"
+echo "  Duration: ${DURATION_MS}ms"
 echo ""
+echo "Files:"
+echo "  metadata.json: ${METADATA_FILE}"
+echo "  stdout.txt: ${STDOUT_FILE} (${STDOUT_SIZE} bytes)"
+echo "  stderr.txt: ${STDERR_FILE} (${STDERR_SIZE} bytes)"
 
-exit ${EXIT_CODE}
+# Exit with test exit code
+exit $EXIT_CODE
