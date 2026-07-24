@@ -8,7 +8,8 @@ use chrono::Utc;
 use serde_json;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::io::Write;
+use std::process::Command;
+use std::time::Instant;
 
 /// Trace file metadata structure
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -324,6 +325,129 @@ impl TraceManager {
     pub fn bead_stderr_path(&self, bead_id: &str) -> PathBuf {
         self.traces_dir.join(bead_id).join("stderr.txt")
     }
+
+    /// Execute cargo test in the specified directory and capture all output
+    ///
+    /// This function runs `cargo test` in the given directory, captures both
+    /// stdout and stderr, and writes the combined output to a trace file.
+    ///
+    /// # Arguments
+    /// * `workspace_dir` - Path to the directory where cargo test should be executed
+    ///
+    /// # Returns
+    /// * `Result<CargoTestResult>` containing exit code, duration, and trace path
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let result = manager.run_cargo_test(Path::new("/home/coding/NEEDLE"))?;
+    /// println!("Exit code: {}", result.exit_code);
+    /// println!("Duration: {}ms", result.duration_ms);
+    /// println!("Output written to: {}", result.trace_path.display());
+    /// ```
+    pub fn run_cargo_test(&self, workspace_dir: &Path) -> Result<CargoTestResult> {
+        // Ensure the traces directory exists
+        self.ensure_traces_dir()?;
+
+        // Start timing
+        let start = Instant::now();
+
+        // Execute cargo test, capturing both stdout and stderr
+        let output = Command::new("cargo")
+            .arg("test")
+            .current_dir(workspace_dir)
+            .output()
+            .with_context(|| {
+                format!(
+                    "Failed to execute cargo test in workspace: {}",
+                    workspace_dir.display()
+                )
+            })?;
+
+        // Calculate duration
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        // Combine stdout and stderr for the trace file
+        let mut combined_output = String::new();
+        combined_output.push_str("=== STDOUT ===\n");
+        combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
+        combined_output.push_str("\n=== STDERR ===\n");
+        combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
+        combined_output.push_str(&format!("\n=== EXIT CODE: {} ===\n",
+            output.status.code().unwrap_or(-1)));
+
+        // Write to trace file
+        let trace_path = self.write_cargo_test_trace(&combined_output)?;
+
+        Ok(CargoTestResult {
+            exit_code: output.status.code().unwrap_or(-1),
+            duration_ms,
+            trace_path,
+        })
+    }
+
+    /// Execute cargo test with custom arguments
+    ///
+    /// This function runs `cargo test` with additional arguments, which is
+    /// useful for running specific tests or with different options.
+    ///
+    /// # Arguments
+    /// * `workspace_dir` - Path to the directory where cargo test should be executed
+    /// * `args` - Additional arguments to pass to cargo test
+    ///
+    /// # Returns
+    /// * `Result<CargoTestResult>` containing exit code, duration, and trace path
+    pub fn run_cargo_test_with_args(&self, workspace_dir: &Path, args: &[&str]) -> Result<CargoTestResult> {
+        // Ensure the traces directory exists
+        self.ensure_traces_dir()?;
+
+        // Start timing
+        let start = Instant::now();
+
+        // Build the command with custom arguments
+        let mut cmd = Command::new("cargo");
+        cmd.arg("test").args(args).current_dir(workspace_dir);
+
+        // Execute cargo test, capturing both stdout and stderr
+        let output = cmd.output().with_context(|| {
+            format!(
+                "Failed to execute cargo test in workspace: {}",
+                workspace_dir.display()
+            )
+        })?;
+
+        // Calculate duration
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        // Combine stdout and stderr for the trace file
+        let mut combined_output = String::new();
+        combined_output.push_str("=== STDOUT ===\n");
+        combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
+        combined_output.push_str("\n=== STDERR ===\n");
+        combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
+        combined_output.push_str(&format!("\n=== EXIT CODE: {} ===\n",
+            output.status.code().unwrap_or(-1)));
+
+        // Write to trace file
+        let trace_path = self.write_cargo_test_trace(&combined_output)?;
+
+        Ok(CargoTestResult {
+            exit_code: output.status.code().unwrap_or(-1),
+            duration_ms,
+            trace_path,
+        })
+    }
+}
+
+/// Result from running cargo test
+#[derive(Debug)]
+pub struct CargoTestResult {
+    /// Exit code from cargo test (0 = success, non-zero = tests failed or error)
+    pub exit_code: i32,
+    /// Duration in milliseconds
+    pub duration_ms: u64,
+    /// Path to the trace file containing captured output
+    pub trace_path: PathBuf,
 }
 
 #[cfg(test)]
@@ -452,5 +576,166 @@ mod tests {
         assert!(trace_path.exists());
         let content = fs::read_to_string(&trace_path).unwrap();
         assert_eq!(content, test_output);
+    }
+
+    #[test]
+    fn test_cargo_test_result_structure() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = CargoTestResult {
+            exit_code: 0,
+            duration_ms: 1500,
+            trace_path: temp_dir.path().join("test.log"),
+        };
+
+        assert_eq!(result.exit_code, 0);
+        assert_eq!(result.duration_ms, 1500);
+        assert!(result.trace_path.ends_with("test.log"));
+    }
+
+    #[test]
+    fn test_run_cargo_test_in_temp_workspace() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a minimal Rust project in the temp directory
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-project"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}
+"#
+        ).unwrap();
+
+        // Run cargo test
+        let result = manager.run_cargo_test(temp_dir.path()).unwrap();
+
+        // Verify the result
+        assert_eq!(result.exit_code, 0, "cargo test should succeed");
+        assert!(result.duration_ms > 0, "duration should be positive");
+        assert!(result.trace_path.exists(), "trace file should exist");
+
+        // Verify trace file contains expected output
+        let content = fs::read_to_string(&result.trace_path).unwrap();
+        assert!(content.contains("=== STDOUT ==="), "should have stdout section");
+        assert!(content.contains("=== STDERR ==="), "should have stderr section");
+        assert!(content.contains("=== EXIT CODE: 0 ==="), "should have exit code");
+    }
+
+    #[test]
+    fn test_run_cargo_test_with_failing_tests() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a minimal Rust project with a failing test
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-project-fail"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_fails() {
+        assert_eq!(2 + 2, 5, "This test is designed to fail");
+    }
+}
+"#
+        ).unwrap();
+
+        // Run cargo test - it should complete even though tests fail
+        let result = manager.run_cargo_test(temp_dir.path()).unwrap();
+
+        // Verify the result - should have non-zero exit code but still complete
+        assert!(result.exit_code != 0, "cargo test should fail");
+        assert!(result.duration_ms > 0, "duration should be positive");
+        assert!(result.trace_path.exists(), "trace file should exist");
+
+        // Verify trace file contains error output
+        let content = fs::read_to_string(&result.trace_path).unwrap();
+        assert!(content.contains("=== STDERR ==="), "should have stderr section");
+        assert!(content.contains("=== EXIT CODE"), "should have exit code");
+    }
+
+    #[test]
+    fn test_run_cargo_test_with_custom_args() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a minimal Rust project
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-project-args"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn first_test() {
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn second_test() {
+        assert_eq!(1 + 1, 2);
+    }
+}
+"#
+        ).unwrap();
+
+        // Run cargo test with specific test filter
+        let result = manager.run_cargo_test_with_args(
+            temp_dir.path(),
+            &["--", "first_test"]
+        ).unwrap();
+
+        // Verify the result
+        assert_eq!(result.exit_code, 0, "cargo test should succeed");
+        assert!(result.trace_path.exists(), "trace file should exist");
     }
 }
