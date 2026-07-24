@@ -10,7 +10,7 @@
 //! - JSON output formats with labels
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 

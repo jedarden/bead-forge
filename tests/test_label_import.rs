@@ -99,7 +99,7 @@ fn test_label_import_with_empty_labels() {
     let storage = Storage::open(&db_path).unwrap();
     let imported = storage.get_issue("bf-no-labels").unwrap().unwrap();
 
-    assert_eq!(imported.labels, vec![], "Issue should have no labels");
+    assert_eq!(imported.labels, Vec::<String>::new(), "Issue should have no labels");
 }
 
 #[test]
