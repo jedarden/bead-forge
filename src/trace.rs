@@ -437,6 +437,165 @@ impl TraceManager {
             trace_path,
         })
     }
+
+    /// Execute cargo test and write to a bead-specific trace directory
+    ///
+    /// This function runs `cargo test` in the given directory, captures both
+    /// stdout and stderr, and writes the output to a bead-specific trace directory
+    /// using the naming scheme from bf-177v7f (metadata.json, stdout.txt, stderr.txt).
+    ///
+    /// # Arguments
+    /// * `workspace_dir` - Path to the directory where cargo test should be executed
+    /// * `bead_id` - Bead ID for the trace directory
+    /// * `metadata` - Trace metadata to record
+    ///
+    /// # Returns
+    /// * `Result<BeadTestResult>` containing exit code, duration, and bead trace directory
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let metadata = TraceMetadata {
+    ///     bead_id: Some("bf-8ei6pa".to_string()),
+    ///     agent: "needle-worker".to_string(),
+    ///     ..Default::default()
+    /// };
+    /// let result = manager.run_cargo_test_to_bead_trace(
+    ///     Path::new("/home/coding/NEEDLE"),
+    ///     "bf-8ei6pa",
+    ///     &metadata
+    /// )?;
+    /// println!("Exit code: {}", result.exit_code);
+    /// println!("Duration: {}ms", result.duration_ms);
+    /// println!("Output written to: {}", result.bead_trace_dir.display());
+    /// ```
+    pub fn run_cargo_test_to_bead_trace(
+        &self,
+        workspace_dir: &Path,
+        bead_id: &str,
+        metadata: &TraceMetadata,
+    ) -> Result<BeadTestResult> {
+        // Ensure the traces directory exists
+        self.ensure_traces_dir()?;
+
+        // Start timing
+        let start = Instant::now();
+
+        // Execute cargo test, capturing both stdout and stderr
+        let output = Command::new("cargo")
+            .arg("test")
+            .current_dir(workspace_dir)
+            .output()
+            .with_context(|| {
+                format!(
+                    "Failed to execute cargo test in workspace: {}",
+                    workspace_dir.display()
+                )
+            })?;
+
+        // Calculate duration
+        let duration_ms = start.elapsed().as_millis() as u64;
+        let exit_code = output.status.code().unwrap_or(-1);
+
+        // Convert output to strings
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        // Create updated metadata with execution results
+        let mut exec_metadata = metadata.clone();
+        exec_metadata.exit_code = Some(exit_code);
+        exec_metadata.duration_ms = Some(duration_ms);
+        exec_metadata.outcome = if exit_code == 0 {
+            "success".to_string()
+        } else {
+            "failure".to_string()
+        };
+        exec_metadata.captured_at = Utc::now().to_rfc3339();
+
+        // Write to bead trace directory
+        self.write_bead_trace(bead_id, &exec_metadata, &stdout, &stderr)?;
+
+        let bead_trace_dir = self.bead_trace_dir(bead_id)?;
+
+        Ok(BeadTestResult {
+            exit_code,
+            duration_ms,
+            bead_trace_dir,
+            stdout,
+            stderr,
+        })
+    }
+
+    /// Execute cargo test with custom arguments to a bead-specific trace directory
+    ///
+    /// This function runs `cargo test` with additional arguments and writes
+    /// the output to a bead-specific trace directory.
+    ///
+    /// # Arguments
+    /// * `workspace_dir` - Path to the directory where cargo test should be executed
+    /// * `bead_id` - Bead ID for the trace directory
+    /// * `metadata` - Trace metadata to record
+    /// * `args` - Additional arguments to pass to cargo test
+    ///
+    /// # Returns
+    /// * `Result<BeadTestResult>` containing exit code, duration, and bead trace directory
+    pub fn run_cargo_test_to_bead_trace_with_args(
+        &self,
+        workspace_dir: &Path,
+        bead_id: &str,
+        metadata: &TraceMetadata,
+        args: &[&str],
+    ) -> Result<BeadTestResult> {
+        // Ensure the traces directory exists
+        self.ensure_traces_dir()?;
+
+        // Start timing
+        let start = Instant::now();
+
+        // Build the command with custom arguments
+        let mut cmd = Command::new("cargo");
+        cmd.arg("test").args(args).current_dir(workspace_dir);
+
+        // Execute cargo test, capturing both stdout and stderr
+        let output = cmd.output().with_context(|| {
+            format!(
+                "Failed to execute cargo test in workspace: {}",
+                workspace_dir.display()
+            )
+        })?;
+
+        // Calculate duration
+        let duration_ms = start.elapsed().as_millis() as u64;
+        let exit_code = output.status.code().unwrap_or(-1);
+
+        // Convert output to strings
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        // Create updated metadata with execution results
+        let mut exec_metadata = metadata.clone();
+        exec_metadata.exit_code = Some(exit_code);
+        exec_metadata.duration_ms = Some(duration_ms);
+        exec_metadata.outcome = if exit_code == 0 {
+            "success".to_string()
+        } else {
+            "failure".to_string()
+        };
+        exec_metadata.captured_at = Utc::now().to_rfc3339();
+
+        // Write to bead trace directory
+        self.write_bead_trace(bead_id, &exec_metadata, &stdout, &stderr)?;
+
+        let bead_trace_dir = self.bead_trace_dir(bead_id)?;
+
+        Ok(BeadTestResult {
+            exit_code,
+            duration_ms,
+            bead_trace_dir,
+            stdout,
+            stderr,
+        })
+    }
 }
 
 /// Result from running cargo test
@@ -448,6 +607,21 @@ pub struct CargoTestResult {
     pub duration_ms: u64,
     /// Path to the trace file containing captured output
     pub trace_path: PathBuf,
+}
+
+/// Result from running cargo test to a bead-specific trace directory
+#[derive(Debug)]
+pub struct BeadTestResult {
+    /// Exit code from cargo test (0 = success, non-zero = tests failed or error)
+    pub exit_code: i32,
+    /// Duration in milliseconds
+    pub duration_ms: u64,
+    /// Path to the bead trace directory containing captured output
+    pub bead_trace_dir: PathBuf,
+    /// Captured stdout content
+    pub stdout: String,
+    /// Captured stderr content
+    pub stderr: String,
 }
 
 #[cfg(test)]
@@ -737,5 +911,214 @@ mod tests {
         // Verify the result
         assert_eq!(result.exit_code, 0, "cargo test should succeed");
         assert!(result.trace_path.exists(), "trace file should exist");
+    }
+
+    #[test]
+    fn test_run_cargo_test_to_bead_trace() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a minimal Rust project
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-bead-trace"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn bead_trace_test() {
+        assert_eq!(2 + 2, 4);
+    }
+}
+"#
+        ).unwrap();
+
+        // Create metadata for the trace
+        let metadata = TraceMetadata {
+            bead_id: Some("bf-test-8ei6pa".to_string()),
+            agent: "test-needle-worker".to_string(),
+            provider: Some("test-provider".to_string()),
+            model: Some("test-model".to_string()),
+            outcome: "success".to_string(),
+            ..Default::default()
+        };
+
+        // Run cargo test and write to bead trace directory
+        let result = manager.run_cargo_test_to_bead_trace(
+            temp_dir.path(),
+            "bf-test-8ei6pa",
+            &metadata
+        ).unwrap();
+
+        // Verify the result
+        assert_eq!(result.exit_code, 0, "cargo test should succeed");
+        assert!(result.duration_ms > 0, "duration should be positive");
+        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+        assert!(!result.stdout.is_empty(), "stdout should not be empty");
+        assert!(!result.stderr.is_empty() || result.exit_code == 0, "stderr may be empty on success");
+
+        // Verify all expected files exist in the bead trace directory
+        let metadata_path = manager.bead_metadata_path("bf-test-8ei6pa");
+        let stdout_path = manager.bead_stdout_path("bf-test-8ei6pa");
+        let stderr_path = manager.bead_stderr_path("bf-test-8ei6pa");
+
+        assert!(metadata_path.exists(), "metadata.json should exist");
+        assert!(stdout_path.exists(), "stdout.txt should exist");
+        assert!(stderr_path.exists(), "stderr.txt should exist");
+
+        // Verify metadata content
+        let metadata_content = fs::read_to_string(&metadata_path).unwrap();
+        let read_metadata: TraceMetadata = serde_json::from_str(&metadata_content).unwrap();
+        assert_eq!(read_metadata.bead_id, Some("bf-test-8ei6pa".to_string()));
+        assert_eq!(read_metadata.agent, "test-needle-worker");
+        assert_eq!(read_metadata.exit_code, Some(0));
+        assert_eq!(read_metadata.outcome, "success");
+
+        // Verify stdout content
+        let stdout_content = fs::read_to_string(&stdout_path).unwrap();
+        assert!(stdout_content.contains("running 1 test") || stdout_content.contains("test result: ok"),
+            "stdout should contain test output");
+    }
+
+    #[test]
+    fn test_run_cargo_test_to_bead_trace_with_failure() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a minimal Rust project with a failing test
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-bead-trace-fail"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn failing_test() {
+        assert_eq!(2 + 2, 5, "This test is designed to fail");
+    }
+}
+"#
+        ).unwrap();
+
+        // Create metadata for the trace
+        let metadata = TraceMetadata {
+            bead_id: Some("bf-test-fail".to_string()),
+            agent: "test-needle-worker".to_string(),
+            outcome: "failure".to_string(),
+            ..Default::default()
+        };
+
+        // Run cargo test - it should complete even though tests fail
+        let result = manager.run_cargo_test_to_bead_trace(
+            temp_dir.path(),
+            "bf-test-fail",
+            &metadata
+        ).unwrap();
+
+        // Verify the result - should have non-zero exit code but still complete
+        assert!(result.exit_code != 0, "cargo test should fail");
+        assert!(result.duration_ms > 0, "duration should be positive");
+        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+
+        // Verify metadata shows failure
+        let metadata_path = manager.bead_metadata_path("bf-test-fail");
+        let metadata_content = fs::read_to_string(&metadata_path).unwrap();
+        let read_metadata: TraceMetadata = serde_json::from_str(&metadata_content).unwrap();
+        assert_eq!(read_metadata.exit_code, Some(result.exit_code));
+        assert_eq!(read_metadata.outcome, "failure");
+    }
+
+    #[test]
+    fn test_run_cargo_test_to_bead_trace_with_args() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a minimal Rust project with multiple tests
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-bead-trace-args"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn first_test() {
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn second_test() {
+        assert_eq!(1 + 1, 2);
+    }
+}
+"#
+        ).unwrap();
+
+        // Create metadata for the trace
+        let metadata = TraceMetadata {
+            bead_id: Some("bf-test-args".to_string()),
+            agent: "test-needle-worker".to_string(),
+            outcome: "success".to_string(),
+            ..Default::default()
+        };
+
+        // Run cargo test with specific test filter
+        let result = manager.run_cargo_test_to_bead_trace_with_args(
+            temp_dir.path(),
+            "bf-test-args",
+            &metadata,
+            &["--", "first_test"]
+        ).unwrap();
+
+        // Verify the result
+        assert_eq!(result.exit_code, 0, "cargo test should succeed");
+        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+
+        // Verify stdout contains the filtered test output
+        let stdout_content = fs::read_to_string(
+            &manager.bead_stdout_path("bf-test-args")
+        ).unwrap();
+        assert!(stdout_content.contains("first_test"), "stdout should mention the filtered test");
     }
 }

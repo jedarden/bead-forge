@@ -50,4 +50,4 @@ pub use rotate::{
 };
 pub use storage::Storage;
 pub use sync::{flush, flush_after_delete, flush_dirty, import, sync, SyncResult};
-pub use trace::{CargoTestResult, TraceManager, TraceMetadata};
+pub use trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};
