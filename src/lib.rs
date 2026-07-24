@@ -22,6 +22,7 @@ pub mod robot_docs;
 pub mod rotate;
 pub mod secrets;
 pub mod storage;
+pub mod subprocess;
 pub mod sync;
 pub mod trace;
 pub mod validation;
@@ -49,5 +50,9 @@ pub use rotate::{
     RotateResult,
 };
 pub use storage::Storage;
+pub use subprocess::{
+    execute_command, execute_command_streaming, execute_command_to_trace, SubprocessConfig,
+    SubprocessResult,
+};
 pub use sync::{flush, flush_after_delete, flush_dirty, import, sync, SyncResult};
 pub use trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};
