@@ -652,6 +652,7 @@ fn test_mixed_edge_case_labels() {
     storage.create_issue(&bead).unwrap();
 
     // Test a mix of edge cases together
+    let long_label = "a".repeat(1000);
     let mixed_labels = vec![
         "",                              // empty
         " ",                             // single space
@@ -661,7 +662,7 @@ fn test_mixed_edge_case_labels() {
         "won't-fix",                     // punctuation
         "中文",                           // unicode
         "label with spaces",              // internal spaces
-        "a".repeat(1000).as_str(),       // long label
+        long_label.as_str(),             // long label
     ];
 
     for label in &mixed_labels {
@@ -819,7 +820,7 @@ fn test_whitespace_only_label_deduplication() {
     storage.add_label("space-dedup-test", " ").unwrap();
 
     let labels = storage.get_labels("space-dedup-test").unwrap();
-    let space_count = labels.iter().filter(|l| l == " ").count();
+    let space_count = labels.iter().filter(|l| *l == " ").count();
     assert_eq!(space_count, 1, "Whitespace-only duplicate labels should be deduplicated");
 }
 

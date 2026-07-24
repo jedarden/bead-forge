@@ -973,6 +973,7 @@ fn test_label_multiple_import_cycles() {
             );
         }
 
+        drop(conn);
         drop(storage2);
     }
 
