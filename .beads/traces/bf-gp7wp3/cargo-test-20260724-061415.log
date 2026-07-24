@@ -1,0 +1,628 @@
+       Fresh unicode-ident v1.0.24
+       Fresh cfg-if v1.0.4
+       Fresh version_check v0.9.5
+       Fresh proc-macro2 v1.0.106
+       Fresh quote v1.0.45
+       Fresh once_cell v1.21.4
+       Fresh syn v2.0.117
+       Fresh zerocopy v0.8.48
+       Fresh libc v0.2.186
+       Fresh autocfg v1.5.0
+       Fresh typenum v1.20.0
+       Fresh find-msvc-tools v0.1.9
+       Fresh shlex v1.3.0
+       Fresh generic-array v0.14.7
+       Fresh cc v1.2.61
+       Fresh serde_core v1.0.228
+       Fresh bitflags v2.11.1
+       Fresh vcpkg v0.2.15
+       Fresh pkg-config v0.3.33
+       Fresh memchr v2.8.0
+       Fresh utf8parse v0.2.2
+       Fresh anstyle-parse v1.0.0
+       Fresh num-traits v0.2.19
+       Fresh ahash v0.8.12
+       Fresh getrandom v0.2.17
+       Fresh serde_derive v1.0.228
+       Fresh tracing-core v0.1.36
+       Fresh anstyle-query v1.1.5
+       Fresh colorchoice v1.0.5
+       Fresh anstyle v1.0.14
+       Fresh linux-raw-sys v0.12.1
+       Fresh is_terminal_polyfill v1.70.2
+       Fresh rustix v1.1.4
+       Fresh anstream v1.0.0
+       Fresh serde v1.0.228
+       Fresh rand_core v0.6.4
+       Fresh hashbrown v0.14.5
+       Fresh aho-corasick v1.1.4
+       Fresh block-buffer v0.10.4
+       Fresh crypto-common v0.1.7
+       Fresh ppv-lite86 v0.2.21
+       Fresh log v0.4.29
+       Fresh itoa v1.0.18
+       Fresh strsim v0.11.1
+       Fresh lazy_static v1.5.0
+       Fresh smallvec v1.15.1
+       Fresh clap_lex v1.1.0
+       Fresh hashbrown v0.17.0
+       Fresh equivalent v1.0.2
+       Fresh regex-syntax v0.8.10
+       Fresh heck v0.5.0
+       Fresh clap_derive v4.6.1
+       Fresh indexmap v2.14.0
+       Fresh regex-automata v0.4.14
+       Fresh clap_builder v4.6.0
+       Fresh sharded-slab v0.1.7
+       Fresh tracing-log v0.2.0
+       Fresh rand_chacha v0.3.1
+       Fresh digest v0.10.7
+       Fresh libsqlite3-sys v0.28.0
+       Fresh hashlink v0.9.1
+       Fresh zmij v1.0.21
+       Fresh num-integer v0.1.46
+       Fresh thiserror-impl v1.0.69
+       Fresh tracing-attributes v0.1.31
+       Fresh thread_local v1.1.9
+       Fresh iana-time-zone v0.1.65
+       Fresh fallible-iterator v0.3.0
+       Fresh either v1.16.0
+       Fresh fallible-streaming-iterator v0.1.9
+       Fresh env_home v0.1.0
+       Fresh cpufeatures v0.2.17
+       Fresh pin-project-lite v0.2.17
+       Fresh unsafe-libyaml v0.2.11
+       Fresh ryu v1.0.23
+       Fresh nu-ansi-term v0.50.3
+       Fresh serde_yaml v0.9.34+deprecated
+       Fresh tracing-subscriber v0.3.23
+       Fresh sha2 v0.10.9
+       Fresh tracing v0.1.44
+       Fresh which v7.0.3
+       Fresh rusqlite v0.31.0
+       Fresh chrono v0.4.44
+       Fresh thiserror v1.0.69
+       Fresh num-bigint v0.4.6
+       Fresh serde_json v1.0.149
+       Fresh rand v0.8.6
+       Fresh clap v4.6.1
+       Fresh regex v1.12.3
+       Fresh anyhow v1.0.102
+       Fresh shell-words v1.1.1
+       Fresh getrandom v0.4.2
+       Fresh fastrand v2.4.1
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `IssueChanges`
+  --> src/sync.rs:10:27
+   |
+10 | use crate::model::{Issue, IssueChanges};
+   |                           ^^^^^^^^^^^^
+
+warning: unused import: `rusqlite::params`
+  --> src/sync.rs:14:5
+   |
+14 | use rusqlite::params;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2228:9
+     |
+2228 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2890:5
+     |
+2890 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:248:13
+    |
+248 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1185:51
+     |
+1185 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1425:13
+     |
+1425 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1567:13
+     |
+1567 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1049:4
+     |
+1049 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `cleanup_old_archives` is never used
+   --> src/rotate.rs:284:4
+    |
+284 | fn cleanup_old_archives(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:335:4
+    |
+335 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (lib) generated 21 warnings (run `cargo fix --lib -p bead-forge` to apply 12 suggestions)
+       Fresh tempfile v3.27.0
+       Dirty bead-forge v0.3.0 (/home/coding/bead-forge): the dependency `bead-forge` was rebuilt (1784888060.978352930s, 1h 31m 29s after last build at 1784882571.444900445s)
+   Compiling bead-forge v0.3.0 (/home/coding/bead-forge)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name bf --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=c4c89151c79eb829 -C extra-filename=-ef90e1c1e5eaafdc --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_epic_1784832309_label_functionality --edition=2021 tests/test_epic_1784832309_label_functionality.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=bcd96fd90d1e0753 -C extra-filename=-2f1bce2b3a2e71ea --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name epic_type_basic --edition=2021 tests/epic_type_basic.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=c0f280cbcd96eb16 -C extra-filename=-bc917b404fc4e859 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused variable: `i`
+   --> tests/bug_default_priority.rs:216:10
+    |
+216 |     for (i, (priority, value, display)) in priorities.iter().enumerate() {
+    |          ^ help: if this is intentional, prefix it with an underscore: `_i`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "bug_default_priority") generated 1 warning (run `cargo fix --test "bug_default_priority" -p bead-forge` to apply 1 suggestion)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name br_isolation --edition=2021 tests/br_isolation.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=686c9b1fdcfb7142 -C extra-filename=-9342556aac7957ce --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_bf_1dbvv_roundtrip_description_ac --edition=2021 tests/test_bf_1dbvv_roundtrip_description_ac.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=eb18cd9a0e004ae2 -C extra-filename=-344d2bdd5aac820b --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: associated function `from_fixture` is never used
+  --> tests/common.rs:73:12
+   |
+25 | impl TempWorkspace {
+   | ------------------ associated function in this implementation
+...
+73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+   |            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `sample_closed_bead_jsonl` is never used
+   --> tests/common.rs:162:8
+    |
+162 | pub fn sample_closed_bead_jsonl(id: &str, title: &str, close_reason: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_deps_jsonl` is never used
+   --> tests/common.rs:170:8
+    |
+170 | pub fn sample_bead_with_deps_jsonl(id: &str, title: &str, deps: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_labels_jsonl` is never used
+   --> tests/common.rs:179:8
+    |
+179 | pub fn sample_bead_with_labels_jsonl(id: &str, title: &str, labels: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_jsonl_eq` is never used
+   --> tests/common.rs:190:8
+    |
+190 | pub fn assert_jsonl_eq(jsonl1: &str, jsonl2: &str) -> anyhow::Result<()> {
+    |        ^^^^^^^^^^^^^^^
+
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name batch_cascade_and_rotation --edition=2021 tests/batch_cascade_and_rotation.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7ad04806a05dd821 -C extra-filename=-9124d6dc6d3be769 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: `bead-forge` (test "br_isolation") generated 5 warnings
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_bf_52is_smoke --edition=2021 tests/test_bf_52is_smoke.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8cb74bed5acd5647 -C extra-filename=-810e5a63c4647edd --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name epic_json_format --edition=2021 tests/epic_json_format.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7680340a24fc1c81 -C extra-filename=-f62025d9d468d29f --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name readonly_commands --edition=2021 tests/readonly_commands.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=5b58246c7397d8e6 -C extra-filename=-039b424973fda025 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused macro definition: `test_readonly_command_with_exit`
+   --> tests/readonly_commands.rs:164:14
+    |
+164 | macro_rules! test_readonly_command_with_exit {
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_macros)]` (part of `#[warn(unused)]`) on by default
+
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_label_comprehensive --edition=2021 tests/test_label_comprehensive.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=6e56dfd84c9b2f86 -C extra-filename=-1be53895d2752f9e --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: `bead-forge` (test "readonly_commands") generated 1 warning
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name epic_cli_label_mutate --edition=2021 tests/epic_cli_label_mutate.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=750963c96a176241 -C extra-filename=-4570aa5ec2e85ec1 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name batch_atomic --edition=2021 tests/batch_atomic.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=bcfba2b34c5a2f89 -C extra-filename=-028a3c00ed4bbebc --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused import: `std::io::Write`
+   --> tests/batch_atomic.rs:616:9
+    |
+616 |     use std::io::Write;
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name epic_cli_label_creation --edition=2021 tests/epic_cli_label_creation.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=d61e2b81ff0b54d7 -C extra-filename=-25d2e8e0b0e840d9 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: `bead-forge` (test "batch_atomic") generated 1 warning (run `cargo fix --test "batch_atomic" -p bead-forge` to apply 1 suggestion)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_assignee_validation --edition=2021 tests/test_assignee_validation.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8303fae69262ad23 -C extra-filename=-bd952f43abdd8300 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused variable: `stdout`
+   --> tests/test_assignee_validation.rs:320:19
+    |
+320 |     let (success, stdout, _stderr) = run_bf_create(
+    |                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `stdout`
+   --> tests/test_assignee_validation.rs:328:19
+    |
+328 |     let (success, stdout, _stderr) = run_bf_create(
+    |                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_labels_json_format --edition=2021 tests/test_labels_json_format.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=36f315ce7f7bf117 -C extra-filename=-13120f395ff3cdf0 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: `bead-forge` (test "test_assignee_validation") generated 2 warnings (run `cargo fix --test "test_assignee_validation" -p bead-forge` to apply 2 suggestions)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name limit_zero --edition=2021 tests/limit_zero.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=325fbff918e7d37b -C extra-filename=-84307d886f6aa634 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_label_special_characters --edition=2021 tests/test_label_special_characters.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=594ebbf4645b500e -C extra-filename=-d3dcac5dfd21d79d --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name verify_epic_implementation --edition=2021 tests/verify_epic_implementation.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=b1685d992f27b9e5 -C extra-filename=-1077f54aa65b802f --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name epic_default_priority --edition=2021 tests/epic_default_priority.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=10104a889701cdf2 -C extra-filename=-b0a88070e241ef2f --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_concurrent_storage --edition=2021 examples/test_concurrent_storage.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=0fa88ae4fb015908 -C extra-filename=-47bfa0720f795874 --out-dir /home/coding/bead-forge/target/debug/examples -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name label_integration_test --edition=2021 tests/label_integration_test.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=2b8970d145dcc9e1 -C extra-filename=-90d27ee281c62bfe --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused import: `Status`
+ --> tests/label_integration_test.rs:6:46
+  |
+6 | use bead_forge::model::{Issue, IssueChanges, Status};
+  |                                              ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::path::PathBuf`
+ --> tests/label_integration_test.rs:9:5
+  |
+9 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_label_sync_persistence --edition=2021 tests/test_label_sync_persistence.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=5f13411f89ad0a2d -C extra-filename=-1285f5c08605dd86 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: `bead-forge` (test "label_integration_test") generated 2 warnings (run `cargo fix --test "label_integration_test" -p bead-forge` to apply 2 suggestions)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name velocity_seed_integration --edition=2021 tests/velocity_seed_integration.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=bb43b5e0578e1bc9 -C extra-filename=-17d560e04513b92e --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_bf_5id --edition=2021 tests/test_bf_5id.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=53fe19498ee822e0 -C extra-filename=-98c9e588b14fff4e --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name label_list --edition=2021 tests/label_list.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7d9decd386ea91f6 -C extra-filename=-fabecfd212370e51 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused import: `std::path::PathBuf`
+  --> tests/test_bf_5id.rs:10:5
+   |
+10 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Priority`
+ --> tests/label_list.rs:4:57
+  |
+4 | use bead_forge::model::{Issue, IssueChanges, IssueType, Priority, Status};
+  |                                                         ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `chrono::Utc`
+ --> tests/label_list.rs:6:5
+  |
+6 | use chrono::Utc;
+  |     ^^^^^^^^^^^
+
+warning: unused variable: `label`
+  --> tests/label_list.rs:91:10
+   |
+91 |     for (label, count) in &labels {
+   |          ^^^^^ help: if this is intentional, prefix it with an underscore: `_label`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_bf_5id") generated 1 warning (run `cargo fix --test "test_bf_5id" -p bead-forge` to apply 1 suggestion)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_comprehensive_labels --edition=2021 tests/test_comprehensive_labels.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=d27cc62ccc3392eb -C extra-filename=-01a9107e577f76f8 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: `bead-forge` (test "label_list") generated 3 warnings (run `cargo fix --test "label_list" -p bead-forge` to apply 3 suggestions)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name batch_mitosis --edition=2021 tests/batch_mitosis.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=d08eeaf71dea9321 -C extra-filename=-812ca8d6974b49e4 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name autoflush_wiring --edition=2021 tests/autoflush_wiring.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7376e99b8feb1552 -C extra-filename=-9821e3820f02bac7 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_epic_p0_creation --edition=2021 tests/test_epic_p0_creation.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ba542edb8a891dca -C extra-filename=-b66104a554cbcc44 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name secret_scanning --edition=2021 tests/secret_scanning.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=cd532a9ef889a1c0 -C extra-filename=-6edd9762406cbfdd --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused variable: `storage`
+   --> tests/secret_scanning.rs:156:9
+    |
+156 |     let storage = ws.storage().unwrap();
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_storage`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:167:9
+    |
+167 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:188:9
+    |
+188 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:208:9
+    |
+208 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:224:9
+    |
+224 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: variable does not need to be mutable
+   --> tests/secret_scanning.rs:318:17
+    |
+318 |             let mut bead = bead_forge::Issue::new(
+    |                 ----^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:440:9
+    |
+440 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:460:9
+    |
+460 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: field `temp_dir` is never read
+  --> tests/common.rs:16:9
+   |
+14 | pub struct TempWorkspace {
+   |            ------------- field in this struct
+15 |     /// Temp directory that holds the workspace (cleaned up on drop)
+16 |     pub temp_dir: TempDir,
+   |         ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated items `from_fixture`, `workspace_path`, `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 91 |     pub fn workspace_path(&self) -> &Path {
+    |            ^^^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_bf_2hqt --edition=2021 tests/test_bf_2hqt.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=424d9dcc5bc76f2a -C extra-filename=-baef5b3f00dbe018 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name epic_cli_labels --edition=2021 tests/epic_cli_labels.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=c40467b52ea274c5 -C extra-filename=-d810d9df9b7cd210 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: `bead-forge` (test "secret_scanning") generated 14 warnings (4 duplicates) (run `cargo fix --test "secret_scanning" -p bead-forge` to apply 8 suggestions)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name kill_worker_preserves_beads --edition=2021 tests/kill_worker_preserves_beads.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ae04e0ac8814fd3c -C extra-filename=-4a7bd9b2e4a9f377 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused import: `std::path::PathBuf`
+ --> tests/label_tests.rs:4:5
+  |
+4 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `super::*`
+ --> tests/label_tests.rs:8:9
+  |
+8 |     use super::*;
+  |         ^^^^^^^^
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:13:13
+   |
+13 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:26:13
+   |
+26 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:39:13
+   |
+39 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:52:13
+   |
+52 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:71:13
+   |
+71 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:84:13
+   |
+84 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/label_tests.rs:106:13
+    |
+106 |         let bead_id = "bf-4yk8nn";
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: `bead-forge` (test "label_tests") generated 9 warnings (run `cargo fix --test "label_tests" -p bead-forge` to apply 9 suggestions)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_bf_23vs_basic_functionality --edition=2021 tests/test_bf_23vs_basic_functionality.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=c38c33a5705e0d63 -C extra-filename=-8e13b7c84f605952 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused import: `std::path::PathBuf`
+ --> tests/test_bf_23vs_basic_functionality.rs:7:9
+  |
+7 |     use std::path::PathBuf;
+  |         ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name duplicate_label_test --edition=2021 tests/duplicate_label_test.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=2a862efad0e752b8 -C extra-filename=-d7e20c139b68b2ab --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused import: `Priority`
+ --> tests/duplicate_label_test.rs:4:43
+  |
+4 | use bead_forge::model::{Issue, IssueType, Priority, Status};
+  |                                           ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_bf_23vs_basic_functionality") generated 1 warning (run `cargo fix --test "test_bf_23vs_basic_functionality" -p bead-forge` to apply 1 suggestion)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_schema --edition=2021 examples/test_schema.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8adf0c2b1eb7c63e -C extra-filename=-e71e1425bdb0d8cc --out-dir /home/coding/bead-forge/target/debug/examples -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_label_multiple_imports --edition=2021 tests/test_label_multiple_imports.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ab41cc38f65034f3 -C extra-filename=-f3da448268bd04c5 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+warning: unused import: `Priority`
+ --> tests/test_label_multiple_imports.rs:9:43
+  |
+9 | use bead_forge::model::{Issue, IssueType, Priority, Status};
+  |                                           ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `UpsertResult`
+  --> tests/test_label_multiple_imports.rs:11:31
+   |
+11 | use bead_forge::jsonl::{self, UpsertResult};
+   |                               ^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> tests/test_label_multiple_imports.rs:12:5
+   |
+12 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `delete_issue` found for reference `&Storage` in the current scope
+  --> tests/test_label_multiple_imports.rs:48:17
+   |
+48 |         storage.delete_issue(&bead.id).expect("Failed to delete bead");
+   |                 ^^^^^^^^^^^^
+   |
+help: there is a method `get_issue` with a similar name
+   |
+48 -         storage.delete_issue(&bead.id).expect("Failed to delete bead");
+48 +         storage.get_issue(&bead.id).expect("Failed to delete bead");
+   |
+
+error[E0308]: mismatched types
+   --> tests/test_label_multiple_imports.rs:344:9
+    |
+341 |     let bead = create_bead_with_label_slices(
+    |                ----------------------------- arguments to this function are incorrect
+...
+344 |         vec!["zebra", "alpha", "middle", "beta", "gamma"]
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&[&str]`, found `Vec<&str>`
+    |
+    = note: expected reference `&[&str]`
+                  found struct `Vec<&str>`
+note: function defined here
+   --> tests/test_label_multiple_imports.rs:27:4
+    |
+ 27 | fn create_bead_with_label_slices(id: &str, title: &str, labels: &[&str]) -> Issue {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                        ---------------
+
+warning: `bead-forge` (test "duplicate_label_test") generated 1 warning (run `cargo fix --test "duplicate_label_test" -p bead-forge` to apply 1 suggestion)
+     Running `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name task_default_priority --edition=2021 tests/task_default_priority.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=3d87c5b8d847b117 -C extra-filename=-d214f61bc9af928b --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out`
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+warning: `bead-forge` (test "test_label_multiple_imports") generated 3 warnings
+error: could not compile `bead-forge` (test "test_label_multiple_imports") due to 2 previous errors; 3 warnings emitted
+
+Caused by:
+  process didn't exit successfully: `/home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name test_label_multiple_imports --edition=2021 tests/test_label_multiple_imports.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=ab41cc38f65034f3 -C extra-filename=-f3da448268bd04c5 --out-dir /home/coding/bead-forge/target/debug/deps -L dependency=/home/coding/bead-forge/target/debug/deps --extern anyhow=/home/coding/bead-forge/target/debug/deps/libanyhow-ce487b25557e737c.rlib --extern bead_forge=/home/coding/bead-forge/target/debug/deps/libbead_forge-d858f55b098b508d.rlib --extern chrono=/home/coding/bead-forge/target/debug/deps/libchrono-ac892fec41782303.rlib --extern clap=/home/coding/bead-forge/target/debug/deps/libclap-a195b7996598e932.rlib --extern num_bigint=/home/coding/bead-forge/target/debug/deps/libnum_bigint-1c66f0521a309001.rlib --extern num_traits=/home/coding/bead-forge/target/debug/deps/libnum_traits-07407af4683841a2.rlib --extern rand=/home/coding/bead-forge/target/debug/deps/librand-57e55ff93e6fd789.rlib --extern regex=/home/coding/bead-forge/target/debug/deps/libregex-3e3dd9d8b38333cd.rlib --extern rusqlite=/home/coding/bead-forge/target/debug/deps/librusqlite-6ec9f4fd12492dd3.rlib --extern serde=/home/coding/bead-forge/target/debug/deps/libserde-c7f3dcdaf912bc85.rlib --extern serde_json=/home/coding/bead-forge/target/debug/deps/libserde_json-4b42cbe98a6c97ef.rlib --extern serde_yaml=/home/coding/bead-forge/target/debug/deps/libserde_yaml-ab15f9e1605b72d9.rlib --extern sha2=/home/coding/bead-forge/target/debug/deps/libsha2-cd209756c2e239d1.rlib --extern shell_words=/home/coding/bead-forge/target/debug/deps/libshell_words-a56190553a7ffb5e.rlib --extern tempfile=/home/coding/bead-forge/target/debug/deps/libtempfile-bb097bc6c2cf2fa7.rlib --extern thiserror=/home/coding/bead-forge/target/debug/deps/libthiserror-f81d6c86577431de.rlib --extern tracing=/home/coding/bead-forge/target/debug/deps/libtracing-3ce5909329d4e97e.rlib --extern tracing_subscriber=/home/coding/bead-forge/target/debug/deps/libtracing_subscriber-5112df203f03437b.rlib --extern which=/home/coding/bead-forge/target/debug/deps/libwhich-fe12989eaab99ab5.rlib -C codegen-units=1 -L native=/home/coding/bead-forge/target/debug/build/libsqlite3-sys-811411d4727362b5/out` (exit status: 1)
+warning: build failed, waiting for other jobs to finish...
