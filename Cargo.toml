@@ -30,7 +30,7 @@ which = "7"
 tempfile = "3"
 chrono = { version = "0.4", features = ["serde"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
-cargo-tarpaulin = "0.31"
+# cargo-tarpaulin = "0.31"  # Temporarily disabled - requires openssl
 
 [[test]]
 name = "test_jsonl"
