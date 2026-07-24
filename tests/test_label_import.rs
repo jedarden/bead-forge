@@ -101,6 +101,122 @@ fn test_label_import_with_empty_labels() {
 }
 
 #[test]
+fn test_label_import_null_field_rejected() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    bead_forge::config::init_workspace(&beads_dir, "bf").unwrap();
+
+    let jsonl_path = beads_dir.join("issues.jsonl");
+
+    // Create a JSONL file with explicit null labels field
+    // This should be rejected during JSON deserialization
+    let issue_json = r#"{"id":"bf-null-labels","title":"Test Null Labels","status":"open","priority":2,"issue_type":"task","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","source_repo":".","labels":null}"#;
+
+    {
+        let mut file = fs::File::create(&jsonl_path).unwrap();
+        writeln!(file, "{}", issue_json).unwrap();
+    }
+
+    // Verify file exists and has content
+    assert!(jsonl_path.exists(), "JSONL file should exist");
+    let content = fs::read_to_string(&jsonl_path).unwrap();
+    assert!(!content.is_empty(), "JSONL file should not be empty");
+
+    // Import from JSONL should fail because null is not a valid value for labels array
+    let result = sync::import(workspace);
+
+    assert!(result.is_err(), "Import should fail when labels field is null");
+    let err = result.unwrap_err();
+    let err_msg = err.to_string();
+    assert!(
+        err_msg.contains("invalid type: null") || err_msg.contains("expected a sequence"),
+        "Error should indicate null value was rejected: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_label_import_empty_array() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    bead_forge::config::init_workspace(&beads_dir, "bf").unwrap();
+
+    let db_path = beads_dir.join("beads.db");
+    let jsonl_path = beads_dir.join("issues.jsonl");
+
+    // Create a JSONL file with explicit empty labels array
+    let issue_json = r#"{"id":"bf-empty-array","title":"Test Empty Array","status":"open","priority":2,"issue_type":"task","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","source_repo":".","labels":[]}"#;
+
+    {
+        let mut file = fs::File::create(&jsonl_path).unwrap();
+        writeln!(file, "{}", issue_json).unwrap();
+    }
+
+    // Verify file exists and has content
+    assert!(jsonl_path.exists(), "JSONL file should exist");
+    let content = fs::read_to_string(&jsonl_path).unwrap();
+    assert!(!content.is_empty(), "JSONL file should not be empty");
+
+    // Import from JSONL
+    let result = sync::import(workspace).unwrap();
+
+    assert_eq!(result.imported, 1, "Should import 1 issue with empty labels array");
+
+    // Verify the issue was imported with no labels
+    let storage = Storage::open(&db_path).unwrap();
+    let imported = storage.get_issue("bf-empty-array").unwrap().unwrap();
+
+    assert_eq!(imported.labels, Vec::<String>::new(), "Issue with empty labels array should have no labels");
+}
+
+#[test]
+fn test_label_import_mixed_empty_scenarios() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    bead_forge::config::init_workspace(&beads_dir, "bf").unwrap();
+
+    let db_path = beads_dir.join("beads.db");
+    let jsonl_path = beads_dir.join("issues.jsonl");
+
+    // Create JSONL with multiple empty label scenarios (excluding null which is rejected)
+    let json_lines = vec![
+        r#"{"id":"bf-mixed-missing","title":"Missing Labels","status":"open","priority":2,"issue_type":"task","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","source_repo":"."}"#,
+        r#"{"id":"bf-mixed-empty","title":"Empty Array Labels","status":"open","priority":2,"issue_type":"task","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","source_repo":".","labels":[]}"#,
+        r#"{"id":"bf-mixed-valid","title":"Valid Labels","status":"open","priority":2,"issue_type":"task","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","source_repo":".","labels":["phase-1"]}"#,
+    ];
+
+    {
+        let mut file = fs::File::create(&jsonl_path).unwrap();
+        for line in json_lines {
+            writeln!(file, "{}", line).unwrap();
+        }
+    }
+
+    // Import from JSONL
+    let result = sync::import(workspace).unwrap();
+
+    assert_eq!(result.imported, 3, "Should import all 3 issues");
+
+    // Verify all issues were imported correctly
+    let storage = Storage::open(&db_path).unwrap();
+
+    let missing = storage.get_issue("bf-mixed-missing").unwrap().unwrap();
+    assert_eq!(missing.labels, Vec::<String>::new(), "Missing labels should be empty");
+
+    let empty = storage.get_issue("bf-mixed-empty").unwrap().unwrap();
+    assert_eq!(empty.labels, Vec::<String>::new(), "Empty array labels should be empty");
+
+    let valid = storage.get_issue("bf-mixed-valid").unwrap().unwrap();
+    assert_eq!(valid.labels, vec!["phase-1"], "Valid labels should be preserved");
+}
+
+#[test]
 fn test_label_import_roundtrip() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path();
