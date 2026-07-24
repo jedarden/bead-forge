@@ -1,16 +1,14 @@
-//! Example: Run cargo test in NEEDLE directory and capture output to trace files
+//! Quick demonstration: Run specific cargo test module with output capture
 //!
-//! This demonstrates the core functionality for running cargo test with output capture.
-//! The execution writes to bead-specific trace directories with metadata.json, stdout.txt, and stderr.txt.
-//!
-//! Run with: cargo run --example cargo_test_execution
+//! This demonstrates cargo test execution with output capture using a single test module
+//! to keep execution time manageable while still validating the functionality.
 
 use anyhow::Result;
 use bead_forge::trace::{TraceManager, TraceMetadata};
 use std::path::PathBuf;
 
 fn main() -> Result<()> {
-    println!("=== Cargo Test Execution with Output Capture ===\n");
+    println!("=== Quick Cargo Test Execution Demo ===\n");
 
     // Set up paths
     let needle_dir = PathBuf::from("/home/coding/NEEDLE");
@@ -18,17 +16,11 @@ fn main() -> Result<()> {
 
     println!("Workspace: {}", needle_dir.display());
     println!("Bead ID: bf-3ezlq4");
-    println!("Trace directory: .beads/traces/bf-3ezlq4/\n");
+    println!("Test filter: bead_store (single module for quick demo)\n");
 
     // Verify NEEDLE directory exists
     if !needle_dir.exists() {
         anyhow::bail!("NEEDLE directory does not exist: {}", needle_dir.display());
-    }
-
-    // Verify NEEDLE has Cargo.toml
-    let cargo_toml = needle_dir.join("Cargo.toml");
-    if !cargo_toml.exists() {
-        anyhow::bail!("NEEDLE directory does not contain Cargo.toml: {}", needle_dir.display());
     }
 
     // Create trace manager for bead-forge workspace
@@ -44,14 +36,15 @@ fn main() -> Result<()> {
         ..Default::default()
     };
 
-    println!("Running cargo test in {}...", needle_dir.display());
-    println!("This may take several minutes...\n");
+    println!("Running cargo test -- bead_store...");
+    println!("This will run only the bead_store test module for quick demonstration.\n");
 
-    // Run cargo test and capture output to bead trace directory
-    let result = trace_manager.run_cargo_test_to_bead_trace(
+    // Run cargo test with specific test filter and capture output to bead trace directory
+    let result = trace_manager.run_cargo_test_to_bead_trace_with_args(
         &needle_dir,
         "bf-3ezlq4",
-        &metadata
+        &metadata,
+        &["--", "bead_store"]  // Run only bead_store tests
     )?;
 
     println!("=== Test Execution Complete ===\n");
@@ -72,13 +65,13 @@ fn main() -> Result<()> {
     println!();
 
     // Show first few lines of stdout
-    println!("First 10 lines of stdout:");
-    for (i, line) in stdout_lines.iter().take(10).enumerate() {
+    println!("First 15 lines of stdout:");
+    for (i, line) in stdout_lines.iter().take(15).enumerate() {
         println!("  {}: {}", i + 1, line);
     }
 
-    if stdout_lines.len() > 10 {
-        println!("  ... ({} more lines)", stdout_lines.len() - 10);
+    if stdout_lines.len() > 15 {
+        println!("  ... ({} more lines)", stdout_lines.len() - 15);
     }
 
     // Show first few lines of stderr if any
@@ -94,14 +87,24 @@ fn main() -> Result<()> {
     }
 
     println!("\n=== Files Written ===");
-    println!("metadata.json: {}", result.bead_trace_dir.join("metadata.json").display());
-    println!("stdout.txt: {}", result.bead_trace_dir.join("stdout.txt").display());
-    println!("stderr.txt: {}", result.bead_trace_dir.join("stderr.txt").display());
+    let metadata_path = result.bead_trace_dir.join("metadata.json");
+    let stdout_path = result.bead_trace_dir.join("stdout.txt");
+    let stderr_path = result.bead_trace_dir.join("stderr.txt");
+
+    println!("metadata.json: {}", metadata_path.display());
+    println!("stdout.txt: {}", stdout_path.display());
+    println!("stderr.txt: {}", stderr_path.display());
+
+    // Verify files exist
+    println!("\n=== Verification ===");
+    println!("metadata.json exists: {}", metadata_path.exists());
+    println!("stdout.txt exists: {}", stdout_path.exists());
+    println!("stderr.txt exists: {}", stderr_path.exists());
 
     if result.exit_code == 0 {
-        println!("\n✓ All tests passed!");
+        println!("\n✓ All bead_store tests passed!");
     } else {
-        println!("\n✗ Some tests failed (non-zero exit code)");
+        println!("\n✗ Some bead_store tests failed (non-zero exit code)");
         println!("  Check the trace files for details");
     }
 
