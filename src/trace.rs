@@ -1681,4 +1681,217 @@ mod tests {
                 "all bead IDs should start with bf- or needle- prefix, got: {}", bead);
         }
     }
+
+    #[test]
+    fn test_stdout_capture_with_known_output() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a Rust project with a test that produces known stdout output
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-stdout-capture"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_with_stdout_output() {
+        println!("TEST_OUTPUT_LINE_1");
+        println!("TEST_OUTPUT_LINE_2");
+        assert_eq!(2 + 2, 4);
+        println!("TEST_OUTPUT_LINE_3");
+    }
+}
+"#
+        ).unwrap();
+
+        // Create metadata for the trace
+        let metadata = TraceMetadata {
+            bead_id: Some("bf-stdout-test".to_string()),
+            agent: "test-stdout-agent".to_string(),
+            outcome: "success".to_string(),
+            ..Default::default()
+        };
+
+        // Run cargo test with --nocapture to actually capture test stdout output
+        let result = manager.run_cargo_test_to_bead_trace_with_args(
+            temp_dir.path(),
+            "bf-stdout-test",
+            &metadata,
+            &["--", "--nocapture"]
+        ).unwrap();
+
+        // Test assertions pass - test completed successfully
+        assert_eq!(result.exit_code, 0, "cargo test should succeed");
+
+        // Verify stdout is captured and accessible
+        assert!(!result.stdout.is_empty(), "stdout should not be empty");
+
+        // Verify capture mechanism works correctly by checking for known output patterns
+        assert!(result.stdout.contains("TEST_OUTPUT_LINE_1"),
+            "stdout should contain first test output line");
+        assert!(result.stdout.contains("TEST_OUTPUT_LINE_2"),
+            "stdout should contain second test output line");
+        assert!(result.stdout.contains("TEST_OUTPUT_LINE_3"),
+            "stdout should contain third test output line");
+
+        // Verify the stdout was written to file
+        let stdout_path = result.bead_trace_dir.join("stdout.txt");
+        assert!(stdout_path.exists(), "stdout.txt file should exist");
+
+        // Verify the file content matches the captured stdout
+        let stdout_content = fs::read_to_string(&stdout_path).unwrap();
+        assert_eq!(stdout_content, result.stdout, "file content should match captured stdout");
+
+        // Verify the file contains all expected patterns
+        assert!(stdout_content.contains("TEST_OUTPUT_LINE_1"),
+            "stdout file should contain first test output line");
+        assert!(stdout_content.contains("TEST_OUTPUT_LINE_2"),
+            "stdout file should contain second test output line");
+        assert!(stdout_content.contains("TEST_OUTPUT_LINE_3"),
+            "stdout file should contain third test output line");
+
+        // Verify standard cargo test output markers are present
+        assert!(stdout_content.contains("running") || stdout_content.contains("test result:"),
+            "stdout should contain cargo test output markers");
+
+        // Verify trace directory structure is complete
+        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+        let metadata_path = result.bead_trace_dir.join("metadata.json");
+        assert!(metadata_path.exists(), "metadata.json should exist");
+        let stderr_path = result.bead_trace_dir.join("stderr.txt");
+        assert!(stderr_path.exists(), "stderr.txt should exist");
+
+        // Verify metadata contains expected execution information
+        let metadata_content = fs::read_to_string(&metadata_path).unwrap();
+        let read_metadata: TraceMetadata = serde_json::from_str(&metadata_content).unwrap();
+        assert_eq!(read_metadata.bead_id, Some("bf-stdout-test".to_string()));
+        assert_eq!(read_metadata.agent, "test-stdout-agent");
+        assert_eq!(read_metadata.exit_code, Some(0));
+        assert_eq!(read_metadata.outcome, "success");
+        assert!(read_metadata.start_time.is_some(), "metadata should have start time");
+        assert!(read_metadata.end_time.is_some(), "metadata should have end time");
+        assert!(read_metadata.duration_ms.is_some(), "metadata should have duration");
+    }
+
+    #[test]
+    fn test_stdout_capture_comprehensive() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a Rust project with multiple tests producing varied stdout output
+        let cargo_toml = temp_dir.path().join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            r#"[package]
+name = "test-stdout-comprehensive"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#
+        ).unwrap();
+
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            r#"#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_first() {
+        println!("FIRST_TEST_OUTPUT");
+        assert!(true);
+    }
+
+    #[test]
+    fn test_second() {
+        println!("SECOND_TEST_OUTPUT");
+        assert_eq!(1, 1);
+    }
+
+    #[test]
+    fn test_with_structured_output() {
+        println!("STRUCTURED_OUTPUT: {{\"status\": \"success\", \"value\": 42}}");
+        assert!(true);
+    }
+}
+"#
+        ).unwrap();
+
+        // Create metadata for comprehensive trace
+        let metadata = TraceMetadata {
+            bead_id: Some("bf-stdout-comprehensive".to_string()),
+            agent: "test-comprehensive-agent".to_string(),
+            outcome: "success".to_string(),
+            ..Default::default()
+        };
+
+        // Run cargo test with --nocapture to capture all stdout output
+        let result = manager.run_cargo_test_to_bead_trace_with_args(
+            temp_dir.path(),
+            "bf-stdout-comprehensive",
+            &metadata,
+            &["--", "--nocapture"]
+        ).unwrap();
+
+        // Comprehensive assertions
+        assert_eq!(result.exit_code, 0, "all tests should pass");
+
+        // Verify stdout capture from multiple tests
+        assert!(!result.stdout.is_empty(), "stdout should not be empty");
+        assert!(result.stdout.len() > 100, "stdout should contain substantial output");
+
+        // Verify all test outputs are captured
+        assert!(result.stdout.contains("FIRST_TEST_OUTPUT"),
+            "should capture output from first test");
+        assert!(result.stdout.contains("SECOND_TEST_OUTPUT"),
+            "should capture output from second test");
+        assert!(result.stdout.contains("STRUCTURED_OUTPUT"),
+            "should capture structured JSON output");
+
+        // Verify stdout contains cargo test framework output
+        assert!(result.stdout.contains("running") || result.stdout.contains("test result:"),
+            "stdout should contain cargo test execution indicators");
+
+        // Verify file persistence
+        let stdout_path = result.bead_trace_dir.join("stdout.txt");
+        assert!(stdout_path.exists(), "stdout.txt should exist");
+
+        let file_content = fs::read_to_string(&stdout_path).unwrap();
+        assert_eq!(file_content, result.stdout, "file should exactly match captured stdout");
+
+        // Verify metadata integrity
+        let metadata_path = result.bead_trace_dir.join("metadata.json");
+        let metadata_content = fs::read_to_string(&metadata_path).unwrap();
+        let trace_metadata: TraceMetadata = serde_json::from_str(&metadata_content).unwrap();
+
+        assert_eq!(trace_metadata.exit_code, Some(0));
+        assert_eq!(trace_metadata.outcome, "success");
+        assert!(trace_metadata.duration_ms.unwrap() > 0, "duration should be positive");
+
+        // Verify trace directory completeness
+        let stderr_path = result.bead_trace_dir.join("stderr.txt");
+        assert!(stderr_path.exists(), "stderr.txt should exist (even if empty)");
+
+        // Verify capture mechanism reliability by counting lines
+        let stdout_lines = result.stdout.lines().count();
+        assert!(stdout_lines > 5, "stdout should contain multiple lines of output");
+    }
 }
