@@ -652,3 +652,236 @@ fn test_labels_persist_empty_label_edge_case() {
     let final_issue = storage2.get_issue("bf-empty-edge").unwrap().unwrap();
     assert_eq!(final_issue.labels.len(), 0, "Labels should be empty after clearing");
 }
+
+/// Test that labels persist after add/remove operations through sync
+#[test]
+fn test_labels_persist_after_add_remove_operations() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    init_workspace(&beads_dir, "bf").unwrap();
+
+    let db_path = beads_dir.join("beads.db");
+
+    // Create issue with initial labels
+    let issue = Issue {
+        id: "bf-addremove-1".to_string(),
+        title: "Add/Remove Test".to_string(),
+        status: Status::Open,
+        priority: Priority::MEDIUM,
+        issue_type: IssueType::Task,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        source_repo: Some(".".to_string()),
+        labels: vec!["initial".to_string(), "keep-me".to_string()],
+        ..Default::default()
+    };
+
+    let storage = Storage::open(&db_path).unwrap();
+    storage.create_issue(&issue).unwrap();
+
+    // Initial flush
+    sync::flush(workspace).unwrap();
+
+    // Add a new label using add_label API
+    storage.add_label("bf-addremove-1", "added-label").unwrap();
+
+    // Remove a label using remove_label API
+    storage.remove_label("bf-addremove-1", "initial").unwrap();
+
+    // Flush after add/remove
+    sync::flush_dirty(workspace).unwrap();
+
+    // Verify JSONL contains the updated labels
+    let jsonl_path = beads_dir.join("issues.jsonl");
+    let jsonl_contents = fs::read_to_string(&jsonl_path).unwrap();
+    let parsed: Issue = serde_json::from_str(
+        jsonl_contents.lines().next().unwrap()
+    ).unwrap();
+
+    assert_eq!(parsed.labels.len(), 2);
+    assert!(parsed.labels.contains(&"keep-me".to_string()), "Kept label should be present");
+    assert!(parsed.labels.contains(&"added-label".to_string()), "Added label should be present");
+    assert!(!parsed.labels.contains(&"initial".to_string()), "Removed label should not be present");
+
+    // Clear database and restore from JSONL
+    drop(storage);
+    fs::remove_file(&db_path).unwrap();
+    sync::import(workspace).unwrap();
+
+    // Verify labels survived after add/remove + sync roundtrip
+    let storage2 = Storage::open(&db_path).unwrap();
+    let final_issue = storage2.get_issue("bf-addremove-1").unwrap().unwrap();
+
+    assert_eq!(final_issue.labels.len(), 2, "Should have 2 labels after roundtrip");
+    assert!(final_issue.labels.contains(&"keep-me".to_string()), "Kept label should persist");
+    assert!(final_issue.labels.contains(&"added-label".to_string()), "Added label should persist");
+    assert!(!final_issue.labels.contains(&"initial".to_string()), "Removed label should not persist");
+}
+
+/// Test atomic transaction handling for labels
+#[test]
+fn test_label_atomic_transaction_handling() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    init_workspace(&beads_dir, "bf").unwrap();
+
+    let db_path = beads_dir.join("beads.db");
+
+    // Create initial issue
+    let issue = Issue {
+        id: "bf-atomic-labels".to_string(),
+        title: "Atomic Labels Test".to_string(),
+        status: Status::Open,
+        priority: Priority::HIGH,
+        issue_type: IssueType::Feature,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        source_repo: Some(".".to_string()),
+        labels: vec!["label-1".to_string()],
+        ..Default::default()
+    };
+
+    let storage = Storage::open(&db_path).unwrap();
+    storage.create_issue(&issue).unwrap();
+
+    // Perform multiple add_label operations - each should be atomic
+    storage.add_label("bf-atomic-labels", "label-2").unwrap();
+    storage.add_label("bf-atomic-labels", "label-3").unwrap();
+
+    // Verify all labels are in the database
+    let current_labels = storage.get_labels("bf-atomic-labels").unwrap();
+    assert_eq!(current_labels.len(), 3, "All labels should be present after atomic adds");
+
+    // Perform remove_label - should be atomic
+    storage.remove_label("bf-atomic-labels", "label-2").unwrap();
+
+    // Verify remove was atomic
+    let after_remove = storage.get_labels("bf-atomic-labels").unwrap();
+    assert_eq!(after_remove.len(), 2, "One label should be removed atomically");
+    assert!(!after_remove.contains(&"label-2".to_string()), "Removed label should not be present");
+
+    // Flush to JSONL
+    sync::flush(workspace).unwrap();
+
+    // Verify atomic operations persisted to JSONL
+    let jsonl_path = beads_dir.join("issues.jsonl");
+    let jsonl_contents = fs::read_to_string(&jsonl_path).unwrap();
+    let parsed: Issue = serde_json::from_str(
+        jsonl_contents.lines().next().unwrap()
+    ).unwrap();
+
+    assert_eq!(parsed.labels.len(), 2, "JSONL should reflect atomic operations");
+    assert!(parsed.labels.contains(&"label-1".to_string()));
+    assert!(parsed.labels.contains(&"label-3".to_string()));
+    assert!(!parsed.labels.contains(&"label-2".to_string()));
+
+    // Clear database and restore from JSONL to test import atomicity
+    drop(storage);
+    fs::remove_file(&db_path).unwrap();
+    sync::import(workspace).unwrap();
+
+    // Verify atomicity through full sync cycle
+    let storage2 = Storage::open(&db_path).unwrap();
+    let final_issue = storage2.get_issue("bf-atomic-labels").unwrap().unwrap();
+
+    assert_eq!(final_issue.labels.len(), 2, "Atomic operations should survive sync cycle");
+    assert!(final_issue.labels.contains(&"label-1".to_string()));
+    assert!(final_issue.labels.contains(&"label-3".to_string()));
+    assert!(!final_issue.labels.contains(&"label-2".to_string()));
+
+    // Verify database consistency - all labels should be in both tables atomically
+    storage2.with_immediate_transaction(|tx| {
+        // Check bead_labels table
+        let mut stmt = tx.prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1").unwrap();
+        let bead_count: i64 = stmt.query_row(
+            rusqlite::params!["bf-atomic-labels"],
+            |row| row.get(0)
+        ).unwrap();
+
+        // Check labels table
+        let mut stmt = tx.prepare("SELECT COUNT(*) FROM labels WHERE issue_id = ?1").unwrap();
+        let label_count: i64 = stmt.query_row(
+            rusqlite::params!["bf-atomic-labels"],
+            |row| row.get(0)
+        ).unwrap();
+
+        assert_eq!(bead_count, 2, "bead_labels should have 2 labels");
+        assert_eq!(label_count, 2, "labels table should have 2 labels");
+        assert_eq!(bead_count, label_count, "Both label tables should be in sync");
+
+        Ok(())
+    }).unwrap();
+}
+
+/// Test that multiple label operations in sequence persist correctly
+#[test]
+fn test_labels_persist_through_multiple_add_remove_sequences() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    init_workspace(&beads_dir, "bf").unwrap();
+
+    let db_path = beads_dir.join("beads.db");
+
+    // Create issue with initial label
+    let issue = Issue {
+        id: "bf-sequence-labels".to_string(),
+        title: "Sequence Labels Test".to_string(),
+        status: Status::Open,
+        priority: Priority::MEDIUM,
+        issue_type: IssueType::Task,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        source_repo: Some(".".to_string()),
+        labels: vec!["start".to_string()],
+        ..Default::default()
+    };
+
+    let storage = Storage::open(&db_path).unwrap();
+    storage.create_issue(&issue).unwrap();
+
+    // Sequence 1: Add labels
+    storage.add_label("bf-sequence-labels", "a").unwrap();
+    storage.add_label("bf-sequence-labels", "b").unwrap();
+    storage.add_label("bf-sequence-labels", "c").unwrap();
+
+    // Flush after sequence 1
+    sync::flush(workspace).unwrap();
+
+    // Sequence 2: Remove some labels
+    storage.remove_label("bf-sequence-labels", "b").unwrap();
+    storage.remove_label("bf-sequence-labels", "start").unwrap();
+
+    // Flush after sequence 2
+    sync::flush_dirty(workspace).unwrap();
+
+    // Sequence 3: Add more labels
+    storage.add_label("bf-sequence-labels", "d").unwrap();
+    storage.add_label("bf-sequence-labels", "e").unwrap();
+
+    // Final flush
+    sync::flush_dirty(workspace).unwrap();
+
+    // Clear database and restore
+    drop(storage);
+    fs::remove_file(&db_path).unwrap();
+    sync::import(workspace).unwrap();
+
+    // Verify final state after all sequences
+    let storage2 = Storage::open(&db_path).unwrap();
+    let final_issue = storage2.get_issue("bf-sequence-labels").unwrap().unwrap();
+
+    // Should have: a, c, d, e (b and start were removed)
+    assert_eq!(final_issue.labels.len(), 4, "Should have 4 labels after all sequences");
+    assert!(final_issue.labels.contains(&"a".to_string()));
+    assert!(final_issue.labels.contains(&"c".to_string()));
+    assert!(final_issue.labels.contains(&"d".to_string()));
+    assert!(final_issue.labels.contains(&"e".to_string()));
+    assert!(!final_issue.labels.contains(&"b".to_string()), "Removed label should not persist");
+    assert!(!final_issue.labels.contains(&"start".to_string()), "Removed label should not persist");
+}

@@ -1,9 +1,11 @@
 # Label Sync Persistence Tests
 
-## Bead: bf-18vf1p
+## Bead: bf-18vf1p (original), bf-9dok16 (extended)
 
 ### Summary
 Created comprehensive tests for label persistence through sync operations in `tests/test_label_sync_persistence.rs`.
+
+## Original Tests (bf-18vf1p)
 
 ### Tests Implemented
 
@@ -41,12 +43,37 @@ Created comprehensive tests for label persistence through sync operations in `te
    - Tests edge case of clearing all labels from an issue
    - Verifies empty label array persists correctly
 
+## Extended Tests (bf-9dok16)
+
+### Tests Added
+
+8. **test_labels_persist_after_add_remove_operations**
+   - Tests that labels persist after using `add_label()` and `remove_label()` APIs
+   - Verifies added labels are preserved through sync flush
+   - Verifies removed labels are not restored after sync
+   - Tests full roundtrip: DB operations → flush → import → verify
+
+9. **test_label_atomic_transaction_handling**
+   - Tests that label operations (`add_label`, `remove_label`) are atomic
+   - Verifies each operation happens within `BEGIN IMMEDIATE` transaction
+   - Ensures both `labels` and `bead_labels` tables stay synchronized
+   - Confirms atomic operations persist through sync cycles
+   - Validates database consistency after sequences of add/remove
+
+10. **test_labels_persist_through_multiple_add_remove_sequences**
+    - Tests complex sequences of add/remove operations
+    - Multiple flush cycles with interleaved label changes
+    - Verifies final state is correct after all operations and sync
+    - Ensures no label drift occurs through multiple cycles
+
 ### Test Coverage
 
 All acceptance criteria met:
-- ✅ Test that labels persist through 'bf sync --flush-only'
-- ✅ Test that labels survive export/import cycle
-- ✅ Test label survival after full sync operations
+- ✅ Test label persistence through 'bf sync --flush-only'
+- ✅ Test label persistence across multiple flushes
+- ✅ Test labels survive after add/remove operations
+- ✅ Test labels survive full sync operations
+- ✅ Test atomic transaction handling for labels
 
 ### Notes
 
