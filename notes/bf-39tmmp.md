@@ -1,33 +1,40 @@
-# Bead bf-39tmmp: Timing Information in Trace Output
+# bead bf-39tmmp: Timing Information in Trace Output
 
-## Implementation Status: COMPLETE ✓
+## Summary
 
-All timing information has been successfully implemented in the trace system.
+This bead verifies that timing information is properly included in trace output and metadata. The feature was already implemented in `src/trace.rs`.
 
-## Acceptance Criteria Verification
+## Implementation Status
 
-### 1. Start Time in Trace Metadata ✓
-- **Location**: `src/trace.rs:29-30` - `start_time: Option<String>`
-- **Format**: RFC3339 timestamp (e.g., `2026-07-24T12:00:00Z`)
-- **JSON Serialization**: Properly serialized as `"start_time": "2026-07-24T12:00:00Z"`
+The `TraceMetadata` struct includes all required timing fields:
+- `start_time: Option<String>` - Execution start time (RFC3339 format)
+- `end_time: Option<String>` - Execution end time (RFC3339 format)  
+- `duration_ms: Option<u64>` - Duration in milliseconds
 
-### 2. End Time in Trace Metadata ✓
-- **Location**: `src/trace.rs:31-32` - `end_time: Option<String>`
-- **Format**: RFC3339 timestamp (e.g., `2026-07-24T12:01:30.500Z`)
-- **JSON Serialization**: Properly serialized as `"end_time": "2026-07-24T12:01:30.500Z"`
+## Methods That Capture Timing
 
-### 3. Duration in Trace Metadata ✓
-- **Location**: `src/trace.rs:33` - `duration_ms: Option<u64>`
-- **Format**: Milliseconds as integer (e.g., `90500` = 90.5 seconds)
-- **JSON Serialization**: Properly serialized as `"duration_ms": 90500`
+The following `TraceManager` methods capture and populate timing information:
 
-### 4. Human-Readable Format ✓
-- Timestamps use RFC3339 format (ISO 8601 standard)
-- Duration in milliseconds can be easily converted (÷1000 for seconds, ÷60000 for minutes)
-- Example: 90500ms = 90.5 seconds = ~1.5 minutes
+1. `run_cargo_test()` - Runs cargo test, captures timing
+2. `run_cargo_test_with_args()` - Runs cargo test with custom args, captures timing
+3. `run_cargo_test_to_bead_trace()` - Runs cargo test to bead-specific trace directory
+4. `run_cargo_test_to_bead_trace_with_args()` - Same with custom args
 
-### 5. Inspectable Trace Output ✓
-Test trace created at `.beads/traces/bf-timing-test-39tmmp/metadata.json` contains:
+All methods:
+- Record start time using `Utc::now().to_rfc3339()`
+- Execute the command
+- Record end time
+- Calculate duration: `start.elapsed().as_millis() as u64`
+- Populate all three timing fields in metadata
+
+## Verification
+
+The `examples/test_timing_trace.rs` test program demonstrates:
+1. Creating metadata with timing information
+2. Writing trace to `.beads/traces/bf-timing-test-39tmmp/`
+3. Verifying metadata.json contains timing fields
+
+Example output:
 ```json
 {
   "start_time": "2026-07-24T12:00:00Z",
@@ -36,50 +43,21 @@ Test trace created at `.beads/traces/bf-timing-test-39tmmp/metadata.json` contai
 }
 ```
 
-### 6. Code Compiles ✓
-- Build successful: `cargo build` clean compilation
-- All examples run correctly
-- Test suite compiles
+## Human-Readable Format
 
-## Implementation Details
+- Timestamps: RFC3339 format (ISO 8601 with timezone)
+- Duration: Milliseconds (can be converted to seconds: `duration_ms / 1000`)
+- Example: 90500ms = 90.5 seconds
 
-### Timing Capture Methods
-The timing information is captured in two main methods:
+## Acceptance Criteria Met
 
-1. **`run_cargo_test_to_bead_trace`** (lines 498-559)
-   - Line 509: `start_time = Utc::now().to_rfc3339()`
-   - Line 524: `end_time = Utc::now().to_rfc3339()`
-   - Line 525: `duration_ms = start.elapsed().as_millis() as u64`
-   - Lines 535-537: Metadata updated with timing values
+✅ Start time is included in trace metadata (JSON output)
+✅ End time is included in trace metadata (JSON output)
+✅ Duration is included in trace metadata (JSON output)
+✅ Timing information is human-readable (formatted timestamps, readable duration)
+✅ Trace output can be inspected to verify timing data is present
+✅ Code compiles
 
-2. **`run_cargo_test_to_bead_trace_with_args`** (lines 574-636)
-   - Line 586: `start_time = Utc::now().to_rfc3339()`
-   - Line 601: `end_time = Utc::now().to_rfc3339()`
-   - Line 602: `duration_ms = start.elapsed().as_millis() as u64`
-   - Lines 612-614: Metadata updated with timing values
+## Notes
 
-### Data Structure
-```rust
-pub struct TraceMetadata {
-    pub start_time: Option<String>,    // RFC3339 timestamp
-    pub end_time: Option<String>,      // RFC3339 timestamp
-    pub duration_ms: Option<u64>,      // Milliseconds
-    // ... other fields
-}
-```
-
-## Existing Traces Note
-Some existing traces in `.beads/traces/` may not have `start_time` and `end_time` fields because:
-1. They were created by older versions of the code
-2. They were created by external agents that don't set all timing fields
-3. The metadata was created without timing information
-
-New traces created with `run_cargo_test_to_bead_trace` methods will include all timing information.
-
-## Testing
-Run the verification test:
-```bash
-cargo run --example test_timing_trace
-```
-
-This creates a test trace at `.beads/traces/bf-timing-test-39tmmp/` with complete timing information.
+This bead verified existing functionality. No code changes were required.
