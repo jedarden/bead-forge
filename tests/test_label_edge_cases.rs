@@ -15,7 +15,7 @@ use bead_forge::storage::Storage;
 //
 
 #[test]
-fn test_empty_label_is_allowed() {
+fn test_empty_label_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
     let storage = Storage::open(&dir.path().join("test.db")).unwrap();
 
@@ -29,16 +29,18 @@ fn test_empty_label_is_allowed() {
     };
     storage.create_issue(&bead).unwrap();
 
-    // Test that empty string label can be added
+    // Test that empty string label is rejected
     let result = storage.add_label("empty-label-test", "");
-    assert!(result.is_ok(), "Empty label should be allowed");
+    assert!(result.is_err(), "Empty label should be rejected");
+    assert!(result.unwrap_err().to_string().contains("Label cannot be empty"), "Error should mention empty label");
 
+    // Verify no empty label was added
     let labels = storage.get_labels("empty-label-test").unwrap();
-    assert!(labels.contains(&"".to_string()), "Empty label should be present");
+    assert!(!labels.contains(&"".to_string()), "Empty label should not be present");
 }
 
 #[test]
-fn test_multiple_empty_labels_are_deduplicated() {
+fn test_multiple_empty_label_attempts_are_all_rejected() {
     let dir = tempfile::tempdir().unwrap();
     let storage = Storage::open(&dir.path().join("test.db")).unwrap();
 
@@ -52,14 +54,19 @@ fn test_multiple_empty_labels_are_deduplicated() {
     };
     storage.create_issue(&bead).unwrap();
 
-    // Add empty label multiple times
-    storage.add_label("multi-empty-test", "").unwrap();
-    storage.add_label("multi-empty-test", "").unwrap();
-    storage.add_label("multi-empty-test", "").unwrap();
+    // Try to add empty label multiple times - all should fail
+    let result1 = storage.add_label("multi-empty-test", "");
+    assert!(result1.is_err(), "First empty label attempt should be rejected");
+
+    let result2 = storage.add_label("multi-empty-test", "");
+    assert!(result2.is_err(), "Second empty label attempt should be rejected");
+
+    let result3 = storage.add_label("multi-empty-test", "");
+    assert!(result3.is_err(), "Third empty label attempt should be rejected");
 
     let labels = storage.get_labels("multi-empty-test").unwrap();
     let empty_count = labels.iter().filter(|l| l.is_empty()).count();
-    assert_eq!(empty_count, 1, "Multiple empty labels should deduplicate to one");
+    assert_eq!(empty_count, 0, "No empty labels should be present");
 }
 
 //
@@ -814,6 +821,178 @@ fn test_whitespace_only_label_deduplication() {
     let labels = storage.get_labels("space-dedup-test").unwrap();
     let space_count = labels.iter().filter(|l| l == " ").count();
     assert_eq!(space_count, 1, "Whitespace-only duplicate labels should be deduplicated");
+}
+
+//
+// Large Number of Labels Tests
+//
+
+#[test]
+fn test_large_number_of_labels() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    let bead = Issue {
+        id: "many-labels-test".to_string(),
+        title: "Large Number of Labels Test".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: vec![],
+        ..Default::default()
+    };
+    storage.create_issue(&bead).unwrap();
+
+    // Add 50 labels
+    let mut expected_labels = Vec::new();
+    for i in 1..=50 {
+        let label = format!("label-{}", i);
+        expected_labels.push(label.clone());
+        storage.add_label("many-labels-test", &label).unwrap();
+    }
+
+    let labels = storage.get_labels("many-labels-test").unwrap();
+    assert_eq!(labels.len(), 50, "Should have 50 unique labels");
+
+    for expected_label in &expected_labels {
+        assert!(labels.contains(expected_label), "Label '{}' should be present", expected_label);
+    }
+}
+
+#[test]
+fn test_create_bead_with_many_labels() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create bead with 50 labels
+    let mut labels = Vec::new();
+    for i in 1..=50 {
+        labels.push(format!("label-{}", i));
+    }
+
+    let bead = Issue {
+        id: "create-many-test".to_string(),
+        title: "Create with Many Labels Test".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: labels.clone(),
+        ..Default::default()
+    };
+    storage.create_issue(&bead).unwrap();
+
+    let retrieved_labels = storage.get_labels("create-many-test").unwrap();
+    assert_eq!(retrieved_labels.len(), 50, "Should have 50 unique labels when created");
+
+    for expected_label in &labels {
+        assert!(retrieved_labels.contains(expected_label), "Label '{}' should be present", expected_label);
+    }
+}
+
+//
+// Removing from Empty Label List Tests
+//
+
+#[test]
+fn test_remove_label_from_bead_with_no_labels() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    let bead = Issue {
+        id: "no-labels-test".to_string(),
+        title: "Remove from Empty Labels Test".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: vec![],
+        ..Default::default()
+    };
+    storage.create_issue(&bead).unwrap();
+
+    // Verify bead has no labels
+    let labels = storage.get_labels("no-labels-test").unwrap();
+    assert!(labels.is_empty(), "Bead should start with no labels");
+
+    // Removing a label from a bead with no labels should succeed (no-op)
+    let result = storage.remove_label("no-labels-test", "nonexistent");
+    assert!(result.is_ok(), "Removing from empty label list should succeed");
+
+    // Verify still no labels
+    let labels = storage.get_labels("no-labels-test").unwrap();
+    assert!(labels.is_empty(), "Bead should still have no labels after removal attempt");
+}
+
+#[test]
+fn test_remove_all_labels_from_bead() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    let mut labels = Vec::new();
+    for i in 1..=10 {
+        labels.push(format!("label-{}", i));
+    }
+
+    let bead = Issue {
+        id: "remove-all-test".to_string(),
+        title: "Remove All Labels Test".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: labels.clone(),
+        ..Default::default()
+    };
+    storage.create_issue(&bead).unwrap();
+
+    // Verify all labels exist
+    let initial_labels = storage.get_labels("remove-all-test").unwrap();
+    assert_eq!(initial_labels.len(), 10, "Should start with 10 labels");
+
+    // Remove all labels one by one
+    for label in &labels {
+        storage.remove_label("remove-all-test", label).unwrap();
+    }
+
+    // Verify no labels remain
+    let final_labels = storage.get_labels("remove-all-test").unwrap();
+    assert!(final_labels.is_empty(), "Should have no labels after removing all");
+
+    // Try removing from empty list again (edge case: remove from already empty)
+    let result = storage.remove_label("remove-all-test", "another-label");
+    assert!(result.is_ok(), "Removing from already empty label list should succeed");
+
+    let labels = storage.get_labels("remove-all-test").unwrap();
+    assert!(labels.is_empty(), "Should still have no labels");
+}
+
+#[test]
+fn test_remove_specific_label_from_bead_with_many_labels() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    let mut labels = Vec::new();
+    for i in 1..=50 {
+        labels.push(format!("label-{}", i));
+    }
+
+    let bead = Issue {
+        id: "remove-specific-test".to_string(),
+        title: "Remove Specific Label Test".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: labels.clone(),
+        ..Default::default()
+    };
+    storage.create_issue(&bead).unwrap();
+
+    // Verify all 50 labels exist
+    let initial_labels = storage.get_labels("remove-specific-test").unwrap();
+    assert_eq!(initial_labels.len(), 50, "Should start with 50 labels");
+
+    // Remove a specific label
+    storage.remove_label("remove-specific-test", "label-25").unwrap();
+
+    // Verify 49 labels remain and label-25 is gone
+    let remaining_labels = storage.get_labels("remove-specific-test").unwrap();
+    assert_eq!(remaining_labels.len(), 49, "Should have 49 labels after removing one");
+    assert!(!remaining_labels.contains(&"label-25".to_string()), "Removed label should not be present");
+    assert!(remaining_labels.contains(&"label-1".to_string()), "Other labels should still be present");
+    assert!(remaining_labels.contains(&"label-50".to_string()), "Other labels should still be present");
 }
 
 //
