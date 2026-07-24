@@ -285,7 +285,7 @@ fn test_duplicate_labels_are_prevented() {
     storage.add_label("dedup-test", "urgent").unwrap();
 
     let labels = storage.get_labels("dedup-test").unwrap();
-    let urgent_count = labels.iter().filter(|l| l == "urgent").count();
+    let urgent_count = labels.iter().filter(|l| *l == "urgent").count();
     assert_eq!(urgent_count, 1, "Duplicate labels should be prevented");
 }
 

@@ -55,11 +55,12 @@ fn test_label_import_from_jsonl() {
 
     assert_eq!(imported.id, "bf-test-labels");
     assert_eq!(imported.title, "Test Label Import");
-    assert_eq!(
-        imported.labels,
-        vec!["phase-1", "storage", "critical"],
-        "Labels should be imported from JSONL"
-    );
+
+    // Labels are unordered - compare as sets
+    assert_eq!(imported.labels.len(), 3, "Should have 3 labels");
+    assert!(imported.labels.contains(&"phase-1".to_string()), "Should contain phase-1 label");
+    assert!(imported.labels.contains(&"storage".to_string()), "Should contain storage label");
+    assert!(imported.labels.contains(&"critical".to_string()), "Should contain critical label");
 }
 
 #[test]
@@ -74,21 +75,18 @@ fn test_label_import_with_empty_labels() {
     let jsonl_path = beads_dir.join("issues.jsonl");
 
     // Create a JSONL file without labels field (should default to empty)
-    let issue_json = r#"{
-        "id": "bf-no-labels",
-        "title": "Test No Labels",
-        "status": "open",
-        "priority": 2,
-        "issue_type": "task",
-        "created_at": "2026-01-01T00:00:00Z",
-        "updated_at": "2026-01-01T00:00:00Z",
-        "source_repo": "."
-    }"#;
+    // JSONL requires each record on a single line (no newlines within the JSON)
+    let issue_json = r#"{"id":"bf-no-labels","title":"Test No Labels","status":"open","priority":2,"issue_type":"task","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","source_repo":"."}"#;
 
     {
         let mut file = fs::File::create(&jsonl_path).unwrap();
         writeln!(file, "{}", issue_json).unwrap();
-    }
+    } // File is closed here
+
+    // Verify file exists and has content
+    assert!(jsonl_path.exists(), "JSONL file should exist");
+    let content = fs::read_to_string(&jsonl_path).unwrap();
+    assert!(!content.is_empty(), "JSONL file should not be empty");
 
     // Import from JSONL
     let result = sync::import(workspace).unwrap();
@@ -141,15 +139,14 @@ fn test_label_import_roundtrip() {
 
     assert_eq!(result.imported, 1);
 
-    // Verify labels survived the roundtrip
+    // Verify labels survived the roundtrip (labels are unordered)
     let storage2 = Storage::open(&db_path).unwrap();
     let imported = storage2.get_issue("bf-roundtrip").unwrap().unwrap();
 
-    assert_eq!(
-        imported.labels,
-        vec!["bug", "backend", "urgent"],
-        "Labels should survive export/import roundtrip"
-    );
+    assert_eq!(imported.labels.len(), 3, "Should have 3 labels");
+    assert!(imported.labels.contains(&"bug".to_string()), "Should contain 'bug' label");
+    assert!(imported.labels.contains(&"backend".to_string()), "Should contain 'backend' label");
+    assert!(imported.labels.contains(&"urgent".to_string()), "Should contain 'urgent' label");
 }
 
 #[test]
