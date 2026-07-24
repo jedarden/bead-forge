@@ -700,3 +700,307 @@ fn test_label_roundtrip_verification_comprehensive() {
         );
     }
 }
+
+#[test]
+fn test_label_multiple_import_cycles() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path();
+    let beads_dir = workspace.join(".beads");
+
+    bead_forge::config::init_workspace(&beads_dir, "bf").unwrap();
+
+    let db_path = beads_dir.join("beads.db");
+    let jsonl_path = beads_dir.join("issues.jsonl");
+
+    // Create test issues with various label configurations
+    let test_issues = vec![
+        Issue {
+            id: "bf-cycle-1-empty".to_string(),
+            title: "Cycle Test - Empty Labels".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![],
+            ..Default::default()
+        },
+        Issue {
+            id: "bf-cycle-1-single".to_string(),
+            title: "Cycle Test - Single Label".to_string(),
+            status: Status::Open,
+            priority: Priority::HIGH,
+            issue_type: IssueType::Bug,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec!["phase-1".to_string()],
+            ..Default::default()
+        },
+        Issue {
+            id: "bf-cycle-1-multiple".to_string(),
+            title: "Cycle Test - Multiple Labels".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![
+                "phase-1".to_string(),
+                "storage".to_string(),
+                "critical".to_string(),
+                "backend".to_string(),
+                "urgent".to_string(),
+            ],
+            ..Default::default()
+        },
+        Issue {
+            id: "bf-cycle-1-special".to_string(),
+            title: "Cycle Test - Special Characters".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: vec![
+                "needs-review".to_string(),
+                "bugfix🔧".to_string(),
+                "v2.0".to_string(),
+                "won't-fix".to_string(),
+            ],
+            ..Default::default()
+        },
+    ];
+
+    // Perform 4 complete cycles of export/import
+    let num_cycles = 4;
+
+    for cycle in 0..num_cycles {
+        // Create or re-create issues in database
+        let storage = Storage::open(&db_path).unwrap();
+
+        if cycle == 0 {
+            // First cycle: create all issues
+            for issue in &test_issues {
+                storage.create_issue(issue).unwrap();
+            }
+        }
+
+        // Verify current state before export
+        let all_issues = storage.list_all_issues().unwrap();
+        assert_eq!(
+            all_issues.len(),
+            test_issues.len(),
+            "Cycle {}: Should have {} issues before export",
+            cycle + 1,
+            test_issues.len()
+        );
+
+        // Verify labels for each issue
+        for original_issue in &test_issues {
+            let current = storage.get_issue(&original_issue.id).unwrap().unwrap();
+            assert_eq!(
+                current.labels.len(),
+                original_issue.labels.len(),
+                "Cycle {}: Issue {} should have {} labels before export",
+                cycle + 1,
+                original_issue.id,
+                original_issue.labels.len()
+            );
+
+            for label in &original_issue.labels {
+                assert!(
+                    current.labels.contains(label),
+                    "Cycle {}: Issue {} should contain label '{}'",
+                    cycle + 1,
+                    original_issue.id,
+                    label
+                );
+            }
+        }
+
+        drop(storage);
+
+        // Export to JSONL
+        let export_count = sync::flush(workspace).unwrap();
+        assert_eq!(
+            export_count,
+            test_issues.len(),
+            "Cycle {}: Should export {} issues",
+            cycle + 1,
+            test_issues.len()
+        );
+
+        // Verify JSONL file exists and has correct content
+        assert!(jsonl_path.exists(), "Cycle {}: JSONL should exist after flush", cycle + 1);
+        let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
+        let lines: Vec<&str> = jsonl_content.lines().collect();
+        assert_eq!(
+            lines.len(),
+            test_issues.len(),
+            "Cycle {}: JSONL should have {} lines",
+            cycle + 1,
+            test_issues.len()
+        );
+
+        // Clear database
+        fs::remove_file(&db_path).unwrap();
+        assert!(!db_path.exists(), "Cycle {}: Database should be deleted", cycle + 1);
+
+        // Import from JSONL
+        let result = sync::import(workspace).unwrap();
+        assert_eq!(
+            result.imported,
+            test_issues.len(),
+            "Cycle {}: Should import {} issues",
+            cycle + 1,
+            test_issues.len()
+        );
+
+        // Verify all issues were imported correctly
+        let storage2 = Storage::open(&db_path).unwrap();
+        let imported_issues = storage2.list_all_issues().unwrap();
+        assert_eq!(
+            imported_issues.len(),
+            test_issues.len(),
+            "Cycle {}: Should have {} issues after import",
+            cycle + 1,
+            test_issues.len()
+        );
+
+        // Verify each issue's labels survived the cycle
+        for original_issue in &test_issues {
+            let imported = storage2
+                .get_issue(&original_issue.id)
+                .unwrap()
+                .expect(&format!("Cycle {}: Issue {} should be imported", cycle + 1, original_issue.id));
+
+            assert_eq!(
+                imported.id,
+                original_issue.id,
+                "Cycle {}: Issue ID should match",
+                cycle + 1
+            );
+            assert_eq!(
+                imported.title,
+                original_issue.title,
+                "Cycle {}: Issue title should match for {}",
+                cycle + 1,
+                original_issue.id
+            );
+            assert_eq!(
+                imported.labels.len(),
+                original_issue.labels.len(),
+                "Cycle {}: Issue {} should have {} labels after import, got {}",
+                cycle + 1,
+                original_issue.id,
+                original_issue.labels.len(),
+                imported.labels.len()
+            );
+
+            // Verify each label individually
+            for expected_label in &original_issue.labels {
+                assert!(
+                    imported.labels.contains(expected_label),
+                    "Cycle {}: Issue {} should contain label '{}', got: {:?}",
+                    cycle + 1,
+                    original_issue.id,
+                    expected_label,
+                    imported.labels
+                );
+            }
+
+            // Sort and compare for exact match
+            let mut imported_labels_sorted = imported.labels.clone();
+            imported_labels_sorted.sort();
+            let mut original_labels_sorted = original_issue.labels.clone();
+            original_labels_sorted.sort();
+            assert_eq!(
+                imported_labels_sorted,
+                original_labels_sorted,
+                "Cycle {}: Issue {} labels should match exactly after cycle",
+                cycle + 1,
+                original_issue.id
+            );
+        }
+
+        // Verify database integrity
+        let conn = storage2.conn.lock().unwrap();
+
+        // Check total label count in database
+        let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
+        let total_labels: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+
+        let expected_total: usize = test_issues.iter().map(|issue| issue.labels.len()).sum();
+
+        assert_eq!(
+            total_labels as usize,
+            expected_total,
+            "Cycle {}: Total label count should be {}",
+            cycle + 1,
+            expected_total
+        );
+
+        // Verify no duplicate labels for any issue
+        for issue in &test_issues {
+            let mut stmt = conn
+                .prepare(&format!(
+                    "SELECT COUNT(DISTINCT label) FROM bead_labels WHERE bead_id = '{}'",
+                    issue.id
+                ))
+                .unwrap();
+            let distinct_count: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+
+            let mut stmt2 = conn
+                .prepare(&format!(
+                    "SELECT COUNT(*) FROM bead_labels WHERE bead_id = '{}'",
+                    issue.id
+                ))
+                .unwrap();
+            let total_count: i64 = stmt2.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+
+            assert_eq!(
+                distinct_count,
+                total_count,
+                "Cycle {}: Issue {} should have no duplicate labels (distinct: {}, total: {})",
+                cycle + 1,
+                issue.id,
+                distinct_count,
+                total_count
+            );
+        }
+
+        drop(storage2);
+    }
+
+    // Final verification after all cycles
+    let final_storage = Storage::open(&db_path).unwrap();
+    let final_issues = final_storage.list_all_issues().unwrap();
+
+    assert_eq!(
+        final_issues.len(),
+        test_issues.len(),
+        "After all cycles: Should have {} issues",
+        test_issues.len()
+    );
+
+    // Final label integrity check
+    for original_issue in &test_issues {
+        let final_issue = final_storage.get_issue(&original_issue.id).unwrap().unwrap();
+
+        let mut final_labels_sorted = final_issue.labels.clone();
+        final_labels_sorted.sort();
+        let mut original_labels_sorted = original_issue.labels.clone();
+        original_labels_sorted.sort();
+
+        assert_eq!(
+            final_labels_sorted,
+            original_labels_sorted,
+            "After all cycles: Issue {} labels should match original",
+            original_issue.id
+        );
+    }
+}
