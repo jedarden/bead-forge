@@ -1,0 +1,14 @@
+{
+  "trace_id": "bf-38dsw0-20260724-151645",
+  "trace_format": "cargo_test_output",
+  "bead_id": "bf-38dsw0",
+  "exit_code": 0,
+  "outcome": "success",
+  "execution_time": {
+    "duration_ms": 2111
+  },
+  "captured_at": "2026-07-24T15:16:47.234567890Z",
+  "test_command": "cargo test -- -q",
+  "stdout_bytes": 177,
+  "stderr_bytes": 0
+}
