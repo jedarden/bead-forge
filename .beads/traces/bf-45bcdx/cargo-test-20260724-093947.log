@@ -1,0 +1,991 @@
+
+running 280 tests
+test autoflush::tests::disabled_outcome_when_not_enabled ... ok
+test autoflush::tests::enabled_true_only_when_config_on_and_flag_off ... ok
+test autoflush::tests::forced_failure_yields_populated_warning ... ok
+test autoflush::tests::success_yields_no_warning ... ok
+test autoflush::tests::with_config_resolves_before_running ... ok
+test batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl ... FAILED
+test batch::tests::test_batch_fail_fast_no_dirty_marks_on_partial_failure ... ok
+test batch::tests::test_batch_rollback_on_any_op_failure ... ok
+test batch::tests::test_batch_with_immediate_transaction_wrapper ... ok
+test batch::tests::test_execute_dep_add_blocker_detects_cycles ... ok
+test batch::tests::test_execute_dep_add_blocker_detects_duplicates ... ok
+test batch::tests::test_execute_dep_add_blocker_direction_parity_with_cli ... ok
+test batch::tests::test_label_add_adds_labels_to_bead ... FAILED
+test batch::tests::test_label_remove_removes_labels_from_bead ... FAILED
+test batch::tests::test_mark_dirty_tx_called_within_batch_transaction ... ok
+test batch::tests::test_mitosis_ex_function ... ok
+test batch::tests::test_mitosis_function ... ok
+test batch::tests::test_mitosis_placeholder_references_end_to_end ... ok
+test batch::tests::test_mixed_op_batch_all_operations_atomic ... FAILED
+test batch::tests::test_resolve_reference_empty_created_ids ... ok
+test batch::tests::test_resolve_reference_out_of_bounds ... ok
+test batch::tests::test_resolve_reference_passthrough ... ok
+test batch::tests::test_resolve_reference_placeholder ... ok
+test batch::tests::test_serde_alias_compatibility ... ok
+test batch::tests::test_single_auto_flush_after_batch_commit ... ok
+test batch::tests::test_update_and_label_operations_wired_in_exec_loop ... FAILED
+test batch::tests::test_update_label_operations_return_result ... ok
+test batch::tests::test_update_operation_modifies_bead_fields ... ok
+test batch::tests::test_validate_op_fields_accepts_aliases ... ok
+test batch::tests::test_validate_op_fields_allows_all_create_fields ... ok
+test batch::tests::test_validate_op_fields_rejects_unknown_field ... ok
+test claim::tests::test_claim_basic ... ok
+test claim::tests::test_claim_no_candidates ... ok
+test claim::tests::test_claim_reclaims_stale ... ok
+test claim::tests::test_completed_status_blocker_unblocks_dependent ... ok
+test claim::tests::test_concurrent_claim_no_double_claim ... ok
+test claim::tests::test_critical_path_bonus_in_claim ... ok
+test claim::tests::test_critical_path_zero_float_outranks_high_priority ... ok
+test claim::tests::test_get_ready_candidates_limit_zero_returns_all ... ok
+test claim::tests::test_get_ready_candidates_respects_limit ... ok
+test claim::tests::test_ready_includes_zero_dependency_open_beads_bf_1nprw ... ok
+test commit_check::tests::test_format_scan_results ... ok
+test commit_check::tests::test_parse_diff_empty ... ok
+test commit_check::tests::test_parse_diff_no_secrets ... ok
+test commit_check::tests::test_parse_diff_simple ... ok
+test config::tests::test_checkpoint_config_defaults ... ok
+test config::tests::test_checkpoint_config_omitted_block_uses_defaults ... ok
+test config::tests::test_checkpoint_config_parses_populated_block ... ok
+test config::tests::test_checkpoint_config_partial_block_uses_defaults ... ok
+test config::tests::test_checkpoint_config_via_config_default ... ok
+test config::tests::test_sync_config_default_auto_flush_true ... ok
+test config::tests::test_sync_config_omitted_block_uses_defaults ... ok
+test config::tests::test_sync_config_parses_auto_flush_false ... ok
+test critical_path::tests::test_invalidate_cache ... ok
+test critical_path::tests::test_linear_chain ... ok
+test critical_path::tests::test_parallel_paths ... ok
+test critical_path::tests::test_parallel_paths_with_extra_bead ... ok
+test doctor::tests::test_check_empty_workspace ... ok
+test doctor::tests::test_check_no_null_not_null_on_clean_db ... ok
+test doctor::tests::test_check_reports_null_not_null ... ok
+test doctor::tests::test_check_reports_pseudo_terminal_statuses ... ok
+test doctor::tests::test_doctor_reports_unflushed_count ... ok
+test doctor::tests::test_fix_null_not_null_repairs_in_place ... ok
+test doctor::tests::test_import_clears_pre_existing_dirty_marks ... ok
+test doctor::tests::test_import_leaves_zero_unflushed ... ok
+test doctor::tests::test_null_datetime_does_not_crash_list ... ok
+test doctor::tests::test_reclaim_stale ... ok
+test doctor::tests::test_repair_clears_unflushed_count ... ok
+test doctor::tests::test_repair_cycle_clears_unflushed_correctly ... ok
+test doctor::tests::test_repair_from_jsonl ... ok
+test doctor::tests::test_repair_refuses_with_unflushed_beads ... ok
+test doctor::tests::test_repair_with_flush_first_protects_beads ... ok
+test doctor::tests::test_repair_with_force_warns_but_proceeds ... ok
+test doctor::tests::test_verify_schema ... ok
+test format::envelope::claim_stats::claim_json_envelope_empty_when_no_bead_available ... ok
+test format::envelope::claim_stats::claim_json_envelope_has_stable_structure ... ok
+test format::envelope::claim_stats::claim_json_envelope_metadata_fields_present ... ok
+test format::envelope::claim_stats::claim_json_envelope_roundtrip_serialization ... ok
+test format::envelope::claim_stats::claim_json_envelope_successful_claim_case ... ok
+test format::envelope::claim_stats::stats_json_envelope_aggregate_counts ... ok
+test format::envelope::claim_stats::stats_json_envelope_has_stable_structure ... ok
+test format::envelope::claim_stats::stats_json_envelope_metadata_fields_present ... ok
+test format::envelope::list_show::list_json_envelope_empty_returns_empty_array ... ok
+test format::envelope::list_show::list_json_envelope_metadata_fields_present ... ok
+test format::envelope::list_show::list_json_envelope_multiple_issues_formatting ... ok
+test format::envelope::list_show::list_json_envelope_returns_array_data ... ok
+test format::envelope::list_show::list_show_envelope_kind_identifiers ... ok
+test format::envelope::list_show::list_show_envelope_version_field ... ok
+test format::envelope::list_show::show_json_envelope_metadata_fields_present ... ok
+test format::envelope::list_show::show_json_envelope_returns_single_object ... ok
+test format::envelope::list_show::show_json_envelope_with_all_issue_fields ... ok
+test format::envelope::tests::batch_command_emits_operations_array ... ok
+test format::envelope::tests::claim_command_emits_result_object ... ok
+test format::envelope::tests::create_command_emits_id_only ... ok
+test format::envelope::tests::envelope_allows_arbitrary_kind_values ... ok
+test format::envelope::tests::envelope_compact_roundtrip_with_warning ... ok
+test format::envelope::tests::envelope_data_can_be_array ... ok
+test format::envelope::tests::envelope_data_can_be_boolean ... ok
+test format::envelope::tests::envelope_data_can_be_nested_structure ... ok
+test format::envelope::tests::envelope_data_can_be_number ... ok
+test format::envelope::tests::envelope_data_can_be_object ... ok
+test format::envelope::tests::envelope_data_can_be_string ... ok
+test format::envelope::tests::envelope_data_preserves_exact_value ... ok
+test format::envelope::tests::envelope_field_order_is_stable ... ok
+test format::envelope::tests::envelope_has_required_fields ... ok
+test format::envelope::tests::envelope_kind_identifies_command ... ok
+test format::envelope::tests::envelope_kind_is_required_field ... ok
+test format::envelope::tests::envelope_kind_preserves_original_value ... ok
+test format::envelope::tests::envelope_new_accepts_various_kind_types ... ok
+test format::envelope::tests::envelope_new_creates_valid_structure ... ok
+test format::envelope::tests::envelope_new_with_empty_data ... ok
+test format::envelope::tests::envelope_new_with_null_data ... ok
+test format::envelope::tests::envelope_serialization_roundtrip ... ok
+test format::envelope::tests::envelope_to_json_compact_produces_valid_json ... ok
+test format::envelope::tests::envelope_to_json_pretty_prints ... ok
+test format::envelope::tests::envelope_to_json_produces_valid_json ... ok
+test format::envelope::tests::envelope_version_constant_matches_serialized_value ... ok
+test format::envelope::tests::envelope_version_is_always_current ... ok
+test format::envelope::tests::envelope_version_is_present_in_serialization ... ok
+test format::envelope::tests::envelope_warning_can_be_empty_string ... ok
+test format::envelope::tests::envelope_warning_can_contain_any_text ... ok
+test format::envelope::tests::envelope_warning_is_optional ... ok
+test format::envelope::tests::envelope_warning_omitted_in_compact_serialization ... ok
+test format::envelope::tests::envelope_warning_omitted_when_none_in_serialization ... ok
+test format::envelope::tests::envelope_warning_serializes_when_present ... ok
+test format::envelope::tests::envelope_with_large_data_serializes_correctly ... ok
+test format::envelope::tests::envelope_with_newlines_in_warning ... ok
+test format::envelope::tests::envelope_with_special_chars_in_kind ... ok
+test format::envelope::tests::envelope_with_unicode_warning ... ok
+test format::envelope::tests::envelope_with_warning_adds_message ... ok
+test format::envelope::tests::envelope_with_warning_preserves_other_fields ... ok
+test format::envelope::tests::list_command_emits_array ... ok
+test format::envelope::tests::ready_command_empty_returns_array ... ok
+test format::envelope::tests::search_command_emits_results_array ... ok
+test format::envelope::tests::show_command_emits_single_object ... ok
+test format::envelope::tests::stats_command_emits_aggregate_counts ... ok
+test format::json::tests::assignee_and_labels_populated_when_present ... ok
+test format::json::tests::assignee_null_when_unset ... ok
+test format::json::tests::claim_dry_run_emits_only_preview_keys ... ok
+test format::json::tests::claim_single_workspace_omits_workspace_key ... ok
+test format::json::tests::format_issues_empty_yields_empty_string ... ok
+test format::json::tests::format_issues_guarantees_fields_per_line ... ok
+test format::json::tests::format_issues_multiple_yields_jsonl_one_object_per_line ... ok
+test format::json::tests::format_issues_single_yields_one_valid_json_line ... ok
+test format::json::tests::labels_empty_array_when_none ... ok
+test format::json::tests::no_claim_is_empty_object ... ok
+test format::warning::tests::non_object_value_is_wrapped ... ok
+test format::warning::tests::none_returns_value_unchanged ... ok
+test format::warning::tests::some_injects_top_level_warning_on_object ... ok
+test format::warning::tests::some_overwrites_existing_warning_key ... ok
+test git_log::tests::test_merge_events ... ok
+test git_log::tests::test_parse_git_date ... ok
+test git_log::tests::test_parse_jsonl_issues ... ok
+test history::tests::backup_copies_content ... ok
+test history::tests::disabled_config_is_noop ... ok
+test history::tests::empty_source_is_noop ... ok
+test history::tests::missing_source_is_noop ... ok
+test history::tests::prune_keeps_only_max_backups ... ok
+test history::tests::prune_zero_is_unbounded ... ok
+test history::tests::successive_backups_accumulate_then_cap ... ok
+test id::tests::test_adaptive_hash_length ... ok
+test id::tests::test_base36_encode ... ok
+test id::tests::test_br_format_compatibility ... ok
+test id::tests::test_generate_id ... ok
+test id::tests::test_is_valid_bead_id ... ok
+test id::tests::test_no_collisions_10k ... ok
+test id::tests::test_optimal_hash_length ... ok
+test jsonl::tests::empty_labels_array_skipped_in_jsonl ... ok
+test jsonl::tests::labels_are_exported_to_jsonl ... ok
+test jsonl::tests::labels_roundtrip_through_jsonl ... ok
+test jsonl::tests::merge_no_op_on_missing_file_writes_nothing ... ok
+test jsonl::tests::merge_preserves_unparseable_orphan_lines ... ok
+test jsonl::tests::merge_removes_ids ... ok
+test jsonl::tests::merge_upserts_dirty_and_preserves_untouched ... ok
+test jsonl::tests::test_stream_issues ... ok
+test log::tests::test_event_filter_builder ... ok
+test log::tests::test_format_event_text ... ok
+test merge::tests::merge_both_changed_last_writer_wins ... ok
+test merge::tests::merge_delete_unchanged_other_side_deletes ... ok
+test merge::tests::merge_delete_vs_modify_keeps_modification ... ok
+test merge::tests::merge_disjoint_adds_from_both_sides ... ok
+test merge::tests::merge_files_roundtrip ... ok
+test merge::tests::merge_is_order_independent ... ok
+test merge::tests::merge_missing_base_degrades_to_union ... ok
+test merge::tests::merge_one_sided_change_takes_that_side ... ok
+test merge::tests::merge_same_edit_on_both_sides_no_conflict ... ok
+test model::tests::test_all_priority_constants_exist ... ok
+test model::tests::test_all_priority_display_formats ... ok
+test model::tests::test_all_priority_from_str_parsing ... ok
+test model::tests::test_all_standard_issue_types_roundtrip ... ok
+test model::tests::test_comment_text_field_renamed ... ok
+test model::tests::test_compaction_level_serializes_as_zero_when_none ... ok
+test model::tests::test_custom_dependency_type_roundtrip ... ok
+test model::tests::test_custom_event_type_roundtrip ... ok
+test model::tests::test_custom_issue_type_roundtrip ... ok
+test model::tests::test_custom_status_roundtrip ... ok
+test model::tests::test_default_issue_type_is_task ... ok
+test model::tests::test_dependency_type_field_renamed ... ok
+test model::tests::test_dependency_type_kebab_case ... ok
+test model::tests::test_empty_vectors_skipped_in_serialization ... ok
+test model::tests::test_epic_issue_type_serialization ... ok
+test model::tests::test_epic_status_serialization ... ok
+test model::tests::test_event_type_field_renamed ... ok
+test model::tests::test_full_issue_with_all_fields ... ok
+test model::tests::test_is_expired_tombstone_expired ... ok
+test model::tests::test_is_expired_tombstone_no_deleted_at ... ok
+test model::tests::test_is_expired_tombstone_no_retention ... ok
+test model::tests::test_is_expired_tombstone_not_expired ... ok
+test model::tests::test_is_expired_tombstone_not_tombstone ... ok
+test model::tests::test_is_expired_tombstone_zero_retention ... ok
+test model::tests::test_issue_roundtrip_from_br_format ... ok
+test model::tests::test_issue_with_epic_type_serialization ... ok
+test model::tests::test_p0_critical_exists_in_priority_enum ... ok
+test model::tests::test_p0_priority_compares_as_highest_priority ... ok
+test model::tests::test_p0_priority_default_is_medium ... ok
+test model::tests::test_p0_priority_displays_as_p0 ... ok
+test model::tests::test_p0_priority_equality ... ok
+test model::tests::test_p0_priority_from_str_case_insensitive ... ok
+test model::tests::test_p0_priority_from_str_invalid_formats ... ok
+test model::tests::test_p0_priority_from_str_parsing ... ok
+test model::tests::test_p0_priority_from_str_with_whitespace ... ok
+test model::tests::test_p0_priority_serialization_roundtrip ... ok
+test model::tests::test_p0_priority_total_ordering ... ok
+test model::tests::test_pinned_status_renamed ... ok
+test model::tests::test_priority_transparent_serialization ... ok
+test model::tests::test_sync_equals_detects_semantic_changes ... ok
+test model::tests::test_sync_equals_ignores_audit_timestamps_and_relation_order ... ok
+test model::tests::test_sync_equals_treats_duplicate_labels_as_equivalent ... ok
+test model::tests::test_tombstone_status_renamed ... ok
+test recovery::tests::backup_records_hashes_and_verifies ... ok
+test recovery::tests::marker_lifecycle ... ok
+test recovery::tests::missing_sidecar_is_skipped ... ok
+test recovery::tests::restore_latest_picks_newest_run ... ok
+test recovery::tests::restore_replaces_live_files ... ok
+test recovery::tests::verify_detects_tampering ... ok
+test rotate::tests::test_cleanup_old_archives ... ok
+test rotate::tests::test_find_bead_in_archives ... ok
+test rotate::tests::test_list_all_with_archives ... ok
+test rotate::tests::test_rotate_creates_archive ... ok
+test rotate::tests::test_rotate_dry_run ... ok
+test rotate::tests::test_shift_archives ... ok
+test rotate::tests::test_shift_archives_with_deletion ... ok
+test rotate::tests::test_should_archive_closed_old_bead ... ok
+test rotate::tests::test_should_not_archive_closed_recent_bead ... ok
+test rotate::tests::test_should_not_archive_open_bead ... ok
+test secrets::tests::test_allowlist ... ok
+test secrets::tests::test_detects_api_token ... ok
+test secrets::tests::test_detects_aws_key ... ok
+test secrets::tests::test_detects_azure_key ... ok
+test secrets::tests::test_detects_jwt ... ok
+test secrets::tests::test_detects_private_key ... ok
+test secrets::tests::test_long_absolute_path_is_not_azure_key ... ok
+test secrets::tests::test_safe_content_passes ... ok
+test secrets::tests::test_scans_issue ... ok
+test storage::sqlite::parse_datetime_tests::accepts_rfc3339_and_sqlite_native_formats ... ok
+test storage::sqlite::parse_datetime_tests::required_datetime_tolerates_null_and_empty ... ok
+test sync::tests::test_collision_resolution_newer_wins ... ok
+test sync::tests::test_collision_resolution_older_skipped ... ok
+test sync::tests::test_find_workspace ... ok
+test sync::tests::test_find_workspace_not_found ... FAILED
+test sync::tests::test_flush_and_import_roundtrip ... ok
+test sync::tests::test_flush_dirty_with_no_changes ... ok
+test sync::tests::test_get_db_path ... ok
+test sync::tests::test_get_jsonl_path ... ok
+test sync::tests::test_import_skips_unchanged ... ok
+test sync::tests::test_labels_flush_import_roundtrip ... ok
+test sync::tests::test_labels_import_from_jsonl ... ok
+test sync::tests::test_labels_import_idempotent ... ok
+test sync::tests::test_labels_persist_through_flush_dirty ... ok
+test sync::tests::test_labels_persist_through_full_sync ... FAILED
+test validation::tests::test_normalize_assignee_collapses_empty ... ok
+test validation::tests::test_normalize_assignee_none ... ok
+test validation::tests::test_normalize_assignee_real_value ... ok
+test validation::tests::test_normalize_assignee_trims_padding ... ok
+test velocity::tests::test_parse_datetime_empty_string_rejection ... ok
+test velocity::tests::test_parse_datetime_malformed_datetime_rejection ... ok
+test velocity::tests::test_parse_datetime_rfc3339_with_timezone ... ok
+test velocity::tests::test_parse_datetime_sqlite_native_without_timezone ... ok
+test velocity::tests::test_recompute_velocity_stats ... ok
+test velocity::tests::test_update_session_on_close ... ok
+
+failures:
+
+---- batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl stdout ----
+
+thread 'batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl' (2304923) panicked at src/batch.rs:3008:9:
+assertion failed: labeled.labels.contains(&"auto-flushed".to_string())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- batch::tests::test_label_add_adds_labels_to_bead stdout ----
+
+thread 'batch::tests::test_label_add_adds_labels_to_bead' (2304930) panicked at src/batch.rs:2065:9:
+assertion `left == right` failed
+  left: 0
+ right: 2
+
+---- batch::tests::test_label_remove_removes_labels_from_bead stdout ----
+
+thread 'batch::tests::test_label_remove_removes_labels_from_bead' (2304931) panicked at src/batch.rs:2127:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- batch::tests::test_mixed_op_batch_all_operations_atomic stdout ----
+
+thread 'batch::tests::test_mixed_op_batch_all_operations_atomic' (2304936) panicked at src/batch.rs:2404:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- batch::tests::test_update_and_label_operations_wired_in_exec_loop stdout ----
+
+thread 'batch::tests::test_update_and_label_operations_wired_in_exec_loop' (2304943) panicked at src/batch.rs:2280:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- sync::tests::test_find_workspace_not_found stdout ----
+
+thread 'sync::tests::test_find_workspace_not_found' (2305385) panicked at src/sync.rs:360:9:
+assertion failed: result.is_err()
+
+---- sync::tests::test_labels_persist_through_full_sync stdout ----
+WARNING: 1 unflushed bead(s) exist in SQLite (modified/created since last flush to JSONL).
+  Import will preserve SQLite versions when they are newer.
+  Run 'bf sync --flush-only' first to flush these beads to JSONL.
+  Unflushed: bf-sync-labels
+
+thread 'sync::tests::test_labels_persist_through_full_sync' (2305404) panicked at src/sync.rs:948:43:
+called `Result::unwrap()` on an `Err` value: No such file or directory (os error 2)
+
+
+failures:
+    batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl
+    batch::tests::test_label_add_adds_labels_to_bead
+    batch::tests::test_label_remove_removes_labels_from_bead
+    batch::tests::test_mixed_op_batch_all_operations_atomic
+    batch::tests::test_update_and_label_operations_wired_in_exec_loop
+    sync::tests::test_find_workspace_not_found
+    sync::tests::test_labels_persist_through_full_sync
+
+test result: FAILED. 273 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.76s
+
+warning: unused import: `crate::storage::schema`
+   --> src/claim.rs:883:13
+    |
+883 |         use crate::storage::schema;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::format::json::JsonFormatter`
+   --> src/format/envelope.rs:862:9
+    |
+862 |     use crate::format::json::JsonFormatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::format::Formatter`
+   --> src/format/envelope.rs:863:9
+    |
+863 |     use crate::format::Formatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+
+warning: unused imports: `Priority` and `Status`
+   --> src/secrets.rs:316:31
+    |
+316 |     use crate::model::{Issue, Priority, Status};
+    |                               ^^^^^^^^  ^^^^^^
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused import: `Status`
+   --> src/velocity.rs:396:42
+    |
+396 |     use crate::model::{Issue, IssueType, Status};
+    |                                          ^^^^^^
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:403:32
+    |
+403 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:417:32
+    |
+417 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+    --> src/batch.rs:1766:13
+     |
+1766 |         let mut ops = vec![
+     |             ----^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:728:21
+    |
+728 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:756:21
+    |
+756 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:768:21
+    |
+768 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:885:21
+    |
+885 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:981:21
+    |
+981 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1045:21
+     |
+1045 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1072:21
+     |
+1072 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1101:21
+     |
+1101 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1174:21
+     |
+1174 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2228:9
+     |
+2228 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2890:5
+     |
+2890 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `critical`
+   --> src/critical_path.rs:558:13
+    |
+558 |         let critical: Vec<&str> = result
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_critical`
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1547:13
+     |
+1547 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1653:13
+     |
+1653 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1702:13
+     |
+1702 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `import_result`
+    --> src/doctor.rs:1741:13
+     |
+1741 |         let import_result = crate::sync::import(workspace).unwrap();
+     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_import_result`
+
+warning: variable does not need to be mutable
+    --> src/model.rs:1220:13
+     |
+1220 |         let mut issue1 = Issue {
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:248:13
+    |
+248 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1185:51
+     |
+1185 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1425:13
+     |
+1425 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1567:13
+     |
+1567 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1049:4
+     |
+1049 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `create_test_issue` is never used
+   --> src/format/envelope.rs:867:8
+    |
+867 |     fn create_test_issue(id: &str, title: &str) -> Issue {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:335:4
+    |
+335 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (lib test) generated 42 warnings (run `cargo fix --lib -p bead-forge --tests` to apply 31 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (target/debug/deps/bead_forge-fd73a99e4eed0cab)
+
+running 280 tests
+test autoflush::tests::disabled_outcome_when_not_enabled ... ok
+test autoflush::tests::enabled_true_only_when_config_on_and_flag_off ... ok
+test autoflush::tests::forced_failure_yields_populated_warning ... ok
+test autoflush::tests::success_yields_no_warning ... ok
+test autoflush::tests::with_config_resolves_before_running ... ok
+test batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl ... FAILED
+test batch::tests::test_batch_fail_fast_no_dirty_marks_on_partial_failure ... ok
+test batch::tests::test_batch_rollback_on_any_op_failure ... ok
+test batch::tests::test_batch_with_immediate_transaction_wrapper ... ok
+test batch::tests::test_execute_dep_add_blocker_detects_cycles ... ok
+test batch::tests::test_execute_dep_add_blocker_detects_duplicates ... ok
+test batch::tests::test_execute_dep_add_blocker_direction_parity_with_cli ... ok
+test batch::tests::test_label_add_adds_labels_to_bead ... FAILED
+test batch::tests::test_label_remove_removes_labels_from_bead ... FAILED
+test batch::tests::test_mark_dirty_tx_called_within_batch_transaction ... ok
+test batch::tests::test_mitosis_ex_function ... ok
+test batch::tests::test_mitosis_function ... ok
+test batch::tests::test_mitosis_placeholder_references_end_to_end ... ok
+test batch::tests::test_mixed_op_batch_all_operations_atomic ... FAILED
+test batch::tests::test_resolve_reference_empty_created_ids ... ok
+test batch::tests::test_resolve_reference_out_of_bounds ... ok
+test batch::tests::test_resolve_reference_passthrough ... ok
+test batch::tests::test_resolve_reference_placeholder ... ok
+test batch::tests::test_serde_alias_compatibility ... ok
+test batch::tests::test_single_auto_flush_after_batch_commit ... ok
+test batch::tests::test_update_and_label_operations_wired_in_exec_loop ... FAILED
+test batch::tests::test_update_label_operations_return_result ... ok
+test batch::tests::test_update_operation_modifies_bead_fields ... ok
+test batch::tests::test_validate_op_fields_accepts_aliases ... ok
+test batch::tests::test_validate_op_fields_allows_all_create_fields ... ok
+test batch::tests::test_validate_op_fields_rejects_unknown_field ... ok
+test claim::tests::test_claim_basic ... ok
+test claim::tests::test_claim_no_candidates ... ok
+test claim::tests::test_claim_reclaims_stale ... ok
+test claim::tests::test_completed_status_blocker_unblocks_dependent ... ok
+test claim::tests::test_concurrent_claim_no_double_claim ... ok
+test claim::tests::test_critical_path_bonus_in_claim ... ok
+test claim::tests::test_critical_path_zero_float_outranks_high_priority ... ok
+test claim::tests::test_get_ready_candidates_limit_zero_returns_all ... ok
+test claim::tests::test_get_ready_candidates_respects_limit ... ok
+test claim::tests::test_ready_includes_zero_dependency_open_beads_bf_1nprw ... ok
+test commit_check::tests::test_format_scan_results ... ok
+test commit_check::tests::test_parse_diff_empty ... ok
+test commit_check::tests::test_parse_diff_no_secrets ... ok
+test commit_check::tests::test_parse_diff_simple ... ok
+test config::tests::test_checkpoint_config_defaults ... ok
+test config::tests::test_checkpoint_config_omitted_block_uses_defaults ... ok
+test config::tests::test_checkpoint_config_parses_populated_block ... ok
+test config::tests::test_checkpoint_config_partial_block_uses_defaults ... ok
+test config::tests::test_checkpoint_config_via_config_default ... ok
+test config::tests::test_sync_config_default_auto_flush_true ... ok
+test config::tests::test_sync_config_omitted_block_uses_defaults ... ok
+test config::tests::test_sync_config_parses_auto_flush_false ... ok
+test critical_path::tests::test_invalidate_cache ... ok
+test critical_path::tests::test_linear_chain ... ok
+test critical_path::tests::test_parallel_paths ... ok
+test critical_path::tests::test_parallel_paths_with_extra_bead ... ok
+test doctor::tests::test_check_empty_workspace ... ok
+test doctor::tests::test_check_no_null_not_null_on_clean_db ... ok
+test doctor::tests::test_check_reports_null_not_null ... ok
+test doctor::tests::test_check_reports_pseudo_terminal_statuses ... ok
+test doctor::tests::test_doctor_reports_unflushed_count ... ok
+test doctor::tests::test_fix_null_not_null_repairs_in_place ... ok
+test doctor::tests::test_import_clears_pre_existing_dirty_marks ... ok
+test doctor::tests::test_import_leaves_zero_unflushed ... ok
+test doctor::tests::test_null_datetime_does_not_crash_list ... ok
+test doctor::tests::test_reclaim_stale ... ok
+test doctor::tests::test_repair_clears_unflushed_count ... ok
+test doctor::tests::test_repair_cycle_clears_unflushed_correctly ... ok
+test doctor::tests::test_repair_from_jsonl ... ok
+test doctor::tests::test_repair_refuses_with_unflushed_beads ... ok
+test doctor::tests::test_repair_with_flush_first_protects_beads ... ok
+test doctor::tests::test_repair_with_force_warns_but_proceeds ... ok
+test doctor::tests::test_verify_schema ... ok
+test format::envelope::claim_stats::claim_json_envelope_empty_when_no_bead_available ... ok
+test format::envelope::claim_stats::claim_json_envelope_has_stable_structure ... ok
+test format::envelope::claim_stats::claim_json_envelope_metadata_fields_present ... ok
+test format::envelope::claim_stats::claim_json_envelope_roundtrip_serialization ... ok
+test format::envelope::claim_stats::claim_json_envelope_successful_claim_case ... ok
+test format::envelope::claim_stats::stats_json_envelope_aggregate_counts ... ok
+test format::envelope::claim_stats::stats_json_envelope_has_stable_structure ... ok
+test format::envelope::claim_stats::stats_json_envelope_metadata_fields_present ... ok
+test format::envelope::list_show::list_json_envelope_empty_returns_empty_array ... ok
+test format::envelope::list_show::list_json_envelope_metadata_fields_present ... ok
+test format::envelope::list_show::list_json_envelope_multiple_issues_formatting ... ok
+test format::envelope::list_show::list_json_envelope_returns_array_data ... ok
+test format::envelope::list_show::list_show_envelope_kind_identifiers ... ok
+test format::envelope::list_show::list_show_envelope_version_field ... ok
+test format::envelope::list_show::show_json_envelope_metadata_fields_present ... ok
+test format::envelope::list_show::show_json_envelope_returns_single_object ... ok
+test format::envelope::list_show::show_json_envelope_with_all_issue_fields ... ok
+test format::envelope::tests::batch_command_emits_operations_array ... ok
+test format::envelope::tests::claim_command_emits_result_object ... ok
+test format::envelope::tests::create_command_emits_id_only ... ok
+test format::envelope::tests::envelope_allows_arbitrary_kind_values ... ok
+test format::envelope::tests::envelope_compact_roundtrip_with_warning ... ok
+test format::envelope::tests::envelope_data_can_be_array ... ok
+test format::envelope::tests::envelope_data_can_be_boolean ... ok
+test format::envelope::tests::envelope_data_can_be_nested_structure ... ok
+test format::envelope::tests::envelope_data_can_be_number ... ok
+test format::envelope::tests::envelope_data_can_be_object ... ok
+test format::envelope::tests::envelope_data_can_be_string ... ok
+test format::envelope::tests::envelope_data_preserves_exact_value ... ok
+test format::envelope::tests::envelope_field_order_is_stable ... ok
+test format::envelope::tests::envelope_has_required_fields ... ok
+test format::envelope::tests::envelope_kind_identifies_command ... ok
+test format::envelope::tests::envelope_kind_is_required_field ... ok
+test format::envelope::tests::envelope_kind_preserves_original_value ... ok
+test format::envelope::tests::envelope_new_accepts_various_kind_types ... ok
+test format::envelope::tests::envelope_new_creates_valid_structure ... ok
+test format::envelope::tests::envelope_new_with_empty_data ... ok
+test format::envelope::tests::envelope_new_with_null_data ... ok
+test format::envelope::tests::envelope_serialization_roundtrip ... ok
+test format::envelope::tests::envelope_to_json_compact_produces_valid_json ... ok
+test format::envelope::tests::envelope_to_json_pretty_prints ... ok
+test format::envelope::tests::envelope_to_json_produces_valid_json ... ok
+test format::envelope::tests::envelope_version_constant_matches_serialized_value ... ok
+test format::envelope::tests::envelope_version_is_always_current ... ok
+test format::envelope::tests::envelope_version_is_present_in_serialization ... ok
+test format::envelope::tests::envelope_warning_can_be_empty_string ... ok
+test format::envelope::tests::envelope_warning_can_contain_any_text ... ok
+test format::envelope::tests::envelope_warning_is_optional ... ok
+test format::envelope::tests::envelope_warning_omitted_in_compact_serialization ... ok
+test format::envelope::tests::envelope_warning_omitted_when_none_in_serialization ... ok
+test format::envelope::tests::envelope_warning_serializes_when_present ... ok
+test format::envelope::tests::envelope_with_large_data_serializes_correctly ... ok
+test format::envelope::tests::envelope_with_newlines_in_warning ... ok
+test format::envelope::tests::envelope_with_special_chars_in_kind ... ok
+test format::envelope::tests::envelope_with_unicode_warning ... ok
+test format::envelope::tests::envelope_with_warning_adds_message ... ok
+test format::envelope::tests::envelope_with_warning_preserves_other_fields ... ok
+test format::envelope::tests::list_command_emits_array ... ok
+test format::envelope::tests::ready_command_empty_returns_array ... ok
+test format::envelope::tests::search_command_emits_results_array ... ok
+test format::envelope::tests::show_command_emits_single_object ... ok
+test format::envelope::tests::stats_command_emits_aggregate_counts ... ok
+test format::json::tests::assignee_and_labels_populated_when_present ... ok
+test format::json::tests::assignee_null_when_unset ... ok
+test format::json::tests::claim_dry_run_emits_only_preview_keys ... ok
+test format::json::tests::claim_single_workspace_omits_workspace_key ... ok
+test format::json::tests::format_issues_empty_yields_empty_string ... ok
+test format::json::tests::format_issues_guarantees_fields_per_line ... ok
+test format::json::tests::format_issues_multiple_yields_jsonl_one_object_per_line ... ok
+test format::json::tests::format_issues_single_yields_one_valid_json_line ... ok
+test format::json::tests::labels_empty_array_when_none ... ok
+test format::json::tests::no_claim_is_empty_object ... ok
+test format::warning::tests::non_object_value_is_wrapped ... ok
+test format::warning::tests::none_returns_value_unchanged ... ok
+test format::warning::tests::some_injects_top_level_warning_on_object ... ok
+test format::warning::tests::some_overwrites_existing_warning_key ... ok
+test git_log::tests::test_merge_events ... ok
+test git_log::tests::test_parse_git_date ... ok
+test git_log::tests::test_parse_jsonl_issues ... ok
+test history::tests::backup_copies_content ... ok
+test history::tests::disabled_config_is_noop ... ok
+test history::tests::empty_source_is_noop ... ok
+test history::tests::missing_source_is_noop ... ok
+test history::tests::prune_keeps_only_max_backups ... ok
+test history::tests::prune_zero_is_unbounded ... ok
+test history::tests::successive_backups_accumulate_then_cap ... ok
+test id::tests::test_adaptive_hash_length ... ok
+test id::tests::test_base36_encode ... ok
+test id::tests::test_br_format_compatibility ... ok
+test id::tests::test_generate_id ... ok
+test id::tests::test_is_valid_bead_id ... ok
+test id::tests::test_no_collisions_10k ... ok
+test id::tests::test_optimal_hash_length ... ok
+test jsonl::tests::empty_labels_array_skipped_in_jsonl ... ok
+test jsonl::tests::labels_are_exported_to_jsonl ... ok
+test jsonl::tests::labels_roundtrip_through_jsonl ... ok
+test jsonl::tests::merge_no_op_on_missing_file_writes_nothing ... ok
+test jsonl::tests::merge_preserves_unparseable_orphan_lines ... ok
+test jsonl::tests::merge_removes_ids ... ok
+test jsonl::tests::merge_upserts_dirty_and_preserves_untouched ... ok
+test jsonl::tests::test_stream_issues ... ok
+test log::tests::test_event_filter_builder ... ok
+test log::tests::test_format_event_text ... ok
+test merge::tests::merge_both_changed_last_writer_wins ... ok
+test merge::tests::merge_delete_unchanged_other_side_deletes ... ok
+test merge::tests::merge_delete_vs_modify_keeps_modification ... ok
+test merge::tests::merge_disjoint_adds_from_both_sides ... ok
+test merge::tests::merge_files_roundtrip ... ok
+test merge::tests::merge_is_order_independent ... ok
+test merge::tests::merge_missing_base_degrades_to_union ... ok
+test merge::tests::merge_one_sided_change_takes_that_side ... ok
+test merge::tests::merge_same_edit_on_both_sides_no_conflict ... ok
+test model::tests::test_all_priority_constants_exist ... ok
+test model::tests::test_all_priority_display_formats ... ok
+test model::tests::test_all_priority_from_str_parsing ... ok
+test model::tests::test_all_standard_issue_types_roundtrip ... ok
+test model::tests::test_comment_text_field_renamed ... ok
+test model::tests::test_compaction_level_serializes_as_zero_when_none ... ok
+test model::tests::test_custom_dependency_type_roundtrip ... ok
+test model::tests::test_custom_event_type_roundtrip ... ok
+test model::tests::test_custom_issue_type_roundtrip ... ok
+test model::tests::test_custom_status_roundtrip ... ok
+test model::tests::test_default_issue_type_is_task ... ok
+test model::tests::test_dependency_type_field_renamed ... ok
+test model::tests::test_dependency_type_kebab_case ... ok
+test model::tests::test_empty_vectors_skipped_in_serialization ... ok
+test model::tests::test_epic_issue_type_serialization ... ok
+test model::tests::test_epic_status_serialization ... ok
+test model::tests::test_event_type_field_renamed ... ok
+test model::tests::test_full_issue_with_all_fields ... ok
+test model::tests::test_is_expired_tombstone_expired ... ok
+test model::tests::test_is_expired_tombstone_no_deleted_at ... ok
+test model::tests::test_is_expired_tombstone_no_retention ... ok
+test model::tests::test_is_expired_tombstone_not_expired ... ok
+test model::tests::test_is_expired_tombstone_not_tombstone ... ok
+test model::tests::test_is_expired_tombstone_zero_retention ... ok
+test model::tests::test_issue_roundtrip_from_br_format ... ok
+test model::tests::test_issue_with_epic_type_serialization ... ok
+test model::tests::test_p0_critical_exists_in_priority_enum ... ok
+test model::tests::test_p0_priority_compares_as_highest_priority ... ok
+test model::tests::test_p0_priority_default_is_medium ... ok
+test model::tests::test_p0_priority_displays_as_p0 ... ok
+test model::tests::test_p0_priority_equality ... ok
+test model::tests::test_p0_priority_from_str_case_insensitive ... ok
+test model::tests::test_p0_priority_from_str_invalid_formats ... ok
+test model::tests::test_p0_priority_from_str_parsing ... ok
+test model::tests::test_p0_priority_from_str_with_whitespace ... ok
+test model::tests::test_p0_priority_serialization_roundtrip ... ok
+test model::tests::test_p0_priority_total_ordering ... ok
+test model::tests::test_pinned_status_renamed ... ok
+test model::tests::test_priority_transparent_serialization ... ok
+test model::tests::test_sync_equals_detects_semantic_changes ... ok
+test model::tests::test_sync_equals_ignores_audit_timestamps_and_relation_order ... ok
+test model::tests::test_sync_equals_treats_duplicate_labels_as_equivalent ... ok
+test model::tests::test_tombstone_status_renamed ... ok
+test recovery::tests::backup_records_hashes_and_verifies ... ok
+test recovery::tests::marker_lifecycle ... ok
+test recovery::tests::missing_sidecar_is_skipped ... ok
+test recovery::tests::restore_latest_picks_newest_run ... ok
+test recovery::tests::restore_replaces_live_files ... ok
+test recovery::tests::verify_detects_tampering ... ok
+test rotate::tests::test_cleanup_old_archives ... ok
+test rotate::tests::test_find_bead_in_archives ... ok
+test rotate::tests::test_list_all_with_archives ... ok
+test rotate::tests::test_rotate_creates_archive ... ok
+test rotate::tests::test_rotate_dry_run ... ok
+test rotate::tests::test_shift_archives ... ok
+test rotate::tests::test_shift_archives_with_deletion ... ok
+test rotate::tests::test_should_archive_closed_old_bead ... ok
+test rotate::tests::test_should_not_archive_closed_recent_bead ... ok
+test rotate::tests::test_should_not_archive_open_bead ... ok
+test secrets::tests::test_allowlist ... ok
+test secrets::tests::test_detects_api_token ... ok
+test secrets::tests::test_detects_aws_key ... ok
+test secrets::tests::test_detects_azure_key ... ok
+test secrets::tests::test_detects_jwt ... ok
+test secrets::tests::test_detects_private_key ... ok
+test secrets::tests::test_long_absolute_path_is_not_azure_key ... ok
+test secrets::tests::test_safe_content_passes ... ok
+test secrets::tests::test_scans_issue ... ok
+test storage::sqlite::parse_datetime_tests::accepts_rfc3339_and_sqlite_native_formats ... ok
+test storage::sqlite::parse_datetime_tests::required_datetime_tolerates_null_and_empty ... ok
+test sync::tests::test_collision_resolution_newer_wins ... ok
+test sync::tests::test_collision_resolution_older_skipped ... ok
+test sync::tests::test_find_workspace ... ok
+test sync::tests::test_find_workspace_not_found ... FAILED
+test sync::tests::test_flush_and_import_roundtrip ... ok
+test sync::tests::test_flush_dirty_with_no_changes ... ok
+test sync::tests::test_get_db_path ... ok
+test sync::tests::test_get_jsonl_path ... ok
+test sync::tests::test_import_skips_unchanged ... ok
+test sync::tests::test_labels_flush_import_roundtrip ... ok
+test sync::tests::test_labels_import_from_jsonl ... ok
+test sync::tests::test_labels_import_idempotent ... ok
+test sync::tests::test_labels_persist_through_flush_dirty ... ok
+test sync::tests::test_labels_persist_through_full_sync ... FAILED
+test validation::tests::test_normalize_assignee_collapses_empty ... ok
+test validation::tests::test_normalize_assignee_none ... ok
+test validation::tests::test_normalize_assignee_real_value ... ok
+test validation::tests::test_normalize_assignee_trims_padding ... ok
+test velocity::tests::test_parse_datetime_empty_string_rejection ... ok
+test velocity::tests::test_parse_datetime_malformed_datetime_rejection ... ok
+test velocity::tests::test_parse_datetime_rfc3339_with_timezone ... ok
+test velocity::tests::test_parse_datetime_sqlite_native_without_timezone ... ok
+test velocity::tests::test_recompute_velocity_stats ... ok
+test velocity::tests::test_update_session_on_close ... ok
+
+failures:
+
+---- batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl stdout ----
+
+thread 'batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl' (2305445) panicked at src/batch.rs:3008:9:
+assertion failed: labeled.labels.contains(&"auto-flushed".to_string())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- batch::tests::test_label_add_adds_labels_to_bead stdout ----
+
+thread 'batch::tests::test_label_add_adds_labels_to_bead' (2305465) panicked at src/batch.rs:2065:9:
+assertion `left == right` failed
+  left: 0
+ right: 2
+
+---- batch::tests::test_label_remove_removes_labels_from_bead stdout ----
+
+thread 'batch::tests::test_label_remove_removes_labels_from_bead' (2305474) panicked at src/batch.rs:2127:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- batch::tests::test_mixed_op_batch_all_operations_atomic stdout ----
+
+thread 'batch::tests::test_mixed_op_batch_all_operations_atomic' (2305480) panicked at src/batch.rs:2404:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- batch::tests::test_update_and_label_operations_wired_in_exec_loop stdout ----
+
+thread 'batch::tests::test_update_and_label_operations_wired_in_exec_loop' (2305487) panicked at src/batch.rs:2280:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- sync::tests::test_find_workspace_not_found stdout ----
+
+thread 'sync::tests::test_find_workspace_not_found' (2305825) panicked at src/sync.rs:360:9:
+assertion failed: result.is_err()
+
+---- sync::tests::test_labels_persist_through_full_sync stdout ----
+WARNING: 1 unflushed bead(s) exist in SQLite (modified/created since last flush to JSONL).
+  Import will preserve SQLite versions when they are newer.
+  Run 'bf sync --flush-only' first to flush these beads to JSONL.
+  Unflushed: bf-sync-labels
+
+thread 'sync::tests::test_labels_persist_through_full_sync' (2305835) panicked at src/sync.rs:948:43:
+called `Result::unwrap()` on an `Err` value: No such file or directory (os error 2)
+
+
+failures:
+    batch::tests::test_auto_flush_enabled_writes_incremental_changes_to_jsonl
+    batch::tests::test_label_add_adds_labels_to_bead
+    batch::tests::test_label_remove_removes_labels_from_bead
+    batch::tests::test_mixed_op_batch_all_operations_atomic
+    batch::tests::test_update_and_label_operations_wired_in_exec_loop
+    sync::tests::test_find_workspace_not_found
+    sync::tests::test_labels_persist_through_full_sync
+
+test result: FAILED. 273 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.72s
+
+error: test failed, to rerun pass `--lib`
