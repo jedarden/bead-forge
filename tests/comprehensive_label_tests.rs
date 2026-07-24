@@ -463,6 +463,136 @@ fn test_edge_case_single_char_labels() {
     assert_eq!(labels.len(), 4);
 }
 
+//
+// MARK: Label Deduplication
+//
+
+#[test]
+fn test_label_deduplication_add_same_label_twice() {
+    let ws = TestWorkspace::new();
+
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-dup-1", vec!["label1"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Add the same label again - should not create duplicate
+    storage.add_label("bf-dup-1", "label1").unwrap();
+
+    let labels = storage.get_labels("bf-dup-1").unwrap();
+    assert_eq!(labels.len(), 1, "Should only have one label after duplicate add");
+    assert!(labels.contains(&"label1".to_string()));
+}
+
+#[test]
+fn test_label_deduplication_add_multiple_unique_labels() {
+    let ws = TestWorkspace::new();
+
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-dup-2", vec![]);
+    storage.create_issue(&issue).unwrap();
+
+    // Add multiple unique labels
+    storage.add_label("bf-dup-2", "label1").unwrap();
+    storage.add_label("bf-dup-2", "label2").unwrap();
+    storage.add_label("bf-dup-2", "label3").unwrap();
+    storage.add_label("bf-dup-2", "label1").unwrap(); // Duplicate
+    storage.add_label("bf-dup-2", "label2").unwrap(); // Duplicate
+
+    let labels = storage.get_labels("bf-dup-2").unwrap();
+    assert_eq!(labels.len(), 3, "Should only have three unique labels");
+    assert!(labels.contains(&"label1".to_string()));
+    assert!(labels.contains(&"label2".to_string()));
+    assert!(labels.contains(&"label3".to_string()));
+}
+
+#[test]
+fn test_label_deduplication_with_creation_and_add() {
+    let ws = TestWorkspace::new();
+
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-dup-3", vec!["label1", "label2"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Add labels that already exist from creation
+    storage.add_label("bf-dup-3", "label1").unwrap();
+    storage.add_label("bf-dup-3", "label2").unwrap();
+    // Add a new label
+    storage.add_label("bf-dup-3", "label3").unwrap();
+
+    let labels = storage.get_labels("bf-dup-3").unwrap();
+    assert_eq!(labels.len(), 3, "Should have three unique labels");
+}
+
+#[test]
+fn test_label_deduplication_survives_sync() {
+    let ws = TestWorkspace::new();
+
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-dup-sync", vec!["label1"]);
+    storage.create_issue(&issue).unwrap();
+
+    // Add same label multiple times
+    storage.add_label("bf-dup-sync", "label1").unwrap();
+    storage.add_label("bf-dup-sync", "label1").unwrap();
+    storage.add_label("bf-dup-sync", "label2").unwrap();
+    storage.add_label("bf-dup-sync", "label2").unwrap();
+
+    // Flush to JSONL
+    sync::flush(ws.workspace_dir()).unwrap();
+    drop(storage);
+
+    // Import and verify deduplication survived
+    fs::remove_file(&ws.db_path()).unwrap();
+    sync::import(ws.workspace_dir()).unwrap();
+
+    let storage2 = Storage::open(&ws.db_path()).unwrap();
+    let imported = storage2.get_issue("bf-dup-sync").unwrap().unwrap();
+
+    assert_eq!(imported.labels.len(), 2, "Should have two unique labels after sync");
+    assert!(imported.labels.contains(&"label1".to_string()));
+    assert!(imported.labels.contains(&"label2".to_string()));
+}
+
+#[test]
+fn test_label_deduplication_with_special_characters() {
+    let ws = TestWorkspace::new();
+
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-dup-special", vec![]);
+    storage.create_issue(&issue).unwrap();
+
+    // Add labels with special characters multiple times
+    storage.add_label("bf-dup-special", "high-priority").unwrap();
+    storage.add_label("bf-dup-special", "high-priority").unwrap();
+    storage.add_label("bf-dup-special", "won't-fix").unwrap();
+    storage.add_label("bf-dup-special", "won't-fix").unwrap();
+
+    let labels = storage.get_labels("bf-dup-special").unwrap();
+    assert_eq!(labels.len(), 2, "Should have two unique labels with special chars");
+    assert!(labels.contains(&"high-priority".to_string()));
+    assert!(labels.contains(&"won't-fix".to_string()));
+}
+
+#[test]
+fn test_label_deduplication_with_unicode() {
+    let ws = TestWorkspace::new();
+
+    let storage = Storage::open(&ws.db_path()).unwrap();
+    let issue = create_issue_with_labels("bf-dup-unicode", vec![]);
+    storage.create_issue(&issue).unwrap();
+
+    // Add unicode labels multiple times
+    storage.add_label("bf-dup-unicode", "测试").unwrap();
+    storage.add_label("bf-dup-unicode", "测试").unwrap();
+    storage.add_label("bf-dup-unicode", "🔧").unwrap();
+    storage.add_label("bf-dup-unicode", "🔧").unwrap();
+
+    let labels = storage.get_labels("bf-dup-unicode").unwrap();
+    assert_eq!(labels.len(), 2, "Should have two unique unicode labels");
+    assert!(labels.contains(&"测试".to_string()));
+    assert!(labels.contains(&"🔧".to_string()));
+}
+
 #[test]
 fn test_edge_case_mixed_labels() {
     let ws = TestWorkspace::new();
