@@ -341,6 +341,145 @@ fn test_search_json_with_filters() {
     assert_eq!(found_id, id1, "Should find the correct bead");
 }
 
+#[test]
+fn test_search_json_status_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with different statuses
+    let id1 = create_bead(&workspace, "open bead for status filter");
+    let id2 = create_bead(&workspace, "blocked bead for status filter");
+    update_bead_status(&workspace, &id2, "blocked");
+    let id3 = create_bead(&workspace, "in_progress bead for status filter");
+    update_bead_status(&workspace, &id3, "in_progress");
+
+    // Search with status filter - open
+    let (out, err, ok) = run_bf(&workspace, &["search", "--status", "open", "--format", "json"]);
+    assert!(ok, "Search with status filter failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert!(parsed.len() >= 1, "Should find at least one open bead");
+
+    // Verify all results have status "open"
+    for bead in &parsed {
+        let status = get_string(bead, "status");
+        assert_eq!(status, "open", "Status filter should only return matching beads");
+    }
+}
+
+#[test]
+fn test_search_json_type_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with different types
+    let (out1, err1, ok1) = run_bf(&workspace, &["create", "--title", "bug type bead", "--type", "bug", "--priority", "2"]);
+    assert!(ok1, "bf create failed: {err1}");
+    let bug_id = out1.trim();
+
+    let (out2, err2, ok2) = run_bf(&workspace, &["create", "--title", "task type bead", "--type", "task", "--priority", "2"]);
+    assert!(ok2, "bf create failed: {err2}");
+    let task_id = out2.trim();
+
+    // Search with type filter - bug
+    let (out, err, ok) = run_bf(&workspace, &["search", "--type", "bug", "--format", "json"]);
+    assert!(ok, "Search with type filter failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert!(parsed.len() >= 1, "Should find at least one bug");
+
+    // Verify all results have type "bug"
+    for bead in &parsed {
+        let issue_type = get_string(bead, "issue_type");
+        assert_eq!(issue_type, "bug", "Type filter should only return matching beads");
+    }
+}
+
+#[test]
+fn test_search_json_label_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with different labels
+    let id1 = create_bead_with_labels(&workspace, "labeled bead one", &["frontend", "ui"]);
+    let id2 = create_bead_with_labels(&workspace, "labeled bead two", &["backend", "api"]);
+    create_bead(&workspace, "unlabeled bead");
+
+    // Search with label filter
+    let (out, err, ok) = run_bf(&workspace, &["search", "--label", "frontend", "--format", "json"]);
+    assert!(ok, "Search with label filter failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert_eq!(parsed.len(), 1, "Should find exactly one bead with 'frontend' label");
+
+    let found_id = get_string(&parsed[0], "id");
+    assert_eq!(found_id, id1, "Should find the correct bead");
+
+    // Verify the labels field contains the label
+    let labels = parsed[0].get("labels").and_then(|l| l.as_array()).unwrap();
+    assert!(labels.iter().any(|l| l.as_str() == Some("frontend")), "Labels should include 'frontend'");
+}
+
+#[test]
+fn test_search_json_priority_range_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with different priorities
+    let (out1, err1, ok1) = run_bf(&workspace, &["create", "--title", "priority 1 bead", "--type", "task", "--priority", "1"]);
+    assert!(ok1, "bf create failed: {err1}");
+
+    let (out2, err2, ok2) = run_bf(&workspace, &["create", "--title", "priority 2 bead", "--type", "task", "--priority", "2"]);
+    assert!(ok2, "bf create failed: {err2}");
+
+    let (out3, err3, ok3) = run_bf(&workspace, &["create", "--title", "priority 3 bead", "--type", "task", "--priority", "3"]);
+    assert!(ok3, "bf create failed: {err3}");
+
+    // Search with priority range filter
+    let (out, err, ok) = run_bf(&workspace, &["search", "--priority-min", "2", "--priority-max", "2", "--format", "json"]);
+    assert!(ok, "Search with priority range filter failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert!(parsed.len() >= 1, "Should find at least one bead in priority range");
+
+    // Verify all results have priority 2
+    for bead in &parsed {
+        let priority = bead.get("priority").and_then(|p| p.as_i64()).unwrap();
+        assert_eq!(priority, 2, "Priority range filter should only return matching beads");
+    }
+}
+
+#[test]
+fn test_search_json_multiple_filters_combined() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with multiple attributes
+    let id1 = create_bead_with_labels(&workspace, "frontend open task", &["frontend"]);
+    let id2 = create_bead_with_labels(&workspace, "backend open task", &["backend"]);
+    let id3 = create_bead_with_labels(&workspace, "frontend blocked task", &["frontend"]);
+    update_bead_status(&workspace, &id3, "blocked");
+
+    // Search with multiple filters: status + label
+    let (out, err, ok) = run_bf(&workspace, &["search", "--status", "open", "--label", "frontend", "--format", "json"]);
+    assert!(ok, "Search with multiple filters failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert_eq!(parsed.len(), 1, "Should find exactly one bead matching both filters");
+
+    let found_id = get_string(&parsed[0], "id");
+    assert_eq!(found_id, id1, "Should find the bead that matches both criteria");
+}
+
+#[test]
+fn test_search_json_filter_no_results() {
+    let (_temp, workspace) = setup();
+
+    create_bead(&workspace, "normal bead");
+
+    // Search with filter that matches nothing
+    let (out, err, ok) = run_bf(&workspace, &["search", "--status", "blocked", "--format", "json"]);
+    assert!(ok, "Search with non-matching filter failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert_eq!(parsed.len(), 0, "Search with non-matching filter should return empty results");
+}
+
 // ============================================================================
 // READY COMMAND TESTS
 // ============================================================================
@@ -620,6 +759,178 @@ fn test_recent_json_limit() {
     let envelope = parse_json(&out);
     let parsed = extract_recent_beads(&envelope);
     assert_eq!(parsed.len(), 2, "Recent with limit=2 should return exactly 2 beads");
+}
+
+#[test]
+fn test_recent_json_type_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with different types
+    let (out1, err1, ok1) = run_bf(&workspace, &["create", "--title", "recent bug", "--type", "bug", "--priority", "2"]);
+    assert!(ok1, "bf create failed: {err1}");
+
+    let (out2, err2, ok2) = run_bf(&workspace, &["create", "--title", "recent task", "--type", "task", "--priority", "2"]);
+    assert!(ok2, "bf create failed: {err2}");
+
+    // Recent with type filter
+    let (out, err, ok) = run_bf(&workspace, &["recent", "--type", "bug", "--format", "json"]);
+    assert!(ok, "Recent with type filter failed: {err}");
+
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+
+    assert!(parsed.len() >= 1, "Should find at least one bug");
+
+    // Verify all results have type "bug"
+    for bead in &parsed {
+        let issue_type = get_string(bead, "issue_type");
+        assert_eq!(issue_type, "bug", "Type filter should only return matching beads");
+    }
+}
+
+#[test]
+fn test_recent_json_assignee_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with different assignees
+    let id1 = create_bead_with_assignee(&workspace, "recent assigned to alice", "alice");
+    let id2 = create_bead_with_assignee(&workspace, "recent assigned to bob", "bob");
+    create_bead(&workspace, "recent unassigned");
+
+    // Recent with assignee filter
+    let (out, err, ok) = run_bf(&workspace, &["recent", "--assignee", "alice", "--format", "json"]);
+    assert!(ok, "Recent with assignee filter failed: {err}");
+
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+
+    assert_eq!(parsed.len(), 1, "Should find exactly one bead assigned to alice");
+
+    let found_id = get_string(&parsed[0], "id");
+    assert_eq!(found_id, id1, "Should find the correct bead");
+}
+
+#[test]
+fn test_recent_json_priority_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with different priorities
+    let (out1, err1, ok1) = run_bf(&workspace, &["create", "--title", "recent priority 1", "--type", "task", "--priority", "1"]);
+    assert!(ok1, "bf create failed: {err1}");
+
+    let (out2, err2, ok2) = run_bf(&workspace, &["create", "--title", "recent priority 3", "--type", "task", "--priority", "3"]);
+    assert!(ok2, "bf create failed: {err2}");
+
+    // Recent with priority filter
+    let (out, err, ok) = run_bf(&workspace, &["recent", "--priority", "1", "--format", "json"]);
+    assert!(ok, "Recent with priority filter failed: {err}");
+
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+
+    assert!(parsed.len() >= 1, "Should find at least one bead with priority 1");
+
+    // Verify all results have priority 1
+    for bead in &parsed {
+        let priority = bead.get("priority").and_then(|p| p.as_i64()).unwrap();
+        assert_eq!(priority, 1, "Priority filter should only return matching beads");
+    }
+}
+
+#[test]
+fn test_recent_json_time_period_filter() {
+    let (_temp, workspace) = setup();
+
+    // Create a bead now
+    let id1 = create_bead(&workspace, "recent time bead");
+
+    // Recent with time period filter (24h)
+    let (out, err, ok) = run_bf(&workspace, &["recent", "--time-period", "24h", "--format", "json"]);
+    assert!(ok, "Recent with time-period filter failed: {err}");
+
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+
+    assert!(parsed.len() >= 1, "Should find at least one bead within 24h");
+
+    // Verify our bead is in the results
+    let found = parsed.iter().any(|v| {
+        v.get("id")
+            .and_then(|id| id.as_str())
+            .map(|id| id == id1)
+            .unwrap_or(false)
+    });
+    assert!(found, "Recently created bead should be in results");
+}
+
+#[test]
+fn test_recent_json_multiple_filters_combined() {
+    let (_temp, workspace) = setup();
+
+    // Create beads with multiple attributes
+    let id1 = create_bead_with_assignee(&workspace, "recent open alice task", "alice");
+    let id2 = create_bead_with_assignee(&workspace, "recent blocked alice task", "alice");
+    update_bead_status(&workspace, &id2, "blocked");
+    let id3 = create_bead_with_assignee(&workspace, "recent open bob task", "bob");
+
+    // Recent with multiple filters: status + assignee
+    let (out, err, ok) = run_bf(&workspace, &["recent", "--status", "open", "--assignee", "alice", "--format", "json"]);
+    assert!(ok, "Recent with multiple filters failed: {err}");
+
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+
+    assert_eq!(parsed.len(), 1, "Should find exactly one bead matching both filters");
+
+    let found_id = get_string(&parsed[0], "id");
+    assert_eq!(found_id, id1, "Should find the bead that matches both criteria");
+}
+
+#[test]
+fn test_recent_json_filter_no_results() {
+    let (_temp, workspace) = setup();
+
+    create_bead(&workspace, "normal recent bead");
+
+    // Recent with filter that matches nothing
+    let (out, err, ok) = run_bf(&workspace, &["recent", "--status", "blocked", "--format", "json"]);
+    assert!(ok, "Recent with non-matching filter failed: {err}");
+
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+
+    assert_eq!(parsed.len(), 0, "Recent with non-matching filter should return empty results");
+}
+
+#[test]
+fn test_recent_json_limit_variations() {
+    let (_temp, workspace) = setup();
+
+    // Create multiple beads
+    for i in 1..=5 {
+        create_bead(&workspace, &format!("recent limit bead {}", i));
+    }
+
+    // Test limit=1
+    let (out, err, ok) = run_bf(&workspace, &["recent", "-n", "1", "--format", "json"]);
+    assert!(ok, "Recent with limit=1 failed: {err}");
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+    assert_eq!(parsed.len(), 1, "Recent with limit=1 should return exactly 1 bead");
+
+    // Test limit=3
+    let (out, err, ok) = run_bf(&workspace, &["recent", "-n", "3", "--format", "json"]);
+    assert!(ok, "Recent with limit=3 failed: {err}");
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+    assert_eq!(parsed.len(), 3, "Recent with limit=3 should return exactly 3 beads");
+
+    // Test unlimited (limit=0)
+    let (out, err, ok) = run_bf(&workspace, &["recent", "-n", "0", "--format", "json"]);
+    assert!(ok, "Recent with limit=0 failed: {err}");
+    let envelope = parse_json(&out);
+    let parsed = extract_recent_beads(&envelope);
+    assert!(parsed.len() >= 5, "Recent with limit=0 should return all beads");
 }
 
 // ============================================================================
