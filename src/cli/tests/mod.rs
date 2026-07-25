@@ -8,6 +8,7 @@ pub use json_output::{
     bf_binary,
     bf_command,
     json_validation,
+    format_detection,
     fixtures,
     envelope,
     capture,
