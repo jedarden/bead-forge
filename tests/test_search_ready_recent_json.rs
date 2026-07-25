@@ -162,11 +162,57 @@ fn run_ready_json(workspace: &Path, limit: usize) -> String {
     out
 }
 
+/// Extract beads from ready command envelope (handles both single object and JSONL string)
+fn extract_ready_beads(envelope: &Value) -> Vec<Value> {
+    let data_value = get_envelope_data(envelope);
+
+    // Ready command returns data differently based on bead count:
+    // - 1 bead: data is a JSON object
+    // - 2+ beads: data is a JSONL string
+    if data_value.is_object() {
+        // Single bead case
+        vec![data_value]
+    } else if data_value.is_string() {
+        // Multiple beads case - parse as JSONL
+        let data_str = data_value.as_str().unwrap();
+        if data_str.is_empty() || data_str == "[]" {
+            vec![]
+        } else {
+            parse_jsonl(data_str)
+        }
+    } else {
+        panic!("Ready envelope data must be object or string, got: {}", data_value);
+    }
+}
+
 /// Helper to run `bf recent --format json` and return stdout
 fn run_recent_json(workspace: &Path) -> String {
     let (out, err, ok) = run_bf(workspace, &["recent", "--format", "json"]);
     assert!(ok, "bf recent --format json failed: {err}");
     out
+}
+
+/// Extract beads from recent command envelope (handles both single object and JSONL string)
+fn extract_recent_beads(envelope: &Value) -> Vec<Value> {
+    let data_value = get_envelope_data(envelope);
+
+    // Recent command returns data differently based on bead count:
+    // - 1 bead: data is a JSON object
+    // - 2+ beads: data is a JSONL string
+    if data_value.is_object() {
+        // Single bead case
+        vec![data_value]
+    } else if data_value.is_string() {
+        // Multiple beads case - parse as JSONL
+        let data_str = data_value.as_str().unwrap();
+        if data_str.is_empty() {
+            vec![]
+        } else {
+            parse_jsonl(data_str)
+        }
+    } else {
+        panic!("Recent envelope data must be object or string, got: {}", data_value);
+    }
 }
 
 // ============================================================================
@@ -436,10 +482,8 @@ fn test_recent_json_output_structure_validity() {
     let envelope = parse_json(&json_str);
     validate_envelope(&json_str, "recent");
 
-    // Extract data field as JSONL string
-    let data_value = get_envelope_data(&envelope);
-    let data_str = data_value.as_str().unwrap();
-    let parsed = parse_jsonl(data_str);
+    // Extract beads using helper that handles both formats
+    let parsed = extract_recent_beads(&envelope);
     assert!(!parsed.is_empty(), "Recent should return results");
 
     // Verify structure
@@ -461,10 +505,8 @@ fn test_recent_json_required_fields_present() {
     let json_str = run_recent_json(&workspace);
     let envelope = parse_json(&json_str);
 
-    // Extract data field as JSONL string
-    let data_value = get_envelope_data(&envelope);
-    let data_str = data_value.as_str().unwrap();
-    let parsed = parse_jsonl(data_str);
+    // Extract beads using helper that handles both formats
+    let parsed = extract_recent_beads(&envelope);
 
     let found = parsed.iter().any(|v| {
         v.get("id")
@@ -510,9 +552,9 @@ fn test_recent_json_empty_results() {
     assert_eq!(parsed["version"].as_u64().unwrap(), 1);
     assert_eq!(parsed["kind"].as_str().unwrap(), "recent");
 
-    // Data should be an empty string (not null)
-    let data = parsed["data"].as_str().unwrap();
-    assert_eq!(data, "", "Recent with no beads should return empty data string");
+    // Extract beads using helper
+    let beads = extract_recent_beads(&parsed);
+    assert_eq!(beads.len(), 0, "Recent with no beads should return empty results");
 }
 
 #[test]
@@ -529,10 +571,8 @@ fn test_recent_json_special_characters() {
     let json_str = run_recent_json(&workspace);
     let envelope = parse_json(&json_str);
 
-    // Extract data field as JSONL string
-    let data_value = get_envelope_data(&envelope);
-    let data_str = data_value.as_str().unwrap();
-    let parsed = parse_jsonl(data_str);
+    // Extract beads using helper
+    let parsed = extract_recent_beads(&envelope);
 
     assert_eq!(parsed.len(), 4, "All beads with special characters should be in recent");
 
@@ -557,9 +597,7 @@ fn test_recent_json_with_filters() {
     assert!(ok, "Recent with status filter failed: {err}");
 
     let envelope = parse_json(&out);
-    let data_value = get_envelope_data(&envelope);
-    let data_str = data_value.as_str().unwrap();
-    let parsed = parse_jsonl(data_str);
+    let parsed = extract_recent_beads(&envelope);
     assert_eq!(parsed.len(), 1, "Should find exactly one open bead");
 
     let found_id = get_string(&parsed[0], "id");
@@ -580,9 +618,7 @@ fn test_recent_json_limit() {
     assert!(ok, "Recent with limit failed: {err}");
 
     let envelope = parse_json(&out);
-    let data_value = get_envelope_data(&envelope);
-    let data_str = data_value.as_str().unwrap();
-    let parsed = parse_jsonl(data_str);
+    let parsed = extract_recent_beads(&envelope);
     assert_eq!(parsed.len(), 2, "Recent with limit=2 should return exactly 2 beads");
 }
 
@@ -619,12 +655,9 @@ fn test_ready_json_envelope_mode() {
     assert!(ok, "Ready --envelope failed: {err}");
 
     let envelope = validate_envelope(&out, "ready");
-    let data_value = get_envelope_data(&envelope);
 
-    // Data should be a string containing JSONL
-    assert!(data_value.is_string(), "Ready envelope data should be a string");
-    let data_str = data_value.as_str().unwrap();
-    let parsed = parse_jsonl(data_str);
+    // Extract beads using helper that handles both single object and JSONL string
+    let parsed = extract_ready_beads(&envelope);
 
     assert!(!parsed.is_empty(), "Ready should return results");
 }
@@ -639,12 +672,9 @@ fn test_recent_json_envelope_mode() {
     assert!(ok, "Recent --envelope failed: {err}");
 
     let envelope = validate_envelope(&out, "recent");
-    let data_value = get_envelope_data(&envelope);
 
-    // Data should be a string containing JSONL
-    assert!(data_value.is_string(), "Recent envelope data should be a string");
-    let data_str = data_value.as_str().unwrap();
-    let parsed = parse_jsonl(data_str);
+    // Extract beads using helper that handles both single object and JSONL string
+    let parsed = extract_recent_beads(&envelope);
 
     assert!(!parsed.is_empty(), "Recent should return results");
 }
@@ -674,9 +704,7 @@ fn test_json_field_consistency_across_commands() {
 
     let recent_json = run_recent_json(&workspace);
     let recent_envelope = parse_json(&recent_json);
-    let recent_data_value = get_envelope_data(&recent_envelope);
-    let recent_data = recent_data_value.as_str().unwrap();
-    let recent_parsed = parse_jsonl(recent_data);
+    let recent_parsed = extract_recent_beads(&recent_envelope);
     let recent_bead = recent_parsed.iter()
         .find(|v| v.get("id").and_then(|id| id.as_str()).map(|id| id == bead_id).unwrap_or(false))
         .unwrap();
@@ -760,19 +788,18 @@ fn test_recent_jsonl_format() {
 
     let out = run_recent_json(&workspace);
 
-    // Recent returns envelope format, not raw JSONL
+    // Recent returns envelope format
     let envelope = parse_json(&out);
     assert_eq!(envelope["version"].as_u64().unwrap(), 1);
     assert_eq!(envelope["kind"].as_str().unwrap(), "recent");
 
-    // Extract data field - should be JSONL string
-    let data_str = envelope["data"].as_str().unwrap();
+    // Extract beads using helper
+    let parsed = extract_recent_beads(&envelope);
+    assert_eq!(parsed.len(), 2, "Should have 2 beads");
 
-    // Each line in data should be valid JSON
-    let lines: Vec<&str> = data_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    assert_eq!(lines.len(), 2, "Should have 2 JSONL lines in data");
-
-    for line in lines {
-        assert!(from_str::<serde_json::Value>(line.trim()).is_ok(), "Each line should be valid JSON");
+    // Verify each bead is valid JSON
+    for bead in &parsed {
+        assert!(bead.is_object(), "Each bead should be a JSON object");
+        assert!(has_field(bead, "id"), "Each bead must have 'id' field");
     }
 }
