@@ -1,0 +1,17 @@
+{
+  "bead_id": "bf-1v59b0",
+  "agent": "claude-code-glm-4.7",
+  "provider": "zai",
+  "model": "glm-4.7",
+  "exit_code": 101,
+  "outcome": "test_failure",
+  "duration_ms": 12467,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-25T05:40:00.000000000Z",
+  "trace_format": "claude_json",
+  "pruned": false,
+  "template_version": null,
+  "notes": "cargo test attempted compilation but failed due to test code API mismatches with storage implementation. Test files need updates to match current storage API signatures."
+}
