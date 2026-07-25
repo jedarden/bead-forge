@@ -203,6 +203,126 @@ fn annotate_set_triggers_flush() {
     find_bead(&ws, &id);
 }
 
+#[test]
+fn claim_flushes_status_and_assignee() {
+    let (_t, ws) = setup();
+    let id = create_bead(&ws, "To claim");
+    // Claim the bead - this changes status to in_progress and sets assignee
+    let (_o, e, ok) = run_bf(&ws, &["claim", "--assignee", "test-worker"]);
+    assert!(ok, "claim failed: {e}");
+    let bead = find_bead(&ws, &id);
+    assert_eq!(field(&bead, "status"), "in_progress");
+    assert_eq!(field(&bead, "assignee"), "test-worker");
+}
+
+#[test]
+fn claim_with_any_flag_flushes_claimed_bead() {
+    let (_t, ws) = setup();
+    let id = create_bead(&ws, "To claim with any");
+    // Claim with --any flag - should still flush to the workspace where bead was claimed
+    let (_o, e, ok) = run_bf(&ws, &["claim", "--any", "--assignee", "another-worker"]);
+    assert!(ok, "claim --any failed: {e}");
+    let bead = find_bead(&ws, &id);
+    assert_eq!(field(&bead, "status"), "in_progress");
+    assert_eq!(field(&bead, "assignee"), "another-worker");
+}
+
+#[test]
+fn claim_with_no_auto_flush_leaves_jsonl_untouched() {
+    let (_t, ws) = setup();
+    let id = create_bead(&ws, "Bead to claim without flush");
+    // First create and flush to get the bead into the system
+    let _bead = find_bead(&ws, &id);
+    // Delete issues.jsonl to test that claim doesn't recreate it
+    fs::remove_file(jsonl_path(&ws)).unwrap();
+
+    // Claim with --no-auto-flush - should not write issues.jsonl
+    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "claim", "--assignee", "worker-no-flush"]);
+    assert!(ok, "claim with --no-auto-flush failed: {e}");
+    assert!(
+        !jsonl_path(&ws).exists(),
+        "--no-auto-flush claim must not write issues.jsonl"
+    );
+}
+
+#[test]
+fn claim_with_config_auto_flush_disabled_leaves_jsonl_untouched() {
+    let (_t, ws) = setup();
+    let id = create_bead(&ws, "Bead to claim with config disabled");
+    // First create and flush to get the bead into the system
+    let _bead = find_bead(&ws, &id);
+    // Delete issues.jsonl to test that claim doesn't recreate it
+    fs::remove_file(jsonl_path(&ws)).unwrap();
+
+    // Persist the config master switch off
+    let cfg = ws.join(".beads").join("config.yaml");
+    let mut content = fs::read_to_string(&cfg).unwrap();
+    content.push_str("sync:\n  auto_flush: false\n");
+    fs::write(&cfg, content).unwrap();
+
+    // Claim with config auto_flush disabled - should not write issues.jsonl
+    let (_o, e, ok) = run_bf(&ws, &["claim", "--assignee", "worker-config-off"]);
+    assert!(ok, "claim with auto_flush=false config failed: {e}");
+    assert!(
+        !jsonl_path(&ws).exists(),
+        "claim with sync.auto_flush:false must not write issues.jsonl"
+    );
+}
+
+#[test]
+fn reclaim_flushes_reclaimed_status() {
+    let (_t, ws) = setup();
+    let id = create_bead(&ws, "To reclaim");
+    // First claim the bead
+    let (_o, e, ok) = run_bf(&ws, &["claim", "--assignee", "original-worker"]);
+    assert!(ok, "initial claim failed: {e}");
+
+    // Create another bead that's open, so there's something to claim
+    let open_id = create_bead(&ws, "Open bead");
+
+    // Claim a second bead - both claimed beads should be flushed
+    let (_o, e, ok) = run_bf(&ws, &["claim", "--assignee", "new-worker"]);
+    assert!(ok, "second claim failed: {e}");
+
+    // Both beads should be flushed to issues.jsonl
+    let first_bead = find_bead(&ws, &id);
+    assert_eq!(field(&first_bead, "status"), "in_progress", "first bead should be in_progress");
+    assert_eq!(field(&first_bead, "assignee"), "original-worker", "first bead should have original assignee");
+
+    let second_bead = find_bead(&ws, &open_id);
+    assert_eq!(field(&second_bead, "status"), "in_progress", "second bead should be in_progress");
+    assert_eq!(field(&second_bead, "assignee"), "new-worker", "second bead should have assignee");
+}
+
+#[test]
+fn claim_flush_failure_warns_and_retains_dirty() {
+    let (_t, ws) = setup();
+    let id = create_bead(&ws, "To claim with wedged flush");
+    // First flush normally to make sure the bead is in the database
+    let _bead = find_bead(&ws, &id);
+
+    // Wedge the flush by making issues.jsonl a directory
+    wedge_flush(&ws);
+
+    // Claim should succeed (exit 0) despite the wedged flush
+    let (_o, err, ok) = run_bf(&ws, &["claim", "--assignee", "worker-wedge"]);
+    assert!(ok, "claim must not fail on a flush error");
+    assert!(
+        err.contains("warning:") && err.contains("auto-flush"),
+        "expected an auto-flush warning on stderr, got: {err}"
+    );
+
+    // Clear the wedge and verify dirty mark is retained
+    fs::remove_dir(jsonl_path(&ws)).unwrap();
+    let (_o, e, ok) = run_bf(&ws, &["sync", "--flush-only"]);
+    assert!(ok, "sync --flush-only failed: {e}");
+
+    // The claimed bead should now appear in issues.jsonl
+    let bead = find_bead(&ws, &id);
+    assert_eq!(field(&bead, "status"), "in_progress");
+    assert_eq!(field(&bead, "assignee"), "worker-wedge");
+}
+
 // --- Auto-flush OFF: the switch suppresses the flush. ---
 
 #[test]
@@ -261,14 +381,15 @@ fn flush_failure_nonfatal_json_warning_and_dirty_retained() {
     wedge_flush(&ws);
 
     // Mutation succeeds (exit 0) despite the wedged flush; --json carries a
-    // top-level "warning" alongside the "id".
+    // top-level "warning" alongside the "data" envelope.
     let (out, _e, ok) = run_bf(&ws, &["create", "--json", "--title", "Wedged"]);
     assert!(ok, "create must not fail on a flush error");
     let parsed: Value = serde_json::from_str(out.trim()).expect("create --json emitted invalid JSON");
     let id = parsed
-        .get("id")
+        .get("data")
+        .and_then(|d| d.get("id"))
         .and_then(|v| v.as_str())
-        .expect("create --json missing id")
+        .expect("create --json missing data.id")
         .to_string();
     assert!(
         parsed
