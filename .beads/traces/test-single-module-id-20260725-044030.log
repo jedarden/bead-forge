@@ -1,0 +1,41 @@
+
+running 36 tests
+test batch::tests::test_resolve_reference_empty_created_ids ... ok
+test batch::tests::test_validate_op_fields_allows_all_create_fields ... ok
+test batch::tests::test_validate_op_fields_accepts_aliases ... ok
+test batch::tests::test_validate_op_fields_rejects_unknown_field ... ok
+test claim::tests::test_claim_no_candidates ... ok
+test claim::tests::test_get_ready_candidates_limit_zero_returns_all ... ok
+test critical_path::tests::test_invalidate_cache ... ok
+test format::envelope::list_show::list_show_envelope_kind_identifiers ... ok
+test format::envelope::tests::create_command_emits_id_only ... ok
+test format::envelope::tests::envelope_kind_identifies_command ... ok
+test format::envelope::tests::envelope_new_creates_valid_structure ... ok
+test format::envelope::tests::envelope_to_json_compact_produces_valid_json ... ok
+test format::envelope::tests::envelope_to_json_produces_valid_json ... ok
+test format::json::tests::format_issues_single_yields_one_valid_json_line ... ok
+test id::tests::test_adaptive_hash_length ... ok
+test id::tests::test_base36_encode ... ok
+test claim::tests::test_get_ready_candidates_respects_limit ... ok
+test id::tests::test_generate_id ... ok
+test id::tests::test_is_valid_bead_id ... ok
+test id::tests::test_br_format_compatibility ... ok
+test id::tests::test_optimal_hash_length ... ok
+test jsonl::tests::merge_removes_ids ... ok
+test merge::tests::merge_delete_unchanged_other_side_deletes ... ok
+test merge::tests::merge_disjoint_adds_from_both_sides ... ok
+test merge::tests::merge_one_sided_change_takes_that_side ... ok
+test merge::tests::merge_same_edit_on_both_sides_no_conflict ... ok
+test model::tests::test_p0_priority_from_str_invalid_formats ... ok
+test recovery::tests::missing_sidecar_is_skipped ... ok
+test sync::tests::test_labels_import_idempotent ... ok
+test trace::tests::test_create_trace_file_idempotent ... ok
+test trace::tests::test_ensure_traces_dir_idempotent ... ok
+test validation::tests::test_normalize_assignee_collapses_empty ... ok
+test validation::tests::test_normalize_assignee_none ... ok
+test validation::tests::test_normalize_assignee_real_value ... ok
+test validation::tests::test_normalize_assignee_trims_padding ... ok
+test id::tests::test_no_collisions_10k ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 313 filtered out; finished in 0.33s
+
