@@ -1,0 +1,19 @@
+{
+  "bead_id": "bf-1yxdgq",
+  "bead_title": "Set up trace output capture mechanism",
+  "agent": "claude-code-glm-4.7-h1-bforge",
+  "provider": "zai",
+  "model": "glm-4.7",
+  "exit_code": null,
+  "outcome": "pending",
+  "duration_ms": null,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-25T01:06:00.000000000Z",
+  "trace_format": "claude_json",
+  "pruned": false,
+  "template_version": null,
+  "trace_type": "test_output_capture",
+  "description": "Trace output capture setup for cargo test run"
+}
