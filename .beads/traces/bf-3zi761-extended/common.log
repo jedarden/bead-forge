@@ -1,0 +1,20 @@
+
+running 15 tests
+test tests::test_assert_p0_epic_display ... ok
+test tests::test_assert_p0_epic ... ok
+test tests::test_assert_p0_epic_json_serialization ... ok
+test tests::test_p0_epic_builder_full ... ok
+test tests::test_p0_epic_builder_minimal ... ok
+test tests::test_p0_epic_roundtrip_through_workspace ... ok
+test tests::test_sample_p0_epic_full_jsonl ... ok
+test tests::test_sample_p0_epic_jsonl ... ok
+test tests::test_sample_p0_epic_with_description_jsonl ... ok
+test tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test tests::test_count_p0_epics ... ok
+test tests::test_seed_p0_epics ... ok
+test tests::test_temp_workspace_create_bead ... ok
+test tests::test_temp_workspace_creation ... ok
+test tests::test_temp_workspace_with_jsonl ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

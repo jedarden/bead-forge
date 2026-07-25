@@ -1,0 +1,35 @@
+Starting extended test batch at Sat Jul 25 05:56:43 AM EDT 2026
+Test: comprehensive_label_tests - Sat Jul 25 05:56:46 AM EDT 2026
+Status: COMPILE_FAILED
+---
+Test: test_label_comprehensive - Sat Jul 25 05:56:55 AM EDT 2026
+Status: COMPILE_FAILED
+---
+Test: test_version_display - Sat Jul 25 05:57:03 AM EDT 2026
+Status: COMPILE_FAILED
+---
+Test: common - Sat Jul 25 05:57:12 AM EDT 2026
+Status: PASSED (15 tests)
+---
+Test: comments_cli - Sat Jul 25 05:57:26 AM EDT 2026
+Status: PASSED (3 tests)
+---
+Test: count_command - Sat Jul 25 05:57:34 AM EDT 2026
+Status: PASSED (3 tests)
+---
+Test: search_command - Sat Jul 25 05:57:42 AM EDT 2026
+Status: PASSED (6 tests)
+---
+Test: test_create_command - Sat Jul 25 05:57:49 AM EDT 2026
+Status: PASSED (14 tests)
+---
+Test: test_show_command - Sat Jul 25 05:57:58 AM EDT 2026
+Status: PASSED (12 tests)
+---
+Test: test_update_command - Sat Jul 25 05:58:09 AM EDT 2026
+Status: PASSED (2 tests)
+---
+Test: test_special_chars - Sat Jul 25 05:58:19 AM EDT 2026
+Status: PASSED (6 tests)
+---
+Test: test_bf_2l7_help_flag - Sat Jul 25 05:58:34 AM EDT 2026

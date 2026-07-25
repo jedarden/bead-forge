@@ -1,0 +1,12 @@
+
+running 7 tests
+test history::tests::disabled_config_is_noop ... ok
+test history::tests::backup_copies_content ... ok
+test history::tests::empty_source_is_noop ... ok
+test history::tests::missing_source_is_noop ... ok
+test history::tests::prune_keeps_only_max_backups ... ok
+test history::tests::prune_zero_is_unbounded ... ok
+test history::tests::successive_backups_accumulate_then_cap ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 342 filtered out; finished in 0.01s
+

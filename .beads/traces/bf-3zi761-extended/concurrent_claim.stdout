@@ -1,0 +1,9 @@
+
+running 4 tests
+test test_concurrent_claim_empty_workspace ... ok
+test test_concurrent_claim_priority_ordering ... ok
+test test_concurrent_claim_no_duplicates ... ok
+test test_concurrent_claim_stale_reclamation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+

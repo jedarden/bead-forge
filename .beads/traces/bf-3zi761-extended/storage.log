@@ -1,0 +1,7 @@
+
+running 2 tests
+test storage::sqlite::parse_datetime_tests::required_datetime_tolerates_null_and_empty ... ok
+test storage::sqlite::parse_datetime_tests::accepts_rfc3339_and_sqlite_native_formats ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 347 filtered out; finished in 0.00s
+

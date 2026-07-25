@@ -1,0 +1,53 @@
+=== Extended Batch Test Run ===
+Total tests available: 125
+Tests selected (50%): 63
+
+[1/63] Running: autoflush_batch_claim_delete
+  ✓ PASSED (s)
+[2/63] Running: autoflush_failure_contract
+  ✗ FAILED (s)
+[3/63] Running: autoflush_readonly
+  ✓ PASSED (s)
+[4/63] Running: batch_atomic
+  ✓ PASSED (s)
+[5/63] Running: batch_mitosis
+  ✓ PASSED (s)
+[6/63] Running: br_isolation
+  ✗ FAILED (s)
+[7/63] Running: claim_fallback
+  ✓ PASSED (s)
+[8/63] Running: close_reopen
+  ✓ PASSED (s)
+[9/63] Running: comprehensive_label_cli
+  ✓ PASSED (s)
+[10/63] Running: concurrent_claim
+  ✓ PASSED (s)
+[11/63] Running: description_update_test_infrastructure
+  ✓ PASSED (s)
+[12/63] Running: doctor_repair_unflushed
+  ✓ PASSED (s)
+[13/63] Running: duplicate_label_test
+  ✓ PASSED (s)
+[14/63] Running: envelope_helpers
+  ✓ PASSED (s)
+[15/63] Running: epic_cli_label_creation
+  ✓ PASSED (s)
+[16/63] Running: epic_cli_label_mutate
+  ✓ PASSED (s)
+[17/63] Running: epic_cli_labels
+  ✗ FAILED (s)
+[18/63] Running: epic_complex_labels
+  ✓ PASSED (s)
+[19/63] Running: epic_default_priority
+  ✓ PASSED (s)
+[20/63] Running: epic_label_edge_cases
+  ✓ PASSED (s)
+[21/63] Running: epic_type_basic
+  ✓ PASSED (s)
+[22/63] Running: feature_default_priority
+  ✓ PASSED (s)
+[23/63] Running: integration_trace_stderr_timing
+  ✓ PASSED (s)
+[24/63] Running: jsonl_compat
+  ✓ PASSED (s)
+[25/63] Running: label_integration_test

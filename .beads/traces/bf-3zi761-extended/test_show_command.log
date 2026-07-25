@@ -1,0 +1,17 @@
+
+running 12 tests
+test test_show_basic_text_format ... ok
+test test_show_basic_fields_display ... ok
+test test_show_closed_bead ... ok
+test test_show_closed_bead_timestamps ... ok
+test test_show_in_progress_bead ... ok
+test test_show_json_flag ... ok
+test test_show_missing_bead ... ok
+test test_show_toon_format ... ok
+test test_show_json_format ... ok
+test test_show_with_all_fields ... ok
+test test_show_with_labels_only ... ok
+test test_show_with_dependencies ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+

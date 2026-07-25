@@ -1,0 +1,11 @@
+
+running 6 tests
+test tests::test_combined_special_chars_and_html ... ok
+test tests::test_html_entities_in_description ... ok
+test tests::test_quotes_and_backslashes ... ok
+test tests::test_json_roundtrip_with_special_chars ... ok
+test tests::test_special_chars_in_title ... ok
+test tests::test_unicode_emoji_characters ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+

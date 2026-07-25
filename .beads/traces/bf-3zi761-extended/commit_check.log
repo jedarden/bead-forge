@@ -1,0 +1,9 @@
+
+running 4 tests
+test commit_check::tests::test_format_scan_results ... ok
+test commit_check::tests::test_parse_diff_empty ... ok
+test commit_check::tests::test_parse_diff_no_secrets ... ok
+test commit_check::tests::test_parse_diff_simple ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 345 filtered out; finished in 0.04s
+

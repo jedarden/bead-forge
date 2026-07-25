@@ -1,0 +1,22 @@
+
+running 17 tests
+test test_comprehensive_epic_label_workflow ... ok
+test test_epic_label_list_command ... ok
+test test_all_issue_types_with_labels_work_identically ... ok
+test test_epic_label_whitespace_handling ... ok
+test test_epic_label_search_integration ... ok
+test test_epic_no_labels_add_and_remove ... ok
+test test_epic_labels_vs_task_labels_no_special_casing ... ok
+test test_epic_no_labels_json_serialization ... ok
+test test_epic_no_labels_storage_api ... ok
+test test_epic_no_labels_cli_create ... ok
+test test_epic_special_characters_labels_cli ... ok
+test test_epic_type_preserved_through_jsonl_sync ... ok
+test test_epic_type_preserved_through_label_add ... ok
+test test_epic_type_preserved_through_label_remove ... ok
+test test_epic_unicode_labels ... ok
+test test_epic_type_preserved_through_update ... ok
+test test_label_operations_across_issue_types_no_special_casing ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+

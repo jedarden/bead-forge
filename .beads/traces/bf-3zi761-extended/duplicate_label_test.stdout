@@ -1,0 +1,18 @@
+
+running 13 tests
+test test_duplicate_label_add_prevention ... ok
+test test_duplicate_label_case_sensitivity ... ok
+test test_duplicate_label_deduplication_on_storage ... ok
+test test_duplicate_label_empty_string ... ok
+test test_duplicate_label_serialization ... ok
+test test_duplicate_label_unicode ... ok
+test test_duplicate_label_removal ... ok
+test test_duplicate_label_very_long_label ... ok
+test test_duplicate_label_whitespace_handling ... ok
+test test_duplicate_label_with_special_characters ... ok
+test test_duplicate_label_with_removal_and_readd ... ok
+test test_multiple_duplicate_labels ... ok
+test test_duplicate_labels_across_beads ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+

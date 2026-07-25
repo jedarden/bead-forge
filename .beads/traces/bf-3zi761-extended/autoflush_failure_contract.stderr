@@ -1,0 +1,198 @@
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `IssueChanges`
+  --> src/sync.rs:10:27
+   |
+10 | use crate::model::{Issue, IssueChanges};
+   |                           ^^^^^^^^^^^^
+
+warning: unused import: `rusqlite::params`
+  --> src/sync.rs:14:5
+   |
+14 | use rusqlite::params;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `SystemTime`
+  --> src/timing.rs:39:26
+   |
+39 | use std::time::{Instant, SystemTime};
+   |                          ^^^^^^^^^^
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2228:9
+     |
+2228 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2890:5
+     |
+2890 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:248:13
+    |
+248 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1185:51
+     |
+1185 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1425:13
+     |
+1425 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1567:13
+     |
+1567 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:297:9
+    |
+297 |     let mut result = execute_command(command, args, config)?;
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:428:17
+    |
+428 |     if let Some(mut stdout) = child.stdout.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:447:17
+    |
+447 |     if let Some(mut stderr) = child.stderr.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/timing.rs:336:35
+    |
+336 |     pub fn complete_with_metadata(mut self, bead_id: &str) -> Result<crate::trace::TraceMetadata> {
+    |                                   ----^^^^
+    |                                   |
+    |                                   help: remove this `mut`
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1049:4
+     |
+1049 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `cleanup_old_archives` is never used
+   --> src/rotate.rs:284:4
+    |
+284 | fn cleanup_old_archives(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:335:4
+    |
+335 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `local_start` is never read
+   --> src/timing.rs:102:5
+    |
+100 | pub struct ExecutionTimer {
+    |            -------------- field in this struct
+101 |     /// In-memory start time (for calculating duration within this process)
+102 |     local_start: Instant,
+    |     ^^^^^^^^^^^
+
+warning: `bead-forge` (lib) generated 27 warnings (run `cargo fix --lib -p bead-forge` to apply 17 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests/autoflush_failure_contract.rs (target/debug/deps/autoflush_failure_contract-37012de1aacb0230)
+error: test failed, to rerun pass `--test autoflush_failure_contract`

@@ -1,0 +1,110 @@
+
+running 33 tests
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test test_bf_core_tables_match_br_schema ... ok
+test test_bf_annotations_table_isolation ... ok
+test test_bf_initializes_bf_workspace ... ok
+test test_bf_jsonl_export_only_includes_core_fields ... ok
+test test_bf_database_integrity_after_operations ... ok
+test test_bf_migration_lock_isolation ... ok
+test test_bf_never_modifies_br_columns ... ok
+test test_bf_preserves_br_metadata ... ok
+test test_bf_multiple_workspaces_dont_interfere ... ok
+test test_bf_respects_tool_field_in_config ... ok
+test test_bf_validates_tool_before_operations ... ok
+test test_bf_tables_dont_corrupt_br_database ... ok
+test test_bf_velocity_stats_isolation ... ok
+test test_bf_worker_sessions_isolation ... ok
+test test_multiple_sync_import_only_operations_dont_corrupt_fixture ... ok
+test test_nested_tempdir_doesnt_discover_parent_beads ... FAILED
+test test_sync_import_only_doesnt_write_original_jsonl ... ok
+test test_walk_up_discovery_stops_at_tempdir_boundary ... FAILED
+
+failures:
+
+---- test_nested_tempdir_doesnt_discover_parent_beads stdout ----
+
+thread 'test_nested_tempdir_doesnt_discover_parent_beads' (3289679) panicked at tests/br_isolation.rs:593:5:
+find_beads_dir should not find any .beads from an unrelated tempdir
+
+---- test_walk_up_discovery_stops_at_tempdir_boundary stdout ----
+
+thread 'test_walk_up_discovery_stops_at_tempdir_boundary' (3289681) panicked at tests/br_isolation.rs:556:5:
+find_beads_dir should not find parent .beads from child tempdir
+
+
+failures:
+    test_nested_tempdir_doesnt_discover_parent_beads
+    test_walk_up_discovery_stops_at_tempdir_boundary
+
+test result: FAILED. 31 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 33 tests
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test test_bf_core_tables_match_br_schema ... ok
+test test_bf_annotations_table_isolation ... ok
+test test_bf_initializes_bf_workspace ... ok
+test test_bf_jsonl_export_only_includes_core_fields ... ok
+test test_bf_database_integrity_after_operations ... ok
+test test_bf_migration_lock_isolation ... ok
+test test_bf_never_modifies_br_columns ... ok
+test test_bf_preserves_br_metadata ... ok
+test test_bf_multiple_workspaces_dont_interfere ... ok
+test test_bf_respects_tool_field_in_config ... ok
+test test_bf_validates_tool_before_operations ... ok
+test test_bf_tables_dont_corrupt_br_database ... ok
+test test_bf_velocity_stats_isolation ... ok
+test test_bf_worker_sessions_isolation ... ok
+test test_multiple_sync_import_only_operations_dont_corrupt_fixture ... ok
+test test_nested_tempdir_doesnt_discover_parent_beads ... FAILED
+test test_sync_import_only_doesnt_write_original_jsonl ... ok
+test test_walk_up_discovery_stops_at_tempdir_boundary ... FAILED
+
+failures:
+
+---- test_nested_tempdir_doesnt_discover_parent_beads stdout ----
+
+thread 'test_nested_tempdir_doesnt_discover_parent_beads' (3289751) panicked at tests/br_isolation.rs:593:5:
+find_beads_dir should not find any .beads from an unrelated tempdir
+
+---- test_walk_up_discovery_stops_at_tempdir_boundary stdout ----
+
+thread 'test_walk_up_discovery_stops_at_tempdir_boundary' (3289753) panicked at tests/br_isolation.rs:556:5:
+find_beads_dir should not find parent .beads from child tempdir
+
+
+failures:
+    test_nested_tempdir_doesnt_discover_parent_beads
+    test_walk_up_discovery_stops_at_tempdir_boundary
+
+test result: FAILED. 31 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+

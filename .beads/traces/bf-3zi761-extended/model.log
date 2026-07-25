@@ -1,0 +1,48 @@
+
+running 43 tests
+test model::tests::test_all_priority_constants_exist ... ok
+test model::tests::test_all_priority_display_formats ... ok
+test model::tests::test_all_priority_from_str_parsing ... ok
+test model::tests::test_all_standard_issue_types_roundtrip ... ok
+test model::tests::test_comment_text_field_renamed ... ok
+test model::tests::test_custom_dependency_type_roundtrip ... ok
+test model::tests::test_compaction_level_serializes_as_zero_when_none ... ok
+test model::tests::test_custom_event_type_roundtrip ... ok
+test model::tests::test_custom_status_roundtrip ... ok
+test model::tests::test_custom_issue_type_roundtrip ... ok
+test model::tests::test_default_issue_type_is_task ... ok
+test model::tests::test_dependency_type_field_renamed ... ok
+test model::tests::test_dependency_type_kebab_case ... ok
+test model::tests::test_epic_issue_type_serialization ... ok
+test model::tests::test_empty_vectors_skipped_in_serialization ... ok
+test model::tests::test_event_type_field_renamed ... ok
+test model::tests::test_epic_status_serialization ... ok
+test model::tests::test_is_expired_tombstone_expired ... ok
+test model::tests::test_is_expired_tombstone_no_deleted_at ... ok
+test model::tests::test_is_expired_tombstone_no_retention ... ok
+test model::tests::test_is_expired_tombstone_not_expired ... ok
+test model::tests::test_is_expired_tombstone_not_tombstone ... ok
+test model::tests::test_is_expired_tombstone_zero_retention ... ok
+test model::tests::test_full_issue_with_all_fields ... ok
+test model::tests::test_issue_roundtrip_from_br_format ... ok
+test model::tests::test_issue_with_epic_type_serialization ... ok
+test model::tests::test_p0_critical_exists_in_priority_enum ... ok
+test model::tests::test_p0_priority_compares_as_highest_priority ... ok
+test model::tests::test_p0_priority_default_is_medium ... ok
+test model::tests::test_p0_priority_displays_as_p0 ... ok
+test model::tests::test_p0_priority_equality ... ok
+test model::tests::test_p0_priority_from_str_case_insensitive ... ok
+test model::tests::test_p0_priority_from_str_invalid_formats ... ok
+test model::tests::test_p0_priority_from_str_parsing ... ok
+test model::tests::test_p0_priority_from_str_with_whitespace ... ok
+test model::tests::test_p0_priority_serialization_roundtrip ... ok
+test model::tests::test_p0_priority_total_ordering ... ok
+test model::tests::test_pinned_status_renamed ... ok
+test model::tests::test_priority_transparent_serialization ... ok
+test model::tests::test_sync_equals_detects_semantic_changes ... ok
+test model::tests::test_sync_equals_treats_duplicate_labels_as_equivalent ... ok
+test model::tests::test_sync_equals_ignores_audit_timestamps_and_relation_order ... ok
+test model::tests::test_tombstone_status_renamed ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 306 filtered out; finished in 0.00s
+

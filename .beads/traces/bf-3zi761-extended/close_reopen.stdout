@@ -1,0 +1,11 @@
+
+running 6 tests
+test test_close_preserves_other_fields ... ok
+test test_close_bead_creates_close_event ... ok
+test test_close_reason_preserved_in_event ... ok
+test test_close_then_reopen_creates_reopened_event ... ok
+test test_multiple_close_reopen_cycles ... ok
+test test_reopen_bead_changes_status_to_open ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+

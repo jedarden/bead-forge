@@ -1,0 +1,31 @@
+
+running 26 tests
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test test_claim_fallback_any_empty_all_workspaces ... ok
+test test_claim_fallback_any_exhausted_primary_workspace ... ok
+test test_claim_fallback_any_multiple_workspaces ... ok
+test test_claim_fallback_any_pinned_beads_respected ... ok
+test test_claim_fallback_any_primary_has_beads_no_fallback ... ok
+test test_claim_fallback_any_selects_from_available_workspace ... ok
+test test_claim_fallback_to_1800s_when_velocity_stats_empty ... ok
+test test_claim_fallback_any_with_dependencies ... ok
+test test_cli_claim_includes_metadata_flags_in_subprocess ... ok
+test test_cli_claim_fallback_any_exhausted_workspace ... ok
+test test_cli_claim_partial_metadata_flags ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+

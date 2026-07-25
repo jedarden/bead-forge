@@ -1,0 +1,11 @@
+
+running 6 tests
+test recovery::tests::marker_lifecycle ... ok
+test recovery::tests::backup_records_hashes_and_verifies ... ok
+test recovery::tests::missing_sidecar_is_skipped ... ok
+test recovery::tests::restore_replaces_live_files ... ok
+test recovery::tests::restore_latest_picks_newest_run ... ok
+test recovery::tests::verify_detects_tampering ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 343 filtered out; finished in 0.00s
+

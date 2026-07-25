@@ -1,0 +1,9 @@
+
+running 4 tests
+test validation::tests::test_normalize_assignee_none ... ok
+test validation::tests::test_normalize_assignee_collapses_empty ... ok
+test validation::tests::test_normalize_assignee_trims_padding ... ok
+test validation::tests::test_normalize_assignee_real_value ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 345 filtered out; finished in 0.00s
+

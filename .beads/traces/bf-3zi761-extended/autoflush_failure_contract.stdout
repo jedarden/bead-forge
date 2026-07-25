@@ -1,0 +1,40 @@
+
+running 3 tests
+test create_json_succeeds_warns_retains_dirty_and_recovers ... FAILED
+test human_path_succeeds_and_warns_stderr_only ... ok
+test update_json_path_also_surfaces_the_warning ... ok
+
+failures:
+
+---- create_json_succeeds_warns_retains_dirty_and_recovers stdout ----
+
+thread 'create_json_succeeds_warns_retains_dirty_and_recovers' (3289418) panicked at tests/autoflush_failure_contract.rs:122:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    create_json_succeeds_warns_retains_dirty_and_recovers
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+
+running 3 tests
+test create_json_succeeds_warns_retains_dirty_and_recovers ... FAILED
+test human_path_succeeds_and_warns_stderr_only ... ok
+test update_json_path_also_surfaces_the_warning ... ok
+
+failures:
+
+---- create_json_succeeds_warns_retains_dirty_and_recovers stdout ----
+
+thread 'create_json_succeeds_warns_retains_dirty_and_recovers' (3289459) panicked at tests/autoflush_failure_contract.rs:122:10:
+--json must carry the created id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    create_json_succeeds_warns_retains_dirty_and_recovers
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

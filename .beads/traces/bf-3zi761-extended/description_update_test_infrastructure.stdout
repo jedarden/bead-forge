@@ -1,0 +1,14 @@
+
+running 9 tests
+test test_infrastructure_create_test_bead ... ok
+test test_infrastructure_clear_description ... ok
+test test_infrastructure_multiline_description ... ok
+test test_infrastructure_description_update_cycle ... ok
+test test_infrastructure_preserves_other_fields ... ok
+test test_infrastructure_read_all_fields ... ok
+test test_infrastructure_read_description_directly ... ok
+test test_infrastructure_unicode_description ... ok
+test test_infrastructure_update_via_storage_verify_via_db ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+

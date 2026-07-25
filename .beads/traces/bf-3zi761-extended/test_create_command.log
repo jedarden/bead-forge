@@ -1,0 +1,19 @@
+
+running 14 tests
+test tests::test_create_all_priorities ... ok
+test tests::test_create_basic_bead ... ok
+test tests::test_create_all_standard_types ... ok
+test tests::test_create_defaults ... ok
+test tests::test_create_persists_to_database ... ok
+test tests::test_create_with_all_parameters ... ok
+test tests::test_create_id_sequence ... ok
+test tests::test_create_with_assignee ... ok
+test tests::test_create_with_custom_type ... ok
+test tests::test_create_with_hyphenated_labels ... ok
+test tests::test_create_with_multiple_labels ... ok
+test tests::test_create_with_description ... ok
+test tests::test_create_with_single_label ... ok
+test tests::test_create_with_special_characters_in_title ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+

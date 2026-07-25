@@ -1,0 +1,64 @@
+
+running 15 tests
+test test_epic_create_single_label_cli ... ok
+test test_epic_create_multiple_labels_cli ... ok
+test test_epic_description_and_labels ... ok
+test test_epic_label_add_remove ... ok
+test test_epic_labels_jsonl_export ... ok
+test test_epic_labels_list_command ... ok
+test test_epic_no_labels ... ok
+test test_epic_list_by_type ... FAILED
+test test_epic_priority_and_labels ... ok
+test test_epic_search_by_label ... ok
+test test_epic_show_labels_json_format ... ok
+test test_epic_show_labels_text_format ... ok
+test test_epic_show_labels_toon_format ... ok
+test test_multiple_epics_same_label ... ok
+test test_epic_stats_by_label ... ok
+
+failures:
+
+---- test_epic_list_by_type stdout ----
+
+thread 'test_epic_list_by_type' (3290260) panicked at tests/epic_cli_labels.rs:257:5:
+assertion failed: list_stdout.contains("epic")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_epic_list_by_type
+
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+
+running 15 tests
+test test_epic_create_multiple_labels_cli ... ok
+test test_epic_create_single_label_cli ... ok
+test test_epic_description_and_labels ... ok
+test test_epic_label_add_remove ... ok
+test test_epic_labels_jsonl_export ... ok
+test test_epic_labels_list_command ... ok
+test test_epic_no_labels ... ok
+test test_epic_list_by_type ... FAILED
+test test_epic_priority_and_labels ... ok
+test test_epic_search_by_label ... ok
+test test_epic_show_labels_json_format ... ok
+test test_epic_show_labels_text_format ... ok
+test test_epic_show_labels_toon_format ... ok
+test test_multiple_epics_same_label ... ok
+test test_epic_stats_by_label ... ok
+
+failures:
+
+---- test_epic_list_by_type stdout ----
+
+thread 'test_epic_list_by_type' (3290328) panicked at tests/epic_cli_labels.rs:257:5:
+assertion failed: list_stdout.contains("epic")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_epic_list_by_type
+
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+

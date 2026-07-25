@@ -1,0 +1,10 @@
+
+running 5 tests
+test test_help_exits_zero ... ok
+test test_help_lists_all_commands ... ok
+test test_help_shows_usage_block ... ok
+test test_short_help_flag ... ok
+test test_subcommand_help ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

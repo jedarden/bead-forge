@@ -1,0 +1,10 @@
+
+running 5 tests
+test git_log::tests::test_parse_git_date ... ok
+test git_log::tests::test_merge_events ... ok
+test log::tests::test_event_filter_builder ... ok
+test log::tests::test_format_event_text ... ok
+test git_log::tests::test_parse_jsonl_issues ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.00s
+

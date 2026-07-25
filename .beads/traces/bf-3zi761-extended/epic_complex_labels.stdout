@@ -1,0 +1,22 @@
+
+running 17 tests
+test test_epic_complex_label_serialization ... ok
+test test_epic_complex_labels_add_and_remove ... ok
+test test_epic_complex_labels_get_labels ... ok
+test test_epic_complex_labels_aggregation ... ok
+test test_epic_complex_labels_ordering_preservation ... ok
+test test_epic_complex_labels_json_roundtrip ... ok
+test test_epic_complex_labels_update_via_changes ... ok
+test test_epic_complex_labels_status_computation ... ok
+test test_epic_complex_labels_with_children ... ok
+test test_epic_complex_labels_with_special_characters ... ok
+test test_epic_complex_labels_with_closed_children ... ok
+test test_epic_label_edge_case_duplicate_labels ... ok
+test test_epic_complex_labels_with_various_types ... ok
+test test_epic_label_edge_case_empty_label_removal ... ok
+test test_epic_with_four_labels ... ok
+test test_epic_with_many_labels ... ok
+test test_multiple_epics_with_complex_labels ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+

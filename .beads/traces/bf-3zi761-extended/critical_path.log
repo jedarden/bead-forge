@@ -1,0 +1,11 @@
+
+running 6 tests
+test claim::tests::test_critical_path_zero_float_outranks_high_priority ... ok
+test claim::tests::test_critical_path_bonus_in_claim ... ok
+test critical_path::tests::test_invalidate_cache ... ok
+test critical_path::tests::test_linear_chain ... ok
+test critical_path::tests::test_parallel_paths ... ok
+test critical_path::tests::test_parallel_paths_with_extra_bead ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 343 filtered out; finished in 0.08s
+

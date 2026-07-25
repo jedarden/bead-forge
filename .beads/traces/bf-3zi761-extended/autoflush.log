@@ -1,0 +1,10 @@
+
+running 5 tests
+test autoflush::tests::disabled_outcome_when_not_enabled ... ok
+test autoflush::tests::enabled_true_only_when_config_on_and_flag_off ... ok
+test autoflush::tests::forced_failure_yields_populated_warning ... ok
+test autoflush::tests::success_yields_no_warning ... ok
+test autoflush::tests::with_config_resolves_before_running ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.04s
+

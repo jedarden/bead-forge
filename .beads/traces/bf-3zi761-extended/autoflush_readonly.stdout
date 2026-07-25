@@ -1,0 +1,7 @@
+
+running 2 tests
+test doctor_does_not_flush_even_with_unflushed_beads ... ok
+test readonly_commands_never_write_jsonl ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s
+

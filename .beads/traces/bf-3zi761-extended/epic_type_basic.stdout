@@ -1,0 +1,10 @@
+
+running 5 tests
+test test_epic_string_representation ... ok
+test test_epic_type_creation ... ok
+test test_epic_default_is_task ... ok
+test test_epic_type_serialization ... ok
+test test_epic_type_roundtrip ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

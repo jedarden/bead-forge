@@ -1,0 +1,11 @@
+
+running 6 tests
+test bead_store::tests::test_claim_bead_empty_workspace ... ok
+test bead_store::tests::test_claim_bead_basic ... ok
+test bead_store::tests::test_claim_bead_priority_ordering ... ok
+test bead_store::tests::test_get_ready ... ok
+test bead_store::tests::test_is_bead_ready ... ok
+test bead_store::tests::test_is_bead_ready_blocked ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 343 filtered out; finished in 0.06s
+
