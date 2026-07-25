@@ -526,6 +526,569 @@ fn test_list_json_invalid_limit_filter() {
 }
 
 // ============================================================================
+// Additional invalid query JSON output tests
+// ============================================================================
+
+#[test]
+fn test_search_json_unicode_edge_cases() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create a bead with unicode content
+    let bead_id = fixtures::create_bead("Unicode bead 测试 🧪 试験");
+
+    let unicode_queries = vec![
+        "🔥🔥🔥", // Multiple emoji
+        "🚀✨🎉", // Celebration emoji
+        "测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试", // Very long Chinese
+        "مرحبامرحبامرحبامرحبامرحبامرحبامرحبامرحبامرحبامرحبا", // Arabic repetition
+        "ñasdfñasdfñasdfñasdfñasdfñasdf", // Accented chars
+        "ΔΔΔΔΔ", // Greek letters
+        "日本語日本語日本語", // Japanese
+        "עבריתעבריתעברית", // Hebrew
+        "💀💀💀💀💀💀💀💀💀💀", // Many skull emoji
+        "", // Empty after trimming
+        "\t\n\r", // Only whitespace
+        "🏳️‍🌈🏳️‍🌈🏳️‍🌈", // Rainbow flag (multi-codepoint emoji)
+    ];
+
+    for query in unicode_queries {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL (even if empty results)
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Unicode edge case cleanup");
+}
+
+#[test]
+fn test_search_json_injection_attempts() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create a test bead
+    let bead_id = fixtures::create_bead("Bead for injection tests");
+
+    let injection_queries = vec![
+        "'; DROP TABLE beads; --",
+        "' OR '1'='1",
+        "<script>alert('xss')</script>",
+        "$(echo pwned)",
+        "`echo pwned`",
+        ";ls -la;",
+        "| cat /etc/passwd",
+        "& whoami",
+        "&& exit",
+        "../etc/passwd",
+        "..\\..\\..\\windows\\system32",
+        "${ENV_VAR}",
+        "%PATH%",
+        "@echo off",
+        "#!/bin/sh",
+        "`id`",
+        "$(whoami)",
+        "<iframe src=xss>",
+        "\"><script>",
+        "' UNION SELECT * FROM --",
+        "1' OR '1'='1' --",
+        "admin'--",
+        "x' AND 1=1--",
+    ];
+
+    for query in injection_queries {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL and not crash
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Injection test cleanup");
+}
+
+#[test]
+fn test_search_json_extremely_long_query() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create a bead
+    let bead_id = fixtures::create_bead("Bead for long query test");
+
+    // Test various long query scenarios
+    let long_queries = vec![
+        "a".repeat(10000), // 10k 'a' characters
+        " ".repeat(5000), // 5k spaces
+        "search term ".repeat(1000), // Repeated phrase
+        "🔥".repeat(1000), // Many emoji
+        "test\n".repeat(100), // Newlines
+        "a\tb\tc".repeat(500), // Tabs
+        "test\r\n".repeat(200), // Windows newlines
+    ];
+
+    for (i, query) in long_queries.iter().enumerate() {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL without crashing
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Long query cleanup");
+}
+
+#[test]
+fn test_search_json_query_with_null_bytes_and_controls() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Bead for control char tests");
+
+    // Note: shell command line arguments generally strip null bytes,
+    // but we can test other control characters
+    let control_queries = vec![
+        "\x01\x02\x03", // Start of heading, start of text, end of text
+        "\x07\x08", // Bell, backspace
+        "\x1b", // Escape
+        "\x7f", // Delete
+        "test\x1btest", // Escape in middle
+    ];
+
+    for query in control_queries {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Control char cleanup");
+}
+
+#[test]
+fn test_malformed_command_syntax_invalid_flag_combinations() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test invalid flag combinations
+    let invalid_combinations = vec![
+        // Conflicting limit values
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("5")
+                    .arg("--limit")
+                    .arg("10")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "duplicate limit flags")
+        },
+        // Conflicting status filters
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--status")
+                    .arg("open")
+                    .arg("--status")
+                    .arg("closed")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "duplicate status flags")
+        },
+        // Conflicting type filters
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--type")
+                    .arg("task")
+                    .arg("--type")
+                    .arg("bug")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "duplicate type flags")
+        },
+        // Priority min > max
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("5")
+                    .arg("--priority-max")
+                    .arg("1")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "priority min > max")
+        },
+    ];
+
+    for scenario in invalid_combinations {
+        let (stdout, stderr, success, description) = scenario();
+
+        // Should either fail or succeed with valid JSON
+        if !success {
+            assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+        } else {
+            // If it succeeds, output should still be valid JSON
+            let stdout_trimmed = stdout.trim();
+            if !stdout_trimmed.is_empty() {
+                json_validation::assert_valid_jsonl(&stdout_trimmed);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_malformed_command_syntax_invalid_flags() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test invalid flag usage
+    let invalid_flags = vec![
+        // Non-existent flag
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--non-existent-flag")
+                    .arg("value")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "non-existent flag")
+        },
+        // Flag with missing value
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "flag with missing value")
+        },
+        // Invalid short flag
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("-x")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "invalid short flag")
+        },
+        // Flag with empty value
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "flag with empty value")
+        },
+    ];
+
+    for scenario in invalid_flags {
+        let (stdout, stderr, success, description) = scenario();
+
+        // Should fail for invalid flags
+        assert!(!success, "command should fail for: {}", description);
+        assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+    }
+}
+
+#[test]
+fn test_malformed_command_syntax_invalid_subcommands() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test invalid subcommand usage
+    let invalid_subcommands = vec![
+        // Non-existent subcommand
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("nonexistent")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "non-existent subcommand")
+        },
+        // Subcommand with typo
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("shwo") // typo for "show"
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "typo in subcommand")
+        },
+        // Valid command with invalid arguments
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("show")
+                    .arg("--invalid-arg")
+                    .arg("value")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "invalid argument to valid command")
+        },
+    ];
+
+    for scenario in invalid_subcommands {
+        let (stdout, stderr, success, description) = scenario();
+
+        // Should fail for invalid subcommands
+        assert!(!success, "command should fail for: {}", description);
+        assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+    }
+}
+
+#[test]
+fn test_out_of_range_parameters_extended() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Bead for extended range tests");
+
+    // Test extended out-of-range scenarios
+    let out_of_range_cases = vec![
+        // Very large positive numbers
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("999999999999999999999")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "very large priority-min")
+        },
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("999999999999999999999")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "very large limit")
+        },
+        // Very large negative numbers
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("-999999999999999999999")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "very large negative priority")
+        },
+        // Zero values where invalid
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("0")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "zero limit")
+        },
+        // Scientific notation
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("1e10")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "scientific notation")
+        },
+        // Hexadecimal
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("0x10")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "hexadecimal value")
+        },
+        // Octal
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("010")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "octal value")
+        },
+    ];
+
+    for scenario in out_of_range_cases {
+        let (stdout, stderr, success, description) = scenario();
+
+        // Should either fail with clear error or succeed with valid JSON
+        if !success {
+            assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+        } else {
+            // If succeeds, should return valid JSON
+            let stdout_trimmed = stdout.trim();
+            if !stdout_trimmed.is_empty() {
+                json_validation::assert_valid_jsonl(&stdout_trimmed);
+            }
+        }
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Extended range test cleanup");
+}
+
+#[test]
+fn test_invalid_parameter_formats() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Bead for format tests");
+
+    // Test various invalid parameter formats
+    let invalid_formats = vec![
+        // URL as parameter
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("https://example.com")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "URL as limit")
+        },
+        // Email as parameter
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("test@example.com")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "email as limit")
+        },
+        // JSON as parameter
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("{\"key\": \"value\"}")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "JSON as priority")
+        },
+        // XML as parameter
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("<value>123</value>")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "XML as priority")
+        },
+        // Path as parameter
+        || {
+            let (stdout, stderr, success) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--limit")
+                    .arg("/path/to/file")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, stderr, success, "file path as limit")
+        },
+    ];
+
+    for scenario in invalid_formats {
+        let (stdout, stderr, success, description) = scenario();
+
+        // Should fail for invalid formats
+        if !success {
+            assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+        } else {
+            // If succeeds, should return valid JSON
+            let stdout_trimmed = stdout.trim();
+            if !stdout_trimmed.is_empty() {
+                json_validation::assert_valid_jsonl(&stdout_trimmed);
+            }
+        }
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Format test cleanup");
+}
+
+// ============================================================================
 // Invalid label and assignee tests
 // ============================================================================
 
