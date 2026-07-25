@@ -1,0 +1,5 @@
+error: unexpected argument 'test_critical_path_cache_invalidation' found
+
+Usage: cargo test [OPTIONS] [TESTNAME] [-- [ARGS]...]
+
+For more information, try '--help'.

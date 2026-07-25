@@ -1,0 +1,914 @@
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `IssueChanges`
+  --> src/sync.rs:10:27
+   |
+10 | use crate::model::{Issue, IssueChanges};
+   |                           ^^^^^^^^^^^^
+
+warning: unused import: `rusqlite::params`
+  --> src/sync.rs:14:5
+   |
+14 | use rusqlite::params;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `SystemTime`
+  --> src/timing.rs:39:26
+   |
+39 | use std::time::{Instant, SystemTime};
+   |                          ^^^^^^^^^^
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2228:9
+     |
+2228 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2890:5
+     |
+2890 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:248:13
+    |
+248 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1185:51
+     |
+1185 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1425:13
+     |
+1425 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1567:13
+     |
+1567 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:297:9
+    |
+297 |     let mut result = execute_command(command, args, config)?;
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:428:17
+    |
+428 |     if let Some(mut stdout) = child.stdout.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:447:17
+    |
+447 |     if let Some(mut stderr) = child.stderr.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/timing.rs:336:35
+    |
+336 |     pub fn complete_with_metadata(mut self, bead_id: &str) -> Result<crate::trace::TraceMetadata> {
+    |                                   ----^^^^
+    |                                   |
+    |                                   help: remove this `mut`
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1049:4
+     |
+1049 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `cleanup_old_archives` is never used
+   --> src/rotate.rs:284:4
+    |
+284 | fn cleanup_old_archives(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:335:4
+    |
+335 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `local_start` is never read
+   --> src/timing.rs:102:5
+    |
+100 | pub struct ExecutionTimer {
+    |            -------------- field in this struct
+101 |     /// In-memory start time (for calculating duration within this process)
+102 |     local_start: Instant,
+    |     ^^^^^^^^^^^
+
+warning: `bead-forge` (lib) generated 27 warnings (run `cargo fix --lib -p bead-forge` to apply 17 suggestions)
+warning: unused import: `crate::storage::schema`
+   --> src/claim.rs:883:13
+    |
+883 |         use crate::storage::schema;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::format::json::JsonFormatter`
+   --> src/format/envelope.rs:862:9
+    |
+862 |     use crate::format::json::JsonFormatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::format::Formatter`
+   --> src/format/envelope.rs:863:9
+    |
+863 |     use crate::format::Formatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+
+warning: unused imports: `Priority` and `Status`
+   --> src/secrets.rs:316:31
+    |
+316 |     use crate::model::{Issue, Priority, Status};
+    |                               ^^^^^^^^  ^^^^^^
+
+warning: unused import: `Status`
+   --> src/velocity.rs:396:42
+    |
+396 |     use crate::model::{Issue, IssueType, Status};
+    |                                          ^^^^^^
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:403:32
+    |
+403 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:417:32
+    |
+417 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+    --> src/batch.rs:1766:13
+     |
+1766 |         let mut ops = vec![
+     |             ----^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:728:21
+    |
+728 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:756:21
+    |
+756 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:768:21
+    |
+768 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:885:21
+    |
+885 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:981:21
+    |
+981 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1045:21
+     |
+1045 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1072:21
+     |
+1072 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1101:21
+     |
+1101 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1174:21
+     |
+1174 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `critical`
+   --> src/critical_path.rs:558:13
+    |
+558 |         let critical: Vec<&str> = result
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_critical`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1547:13
+     |
+1547 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1653:13
+     |
+1653 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1702:13
+     |
+1702 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `import_result`
+    --> src/doctor.rs:1741:13
+     |
+1741 |         let import_result = crate::sync::import(workspace).unwrap();
+     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_import_result`
+
+warning: variable does not need to be mutable
+    --> src/model.rs:1220:13
+     |
+1220 |         let mut issue1 = Issue {
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: function `create_test_issue` is never used
+   --> src/format/envelope.rs:867:8
+    |
+867 |     fn create_test_issue(id: &str, title: &str) -> Issue {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (lib test) generated 48 warnings (22 duplicates) (run `cargo fix --lib -p bead-forge --tests` to apply 23 suggestions)
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:126:13
+    |
+126 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:154:13
+    |
+154 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:182:13
+    |
+182 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:211:13
+    |
+211 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/test_create.rs:501:13
+    |
+501 |         let bead_id = stdout.trim();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: `bead-forge` (test "test_create") generated 5 warnings (run `cargo fix --test "test_create" -p bead-forge` to apply 5 suggestions)
+warning: unused imports: `TraceManager` and `TraceMetadata`
+ --> tests/test_execution_time_recording.rs:7:25
+  |
+7 | use bead_forge::trace::{TraceManager, TraceMetadata};
+  |                         ^^^^^^^^^^^^  ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `temp_dir` is never read
+  --> tests/cargo_test_helpers.rs:36:5
+   |
+34 | pub struct TestProject {
+   |            ----------- field in this struct
+35 |     /// Temporary directory holding the project
+36 |     temp_dir: TempDir,
+   |     ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `temp_dir`, `run_cargo_test_with_args`, and `read_trace` are never used
+   --> tests/cargo_test_helpers.rs:202:12
+    |
+ 47 | impl TestProject {
+    | ---------------- methods in this implementation
+...
+202 |     pub fn temp_dir(&self) -> &TempDir {
+    |            ^^^^^^^^
+...
+225 |     pub fn run_cargo_test_with_args(&self, args: &[&str]) -> anyhow::Result<CargoTestResult> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+254 |     pub fn read_trace(&self) -> anyhow::Result<String> {
+    |            ^^^^^^^^^^
+
+warning: `bead-forge` (test "test_execution_time_recording") generated 3 warnings (run `cargo fix --test "test_execution_time_recording" -p bead-forge` to apply 1 suggestion)
+warning: unused variable: `type_`
+  --> tests/schema_compat.rs:84:20
+   |
+84 |     for (i, (name, type_)) in columns.iter().enumerate() {
+   |                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_type_`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `expected_type`
+  --> tests/schema_compat.rs:85:29
+   |
+85 |         let (expected_name, expected_type) = &expected_columns[i];
+   |                             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_expected_type`
+
+warning: unused variable: `result`
+   --> tests/schema_compat.rs:352:9
+    |
+352 |     let result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `cache_count`
+   --> tests/schema_compat.rs:399:9
+    |
+399 |     let cache_count: i64 = storage
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cache_count`
+
+warning: associated items `from_fixture`, `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `sample_closed_bead_jsonl` is never used
+   --> tests/common.rs:162:8
+    |
+162 | pub fn sample_closed_bead_jsonl(id: &str, title: &str, close_reason: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_deps_jsonl` is never used
+   --> tests/common.rs:170:8
+    |
+170 | pub fn sample_bead_with_deps_jsonl(id: &str, title: &str, deps: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_labels_jsonl` is never used
+   --> tests/common.rs:179:8
+    |
+179 | pub fn sample_bead_with_labels_jsonl(id: &str, title: &str, labels: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_jsonl_eq` is never used
+   --> tests/common.rs:190:8
+    |
+190 | pub fn assert_jsonl_eq(jsonl1: &str, jsonl2: &str) -> anyhow::Result<()> {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (test "schema_compat") generated 9 warnings (run `cargo fix --test "schema_compat" -p bead-forge` to apply 4 suggestions)
+warning: associated items `from_fixture`, `config`, `metadata`, `export_jsonl`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+112 |     pub fn export_jsonl(&self, dirty_only: bool) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "claim_fallback") generated 5 warnings (4 duplicates)
+warning: associated items `from_fixture`, `config`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "doctor_safety_stack") generated 5 warnings (4 duplicates)
+warning: unused variable: `stdout`
+   --> tests/test_assignee_validation.rs:320:19
+    |
+320 |     let (success, stdout, _stderr) = run_bf_create(
+    |                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `stdout`
+   --> tests/test_assignee_validation.rs:328:19
+    |
+328 |     let (success, stdout, _stderr) = run_bf_create(
+    |                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `i`
+   --> tests/bug_default_priority.rs:216:10
+    |
+216 |     for (i, (priority, value, display)) in priorities.iter().enumerate() {
+    |          ^ help: if this is intentional, prefix it with an underscore: `_i`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_assignee_validation") generated 2 warnings (run `cargo fix --test "test_assignee_validation" -p bead-forge` to apply 2 suggestions)
+warning: `bead-forge` (test "bug_default_priority") generated 1 warning (run `cargo fix --test "bug_default_priority" -p bead-forge` to apply 1 suggestion)
+   Compiling bead-forge v0.3.0 (/home/coding/bead-forge)
+warning: unused import: `std::path::PathBuf`
+ --> tests/test_bf_23vs_basic_functionality.rs:7:9
+  |
+7 |     use std::path::PathBuf;
+  |         ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_bf_23vs_basic_functionality") generated 1 warning (run `cargo fix --test "test_bf_23vs_basic_functionality" -p bead-forge` to apply 1 suggestion)
+warning: variable does not need to be mutable
+   --> tests/test_epic_p1_creation.rs:276:9
+    |
+276 |     let mut epic1 = Issue {
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_epic_p1_creation") generated 1 warning (run `cargo fix --test "test_epic_p1_creation" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `bead_forge::config::load_config`
+  --> tests/close_reopen.rs:11:5
+   |
+11 | use bead_forge::config::load_config;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `IssueChanges`
+  --> tests/close_reopen.rs:12:43
+   |
+12 | use bead_forge::model::{EventType, Issue, IssueChanges, IssueType, Priority, Status};
+   |                                           ^^^^^^^^^^^^
+
+warning: unused import: `DateTime`
+  --> tests/close_reopen.rs:14:14
+   |
+14 | use chrono::{DateTime, Utc};
+   |              ^^^^^^^^
+
+warning: `bead-forge` (test "close_reopen") generated 3 warnings (run `cargo fix --test "close_reopen" -p bead-forge` to apply 3 suggestions)
+warning: unused variable: `value`
+   --> tests/epic_p0_labels.rs:446:20
+    |
+446 |     for (priority, value, id) in &priorities {
+    |                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_value`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "epic_p0_labels") generated 1 warning (run `cargo fix --test "epic_p0_labels" -p bead-forge` to apply 1 suggestion)
+warning: unused variable: `result`
+   --> tests/epic_complex_labels.rs:787:9
+    |
+787 |     let result = storage.remove_label("epic-empty-removal", "nonexistent");
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "epic_complex_labels") generated 1 warning (run `cargo fix --test "epic_complex_labels" -p bead-forge` to apply 1 suggestion)
+warning: unused variable: `storage`
+   --> tests/secret_scanning.rs:156:9
+    |
+156 |     let storage = ws.storage().unwrap();
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_storage`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:167:9
+    |
+167 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:188:9
+    |
+188 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:208:9
+    |
+208 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:224:9
+    |
+224 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: variable does not need to be mutable
+   --> tests/secret_scanning.rs:318:17
+    |
+318 |             let mut bead = bead_forge::Issue::new(
+    |                 ----^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:440:9
+    |
+440 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: unused variable: `ws`
+   --> tests/secret_scanning.rs:460:9
+    |
+460 |     let ws = common::TempWorkspace::new().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_ws`
+
+warning: field `temp_dir` is never read
+  --> tests/common.rs:16:9
+   |
+14 | pub struct TempWorkspace {
+   |            ------------- field in this struct
+15 |     /// Temp directory that holds the workspace (cleaned up on drop)
+16 |     pub temp_dir: TempDir,
+   |         ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated items `from_fixture`, `workspace_path`, `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 91 |     pub fn workspace_path(&self) -> &Path {
+    |            ^^^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+
+warning: `bead-forge` (test "secret_scanning") generated 14 warnings (4 duplicates) (run `cargo fix --test "secret_scanning" -p bead-forge` to apply 8 suggestions)
+warning: methods `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:96:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ methods in this implementation
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_jsonl") generated 5 warnings (4 duplicates)
+warning: `bead-forge` (test "migrate_git_reconstruction") generated 6 warnings (6 duplicates)
+warning: unused import: `std::path::PathBuf`
+ --> tests/label_tests.rs:4:5
+  |
+4 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `super::*`
+ --> tests/label_tests.rs:8:9
+  |
+8 |     use super::*;
+  |         ^^^^^^^^
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:13:13
+   |
+13 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:26:13
+   |
+26 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:39:13
+   |
+39 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:52:13
+   |
+52 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:71:13
+   |
+71 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+  --> tests/label_tests.rs:84:13
+   |
+84 |         let bead_id = "bf-4yk8nn";
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: unused variable: `bead_id`
+   --> tests/label_tests.rs:106:13
+    |
+106 |         let bead_id = "bf-4yk8nn";
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+
+warning: `bead-forge` (test "label_tests") generated 9 warnings (run `cargo fix --test "label_tests" -p bead-forge` to apply 9 suggestions)
+warning: unused import: `chrono::Utc`
+  --> tests/epic_label_edge_cases.rs:11:5
+   |
+11 | use chrono::Utc;
+   |     ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `bead_id`
+   --> tests/epic_label_edge_cases.rs:538:9
+    |
+538 |     let bead_id = extract_bead_id(&stdout);
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bead_id`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "epic_label_edge_cases") generated 2 warnings (run `cargo fix --test "epic_label_edge_cases" -p bead-forge` to apply 2 suggestions)
+warning: unused import: `Priority`
+ --> tests/test_label_multiple_imports.rs:9:43
+  |
+9 | use bead_forge::model::{Issue, IssueType, Priority, Status};
+  |                                           ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `UpsertResult`
+  --> tests/test_label_multiple_imports.rs:11:31
+   |
+11 | use bead_forge::jsonl::{self, UpsertResult};
+   |                               ^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> tests/test_label_multiple_imports.rs:12:5
+   |
+12 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `delete_issue` found for reference `&Storage` in the current scope
+  --> tests/test_label_multiple_imports.rs:48:17
+   |
+48 |         storage.delete_issue(&bead.id).expect("Failed to delete bead");
+   |                 ^^^^^^^^^^^^
+   |
+help: there is a method `get_issue` with a similar name
+   |
+48 -         storage.delete_issue(&bead.id).expect("Failed to delete bead");
+48 +         storage.get_issue(&bead.id).expect("Failed to delete bead");
+   |
+
+error[E0308]: mismatched types
+   --> tests/test_label_multiple_imports.rs:344:9
+    |
+341 |     let bead = create_bead_with_label_slices(
+    |                ----------------------------- arguments to this function are incorrect
+...
+344 |         vec!["zebra", "alpha", "middle", "beta", "gamma"]
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&[&str]`, found `Vec<&str>`
+    |
+    = note: expected reference `&[&str]`
+                  found struct `Vec<&str>`
+note: function defined here
+   --> tests/test_label_multiple_imports.rs:27:4
+    |
+ 27 | fn create_bead_with_label_slices(id: &str, title: &str, labels: &[&str]) -> Issue {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                        ---------------
+
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error[E0505]: cannot move out of `conn` because it is borrowed
+   --> tests/test_label_import.rs:976:14
+    |
+931 |         let conn = storage2.conn.lock().unwrap();
+    |             ---- binding `conn` declared here
+...
+934 |         let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
+    |                        ---- borrow of `conn` occurs here
+...
+976 |         drop(conn);
+    |              ^^^^ move out of `conn` occurs here
+977 |         drop(storage2);
+978 |     }
+    |     - borrow might be used here, when `stmt` is dropped and runs the `Drop` code for type `rusqlite::statement::Statement`
+
+error[E0505]: cannot move out of `storage2` because it is borrowed
+   --> tests/test_label_import.rs:977:14
+    |
+864 |         let storage2 = Storage::open(&db_path).unwrap();
+    |             -------- binding `storage2` declared here
+...
+931 |         let conn = storage2.conn.lock().unwrap();
+    |                    ------------- borrow of `storage2.conn` occurs here
+...
+977 |         drop(storage2);
+    |              ^^^^^^^^ move out of `storage2` occurs here
+978 |     }
+    |     - borrow might be used here, when `stmt` is dropped and runs the `Drop` code for type `rusqlite::statement::Statement`
+
+For more information about this error, try `rustc --explain E0505`.
+warning: `bead-forge` (test "test_label_multiple_imports") generated 3 warnings
+error: could not compile `bead-forge` (test "test_label_multiple_imports") due to 2 previous errors; 3 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `bead-forge` (test "test_label_import") due to 2 previous errors

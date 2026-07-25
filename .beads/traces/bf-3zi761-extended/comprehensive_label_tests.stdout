@@ -1,0 +1,751 @@
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `IssueChanges`
+  --> src/sync.rs:10:27
+   |
+10 | use crate::model::{Issue, IssueChanges};
+   |                           ^^^^^^^^^^^^
+
+warning: unused import: `rusqlite::params`
+  --> src/sync.rs:14:5
+   |
+14 | use rusqlite::params;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `SystemTime`
+  --> src/timing.rs:39:26
+   |
+39 | use std::time::{Instant, SystemTime};
+   |                          ^^^^^^^^^^
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2228:9
+     |
+2228 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2890:5
+     |
+2890 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:248:13
+    |
+248 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1185:51
+     |
+1185 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1425:13
+     |
+1425 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1567:13
+     |
+1567 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:297:9
+    |
+297 |     let mut result = execute_command(command, args, config)?;
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:428:17
+    |
+428 |     if let Some(mut stdout) = child.stdout.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:447:17
+    |
+447 |     if let Some(mut stderr) = child.stderr.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/timing.rs:336:35
+    |
+336 |     pub fn complete_with_metadata(mut self, bead_id: &str) -> Result<crate::trace::TraceMetadata> {
+    |                                   ----^^^^
+    |                                   |
+    |                                   help: remove this `mut`
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1049:4
+     |
+1049 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `cleanup_old_archives` is never used
+   --> src/rotate.rs:284:4
+    |
+284 | fn cleanup_old_archives(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:335:4
+    |
+335 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `local_start` is never read
+   --> src/timing.rs:102:5
+    |
+100 | pub struct ExecutionTimer {
+    |            -------------- field in this struct
+101 |     /// In-memory start time (for calculating duration within this process)
+102 |     local_start: Instant,
+    |     ^^^^^^^^^^^
+
+warning: `bead-forge` (lib) generated 27 warnings (run `cargo fix --lib -p bead-forge` to apply 17 suggestions)
+warning: unused import: `std::path::PathBuf`
+ --> tests/test_cargo_test_execution.rs:7:5
+  |
+7 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_cargo_test_execution") generated 1 warning (run `cargo fix --test "test_cargo_test_execution" -p bead-forge` to apply 1 suggestion)
+   Compiling bead-forge v0.3.0 (/home/coding/bead-forge)
+warning: unused import: `PathBuf`
+  --> tests/test_epic_with_labels_cli.rs:13:23
+   |
+13 | use std::path::{Path, PathBuf};
+   |                       ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::env`
+  --> tests/test_epic_with_labels_cli.rs:15:5
+   |
+15 | use std::env;
+   |     ^^^^^^^^
+
+warning: unused variable: `name`
+  --> tests/test_epic_with_labels_cli.rs:34:26
+   |
+34 | fn create_test_workspace(name: &str) -> tempfile::TempDir {
+   |                          ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `id1`
+   --> tests/test_epic_with_labels_cli.rs:250:13
+    |
+250 |         let id1 = extract_id(&stdout);
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_id1`
+
+warning: unused variable: `id2`
+   --> tests/test_epic_with_labels_cli.rs:256:13
+    |
+256 |         let id2 = extract_id(&stdout);
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_id2`
+
+warning: unused variable: `id3`
+   --> tests/test_epic_with_labels_cli.rs:262:13
+    |
+262 |         let id3 = extract_id(&stdout);
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_id3`
+
+warning: unused variable: `stdout`
+   --> tests/test_epic_with_labels_cli.rs:325:14
+    |
+325 |         let (stdout, _, _) = bf_cmd(
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stdout`
+   --> tests/test_epic_with_labels_cli.rs:330:14
+    |
+330 |         let (stdout, _, _) = bf_cmd(
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stdout`
+   --> tests/test_epic_with_labels_cli.rs:335:14
+    |
+335 |         let (stdout, _, _) = bf_cmd(
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: `bead-forge` (test "test_epic_with_labels_cli") generated 9 warnings (run `cargo fix --test "test_epic_with_labels_cli" -p bead-forge` to apply 9 suggestions)
+warning: variable does not need to be mutable
+   --> tests/test_labels_text_format.rs:183:9
+    |
+183 |     let mut labels_found: Vec<String> = lines
+    |         ----^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> tests/test_labels_text_format.rs:594:9
+    |
+594 |     let mut labels_found: Vec<String> = lines
+    |         ----^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: `bead-forge` (test "test_labels_text_format") generated 2 warnings (run `cargo fix --test "test_labels_text_format" -p bead-forge` to apply 2 suggestions)
+warning: unused import: `Status`
+ --> tests/label_integration_test.rs:6:46
+  |
+6 | use bead_forge::model::{Issue, IssueChanges, Status};
+  |                                              ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::path::PathBuf`
+ --> tests/label_integration_test.rs:9:5
+  |
+9 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (test "label_integration_test") generated 2 warnings (run `cargo fix --test "label_integration_test" -p bead-forge` to apply 2 suggestions)
+warning: unused variable: `type_`
+  --> tests/schema_compat.rs:84:20
+   |
+84 |     for (i, (name, type_)) in columns.iter().enumerate() {
+   |                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_type_`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `expected_type`
+  --> tests/schema_compat.rs:85:29
+   |
+85 |         let (expected_name, expected_type) = &expected_columns[i];
+   |                             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_expected_type`
+
+warning: unused variable: `result`
+   --> tests/schema_compat.rs:352:9
+    |
+352 |     let result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `cache_count`
+   --> tests/schema_compat.rs:399:9
+    |
+399 |     let cache_count: i64 = storage
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cache_count`
+
+warning: associated items `from_fixture`, `config`, `metadata`, and `count_beads` are never used
+   --> tests/common.rs:73:12
+    |
+ 25 | impl TempWorkspace {
+    | ------------------ associated items in this implementation
+...
+ 73 |     pub fn from_fixture(fixture_name: &str) -> anyhow::Result<Self> {
+    |            ^^^^^^^^^^^^
+...
+ 96 |     pub fn config(&self) -> anyhow::Result<bead_forge::Config> {
+    |            ^^^^^^
+...
+101 |     pub fn metadata(&self) -> anyhow::Result<bead_forge::Metadata> {
+    |            ^^^^^^^^
+...
+147 |     pub fn count_beads(&self) -> anyhow::Result<usize> {
+    |            ^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `sample_closed_bead_jsonl` is never used
+   --> tests/common.rs:162:8
+    |
+162 | pub fn sample_closed_bead_jsonl(id: &str, title: &str, close_reason: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_deps_jsonl` is never used
+   --> tests/common.rs:170:8
+    |
+170 | pub fn sample_bead_with_deps_jsonl(id: &str, title: &str, deps: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `sample_bead_with_labels_jsonl` is never used
+   --> tests/common.rs:179:8
+    |
+179 | pub fn sample_bead_with_labels_jsonl(id: &str, title: &str, labels: &[&str]) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_jsonl_eq` is never used
+   --> tests/common.rs:190:8
+    |
+190 | pub fn assert_jsonl_eq(jsonl1: &str, jsonl2: &str) -> anyhow::Result<()> {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `bead-forge` (test "schema_compat") generated 9 warnings (run `cargo fix --test "schema_compat" -p bead-forge` to apply 4 suggestions)
+warning: unused import: `std::io::Write`
+   --> tests/batch_atomic.rs:616:9
+    |
+616 |     use std::io::Write;
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "batch_atomic") generated 1 warning (run `cargo fix --test "batch_atomic" -p bead-forge` to apply 1 suggestion)
+warning: unused variable: `errors_clone`
+  --> tests/concurrent_claim.rs:66:13
+   |
+66 |         let errors_clone = Arc::clone(&worker_errors);
+   |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_errors_clone`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "concurrent_claim") generated 1 warning (run `cargo fix --test "concurrent_claim" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `std::path::PathBuf`
+  --> tests/test_bf_5id.rs:10:5
+   |
+10 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_bf_5id") generated 1 warning (run `cargo fix --test "test_bf_5id" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `std::path::PathBuf`
+  --> tests/label_removal_test.rs:13:5
+   |
+13 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "label_removal_test") generated 1 warning (run `cargo fix --test "label_removal_test" -p bead-forge` to apply 1 suggestion)
+warning: unused imports: `TraceManager` and `TraceMetadata`
+ --> tests/test_execution_time_recording.rs:7:25
+  |
+7 | use bead_forge::trace::{TraceManager, TraceMetadata};
+  |                         ^^^^^^^^^^^^  ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `temp_dir` is never read
+  --> tests/cargo_test_helpers.rs:36:5
+   |
+34 | pub struct TestProject {
+   |            ----------- field in this struct
+35 |     /// Temporary directory holding the project
+36 |     temp_dir: TempDir,
+   |     ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `temp_dir`, `run_cargo_test_with_args`, and `read_trace` are never used
+   --> tests/cargo_test_helpers.rs:202:12
+    |
+ 47 | impl TestProject {
+    | ---------------- methods in this implementation
+...
+202 |     pub fn temp_dir(&self) -> &TempDir {
+    |            ^^^^^^^^
+...
+225 |     pub fn run_cargo_test_with_args(&self, args: &[&str]) -> anyhow::Result<CargoTestResult> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+254 |     pub fn read_trace(&self) -> anyhow::Result<String> {
+    |            ^^^^^^^^^^
+
+warning: `bead-forge` (test "test_execution_time_recording") generated 3 warnings (run `cargo fix --test "test_execution_time_recording" -p bead-forge` to apply 1 suggestion)
+warning: variable does not need to be mutable
+   --> tests/test_epic_p1_creation.rs:276:9
+    |
+276 |     let mut epic1 = Issue {
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bead-forge` (test "test_epic_p1_creation") generated 1 warning (run `cargo fix --test "test_epic_p1_creation" -p bead-forge` to apply 1 suggestion)
+warning: unused import: `bead_forge::config::Config`
+  --> tests/test_epic_label_functionality.rs:13:5
+   |
+13 | use bead_forge::config::Config;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+  --> tests/test_epic_label_functionality.rs:59:27
+   |
+59 |         compaction_level: 0,
+   |                           ^ expected `Option<i32>`, found integer
+   |
+   = note: expected enum `Option<i32>`
+              found type `{integer}`
+help: try wrapping the expression in `Some`
+   |
+59 |         compaction_level: Some(0),
+   |                           +++++ +
+
+error[E0063]: missing field `annotations` in initializer of `Issue`
+  --> tests/test_epic_label_functionality.rs:30:16
+   |
+30 |     let epic = Issue {
+   |                ^^^^^ missing `annotations`
+
+error[E0308]: mismatched types
+   --> tests/test_epic_label_functionality.rs:270:31
+    |
+270 |             description: Some(Some("Updated description".to_string())),
+    |                          ---- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `String`, found `Option<String>`
+    |                          |
+    |                          arguments to this enum variant are incorrect
+    |
+    = note: expected struct `String`
+                 found enum `Option<String>`
+help: the type constructed contains `Option<String>` due to the type of the argument passed
+   --> tests/test_epic_label_functionality.rs:270:26
+    |
+270 |             description: Some(Some("Updated description".to_string())),
+    |                          ^^^^^---------------------------------------^
+    |                               |
+    |                               this argument influences the type of `Some`
+note: tuple variant defined here
+   --> /home/coding/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:608:5
+    |
+608 |     Some(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ^^^^
+
+error[E0308]: mismatched types
+   --> tests/test_epic_label_functionality.rs:274:40
+    |
+274 |         storage.update_issue(&epic.id, changes).expect("Failed to update epic");
+    |                 ------------           ^^^^^^^ expected `&IssueChanges`, found `IssueChanges`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/storage/sqlite.rs:443:12
+    |
+443 |     pub fn update_issue(&self, id: &str, changes: &IssueChanges) -> Result<()> {
+    |            ^^^^^^^^^^^^
+help: consider borrowing here
+    |
+274 |         storage.update_issue(&epic.id, &changes).expect("Failed to update epic");
+    |                                        +
+
+error[E0658]: use of unstable library feature `str_as_str`
+   --> tests/test_epic_label_functionality.rs:330:109
+    |
+330 | ...   let epic = create_epic_with_labels(&storage, "Special Chars Test", &special_labels.iter().map(|s| s.as_str()).collect::<Vec<_...
+    |                                                                                                           ^^^^^^
+    |
+    = note: see issue #130366 <https://github.com/rust-lang/rust/issues/130366> for more information
+
+error[E0658]: use of unstable library feature `str_as_str`
+   --> tests/test_epic_label_functionality.rs:391:46
+    |
+391 |             &unicode_labels.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+    |                                              ^^^^^^
+    |
+    = note: see issue #130366 <https://github.com/rust-lang/rust/issues/130366> for more information
+
+error[E0308]: mismatched types
+   --> tests/test_epic_label_functionality.rs:417:44
+    |
+417 |         let filtered = storage.list_issues(filter).expect("Failed to filter epics");
+    |                                ----------- ^^^^^^ expected `&IssueFilter`, found `IssueFilter`
+    |                                |
+    |                                arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/storage/sqlite.rs:182:12
+    |
+182 |     pub fn list_issues(&self, filter: &IssueFilter) -> Result<Vec<Issue>> {
+    |            ^^^^^^^^^^^
+help: consider borrowing here
+    |
+417 |         let filtered = storage.list_issues(&filter).expect("Failed to filter epics");
+    |                                            +
+
+error[E0308]: mismatched types
+   --> tests/test_epic_label_functionality.rs:438:44
+    |
+438 |         let filtered = storage.list_issues(filter).expect("Failed to filter epics");
+    |                                ----------- ^^^^^^ expected `&IssueFilter`, found `IssueFilter`
+    |                                |
+    |                                arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/storage/sqlite.rs:182:12
+    |
+182 |     pub fn list_issues(&self, filter: &IssueFilter) -> Result<Vec<Issue>> {
+    |            ^^^^^^^^^^^
+help: consider borrowing here
+    |
+438 |         let filtered = storage.list_issues(&filter).expect("Failed to filter epics");
+    |                                            +
+
+error[E0061]: this method takes 4 arguments but 1 argument was supplied
+    --> tests/test_epic_label_functionality.rs:462:17
+     |
+ 462 |            storage.add_dependency(&Dependency {
+     |  __________________^^^^^^^^^^^^^^--
+     | | _______________________________|
+     | ||
+ 463 | ||             issue_id: epic.id.clone(),
+ 464 | ||             depends_on_id: task1.id.clone(),
+ 465 | ||             dep_type: DependencyType::Blocks,
+...    ||
+ 469 | ||             created_by: None,
+ 470 | ||         }).expect("Failed to add dep 1");
+     | ||_________-- three arguments of type `&str`, `&DependencyType`, and `&str` are missing
+     | |__________|
+     |            expected `&str`, found `&Dependency`
+     |
+     = note: expected reference `&str`
+                found reference `&Dependency`
+note: method defined here
+    --> src/storage/sqlite.rs:1127:12
+     |
+1127 |     pub fn add_dependency(
+     |            ^^^^^^^^^^^^^^
+help: provide the arguments
+     |
+ 462 -         storage.add_dependency(&Dependency {
+ 463 -             issue_id: epic.id.clone(),
+ 464 -             depends_on_id: task1.id.clone(),
+ 465 -             dep_type: DependencyType::Blocks,
+ 466 -             metadata: None,
+ 467 -             thread_id: None,
+ 468 -             created_at: now,
+ 469 -             created_by: None,
+ 470 -         }).expect("Failed to add dep 1");
+ 462 +         storage.add_dependency(/* &str */, /* &str */, /* &DependencyType */, /* &str */).expect("Failed to add dep 1");
+     |
+
+error[E0061]: this method takes 4 arguments but 1 argument was supplied
+    --> tests/test_epic_label_functionality.rs:472:17
+     |
+ 472 |            storage.add_dependency(&Dependency {
+     |  __________________^^^^^^^^^^^^^^--
+     | | _______________________________|
+     | ||
+ 473 | ||             issue_id: epic.id.clone(),
+ 474 | ||             depends_on_id: task2.id.clone(),
+ 475 | ||             dep_type: DependencyType::Blocks,
+...    ||
+ 479 | ||             created_by: None,
+ 480 | ||         }).expect("Failed to add dep 2");
+     | ||_________-- three arguments of type `&str`, `&DependencyType`, and `&str` are missing
+     | |__________|
+     |            expected `&str`, found `&Dependency`
+     |
+     = note: expected reference `&str`
+                found reference `&Dependency`
+note: method defined here
+    --> src/storage/sqlite.rs:1127:12
+     |
+1127 |     pub fn add_dependency(
+     |            ^^^^^^^^^^^^^^
+help: provide the arguments
+     |
+ 472 -         storage.add_dependency(&Dependency {
+ 473 -             issue_id: epic.id.clone(),
+ 474 -             depends_on_id: task2.id.clone(),
+ 475 -             dep_type: DependencyType::Blocks,
+ 476 -             metadata: None,
+ 477 -             thread_id: None,
+ 478 -             created_at: now,
+ 479 -             created_by: None,
+ 480 -         }).expect("Failed to add dep 2");
+ 472 +         storage.add_dependency(/* &str */, /* &str */, /* &DependencyType */, /* &str */).expect("Failed to add dep 2");
+     |
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> tests/test_epic_label_functionality.rs:498:17
+    |
+498 |         storage.close_issue(&epic.id, "Testing label ops on closed").expect("Failed to close epic");
+    |                 ^^^^^^^^^^^----------------------------------------- argument #3 of type `&str` is missing
+    |
+note: method defined here
+   --> src/storage/sqlite.rs:763:12
+    |
+763 |     pub fn close_issue(&self, id: &str, reason: &str, actor: &str) -> Result<()> {
+    |            ^^^^^^^^^^^
+help: provide the argument
+    |
+498 |         storage.close_issue(&epic.id, "Testing label ops on closed", /* &str */).expect("Failed to close epic");
+    |                                                                    ++++++++++++
+
+error[E0599]: no method named `clone` found for struct `Storage` in the current scope
+   --> tests/test_epic_label_functionality.rs:531:45
+    |
+531 |                 let storage_clone = storage.clone();
+    |                                             ^^^^^ method not found in `Storage`
+
+error[E0505]: cannot move out of `conn` because it is borrowed
+   --> tests/test_label_import.rs:976:14
+    |
+931 |         let conn = storage2.conn.lock().unwrap();
+    |             ---- binding `conn` declared here
+...
+934 |         let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
+    |                        ---- borrow of `conn` occurs here
+...
+976 |         drop(conn);
+    |              ^^^^ move out of `conn` occurs here
+977 |         drop(storage2);
+978 |     }
+    |     - borrow might be used here, when `stmt` is dropped and runs the `Drop` code for type `rusqlite::statement::Statement`
+
+error[E0505]: cannot move out of `storage2` because it is borrowed
+   --> tests/test_label_import.rs:977:14
+    |
+864 |         let storage2 = Storage::open(&db_path).unwrap();
+    |             -------- binding `storage2` declared here
+...
+931 |         let conn = storage2.conn.lock().unwrap();
+    |                    ------------- borrow of `storage2.conn` occurs here
+...
+977 |         drop(storage2);
+    |              ^^^^^^^^ move out of `storage2` occurs here
+978 |     }
+    |     - borrow might be used here, when `stmt` is dropped and runs the `Drop` code for type `rusqlite::statement::Statement`
+
+For more information about this error, try `rustc --explain E0505`.
+error: could not compile `bead-forge` (test "test_label_import") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: unused variable: `epic1`
+   --> tests/test_epic_label_functionality.rs:246:13
+    |
+246 |         let epic1 = create_epic_with_labels(&storage, "Epic 1", &["common", "epic-1-only"]);
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_epic1`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `epic2`
+   --> tests/test_epic_label_functionality.rs:247:13
+    |
+247 |         let epic2 = create_epic_with_labels(&storage, "Epic 2", &["common", "epic-2-only"]);
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_epic2`
+
+warning: unused variable: `epic3`
+   --> tests/test_epic_label_functionality.rs:248:13
+    |
+248 |         let epic3 = create_epic_with_labels(&storage, "Epic 3", &["common"]);
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_epic3`
+
+error[E0308]: mismatched types
+   --> tests/test_epic_label_functionality.rs:413:21
+    |
+413 |             labels: vec!["backend".to_string()],
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<Vec<String>>`, found `Vec<String>`
+    |
+    = note: expected enum `Option<Vec<_>>`
+             found struct `Vec<_>`
+help: call `Into::into` on this expression to convert `Vec<String>` into `Option<Vec<String>>`
+    |
+413 |             labels: vec!["backend".to_string()].into(),
+    |                                                +++++++
+
+error[E0308]: mismatched types
+   --> tests/test_epic_label_functionality.rs:434:21
+    |
+434 |             labels: vec!["backend".to_string(), "phase-1".to_string()],
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<Vec<String>>`, found `Vec<String>`
+    |
+    = note: expected enum `Option<Vec<_>>`
+             found struct `Vec<_>`
+help: call `Into::into` on this expression to convert `Vec<String>` into `Option<Vec<String>>`
+    |
+434 |             labels: vec!["backend".to_string(), "phase-1".to_string()].into(),
+    |                                                                       +++++++
+
+Some errors have detailed explanations: E0061, E0063, E0308, E0599, E0658.
+For more information about an error, try `rustc --explain E0061`.
+warning: `bead-forge` (test "test_epic_label_functionality") generated 4 warnings
+error: could not compile `bead-forge` (test "test_epic_label_functionality") due to 14 previous errors; 4 warnings emitted

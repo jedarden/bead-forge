@@ -1,0 +1,5 @@
+error: unexpected argument 'test_json_formatter' found
+
+Usage: cargo test [OPTIONS] [TESTNAME] [-- [ARGS]...]
+
+For more information, try '--help'.

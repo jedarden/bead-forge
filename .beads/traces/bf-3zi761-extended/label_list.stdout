@@ -1,0 +1,20 @@
+
+running 15 tests
+test test_label_list_after_add ... ok
+test test_label_list_after_issue_close ... ok
+test test_label_list_after_remove ... ok
+test test_label_list_case_sensitivity ... ok
+test test_label_list_empty_database ... ok
+test test_label_list_empty_label ... ok
+test test_label_list_get_individual_issue_labels ... ok
+test test_label_list_mixed_distribution ... ok
+test test_label_list_multiple_issues_same_label ... ok
+test test_label_list_multiple_labels_same_issue ... ok
+test test_label_list_ordering_by_count ... ok
+test test_label_list_single_label ... ok
+test test_label_list_special_characters ... ok
+test test_label_list_unicode ... ok
+test test_label_list_large_scale ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
