@@ -1432,7 +1432,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_ready_command_json_limit() {
         require_binary();
 
