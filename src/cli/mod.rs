@@ -3666,6 +3666,7 @@ mod tests {
     pub mod search_json_tests;
     pub mod edge_case_json_tests;
     pub mod error_json_tests;
+    pub mod json_schema_validation;
     pub use crate::config::init_workspace;
     pub use crate::Storage;
 }
