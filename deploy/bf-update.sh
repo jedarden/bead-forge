@@ -7,8 +7,38 @@
 #   chmod +x ~/.local/bin/bf-update.sh
 #
 # This script is called by the bf-update systemd timer (see bf-update.timer)
+#
+# Rollback: Restores the previous bf binary from .bf-version.previous and bf.previous
+#   ~/.local/bin/bf-update.sh --rollback
 
 set -euo pipefail
+
+# Handle --rollback flag
+if [[ "${1:-}" == "--rollback" ]]; then
+    BIN_DIR="$HOME/.local/bin"
+
+    if [[ ! -f "$BIN_DIR/bf.previous" ]]; then
+        echo "ERROR: No backup binary found at $BIN_DIR/bf.previous"
+        echo "Rollback is only available after at least one successful update."
+        exit 1
+    fi
+
+    echo "Rolling back to previous version..."
+
+    # Restore the binary
+    cp "$BIN_DIR/bf.previous" "$BIN_DIR/bf"
+    chmod +x "$BIN_DIR/bf"
+
+    # Restore the version file if it exists
+    if [[ -f "$BIN_DIR/.bf-version.previous" ]]; then
+        cp "$BIN_DIR/.bf-version.previous" "$BIN_DIR/.bf-version"
+    fi
+
+    # Show the rolled-back version
+    ROLLED_BACK_VERSION=$("$BIN_DIR/bf" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+    echo "Rollback complete (now at $ROLLED_BACK_VERSION)"
+    exit 0
+fi
 
 BIN_DIR="$HOME/.local/bin"
 TEMP_DIR=$(mktemp -d)
@@ -113,6 +143,16 @@ chmod +x "$TEMP_DIR/bf-linux-x86_64"
 if [[ ! -x "$TEMP_DIR/bf-linux-x86_64" ]] || [[ ! -s "$TEMP_DIR/bf-linux-x86_64" ]]; then
     echo "ERROR: Downloaded file is not valid or empty"
     exit 1
+fi
+
+# Backup the existing binary and version file (if they exist)
+if [[ -f "$BIN_DIR/bf" ]]; then
+    cp "$BIN_DIR/bf" "$BIN_DIR/bf.previous"
+    echo "Backed up existing bf binary to $BIN_DIR/bf.previous"
+fi
+
+if [[ -f "$BIN_DIR/.bf-version" ]]; then
+    cp "$BIN_DIR/.bf-version" "$BIN_DIR/.bf-version.previous"
 fi
 
 # Install
