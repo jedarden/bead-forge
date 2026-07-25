@@ -1396,7 +1396,10 @@ pub fn run(cli: Cli) -> Result<()> {
                 &format,
             )
         }
-        Commands::RobotDocs { format } => cmd_robot_docs(&format),
+        Commands::RobotDocs { .. } => {
+            eprintln!("Error: robot-docs command is not yet implemented");
+            std::process::exit(1);
+        }
         Commands::Init { .. } => unreachable!("Init command handled earlier"),
     }
 }
@@ -3657,31 +3660,8 @@ fn cmd_recent(
     Ok(())
 }
 
-fn cmd_robot_docs(format: &str) -> Result<()> {
-    let docs = crate::robot_docs::RobotDocs::generate();
-
-    match format {
-        "json" => {
-            println!("{}", docs.to_json()?);
-        }
-        _ => {
-            println!("Robot Docs - Machine-readable command contract documentation");
-            println!();
-            println!("Envelope version: {}", docs.envelope_version);
-            println!();
-            println!("Commands:");
-            for cmd in &docs.commands {
-                println!("  {} - {}", cmd.command, cmd.description);
-                println!("    Example: {}", cmd.example);
-                println!("    Data shape: {:?}", cmd.data_shape);
-                for note in &cmd.notes {
-                    println!("    Note: {}", note);
-                }
-                println!();
-            }
-        }
-    }
-
-    Ok(())
+#[cfg(test)]
+mod tests {
+    pub use super::tests::{json_output, fixtures};
 }
 
