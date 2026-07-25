@@ -1,83 +1,61 @@
-# Bead bf-4hpmca: Trace Capture Verification
+# bf-4hpmca: Verify Basic cargo test Execution with Trace Capture
 
-## Task
-Verify basic cargo test execution with trace capture setup in ~/NEEDLE directory.
+## Summary
+Verified basic cargo test execution with trace file generation in ~/NEEDLE directory.
+
+## What Was Done
+
+1. **Created trace directory**: `~/NEEDLE/.beads/traces/bf-4hpmca/`
+
+2. **Executed basic cargo test runs**:
+   ```bash
+   # Initial test with heartbeat_validation filter
+   cargo test heartbeat_validation --no-fail-fast -- -Z unstable-options --format=terse
+   
+   # Full library test execution
+   cargo test --lib --no-fail-fast
+   ```
+
+3. **Generated trace files**:
+   - `trace-output.log` (1356 bytes) - Initial test run output
+   - `trace-full-run.log` (1139 bytes) - Full test run with warnings  
+   - `lib-test-execution.log` (6389 bytes, 100 lines) - Library test execution with results
 
 ## Results
 
-### Acceptance Criteria Met
+✅ **cargo test starts executing in ~/NEEDLE directory** - Confirmed
+- Test execution initiated successfully
+- 1504 tests found and started running
 
-✅ **cargo test starts executing in ~/NEEDLE directory**
-- Successfully ran `cargo test --lib` in ~/NEEDLE
-- Tests executed normally (1504 tests started)
+✅ **A trace file is created in .beads/traces/** - Confirmed  
+- Directory: `~/NEEDLE/.beads/traces/bf-4hpmca/`
+- Three trace files created with varying output levels
 
-✅ **A trace file is created in .beads/traces/**
-- Created multiple trace files in `/home/coding/bead-forge/.beads/traces/`
-- Files named with timestamp pattern: `cargo-test-needle-20260724-204924.log`
-- Latest full suite trace: 37KB with 594 lines
+✅ **Basic test execution begins** - Confirmed
+- Library tests ran successfully
+- Individual tests shown passing (e.g., `agent_event::tests::agent_message_round_trip ... ok`)
 
-✅ **Basic test execution begins**
-- Tests start and run successfully
-- Example: `test canary::tests::canary_report_can_promote ... ok`
-- Full test suite started 1504 tests
+✅ **Trace file contains initial output** - Confirmed
+- Files show compilation warnings, test count, and test results
+- Output format: standard cargo test output
 
-✅ **Trace file contains initial output**
-- Trace files contain complete test output
-- Includes test names, status (ok/failed), and summary
-- Captured both stdout and stderr via `tee`
+## Trace File Samples
 
-## Test Execution Summary
-
-### Single Test (Manual Capture)
-```bash
-cd ~/NEEDLE && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && \
-TRACE_FILE="$HOME/bead-forge/.beads/traces/cargo-test-needle-${TIMESTAMP}.log" && \
-timeout 15 cargo test --lib canary::tests::canary_report_can_promote 2>&1 | tee "$TRACE_FILE"
-```
-
-**Result**: Created 168-byte trace file with complete output.
-
-### Full Suite (Manual Capture)
-```bash
-cd ~/NEEDLE && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && \
-TRACE_FILE="$HOME/bead-forge/.beads/traces/cargo-test-full-suite-${TIMESTAMP}.log" && \
-timeout 60 cargo test --lib 2>&1 | tee "$TRACE_FILE"
-```
-
-**Result**: Created 37KB trace file with 594 lines, captured ~500+ test results before timeout.
-
-## Trace File Examples
-
-### Single Test Output
-```
-running 1 test
-test canary::tests::canary_report_can_promote ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1503 filtered out
-```
-
-### Full Suite Output (Excerpt)
+**lib-test-execution.log** (primary output):
 ```
 running 1504 tests
 test agent_event::tests::agent_message_round_trip ... ok
-test agent_event::tests::error_round_trip ... ok
-test bead_store::tests::bf_cli_bead_store_ready_passes_explicit_limit ... ok
+test bead_store::tests::bf_cli_bead_store_list_all_passes_explicit_limit ... ok
 ...
-test outcome::tests::handle_failure_with_flush_timeout_continues_gracefully ... ok
 ```
 
-## Mechanism Verified
+**trace-full-run.log** (warnings + execution):
+```
+warning: unused variable: `global_routing`
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored
+```
 
-The basic trace capture mechanism using standard shell redirection works:
-- `tee` command captures output to file while displaying to console
-- Timestamp-based filenames prevent collisions
-- `.beads/traces/` directory auto-created if needed
-- Both stdout and stderr captured via `2>&1`
+## Conclusion
 
-## Next Steps
-
-This foundational verification confirms the basic mechanism works. Future beads can build on this to add:
-- Full output capture for all test types
-- Structured trace metadata (JSON)
-- Error classification from trace content
-- Automated test failure detection
+The basic trace capture mechanism is functional. Cargo test executes successfully in the NEEDLE workspace and writes output to trace files in the `.beads/traces/bf-4hpmca/` directory. The foundation is in place for more comprehensive output capture.
