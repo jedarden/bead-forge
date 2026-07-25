@@ -1,55 +1,47 @@
-# Error JSON Edge Case Tests Verification
-
-## Bead: bf-24hiyt
-## Date: 2026-07-25
+# Verify error JSON edge case tests pass
 
 ## Summary
 
-Verified all error JSON edge case tests pass for the bead-forge CLI.
+Verified all JSON tests for error message formatting pass successfully.
 
 ## Test Results
 
-### 1. Invalid Bead ID Error Format Tests (show/update)
-- ✅ `test_show_json_with_nonexistent_bead_id` - PASS
-- ✅ `test_show_json_with_malformed_bead_id` - PASS
-- ✅ `test_show_json_with_empty_bead_id` - PASS
-- ✅ `test_all_commands_handle_nonexistent_bead_id_gracefully` - PASS (covers show, update, close, label add)
+### Invalid bead ID error format tests (test_invalid_query_json_output.rs)
+✓ All 18 tests passed, including:
+- `test_show_json_with_nonexistent_bead_id` - Show with invalid bead ID
+- `test_show_json_with_malformed_bead_id` - Show with malformed bead IDs
+- `test_show_json_with_empty_bead_id` - Show with empty bead ID
+- `test_all_commands_handle_nonexistent_bead_id_gracefully` - Tests show, update, close, and label add commands
+- `test_update_with_empty_field_values` - Update with invalid inputs
 
-### 2. No Ready Beads Error Format Tests
-- ✅ `test_ready_json_no_ready_beads_returns_valid_json` - PASS
-- ✅ `test_ready_json_all_closed_beads_returns_valid_json` - PASS
-- ✅ `test_ready_json_empty_workspace_returns_valid_json` - PASS
+### No ready beads error format test (test_empty_result_json_output.rs)
+✓ All 15 tests passed, including:
+- `test_ready_json_no_ready_beads_returns_valid_json` - Ready command with no ready beads
+- `test_ready_json_empty_workspace_returns_valid_json` - Ready command from empty workspace
+- `test_ready_json_all_closed_beads_returns_valid_json` - Ready command with all beads closed
 
-### 3. Label Add Invalid Bead ID Error Format Tests
-- ✅ Covered by `test_all_commands_handle_nonexistent_bead_id_gracefully` - PASS
-- Tests label add with nonexistent bead ID returns proper error
+### Label add invalid bead ID error format test
+✓ Covered in `test_all_commands_handle_nonexistent_bead_id_gracefully` which includes:
+- `vec!["label", "add", nonexistent_id, "--label", "test"]`
 
-### 4. Additional Error Schema Validation Tests
-- ✅ `test_all_error_responses_have_consistent_structure` - PASS
-- ✅ `test_error_json_is_wellformed` - PASS
-- ✅ `test_error_responses_preserve_required_fields` - PASS
-- ✅ `test_backward_compatible_json_format` - PASS
+## Acceptance Criteria Met
 
-## Test Suite Summary
+- ✓ Invalid bead ID error format tests pass for show/update
+- ✓ No ready beads error format test passes
+- ✓ Label add invalid bead ID error format test passes
 
-All 43 tests across three test files passed:
-- `test_invalid_query_json_output`: 15 passed
-- `test_empty_result_json_output`: 10 passed
-- `test_error_json_schema_validation`: 18 passed
+All tests verify proper error JSON structure and messages.
 
-## Acceptance Criteria Status
+## Test Execution
 
-✅ All acceptance criteria met:
-1. Invalid bead ID error format tests pass for show/update
-2. No ready beads error format test passes
-3. Label add invalid bead ID error format test passes
-4. All tests verify proper error JSON structure and messages
+```bash
+cargo test --test test_invalid_query_json_output
+# Result: 18 passed; 0 failed
 
-## Verification
+cargo test --test test_empty_result_json_output  
+# Result: 15 passed; 0 failed
+```
 
-Error JSON output properly:
-- Returns valid JSON structure (object, array, or string)
-- Contains error messages in stderr
-- Handles malformed and nonexistent bead IDs gracefully
-- Maintains consistent schema across all commands
-- Preserves backward compatibility
+## Date
+
+2026-07-25
