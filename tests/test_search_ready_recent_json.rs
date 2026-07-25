@@ -162,13 +162,13 @@ fn run_ready_json(workspace: &Path, limit: usize) -> String {
     out
 }
 
-/// Extract beads from ready command envelope (handles both single object and JSONL string)
+/// Extract beads from ready command envelope (handles single object, JSONL string, or array)
 fn extract_ready_beads(envelope: &Value) -> Vec<Value> {
     let data_value = get_envelope_data(envelope);
 
     // Ready command returns data differently based on bead count:
     // - 1 bead: data is a JSON object
-    // - 2+ beads: data is a JSONL string
+    // - 2+ beads: data is a JSONL string (non-envelope) or JSON array (envelope mode)
     if data_value.is_object() {
         // Single bead case
         vec![data_value]
@@ -180,8 +180,11 @@ fn extract_ready_beads(envelope: &Value) -> Vec<Value> {
         } else {
             parse_jsonl(data_str)
         }
+    } else if data_value.is_array() {
+        // Array case (envelope mode)
+        data_value.as_array().unwrap().clone()
     } else {
-        panic!("Ready envelope data must be object or string, got: {}", data_value);
+        panic!("Ready envelope data must be object, string, or array, got: {}", data_value);
     }
 }
 
@@ -192,13 +195,13 @@ fn run_recent_json(workspace: &Path) -> String {
     out
 }
 
-/// Extract beads from recent command envelope (handles both single object and JSONL string)
+/// Extract beads from recent command envelope (handles single object, JSONL string, or array)
 fn extract_recent_beads(envelope: &Value) -> Vec<Value> {
     let data_value = get_envelope_data(envelope);
 
     // Recent command returns data differently based on bead count:
     // - 1 bead: data is a JSON object
-    // - 2+ beads: data is a JSONL string
+    // - 2+ beads: data is a JSONL string (non-envelope) or JSON array (envelope mode)
     if data_value.is_object() {
         // Single bead case
         vec![data_value]
@@ -210,8 +213,11 @@ fn extract_recent_beads(envelope: &Value) -> Vec<Value> {
         } else {
             parse_jsonl(data_str)
         }
+    } else if data_value.is_array() {
+        // Array case (envelope mode)
+        data_value.as_array().unwrap().clone()
     } else {
-        panic!("Recent envelope data must be object or string, got: {}", data_value);
+        panic!("Recent envelope data must be object, string, or array, got: {}", data_value);
     }
 }
 
