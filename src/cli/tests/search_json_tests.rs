@@ -1130,3 +1130,274 @@ fn test_search_json_result_ordering() {
     fixtures::close_bead(&bead2_id, "Order test cleanup 2");
     fixtures::close_bead(&bead3_id, "Order test cleanup 3");
 }
+
+// ============================================================================
+// Timestamp field validation tests
+// ============================================================================
+
+#[test]
+fn test_search_json_timestamp_fields_valid() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Timestamp validation test");
+
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Timestamp validation")
+            .arg("--format")
+            .arg("json")
+    );
+
+    let json_str = output.trim();
+    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
+
+    // Find our bead in the output
+    let bead_json = lines.iter()
+        .find(|line| line.contains(&bead_id))
+        .expect("created bead should be in search output");
+
+    let parsed = json_validation::parse_json(bead_json);
+
+    // Verify created_at field is present and is ISO 8601 format
+    let created_at = json_validation::get_string(&parsed, "created_at");
+    assert!(
+        created_at.contains('T'),
+        "created_at must be in ISO 8601 format (contains 'T'): {}",
+        created_at
+    );
+    assert!(
+        created_at.ends_with('Z') || created_at.contains('+') || created_at.contains('-'),
+        "created_at must have timezone indicator (Z, +HH:MM, or -HH:MM): {}",
+        created_at
+    );
+
+    // Verify updated_at field is present and is ISO 8601 format
+    let updated_at = json_validation::get_string(&parsed, "updated_at");
+    assert!(
+        updated_at.contains('T'),
+        "updated_at must be in ISO 8601 format (contains 'T'): {}",
+        updated_at
+    );
+    assert!(
+        updated_at.ends_with('Z') || updated_at.contains('+') || updated_at.contains('-'),
+        "updated_at must have timezone indicator (Z, +HH:MM, or -HH:MM): {}",
+        updated_at
+    );
+
+    // Verify both timestamps can be parsed as valid datetime
+    // ISO 8601 format should be: YYYY-MM-DDTHH:MM:SSZ or with offset
+    assert!(
+        created_at.len() >= 20,
+        "created_at timestamp should be at least 20 characters for ISO 8601 format: {}",
+        created_at
+    );
+    assert!(
+        updated_at.len() >= 20,
+        "updated_at timestamp should be at least 20 characters for ISO 8601 format: {}",
+        updated_at
+    );
+
+    fixtures::close_bead(&bead_id, "Timestamp validation cleanup");
+}
+
+#[test]
+fn test_search_json_timestamp_fields_present_all_results() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create multiple beads to test timestamp presence across all results
+    let bead1_id = fixtures::create_bead("Timestamp presence test 1");
+    let bead2_id = fixtures::create_bead("Timestamp presence test 2");
+    let bead3_id = fixtures::create_bead("Timestamp presence test 3");
+
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Timestamp presence")
+            .arg("--format")
+            .arg("json")
+    );
+
+    let json_str = output.trim();
+    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
+
+    // Verify all results have both timestamp fields
+    for line in &lines {
+        let parsed = json_validation::parse_json(line);
+
+        // Check both timestamp fields are present
+        json_validation::assert_required_fields(
+            &parsed,
+            &["created_at", "updated_at"],
+            "search command timestamp fields"
+        );
+
+        // Verify they are strings containing 'T' (ISO 8601 format indicator)
+        let created_at = json_validation::get_string(&parsed, "created_at");
+        assert!(
+            created_at.contains('T'),
+            "created_at must be in ISO 8601 format for all results"
+        );
+
+        let updated_at = json_validation::get_string(&parsed, "updated_at");
+        assert!(
+            updated_at.contains('T'),
+            "updated_at must be in ISO 8601 format for all results"
+        );
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead1_id, "Timestamp presence cleanup 1");
+    fixtures::close_bead(&bead2_id, "Timestamp presence cleanup 2");
+    fixtures::close_bead(&bead3_id, "Timestamp presence cleanup 3");
+}
+
+// ============================================================================
+// Description field validation tests
+// ============================================================================
+
+#[test]
+fn test_search_json_description_field_presence() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Description field test");
+
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Description field")
+            .arg("--format")
+            .arg("json")
+    );
+
+    let json_str = output.trim();
+    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
+
+    // Find our bead in the output
+    let bead_json = lines.iter()
+        .find(|line| line.contains(&bead_id))
+        .expect("created bead should be in search output");
+
+    let parsed = json_validation::parse_json(bead_json);
+
+    // Description field must be present (can be null or string)
+    assert!(
+        parsed.get("description").is_some(),
+        "description field must be present in search output"
+    );
+
+    // If present and not null, it should be a string
+    if let Some(desc_value) = parsed.get("description") {
+        if !desc_value.is_null() {
+            assert!(
+                desc_value.is_string(),
+                "description field must be a string or null"
+            );
+        }
+    }
+
+    fixtures::close_bead(&bead_id, "Description field presence cleanup");
+}
+
+#[test]
+fn test_search_json_description_with_content() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Description content test");
+
+    // Add a description to the bead
+    let test_description = "This is a test description with content for validation";
+    let mut cmd = bf_command();
+    cmd.arg("update")
+        .arg(&bead_id)
+        .arg("--description")
+        .arg(test_description);
+    let update_output = cmd.output().expect("Failed to update");
+    assert!(update_output.status.success(), "Update should succeed");
+
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Description content")
+            .arg("--format")
+            .arg("json")
+    );
+
+    let json_str = output.trim();
+    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
+
+    // Find our bead in the output
+    let bead_json = lines.iter()
+        .find(|line| line.contains(&bead_id))
+        .expect("created bead should be in search output");
+
+    let parsed = json_validation::parse_json(bead_json);
+
+    // Description field must be present and contain our content
+    let description = json_validation::get_string(&parsed, "description");
+    assert_eq!(
+        description, test_description,
+        "description field should contain the full description content"
+    );
+
+    fixtures::close_bead(&bead_id, "Description content cleanup");
+}
+
+#[test]
+fn test_search_json_description_field_all_results() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create multiple beads - some with descriptions, some without
+    let bead1_id = fixtures::create_bead("Desc all test 1");
+    let bead2_id = fixtures::create_bead("Desc all test 2");
+
+    // Add description to bead2 only
+    let mut cmd = bf_command();
+    cmd.arg("update")
+        .arg(&bead2_id)
+        .arg("--description")
+        .arg("Test description for bead2");
+    let update_output = cmd.output().expect("Failed to update");
+    assert!(update_output.status.success(), "Update should succeed");
+
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Desc all")
+            .arg("--format")
+            .arg("json")
+    );
+
+    let json_str = output.trim();
+    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
+
+    // Verify all results have description field present
+    for line in &lines {
+        let parsed = json_validation::parse_json(line);
+
+        // Description field must be present for all results
+        assert!(
+            parsed.get("description").is_some(),
+            "description field must be present in all search results"
+        );
+
+        // If not null, it must be a string
+        if let Some(desc_value) = parsed.get("description") {
+            if !desc_value.is_null() {
+                assert!(
+                    desc_value.is_string(),
+                    "description field must be a string or null for all results"
+                );
+            }
+        }
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead1_id, "Description all cleanup 1");
+    fixtures::close_bead(&bead2_id, "Description all cleanup 2");
+}
