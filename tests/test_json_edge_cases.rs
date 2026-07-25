@@ -615,6 +615,180 @@ fn test_json_empty_results_consistency() {
 }
 
 // ============================================================================
+// REQUIRED FIELD PRESENCE AND TYPE TESTS
+// ============================================================================
+
+#[test]
+fn test_list_json_required_field_types() {
+    let (_temp, workspace) = setup();
+
+    // Create a test bead
+    let bead_id = create_bead(&workspace, "Test bead for required field validation");
+
+    // Run list --json
+    let (list_out, err, ok) = run_bf(&workspace, &["list", "--format", "json"]);
+    assert!(ok, "list failed: {err}");
+
+    // Parse and find our bead
+    let parsed = parse_jsonl(&list_out);
+    let our_bead = parsed
+        .iter()
+        .find(|v| get_string(v, "id") == bead_id)
+        .expect("Should find our created bead");
+
+    // Verify all required fields are present
+    let required_fields = vec!["id", "title", "status", "priority", "created_at"];
+    for field in required_fields {
+        assert!(
+            our_bead.get(field).is_some(),
+            "Required field '{}' should be present in JSON output. Got: {}",
+            field,
+            our_bead
+        );
+    }
+
+    // Verify field types are correct
+
+    // id field should be a string
+    let id_value = our_bead.get("id").expect("id field must exist");
+    assert!(
+        id_value.is_string(),
+        "id field should be a string, got: {}",
+        id_value
+    );
+    let id_str = id_value.as_str().unwrap();
+    assert!(!id_str.is_empty(), "id string should not be empty");
+    assert!(id_str.starts_with("bf-"), "id should start with 'bf-' prefix");
+
+    // title field should be a string
+    let title_value = our_bead.get("title").expect("title field must exist");
+    assert!(
+        title_value.is_string(),
+        "title field should be a string, got: {}",
+        title_value
+    );
+    let title_str = title_value.as_str().unwrap();
+    assert!(!title_str.is_empty(), "title string should not be empty");
+
+    // status field should be a string
+    let status_value = our_bead.get("status").expect("status field must exist");
+    assert!(
+        status_value.is_string(),
+        "status field should be a string, got: {}",
+        status_value
+    );
+    let status_str = status_value.as_str().unwrap();
+    assert!(!status_str.is_empty(), "status string should not be empty");
+    // Verify it's a valid status value
+    let valid_statuses = vec!["open", "closed", "blocked", "in_progress"];
+    assert!(
+        valid_statuses.contains(&status_str),
+        "status should be one of {:?}, got: {}",
+        valid_statuses,
+        status_str
+    );
+
+    // priority field should be a number (can be parsed as integer)
+    let priority_value = our_bead.get("priority").expect("priority field must exist");
+    assert!(
+        priority_value.is_number(),
+        "priority field should be a number, got: {}",
+        priority_value
+    );
+    let priority_num = priority_value.as_i64().expect("priority should be parseable as i64");
+    assert!(priority_num >= 0 && priority_num <= 5, "priority should be between 0 and 5, got: {}", priority_num);
+
+    // created_at field should be a string (ISO 8601 timestamp)
+    let created_at_value = our_bead.get("created_at").expect("created_at field must exist");
+    assert!(
+        created_at_value.is_string(),
+        "created_at field should be a string (timestamp), got: {}",
+        created_at_value
+    );
+    let created_at_str = created_at_value.as_str().unwrap();
+    assert!(!created_at_str.is_empty(), "created_at string should not be empty");
+    // Verify ISO 8601 format (contains 'T' and has timezone indicator)
+    assert!(
+        created_at_str.contains('T'),
+        "created_at should be ISO 8601 format with 'T' separator, got: {}",
+        created_at_str
+    );
+    assert!(
+        created_at_str.ends_with('Z') || created_at_str.contains('+'),
+        "created_at should have timezone indicator ('Z' or '+'), got: {}",
+        created_at_str
+    );
+}
+
+#[test]
+fn test_list_json_multiple_beads_all_required_fields() {
+    let (_temp, workspace) = setup();
+
+    // Create multiple beads to test field presence across all results
+    let bead_ids = vec![
+        create_bead(&workspace, "First bead for multiple field test"),
+        create_bead(&workspace, "Second bead for multiple field test"),
+        create_bead(&workspace, "Third bead for multiple field test"),
+    ];
+
+    // Run list --json
+    let (list_out, err, ok) = run_bf(&workspace, &["list", "--format", "json"]);
+    assert!(ok, "list failed: {err}");
+
+    // Parse all beads from JSONL output
+    let parsed = parse_jsonl(&list_out);
+    assert!(
+        parsed.len() >= bead_ids.len(),
+        "Should return at least {} beads, got {}",
+        bead_ids.len(),
+        parsed.len()
+    );
+
+    // Verify each bead in the output has all required fields with correct types
+    let required_fields = vec!["id", "title", "status", "priority", "created_at"];
+    for (i, bead) in parsed.iter().enumerate() {
+        // Check all required fields exist
+        for field in &required_fields {
+            assert!(
+                bead.get(field).is_some(),
+                "Bead at index {}: Required field '{}' should be present. Got: {}",
+                i,
+                field,
+                bead
+            );
+        }
+
+        // Verify field types for each bead
+        let id = bead.get("id").expect("id must exist");
+        assert!(id.is_string(), "Bead {}: id should be string", i);
+
+        let title = bead.get("title").expect("title must exist");
+        assert!(title.is_string(), "Bead {}: title should be string", i);
+
+        let status = bead.get("status").expect("status must exist");
+        assert!(status.is_string(), "Bead {}: status should be string", i);
+
+        let priority = bead.get("priority").expect("priority must exist");
+        assert!(priority.is_number(), "Bead {}: priority should be number", i);
+
+        let created_at = bead.get("created_at").expect("created_at must exist");
+        assert!(created_at.is_string(), "Bead {}: created_at should be string (timestamp)", i);
+        let created_at_str = created_at.as_str().unwrap();
+        assert!(created_at_str.contains('T'), "Bead {}: created_at should be ISO 8601 format", i);
+    }
+
+    // Verify all our created beads are in the results
+    for expected_id in &bead_ids {
+        let found = parsed.iter().any(|v| get_string(v, "id") == *expected_id);
+        assert!(
+            found,
+            "Created bead {} should be in the list results",
+            expected_id
+        );
+    }
+}
+
+// ============================================================================
 // JSON VALIDATION TESTS
 // ============================================================================
 
