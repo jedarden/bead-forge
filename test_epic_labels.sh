@@ -2,6 +2,14 @@
 # Test epic functionality with labels
 set -e
 
+# Create isolated test workspace
+TEST_WS=$(mktemp -d)
+echo "Using isolated test workspace: $TEST_WS"
+cd "$TEST_WS"
+
+# Initialize bead-forge database
+bf init >/dev/null 2>&1
+
 TITLE="Test Epic with Labels $(date +%s)"
 
 echo "=== Test: Create Epic with Labels ==="
@@ -149,3 +157,9 @@ echo ""
 echo "=== All Tests Passed ==="
 echo "Epic ID: $EPIC_ID"
 echo "Test completed successfully!"
+
+# Cleanup
+cd /
+rm -rf "$TEST_WS"
+
+exit 0
