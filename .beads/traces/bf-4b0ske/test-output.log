@@ -1,0 +1,239 @@
+=== Starting cargo test suite at 2026-07-24T21:29:53-04:00 ===
+   Compiling needle v0.2.12 (/home/coding/NEEDLE)
+warning: unused import: `std::fs::File`
+  --> tests/process_discovery_integration.rs:10:5
+   |
+10 | use std::fs::File;
+   |     ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::io::Write`
+  --> tests/process_discovery_integration.rs:11:5
+   |
+11 | use std::io::Write;
+   |     ^^^^^^^^^^^^^^
+
+warning: `needle` (test "process_discovery_integration") generated 2 warnings (run `cargo fix --test "process_discovery_integration" -p needle` to apply 2 suggestions)
+warning: unused import: `std::path::Path`
+ --> examples/test_4390q_debug.rs:2:5
+  |
+2 | use std::path::Path;
+  |     ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `needle` (example "test_4390q_debug") generated 1 warning (run `cargo fix --example "test_4390q_debug" -p needle` to apply 1 suggestion)
+warning: unused doc comment
+  --> tests/routing_matcher_baseline.rs:22:5
+   |
+22 | /     /// Baseline test documenting CURRENT matcher behavior when multiple rules
+23 | |     /// both match the same model AND route to the same adapter.
+24 | |     ///
+25 | |     /// This test verifies that the matcher implements "first-match-wins" behavior:
+...  |
+29 | |     ///
+30 | |     /// Current behavior: The first rule in the list that matches determines routing.
+   | |_____________________________________________________________________________________^
+...
+35 | /     let rules = vec![
+36 | |         make_rule("claude-.*", "claude-print"),
+37 | |         make_rule("claude-sonnet-.*", "claude-print"),
+38 | |     ];
+   | |______- rustdoc does not generate documentation for statements
+   |
+   = help: use `//` for a plain comment
+   = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+  --> tests/routing_matcher_baseline.rs:63:5
+   |
+63 | /     /// Baseline test documenting CURRENT matcher behavior when multiple rules
+64 | |     /// match the same model but route to DIFFERENT adapters.
+65 | |     ///
+66 | |     /// This test verifies that "first-match-wins" is enforced even when
+...  |
+69 | |     /// Current behavior: The first matching rule determines routing, regardless
+70 | |     /// of whether later rules might be "more appropriate".
+   | |___________________________________________________________^
+...
+75 | /     let rules = vec![
+76 | |         make_rule("claude-.*", "claude-print"),
+77 | |         make_rule("claude-sonnet-.*", "claude-code-glm-4.7"),
+78 | |         make_rule(".*", "fallback"),
+79 | |     ];
+   | |______- rustdoc does not generate documentation for statements
+   |
+   = help: use `//` for a plain comment
+
+warning: unused doc comment
+   --> tests/routing_matcher_baseline.rs:103:5
+    |
+103 | /     /// Baseline test documenting that rule ORDER is significant.
+104 | |     ///
+105 | |     /// This test verifies that swapping rule order changes the outcome,
+106 | |     /// confirming that the matcher uses first-match-wins semantics.
+107 | |     ///
+108 | |     /// Current behavior: Rules are evaluated in order, first match wins.
+    | |_________________________________________________________________________^
+...
+112 | /     let rules = vec![
+113 | |         make_rule("claude-sonnet-.*", "claude-code-glm-4.7"),
+114 | |         make_rule("claude-.*", "claude-print"),
+115 | |     ];
+    | |______- rustdoc does not generate documentation for statements
+    |
+    = help: use `//` for a plain comment
+
+warning: unused doc comment
+   --> tests/routing_matcher_baseline.rs:139:5
+    |
+139 | /     /// Baseline test to verify whether the matcher stops at the first match
+140 | |     /// or continues checking all rules.
+141 | |     ///
+142 | |     /// This test uses counter-like adapters to detect whether all rules are
+...   |
+145 | |     /// Current behavior: The matcher stops evaluation after the first match
+146 | |     /// and does not check subsequent rules.
+    | |____________________________________________^
+...
+151 | /     let rules = vec![
+152 | |         make_rule("^claude-sonnet-4-6$", "adapter-1"),
+153 | |         make_rule("claude-.*", "adapter-2"),
+154 | |         make_rule("*", "adapter-3"),
+155 | |     ];
+    | |______- rustdoc does not generate documentation for statements
+    |
+    = help: use `//` for a plain comment
+
+warning: unused doc comment
+   --> tests/routing_matcher_baseline.rs:181:5
+    |
+181 | /     /// Baseline test documenting CURRENT matcher behavior when an invalid
+182 | |     /// pattern precedes valid matching patterns.
+183 | |     ///
+184 | |     /// This test verifies that invalid patterns are skipped gracefully and
+...   |
+187 | |     /// Current behavior: Invalid regex patterns are logged as warnings and
+188 | |     /// skipped, then the next valid pattern is checked.
+    | |________________________________________________________^
+...
+193 | /     let rules = vec![
+194 | |         make_rule("claude-.*", "first-adapter"),
+195 | |         make_rule("[invalid(regex", "invalid-adapter"),
+196 | |         make_rule("claude-sonnet-.*", "third-adapter"),
+197 | |     ];
+    | |______- rustdoc does not generate documentation for statements
+    |
+    = help: use `//` for a plain comment
+
+warning: unused doc comment
+   --> tests/routing_matcher_baseline.rs:222:5
+    |
+222 | /     /// Test that verifies first-match-wins semantics by showing that a
+223 | |     /// more-specific rule wins when positioned before a less-specific rule.
+224 | |     ///
+225 | |     /// This test demonstrates:
+...   |
+231 | |     /// Current behavior: The first matching rule in the list determines routing,
+232 | |     /// regardless of whether later rules might be more specific.
+    | |_________________________________________________________________^
+...
+236 | /     let rules = vec![
+237 | |         make_rule("claude-sonnet-.*", "claude-code-glm-4.7"),
+238 | |         make_rule("claude-.*", "claude-print"),
+239 | |     ];
+    | |______- rustdoc does not generate documentation for statements
+    |
+    = help: use `//` for a plain comment
+
+warning: unused doc comment
+   --> tests/routing_matcher_baseline.rs:262:5
+    |
+262 | /     /// Test that verifies first-match-wins semantics by showing that a
+263 | |     /// less-specific (broad) rule wins when positioned before a more-specific rule.
+264 | |     ///
+265 | |     /// This test complements `routing_baseline_specific_rule_wins_when_first`
+...   |
+269 | |     /// Current behavior: Rule order is significant - the first matching rule
+270 | |     /// wins, even if a later rule would be "better" or more specific.
+    | |______________________________________________________________________^
+...
+274 | /     let rules = vec![
+275 | |         make_rule("claude-.*", "claude-print"),
+276 | |         make_rule("claude-sonnet-.*", "claude-code-glm-4.7"),
+277 | |     ];
+    | |______- rustdoc does not generate documentation for statements
+    |
+    = help: use `//` for a plain comment
+
+warning: field `spawned_at` is never read
+  --> tests/tmux_fixture.rs:44:9
+   |
+36 | pub struct TmuxSession {
+   |            ----------- field in this struct
+...
+44 |     pub spawned_at: Instant,
+   |         ^^^^^^^^^^
+   |
+   = note: `TmuxSession` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `process_tree_pids` is never used
+   --> tests/tmux_fixture.rs:171:12
+    |
+ 47 | impl TmuxSession {
+    | ---------------- method in this implementation
+...
+171 |     pub fn process_tree_pids(&self) -> Result<Vec<u32>> {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `list_needle_sessions` is never used
+   --> tests/tmux_fixture.rs:254:8
+    |
+254 | pub fn list_needle_sessions() -> Vec<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: `needle` (test "routing_matcher_baseline") generated 7 warnings
+warning: unused variable: `global_routing`
+   --> tests/routing_integration.rs:737:9
+    |
+737 |     let global_routing = RoutingConfig {
+    |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_global_routing`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `global_routing`
+   --> tests/routing_integration.rs:797:9
+    |
+797 |     let global_routing = RoutingConfig {
+    |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_global_routing`
+
+warning: unused variable: `dispatcher`
+    --> tests/routing_integration.rs:1910:9
+     |
+1910 |     let dispatcher = make_test_dispatcher(vec![make_test_adapter(
+     |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dispatcher`
+
+warning: `needle` (test "cleanup_liveness_regression") generated 3 warnings
+error[E0046]: not all trait items implemented, missing: `clear_assignee`, `has_valid_store`
+   --> tests/otlp_integration.rs:468:1
+    |
+468 | impl BeadStore for MockStore {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `clear_assignee`, `has_valid_store` in implementation
+    |
+    = help: implement the missing item: `fn clear_assignee<'life0: 'async_trait, 'life1: 'async_trait, 'async_trait>(&'life0 self, _: &'life1 BeadId) -> Pin<Box<(dyn Future<Output = Result<(), anyhow::Error>> + Send + 'async_trait)>> { todo!() }`
+    = help: implement the missing item: `fn has_valid_store(&self) -> bool { todo!() }`
+
+error[E0063]: missing fields `harness` and `harness_version` in initializer of `AgentAdapter`
+   --> tests/otlp_integration.rs:612:5
+    |
+612 |     AgentAdapter {
+    |     ^^^^^^^^^^^^ missing `harness` and `harness_version`
+
+warning: `needle` (test "routing_integration") generated 3 warnings (run `cargo fix --test "routing_integration" -p needle` to apply 3 suggestions)
+Some errors have detailed explanations: E0046, E0063.
+For more information about an error, try `rustc --explain E0046`.
+error: could not compile `needle` (test "otlp_integration") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+=== Test suite completed at 2026-07-24T21:30:59-04:00 ===
