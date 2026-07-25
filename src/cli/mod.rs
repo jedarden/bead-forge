@@ -3660,8 +3660,3 @@ fn cmd_recent(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    pub use super::tests::{json_output, fixtures};
-}
-
