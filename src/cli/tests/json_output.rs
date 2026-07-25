@@ -658,6 +658,17 @@ pub mod capture {
 
         (stdout, stderr)
     }
+
+    /// Capture command output even when it fails (doesn't panic on error)
+    pub fn capture_failed_command(cmd: &mut Command) -> (String, String, bool) {
+        let output = cmd.output().expect("Failed to execute command");
+
+        let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+        let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
+        let success = output.status.success();
+
+        (stdout, stderr, success)
+    }
 }
 
 #[cfg(test)]
@@ -1490,6 +1501,89 @@ mod command_json_output_tests {
         assert_eq!(json_validation::get_string(issue_json, "id"), bead_id);
 
         fixtures::close_bead(&bead_id, "Envelope show test cleanup");
+    }
+
+    #[test]
+    fn test_show_command_json_nonexistent_bead() {
+        require_binary();
+
+        // Test with a bead ID that doesn't exist
+        let fake_bead_id = "bf-test-nonexistent-12345";
+
+        let (stdout, stderr, success) = capture::capture_failed_command(
+            bf_command()
+                .arg("show")
+                .arg(fake_bead_id)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Command should fail
+        assert!(!success, "show command should fail for non-existent bead");
+
+        // Stderr should contain error message
+        assert!(
+            stderr.contains("not found") || stderr.contains("Bead not found"),
+            "stderr should mention bead not found, got: {}",
+            stderr
+        );
+
+        // Stdout should be empty (no JSON output for errors)
+        assert!(
+            stdout.trim().is_empty(),
+            "stdout should be empty for non-existent bead, got: {}",
+            stdout
+        );
+    }
+
+    #[test]
+    fn test_show_command_json_all_required_fields() {
+        require_binary();
+
+        // Create a bead with various fields populated
+        let bead_id = fixtures::create_bead_with_labels(
+            "Test bead for all fields verification",
+            &["test-label", "priority-high"]
+        );
+
+        // Get JSON output
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("show")
+                .arg(&bead_id)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Parse JSON
+        let json_str = output.trim();
+        let parsed = json_validation::parse_json(json_str);
+        let array = parsed.as_array().expect("show output should be a JSON array");
+        let issue_json = &array[0];
+
+        // Verify all standard required fields are present
+        json_validation::assert_required_fields(
+            issue_json,
+            &["id", "title", "status", "priority", "issue_type", "assignee", "labels"],
+            "show command"
+        );
+
+        // Verify specific field values
+        assert_eq!(json_validation::get_string(issue_json, "id"), bead_id);
+        assert_eq!(json_validation::get_string(issue_json, "title"), "Test bead for all fields verification");
+
+        // Verify labels array
+        let labels = issue_json.get("labels")
+            .and_then(|v| v.as_array())
+            .expect("labels should be an array");
+        assert!(labels.len() >= 2, "should have at least 2 labels");
+
+        // Verify dependencies and comments are stripped (as per NEEDLE compatibility)
+        assert!(issue_json.get("dependencies").is_none(), "dependencies should be stripped from JSON output");
+        assert!(issue_json.get("comments").is_none(), "comments should be stripped from JSON output");
+
+        // Cleanup
+        fixtures::close_bead(&bead_id, "All fields test cleanup");
     }
 
     #[test]
