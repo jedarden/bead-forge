@@ -421,7 +421,6 @@ pub mod fixtures {
         let output = super::bf_command()
             .arg("dep")
             .arg("add")
-            .arg("--blocker")
             .arg(blocker)
             .arg("--blocks")
             .arg(blocked)
