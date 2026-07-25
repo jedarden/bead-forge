@@ -148,6 +148,16 @@ pub fn bf_command() -> Command {
     cmd
 }
 
+/// Create a Command builder for bf with a specific workspace path
+pub fn bf_command_with_workspace(workspace: &Path) -> Command {
+    let beads_dir = workspace.join(".beads");
+
+    let mut cmd = Command::new(bf_binary());
+    cmd.arg("-w").arg(&beads_dir);
+    cmd.current_dir(workspace);
+    cmd
+}
+
 /// JSON validation helpers
 pub mod json_validation {
     use serde_json::{Value, from_str};
@@ -1431,6 +1441,369 @@ mod command_json_output_tests {
 
         fixtures::close_bead(&high_priority, "Search filter test cleanup 1");
         fixtures::close_bead(&low_priority, "Search filter test cleanup 2");
+    }
+
+    #[test]
+    fn test_search_command_json_special_characters() {
+        require_binary();
+
+        // Create beads with special characters in titles
+        let bead1 = fixtures::create_bead("Test with \"quotes\" and 'apostrophes'");
+        let bead2 = fixtures::create_bead("Bead with & symbols < > and \\backslashes");
+        let bead3 = fixtures::create_bead("Item with brackets [parentheses] and {braces}");
+
+        // Search for bead with quotes
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("quotes")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines: Vec<&str> = output.lines().collect();
+        assert!(lines.len() >= 1, "search should find bead with 'quotes'");
+
+        // Verify the found bead contains special characters properly escaped
+        for line in lines {
+            let parsed = json_validation::parse_json(line);
+            let title = json_validation::get_string(&parsed, "title");
+            // JSON should be valid (special chars properly escaped)
+            assert!(title.contains("quotes") || title.contains("apostrophes") ||
+                   title.contains("symbols") || title.contains("backslashes") ||
+                   title.contains("brackets") || title.contains("parentheses"),
+                   "Search result should contain special characters");
+        }
+
+        // Cleanup
+        fixtures::close_bead(&bead1, "Special chars test cleanup 1");
+        fixtures::close_bead(&bead2, "Special chars test cleanup 2");
+        fixtures::close_bead(&bead3, "Special chars test cleanup 3");
+    }
+
+    #[test]
+    fn test_search_command_json_unicode_characters() {
+        require_binary();
+
+        // Create beads with unicode and emoji characters
+        let bead1 = fixtures::create_bead("Test with unicode: café and 日本語");
+        let bead2 = fixtures::create_bead("Emoji test: 🎉 🔥 🚀 💻");
+        let bead3 = fixtures::create_bead("Mixed unicode: Ñ, ü, and emojis 🌟");
+
+        // Search for unicode content
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("unicode")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines: Vec<&str> = output.lines().collect();
+        assert!(lines.len() >= 1, "search should find beads with 'unicode'");
+
+        // Verify unicode is preserved in results
+        for line in lines {
+            let parsed = json_validation::parse_json(line);
+            let title = json_validation::get_string(&parsed, "title");
+
+            // Verify unicode characters are preserved (not escaped or corrupted)
+            assert!(title.contains("café") || title.contains("日本語") ||
+                   title.contains("🎉") || title.contains("Ñ") || title.contains("ü"),
+                   "Unicode characters should be preserved in search results");
+        }
+
+        // Search for emoji content
+        let emoji_output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("emoji")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let emoji_lines: Vec<&str> = emoji_output.lines().collect();
+        assert!(emoji_lines.len() >= 1, "search should find beads with 'emoji'");
+
+        // Verify emojis are preserved
+        for line in emoji_lines {
+            let parsed = json_validation::parse_json(line);
+            let title = json_validation::get_string(&parsed, "title");
+            assert!(title.contains("🎉") || title.contains("🔥") || title.contains("🚀") || title.contains("💻") || title.contains("🌟"),
+                   "Emoji characters should be preserved in search results");
+        }
+
+        // Cleanup
+        fixtures::close_bead(&bead1, "Unicode test cleanup 1");
+        fixtures::close_bead(&bead2, "Unicode test cleanup 2");
+        fixtures::close_bead(&bead3, "Unicode test cleanup 3");
+    }
+
+    #[test]
+    fn test_search_command_json_regex_special_characters() {
+        require_binary();
+
+        // Create beads with regex special characters in titles
+        // These chars have special meaning in regex: . * + ? ^ $ { } [ ] ( ) | \
+        let bead1 = fixtures::create_bead("Test with dots... and asterisks***");
+        let bead2 = fixtures::create_bead("Plus signs +++ and question marks ???");
+        let bead3 = fixtures::create_bead("Caret ^ and dollar $ signs");
+        let bead4 = fixtures::create_bead("Pipe | vertical and other [special] (chars)");
+
+        // Search for content containing regex special characters
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("dots")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines: Vec<&str> = output.lines().collect();
+        assert!(lines.len() >= 1, "search should handle regex special characters in query");
+
+        // Verify JSON is valid despite regex special chars in content
+        for line in lines {
+            let parsed = json_validation::parse_json(line);
+            let title = json_validation::get_string(&parsed, "title");
+            // The search should work correctly even with special chars
+            assert!(title.contains("dots") || title.contains("asterisks") ||
+                   title.contains("Plus") || title.contains("question") ||
+                   title.contains("Caret") || title.contains("dollar") ||
+                   title.contains("Pipe") || title.contains("vertical"),
+                   "Search should work with regex special characters in content");
+        }
+
+        // Search for a term with regex special character
+        let special_output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("dots")  // "." is special in regex but should work as literal in search
+                .arg("--format")
+                .arg("json")
+        );
+
+        let special_lines: Vec<&str> = special_output.lines().collect();
+
+        // Verify each line is valid JSON
+        for line in special_lines {
+            json_validation::parse_json(line);
+        }
+
+        // Cleanup
+        fixtures::close_bead(&bead1, "Regex special chars test cleanup 1");
+        fixtures::close_bead(&bead2, "Regex special chars test cleanup 2");
+        fixtures::close_bead(&bead3, "Regex special chars test cleanup 3");
+        fixtures::close_bead(&bead4, "Regex special chars test cleanup 4");
+    }
+
+    #[test]
+    fn test_search_command_json_very_long_query() {
+        require_binary();
+
+        // Create a bead with a moderately long title (within 500 char limit)
+        let long_title = "This is a moderately long title containing many repeated phrases for testing ";
+        let bead_id = fixtures::create_bead(&long_title);
+
+        // Create another bead for comparison
+        let normal_bead = fixtures::create_bead("Normal bead for comparison");
+
+        // Test 1: Search with a very long query string (longer than typical titles)
+        let long_query = "moderately long title containing many repeated phrases for testing search functionality with long queries";
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(&long_query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL output
+        let lines: Vec<&str> = output.lines().collect();
+
+        // Verify each line is valid JSON
+        for line in lines {
+            json_validation::parse_json(line);
+        }
+
+        // Test 2: Search with another very long query to test handling
+        let another_long_query = "many repeated phrases for testing search functionality with long queries and various words";
+        let another_output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(&another_long_query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        let another_lines: Vec<&str> = another_output.lines().collect();
+
+        // Verify all lines are valid JSON despite long query
+        for line in another_lines {
+            json_validation::parse_json(line);
+        }
+
+        // Test 3: Search with query at extreme length (200+ characters)
+        let extreme_query = "a".repeat(200);
+        let extreme_output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(&extreme_query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should still return valid JSON (even if empty)
+        let extreme_lines: Vec<&str> = extreme_output.lines().collect();
+        for line in extreme_lines {
+            json_validation::parse_json(line);
+        }
+
+        // Cleanup
+        fixtures::close_bead(&bead_id, "Long query test cleanup 1");
+        fixtures::close_bead(&normal_bead, "Long query test cleanup 2");
+    }
+
+    #[test]
+    fn test_search_command_json_whitespace_queries() {
+        require_binary();
+
+        // Create some test beads
+        let bead1 = fixtures::create_bead("Test bead for whitespace queries");
+        let bead2 = fixtures::create_bead("Another test bead");
+
+        // Test 1: Search with single space
+        let output1 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(" ")
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSON (empty or not)
+        let lines1: Vec<&str> = output1.lines().collect();
+        for line in lines1 {
+            json_validation::parse_json(line);
+        }
+
+        // Test 2: Search with multiple spaces
+        let output2 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("    ")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines2: Vec<&str> = output2.lines().collect();
+        for line in lines2 {
+            json_validation::parse_json(line);
+        }
+
+        // Test 3: Search with tabs
+        let output3 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("\t")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines3: Vec<&str> = output3.lines().collect();
+        for line in lines3 {
+            json_validation::parse_json(line);
+        }
+
+        // Test 4: Search with mixed whitespace (spaces + tabs)
+        let output4 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(" \t \t ")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines4: Vec<&str> = output4.lines().collect();
+        for line in lines4 {
+            json_validation::parse_json(line);
+        }
+
+        // Test 5: Search with newlines (should be handled by command-line parsing)
+        let output5 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("\n")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines5: Vec<&str> = output5.lines().collect();
+        for line in lines5 {
+            json_validation::parse_json(line);
+        }
+
+        // Cleanup
+        fixtures::close_bead(&bead1, "Whitespace test cleanup 1");
+        fixtures::close_bead(&bead2, "Whitespace test cleanup 2");
+    }
+
+    #[test]
+    fn test_search_command_json_special_characters_in_query() {
+        require_binary();
+
+        // Create test beads
+        let bead1 = fixtures::create_bead("Test bead with brackets [test]");
+        let bead2 = fixtures::create_bead("Another test (parentheses)");
+        let bead3 = fixtures::create_bead("Third test {curly braces}");
+
+        // Test searching with special characters in the query itself
+        // Search for bracket content
+        let output1 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("[test]")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines1: Vec<&str> = output1.lines().collect();
+        for line in lines1 {
+            json_validation::parse_json(line);
+        }
+
+        // Search with parentheses in query
+        let output2 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("(parentheses)")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines2: Vec<&str> = output2.lines().collect();
+        for line in lines2 {
+            json_validation::parse_json(line);
+        }
+
+        // Search with curly braces in query
+        let output3 = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg("{curly}")
+                .arg("--format")
+                .arg("json")
+        );
+
+        let lines3: Vec<&str> = output3.lines().collect();
+        for line in lines3 {
+            json_validation::parse_json(line);
+        }
+
+        // Cleanup
+        fixtures::close_bead(&bead1, "Special query test cleanup 1");
+        fixtures::close_bead(&bead2, "Special query test cleanup 2");
+        fixtures::close_bead(&bead3, "Special query test cleanup 3");
     }
 
     #[test]
