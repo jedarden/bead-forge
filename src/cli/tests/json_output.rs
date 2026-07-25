@@ -8,6 +8,77 @@
 //! - CLI output capture and assertion
 //! - Envelope wrapping validation
 //! - JSONL (JSON Lines) format validation
+//!
+//! ## Test Pattern Guidelines
+//!
+//! ### 1. Basic JSON Structure Testing
+//! ```rust
+//! // Parse and validate JSON structure
+//! let json = json_validation::parse_json(output);
+//! json_validation::assert_required_fields(&json, &["id", "title", "status"], "show command");
+//! ```
+//!
+//! ### 2. Format Detection and Validation
+//! ```rust
+//! // Detect JSON output format (SingleObject, Array, JsonL, Empty, EmptyArray)
+//! format_detection::assert_format(output, format_detection::JsonFormat::JsonL);
+//!
+//! // Validate JSONL (common for list/ready/search commands)
+//! format_detection::is_valid_jsonl(output);
+//! ```
+//!
+//! ### 3. Envelope Validation (for commands that wrap output)
+//! ```rust
+//! // Validate envelope structure: {version: 1, kind: "<command>", data: {...}}
+//! let envelope = envelope::validate_envelope(output, "create");
+//! let data = envelope::get_envelope_data(&envelope);
+//! if envelope::has_warning(&envelope) {
+//!     let warning = envelope::get_warning(&envelope);
+//! }
+//! ```
+//!
+//! ### 4. Using Test Fixtures
+//! ```rust
+//! // Create test beads with various properties
+//! let bead_id = fixtures::create_bead("Test bead");
+//! let bead_id = fixtures::create_bead_with_labels("Feature", &["enhancement", "ui"]);
+//! let bead_id = fixtures::create_bead_with_assignee("Bug", "alice");
+//!
+//! // Use pre-defined special character test data
+//! let bead_id = fixtures::create_bead(fixtures::SPECIAL_CHARACTERS_TITLE);
+//! ```
+//!
+//! ### 5. Command Execution and Output Capture
+//! ```rust
+//! // Capture stdout from a command
+//! let output = capture::capture_stdout(
+//!     bf_command().arg("show").arg(bead_id).arg("--format").arg("json")
+//! );
+//!
+//! // Capture both stdout and stderr
+//! let (stdout, stderr) = capture::capture_both(
+//!     bf_command().arg("list").arg("--format").arg("json")
+//! );
+//! ```
+//!
+//! ### 6. Special Characters and Edge Cases
+//! Always test with special characters to ensure proper JSON escaping:
+//! - Quotes and apostrophes: `fixtures::SPECIAL_CHARACTERS_TITLE`
+//! - Unicode/emoji: `fixtures::UNICODE_TITLE`
+//! - Long titles: `fixtures::LONG_TITLE`
+//! - JSON-like content: `fixtures::JSON_LIKE_TITLE`
+//!
+//! ## Command-specific JSON Output Formats
+//!
+//! | Command | Format | Description |
+//! |---------|--------|-------------|
+//! | `show` | `[{...}]` | Single bead wrapped in array |
+//! | `list` | JSONL | Multiple beads, newline-delimited |
+//! | `search` | JSONL | Search results, newline-delimited |
+//! | `ready` | JSONL | Unblocked beads, newline-delimited |
+//! | `recent` | Envelope | Recent beads with envelope wrapping |
+//! | `claim` | Object | Single object with bead_id field |
+//! | `create` | String | Bead ID only (plain text) |
 
 use std::process::Command;
 use std::sync::OnceLock;
@@ -40,8 +111,30 @@ pub fn test_workspace() -> &'static Path {
 
 /// Get the path to the bf binary, preferring CARGO_BIN_EXE for test consistency
 pub fn bf_binary() -> String {
-    std::env::var("CARGO_BIN_EXE_bf")
-        .unwrap_or_else(|_| "./target/debug/bf".to_string())
+    // Try CARGO_BIN_EXE_bf first (set by cargo when running integration tests)
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_bf") {
+        return path;
+    }
+
+    // Fallback: resolve absolute path from current directory or from this file's location
+    // First try relative to current working directory (for manual `cargo test --lib` runs)
+    let relative_path = "./target/debug/bf";
+    if let Ok(abs_path) = std::fs::canonicalize(relative_path) {
+        return abs_path.to_string_lossy().to_string();
+    }
+
+    // Second try relative to this file's location (for cargo test runs from workspace root)
+    let this_file = std::file!();
+    let this_dir = std::path::Path::new(this_file).parent().unwrap();
+    let cargo_toml_dir = this_dir.ancestors().find(|d| d.join("Cargo.toml").exists()).unwrap_or(this_dir);
+    let bin_path = cargo_toml_dir.join("target").join("debug").join("bf");
+
+    if let Ok(abs_path) = std::fs::canonicalize(&bin_path) {
+        return abs_path.to_string_lossy().to_string();
+    }
+
+    // Last resort: return the path and let the error surface at call site
+    bin_path.to_string_lossy().to_string()
 }
 
 /// Create a Command builder for bf with workspace already configured
@@ -174,9 +267,59 @@ pub mod json_validation {
     }
 }
 
-/// Test fixture creation helpers
+/// Test fixture data and creation helpers
+///
+/// This module provides:
+/// - Ready-to-use test data constants for edge cases (special characters, unicode, etc.)
+/// - Helper functions to programmatically create test beads with specific properties
+///
+/// ## Usage patterns
+///
+/// ```rust
+/// // Use pre-defined special character test data
+/// let title = fixtures::SPECIAL_CHARACTERS_TITLE;
+/// let bead_id = fixtures::create_bead(title);
+///
+/// // Create beads with specific properties
+/// let bead_id = fixtures::create_bead_with_labels("My bead", &["bug", "urgent"]);
+/// let bead_id = fixtures::create_bead_with_assignee("My bead", "alice");
+/// ```
 pub mod fixtures {
     use std::process::Command;
+
+    // ============================================================
+    // Test fixture data constants - ready-to-use for edge cases
+    // ============================================================
+
+    /// Test data: Title with special characters that need escaping in JSON
+    pub const SPECIAL_CHARACTERS_TITLE: &str =
+        r#"Test with "quotes", 'apostrophes', & symbols <>, and \backslashes\"#;
+
+    /// Test data: Unicode and emoji characters
+    pub const UNICODE_TITLE: &str = "Test with unicode: café, 日本語, emojis 🎉 🔥";
+
+    /// Test data: Newlines and tabs (should be properly escaped in JSON)
+    pub const WHITESPACE_TITLE: &str = "Test with\nnewline\tand\ttabs";
+
+    /// Test data: Very long title (testing field length limits)
+    pub const LONG_TITLE: &str =
+        "This is a very long title that exceeds the normal length and tests field limits and truncation behavior in JSON output ";
+
+    /// Test data: Title with JSON-like content
+    pub const JSON_LIKE_TITLE: &str = r#"Title with {"json": "like"} content [1,2,3]"#;
+
+    /// Test data: Empty title (edge case)
+    pub const EMPTY_TITLE: &str = "";
+
+    /// Test data: Labels with special characters
+    pub const SPECIAL_LABELS: &[&str] = &["bug/urgent", "feature-request", "ci&cd", "test>fix"];
+
+    /// Test data: Assignee with special characters
+    pub const SPECIAL_ASSIGNEE: &str = "user@example.com";
+
+    /// ============================================================
+    // Fixture creation helpers
+    // ============================================================
 
     /// Create a test bead with the given title
     pub fn create_bead(title: &str) -> String {
@@ -826,14 +969,13 @@ mod command_json_output_tests {
         assert!(json.get("title").is_some(), "{}: Missing 'title' field", context);
         assert!(json.get("status").is_some(), "{}: Missing 'status' field", context);
         assert!(json.get("priority").is_some(), "{}: Missing 'priority' field", context);
-        assert!(json.get("type").is_some(), "{}: Missing 'type' field", context);
+        assert!(json.get("issue_type").is_some(), "{}: Missing 'issue_type' field", context);
         // These should always be present even if null/empty (display normalization)
         assert!(json.get("assignee").is_some(), "{}: Missing 'assignee' field", context);
         assert!(json.get("labels").is_some(), "{}: Missing 'labels' field", context);
     }
 
     #[test]
-    #[ignore]
     fn test_show_command_json_structure() {
         require_binary();
 
@@ -868,7 +1010,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_show_command_json_special_characters() {
         require_binary();
 
@@ -899,7 +1040,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_show_command_json_empty_dependencies_comments() {
         require_binary();
 
@@ -926,7 +1066,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_list_command_json_structure() {
         require_binary();
 
@@ -960,7 +1099,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_list_command_json_empty_results() {
         require_binary();
 
@@ -980,7 +1118,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_list_command_json_filters() {
         require_binary();
 
@@ -1011,7 +1148,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_list_command_json_ensure_fields_present() {
         require_binary();
 
@@ -1041,7 +1177,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_search_command_json_structure() {
         require_binary();
 
@@ -1074,7 +1209,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_search_command_json_empty_results() {
         require_binary();
 
@@ -1093,7 +1227,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_search_command_json_with_filters() {
         require_binary();
 
@@ -1128,7 +1261,6 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_ready_command_json_structure() {
         require_binary();
 
@@ -1162,23 +1294,58 @@ mod command_json_output_tests {
     }
 
     #[test]
-    #[ignore]
     fn test_ready_command_json_empty_results() {
         require_binary();
 
-        // If all beads are blocked or closed, ready should return []
-        let output = capture::capture_stdout(
-            bf_command()
-                .arg("ready")
-                .arg("--limit")
-                .arg("0")
-                .arg("--format")
-                .arg("json")
-        );
+        // Create an isolated temporary workspace for this test
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let workspace = temp_dir.path();
+        let beads_dir = workspace.join(".beads");
+        std::fs::create_dir(&beads_dir).expect("Failed to create .beads directory");
 
-        let trimmed = output.trim();
+        // Initialize the isolated workspace
+        crate::config::init_workspace(&beads_dir, "bf-test-empty")
+            .expect("Failed to initialize test workspace");
+
+        let metadata = crate::config::load_metadata(&beads_dir)
+            .expect("Failed to load metadata");
+        let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
+            .expect("Failed to create database");
+
+        // Create and close a bead so there are no ready candidates
+        let mut cmd = Command::new(bf_binary());
+        cmd.arg("-w").arg(&beads_dir)
+            .arg("create")
+            .arg("--title")
+            .arg("Bead to close")
+            .arg("--type")
+            .arg("task")
+            .arg("--priority")
+            .arg("2");
+        let output = cmd.output().expect("Failed to execute bf create");
+        let bead_id = String::from_utf8(output.stdout).expect("Invalid UTF-8").trim().to_string();
+
+        // Close the bead
+        let mut cmd = Command::new(bf_binary());
+        cmd.arg("-w").arg(&beads_dir)
+            .arg("close")
+            .arg(&bead_id)
+            .arg("--reason")
+            .arg("Test close - no ready beads");
+        let _ = cmd.output().expect("Failed to execute bf close");
+
+        // With all beads closed, ready should return []
+        let mut cmd = Command::new(bf_binary());
+        cmd.arg("-w").arg(&beads_dir)
+            .arg("ready")
+            .arg("--format")
+            .arg("json");
+        let output = cmd.output().expect("Failed to execute bf ready");
+        let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+
+        let trimmed = stdout.trim();
         // Empty ready returns "[]" (special case in cmd_ready)
-        assert!(trimmed == "[]" || trimmed.is_empty(), "Empty ready should return '[]' or empty string");
+        assert_eq!(trimmed, "[]", "Empty ready should return '[]'");
     }
 
     #[test]
