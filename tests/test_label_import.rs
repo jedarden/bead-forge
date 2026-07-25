@@ -931,8 +931,12 @@ fn test_label_multiple_import_cycles() {
         let conn = storage2.conn.lock().unwrap();
 
         // Check total label count in database
-        let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
-        let total_labels: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+        let total_labels: i64 = {
+            let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
+            let count = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+            drop(stmt);
+            count
+        };
 
         let expected_total: usize = test_issues.iter().map(|issue| issue.labels.len()).sum();
 
@@ -946,31 +950,36 @@ fn test_label_multiple_import_cycles() {
 
         // Verify no duplicate labels for any issue
         for issue in &test_issues {
-            let mut stmt = conn
-                .prepare(&format!(
-                    "SELECT COUNT(DISTINCT label) FROM bead_labels WHERE bead_id = '{}'",
-                    issue.id
-                ))
-                .unwrap();
-            let distinct_count: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+            {
+                let mut stmt = conn
+                    .prepare(&format!(
+                        "SELECT COUNT(DISTINCT label) FROM bead_labels WHERE bead_id = '{}'",
+                        issue.id
+                    ))
+                    .unwrap();
+                let distinct_count: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
 
-            let mut stmt2 = conn
-                .prepare(&format!(
-                    "SELECT COUNT(*) FROM bead_labels WHERE bead_id = '{}'",
-                    issue.id
-                ))
-                .unwrap();
-            let total_count: i64 = stmt2.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+                let mut stmt2 = conn
+                    .prepare(&format!(
+                        "SELECT COUNT(*) FROM bead_labels WHERE bead_id = '{}'",
+                        issue.id
+                    ))
+                    .unwrap();
+                let total_count: i64 = stmt2.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
 
-            assert_eq!(
-                distinct_count,
-                total_count,
-                "Cycle {}: Issue {} should have no duplicate labels (distinct: {}, total: {})",
-                cycle + 1,
-                issue.id,
-                distinct_count,
-                total_count
-            );
+                assert_eq!(
+                    distinct_count,
+                    total_count,
+                    "Cycle {}: Issue {} should have no duplicate labels (distinct: {}, total: {})",
+                    cycle + 1,
+                    issue.id,
+                    distinct_count,
+                    total_count
+                );
+                // Explicitly drop statements to release borrows on conn
+                drop(stmt2);
+                drop(stmt);
+            }
         }
 
         drop(conn);
