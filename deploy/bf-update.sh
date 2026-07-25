@@ -44,10 +44,26 @@ BIN_DIR="$HOME/.local/bin"
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
+# Token configuration for GitHub API authentication (optional)
+# See deploy/README.md "GitHub API Authentication" for details
+: "${BF_GITHUB_TOKEN_FILE:=$HOME/.config/bf-update/github-token}"
+
+# Read token from environment or file
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+if [[ -z "$GITHUB_TOKEN" ]] && [[ -f "$BF_GITHUB_TOKEN_FILE" ]]; then
+    GITHUB_TOKEN=$(cat "$BF_GITHUB_TOKEN_FILE" 2>/dev/null || echo "")
+fi
+
+# Build curl args: add Authorization header if we have a token
+CURL_ARGS=(-s)
+if [[ -n "$GITHUB_TOKEN" ]]; then
+    CURL_ARGS=(-s -H "Authorization: Bearer $GITHUB_TOKEN")
+fi
+
 echo "Checking for new bead-forge releases..."
 
-# Get the latest release tag from GitHub API
-LATEST_RELEASE=$(curl -s https://api.github.com/repos/jedarden/bead-forge/releases/latest | jq -r .tag_name)
+# Get the latest release tag from GitHub API (with optional authentication)
+LATEST_RELEASE=$(curl "${CURL_ARGS[@]}" https://api.github.com/repos/jedarden/bead-forge/releases/latest | jq -r .tag_name)
 CURRENT_VERSION="unknown"
 
 if [[ -f "$BIN_DIR/bf" ]]; then
@@ -82,7 +98,7 @@ fi
 echo "Downloading bf-linux-x86_64 from release $LATEST_RELEASE..."
 
 # Fetch the release manifest once and extract both asset URLs (binary + checksums)
-RELEASE_JSON=$(curl -s "https://api.github.com/repos/jedarden/bead-forge/releases/latest")
+RELEASE_JSON=$(curl "${CURL_ARGS[@]}" "https://api.github.com/repos/jedarden/bead-forge/releases/latest")
 DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "bf-linux-x86_64") | .browser_download_url')
 SUMS_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "SHA256SUMS") | .browser_download_url')
 
