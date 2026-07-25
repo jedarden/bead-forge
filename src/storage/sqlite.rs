@@ -1529,15 +1529,29 @@ impl Storage {
             params.push(format!("%{}%", q));
             param_idx += 2;
         }
-        for s in status {
-            sql.push_str(&format!(" AND i.status = ?{}", param_idx));
-            params.push(s.to_string());
-            param_idx += 1;
+        if !status.is_empty() {
+            let status_conditions: Vec<String> = status
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("i.status = ?{}", param_idx + i))
+                .collect();
+            sql.push_str(&format!(" AND ({}) ", status_conditions.join(" OR ")));
+            for s in status {
+                params.push(s.to_string());
+                param_idx += 1;
+            }
         }
-        for t in issue_type {
-            sql.push_str(&format!(" AND i.issue_type = ?{}", param_idx));
-            params.push(t.to_string());
-            param_idx += 1;
+        if !issue_type.is_empty() {
+            let type_conditions: Vec<String> = issue_type
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("i.issue_type = ?{}", param_idx + i))
+                .collect();
+            sql.push_str(&format!(" AND ({}) ", type_conditions.join(" OR ")));
+            for t in issue_type {
+                params.push(t.to_string());
+                param_idx += 1;
+            }
         }
         if let Some(a) = assignee {
             sql.push_str(&format!(" AND i.assignee = ?{}", param_idx));
