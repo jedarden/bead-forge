@@ -344,7 +344,7 @@ fn test_label_order_preservation_across_import_cycles() {
     let bead = create_bead_with_label_slices(
         "bf-order",
         "Order Test",
-        vec!["zebra", "alpha", "middle", "beta", "gamma"]
+        &vec!["zebra", "alpha", "middle", "beta", "gamma"]
     );
     storage.create_issue(&bead).expect("Failed to create bead");
 

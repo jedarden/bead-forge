@@ -1657,10 +1657,8 @@ fn cmd_list(
                 };
                 println!("{}", formatter.format_with_envelope("list", &data));
             } else {
-                // Raw JSONL output; empty list prints []
-                if jsonl.is_empty() {
-                    println!("[]");
-                } else {
+                // Raw JSONL output; empty list prints nothing (unlike ready, which prints [])
+                if !jsonl.is_empty() {
                     println!("{}", jsonl);
                 }
             }
