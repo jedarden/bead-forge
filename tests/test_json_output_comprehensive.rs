@@ -339,6 +339,57 @@ fn test_list_json_with_labels() {
     assert!(labels.contains(&"backend"));
 }
 
+#[test]
+fn test_list_json_flag_alias() {
+    let (_temp, workspace) = setup();
+
+    let bead_id = create_bead(&workspace, "JSON flag test bead");
+
+    // Test that --json flag works identically to --format json
+    let (out, err, ok) = run_bf(&workspace, &["list", "--json"]);
+    assert!(ok, "list --json failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert_eq!(parsed.len(), 1, "Should have exactly one bead");
+    assert_eq!(get_string(&parsed[0], "id"), bead_id);
+}
+
+#[test]
+fn test_list_json_flag_empty_results() {
+    let (_temp, workspace) = setup();
+
+    // Create a bead and close it
+    let bead_id = create_bead(&workspace, "Closed bead");
+    close_bead(&workspace, &bead_id, "Test");
+
+    // List only open beads (should be empty)
+    let (out, err, ok) = run_bf(&workspace, &["list", "--status", "in_progress", "--json"]);
+    assert!(ok, "list --json with no results failed: {err}");
+
+    // Empty list returns "[]"
+    assert_eq!(out.trim(), "[]", "Empty list with --json should return []");
+}
+
+#[test]
+fn test_list_json_flag_multiple_items() {
+    let (_temp, workspace) = setup();
+
+    let bead1 = create_bead(&workspace, "JSON flag bead 1");
+    let bead2 = create_bead(&workspace, "JSON flag bead 2");
+    let bead3 = create_bead(&workspace, "JSON flag bead 3");
+
+    let (out, err, ok) = run_bf(&workspace, &["list", "--json"]);
+    assert!(ok, "list --json failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert_eq!(parsed.len(), 3, "Should have exactly three beads");
+
+    let ids: Vec<String> = parsed.iter().map(|b| get_string(b, "id")).collect();
+    assert!(ids.contains(&bead1));
+    assert!(ids.contains(&bead2));
+    assert!(ids.contains(&bead3));
+}
+
 // ============================================================================
 // READY COMMAND TESTS
 // ============================================================================
@@ -434,6 +485,63 @@ fn test_ready_json_with_limit() {
 
     let parsed = parse_jsonl(&out);
     assert_eq!(parsed.len(), 2, "Should have exactly two ready beads");
+}
+
+#[test]
+fn test_ready_json_flag_alias() {
+    let (_temp, workspace) = setup();
+
+    let bead_id = create_bead(&workspace, "Ready JSON flag bead");
+
+    // Test that --json flag works identically to --format json
+    let (out, err, ok) = run_bf(&workspace, &["ready", "--json"]);
+    assert!(ok, "ready --json failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert_eq!(parsed.len(), 1, "Should have exactly one ready bead");
+    assert_eq!(get_string(&parsed[0], "id"), bead_id);
+}
+
+#[test]
+fn test_ready_json_flag_empty_results() {
+    let (_temp, workspace) = setup();
+
+    // Create a workspace where all beads are blocked
+    let blocker_id = create_bead(&workspace, "Blocker");
+    let blocked_id = create_bead(&workspace, "Blocked");
+
+    add_dependency(&workspace, &blocked_id, &blocker_id);
+
+    // Close all beads to have no ready beads
+    close_bead(&workspace, &blocker_id, "Done");
+    close_bead(&workspace, &blocked_id, "Done");
+
+    let (out, err, ok) = run_bf(&workspace, &["ready", "--json"]);
+    assert!(ok, "ready --json failed: {err}");
+
+    // When there are no ready beads, ready returns []
+    let trimmed = out.trim();
+    assert_eq!(trimmed, "[]", "Empty ready with --json should return []");
+}
+
+#[test]
+fn test_ready_json_flag_multiple_items() {
+    let (_temp, workspace) = setup();
+
+    let bead1 = create_bead(&workspace, "Ready JSON flag 1");
+    let bead2 = create_bead(&workspace, "Ready JSON flag 2");
+    let bead3 = create_bead(&workspace, "Ready JSON flag 3");
+
+    let (out, err, ok) = run_bf(&workspace, &["ready", "--json"]);
+    assert!(ok, "ready --json failed: {err}");
+
+    let parsed = parse_jsonl(&out);
+    assert_eq!(parsed.len(), 3, "Should have exactly three ready beads");
+
+    let ids: Vec<String> = parsed.iter().map(|b| get_string(b, "id")).collect();
+    assert!(ids.contains(&bead1));
+    assert!(ids.contains(&bead2));
+    assert!(ids.contains(&bead3));
 }
 
 // ============================================================================
