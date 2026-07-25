@@ -1448,32 +1448,45 @@ mod command_json_output_tests {
         require_binary();
 
         // Create beads with special characters in titles
-        let bead1 = fixtures::create_bead("Test with \"quotes\" and 'apostrophes'");
-        let bead2 = fixtures::create_bead("Bead with & symbols < > and \\backslashes");
-        let bead3 = fixtures::create_bead("Item with brackets [parentheses] and {braces}");
+        // Use unique prefixes to avoid conflicts with other tests
+        let bead1 = fixtures::create_bead("bf-2to9f2-special-1: Test with \"quotes\" and 'apostrophes'");
+        let bead2 = fixtures::create_bead("bf-2to9f2-special-2: Bead with & symbols < > and \\backslashes");
+        let bead3 = fixtures::create_bead("bf-2to9f2-special-3: Item with brackets [parentheses] and {braces}");
 
-        // Search for bead with quotes
+        // Search for beads with our unique prefix to ensure we only get our test beads
         let output = capture::capture_stdout(
             bf_command()
                 .arg("search")
-                .arg("quotes")
+                .arg("bf-2to9f2-special")
                 .arg("--format")
                 .arg("json")
         );
 
         let lines: Vec<&str> = output.lines().collect();
-        assert!(lines.len() >= 1, "search should find bead with 'quotes'");
+        assert!(lines.len() >= 3, "search should find all three beads with 'bf-2to9f2-special' prefix");
 
-        // Verify the found bead contains special characters properly escaped
+        // Verify the found beads contain special characters properly escaped
+        let mut found_quotes = false;
+        let mut found_symbols = false;
+        let mut found_brackets = false;
+
         for line in lines {
             let parsed = json_validation::parse_json(line);
             let title = json_validation::get_string(&parsed, "title");
             // JSON should be valid (special chars properly escaped)
-            assert!(title.contains("quotes") || title.contains("apostrophes") ||
-                   title.contains("symbols") || title.contains("backslashes") ||
-                   title.contains("brackets") || title.contains("parentheses"),
-                   "Search result should contain special characters");
+            if title.contains("quotes") || title.contains("apostrophes") {
+                found_quotes = true;
+            }
+            if title.contains("symbols") || title.contains("backslashes") {
+                found_symbols = true;
+            }
+            if title.contains("brackets") || title.contains("parentheses") {
+                found_brackets = true;
+            }
         }
+
+        assert!(found_quotes && found_symbols && found_brackets,
+               "Search should find beads with quotes, symbols, and brackets");
 
         // Cleanup
         fixtures::close_bead(&bead1, "Special chars test cleanup 1");
@@ -1486,32 +1499,46 @@ mod command_json_output_tests {
         require_binary();
 
         // Create beads with unicode and emoji characters
-        let bead1 = fixtures::create_bead("Test with unicode: café and 日本語");
-        let bead2 = fixtures::create_bead("Emoji test: 🎉 🔥 🚀 💻");
-        let bead3 = fixtures::create_bead("Mixed unicode: Ñ, ü, and emojis 🌟");
+        // Use unique prefixes to avoid conflicts with other tests
+        let bead1 = fixtures::create_bead("bf-2to9f2-unicode-1: Test with unicode: café and 日本語");
+        let bead2 = fixtures::create_bead("bf-2to9f2-unicode-2: Emoji test: 🎉 🔥 🚀 💻");
+        let bead3 = fixtures::create_bead("bf-2to9f2-unicode-3: Mixed unicode: Ñ, ü, and emojis 🌟");
 
-        // Search for unicode content
+        // Search for unicode content with our unique prefix
         let output = capture::capture_stdout(
             bf_command()
                 .arg("search")
-                .arg("unicode")
+                .arg("bf-2to9f2-unicode")
                 .arg("--format")
                 .arg("json")
         );
 
         let lines: Vec<&str> = output.lines().collect();
-        assert!(lines.len() >= 1, "search should find beads with 'unicode'");
+        assert!(lines.len() >= 3, "search should find all three beads with 'bf-2to9f2-unicode' prefix");
 
         // Verify unicode is preserved in results
+        let mut found_cafe = false;
+        let mut found_emoji = false;
+        let mut found_mixed = false;
+
         for line in lines {
             let parsed = json_validation::parse_json(line);
             let title = json_validation::get_string(&parsed, "title");
 
             // Verify unicode characters are preserved (not escaped or corrupted)
-            assert!(title.contains("café") || title.contains("日本語") ||
-                   title.contains("🎉") || title.contains("Ñ") || title.contains("ü"),
-                   "Unicode characters should be preserved in search results");
+            if title.contains("café") || title.contains("日本語") {
+                found_cafe = true;
+            }
+            if title.contains("🎉") || title.contains("🔥") {
+                found_emoji = true;
+            }
+            if title.contains("Ñ") || title.contains("ü") {
+                found_mixed = true;
+            }
         }
+
+        assert!(found_cafe && found_emoji && found_mixed,
+               "Search should find beads with café, emoji, and mixed unicode");
 
         // Search for emoji content
         let emoji_output = capture::capture_stdout(
