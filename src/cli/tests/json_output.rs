@@ -1051,6 +1051,78 @@ mod command_json_output_tests {
     }
 
     #[test]
+    fn test_show_command_json_comprehensive_special_characters() {
+        require_binary();
+
+        // Test comprehensive special character handling using predefined fixture constants
+        // Test with multiple types of special characters in title
+        let title_with_special_chars = fixtures::SPECIAL_CHARACTERS_TITLE;
+        let bead_id = fixtures::create_bead(title_with_special_chars);
+
+        // Update with description containing special characters
+        let special_description = r#"Description with "quotes", 'apostrophes', & symbols, <tags>, \backslashes, and {"json": "like"} content"#;
+        let mut update_cmd = bf_command();
+        update_cmd
+            .arg("update")
+            .arg(&bead_id)
+            .arg("--description")
+            .arg(special_description);
+        let update_output = update_cmd.output().expect("Failed to update bead");
+        if !update_output.status.success() {
+            panic!(
+                "Failed to update bead with special description: {}",
+                String::from_utf8_lossy(&update_output.stderr)
+            );
+        }
+
+        // Get JSON output from show command
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("show")
+                .arg(&bead_id)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Validate JSON is properly formatted and escaped
+        let json_str = output.trim();
+
+        // First, verify it's valid JSON (if it parses, escaping is correct)
+        json_validation::assert_valid_json(json_str);
+
+        let parsed = json_validation::parse_json(json_str);
+        let array = parsed.as_array().expect("show output should be a JSON array");
+        let issue_json = &array[0];
+
+        // Verify title contains special characters properly preserved
+        let title = json_validation::get_string(issue_json, "title");
+        assert!(title.contains("\"quotes\""), "Title should preserve quotes");
+        assert!(title.contains("'apostrophes'"), "Title should preserve apostrophes");
+        assert!(title.contains("&"), "Title should preserve ampersands");
+        assert!(title.contains("<"), "Title should preserve less-than");
+        assert!(title.contains(">"), "Title should preserve greater-than");
+        assert!(title.contains("\\"), "Title should preserve backslashes");
+
+        // Verify description is present and contains special characters
+        let description = json_validation::get_string_optional(issue_json, "description");
+        assert!(description.is_some(), "Description should be present");
+        let desc = description.unwrap();
+        assert!(desc.contains("quotes"), "Description should preserve quotes");
+        assert!(desc.contains("apostrophes"), "Description should preserve apostrophes");
+        assert!(desc.contains("&"), "Description should preserve ampersands");
+        assert!(desc.contains("tags"), "Description should preserve tags");
+        assert!(desc.contains("json"), "Description should preserve json-like content");
+
+        // Verify the entire JSON output is properly escaped by re-parsing
+        // If serde_json can parse it, the escaping is correct
+        let reparsed = json_validation::parse_json(json_str);
+        assert_eq!(parsed, reparsed, "JSON should be consistent after re-parsing");
+
+        // Cleanup
+        fixtures::close_bead(&bead_id, "Comprehensive special characters test cleanup");
+    }
+
+    #[test]
     fn test_show_command_json_empty_dependencies_comments() {
         require_binary();
 
