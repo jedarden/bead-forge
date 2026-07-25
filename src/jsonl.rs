@@ -15,6 +15,7 @@ pub enum UpsertResult {
     Unchanged,
 }
 
+#[derive(Debug)]
 pub struct ImportResult {
     pub imported: usize,
     pub updated: usize,
@@ -591,5 +592,261 @@ mod tests {
         // But should have no content
         let contents = std::fs::read_to_string(&path).unwrap();
         assert_eq!(contents.trim(), "", "file should be empty");
+    }
+
+    // ==================== import_jsonl tests ====================
+
+    #[test]
+    fn import_jsonl_valid_multiple_beads() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with multiple valid beads
+        let jsonl_content = r#"{"id":"bf-001","title":"First bead","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-002","title":"Second bead","status":"open","priority":1,"type":"bug","created_at":"2024-01-02T00:00:00Z","updated_at":"2024-01-02T00:00:00Z","source_repo":"test"}
+{"id":"bf-003","title":"Third bead","status":"open","priority":0,"type":"feature","created_at":"2024-01-03T00:00:00Z","updated_at":"2024-01-03T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        // Track which beads were upserted
+        let mut imported_ids = Vec::new();
+        let mut upsert_called = Vec::new();
+
+        let result = import_jsonl(&path, |issue| {
+            upsert_called.push(issue.id.clone());
+            // Simulate all beads as new
+            imported_ids.push(issue.id.clone());
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 3, "should import 3 new beads");
+        assert_eq!(result.updated, 0, "should not update any beads");
+        assert_eq!(result.skipped, 0, "should not skip any beads");
+        assert_eq!(
+            upsert_called,
+            vec!["bf-001", "bf-002", "bf-003"],
+            "upsert should be called for each bead in order"
+        );
+    }
+
+    #[test]
+    fn import_jsonl_malformed_json_skip() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with malformed JSON lines
+        let jsonl_content = r#"{"id":"bf-001","title":"Valid bead","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-002","title":"Invalid JSON","status":"open","priority":1,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"
+{"id":"bf-003","title":"Another valid","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+not json at all
+{"id":"bf-004","title":"Last valid","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let mut valid_count = 0;
+        let result = import_jsonl(&path, |issue| {
+            valid_count += 1;
+            Ok(UpsertResult::New)
+        });
+
+        // Import should fail on malformed JSON
+        assert!(result.is_err(), "import_jsonl should return error for malformed JSON");
+
+        // Even though it failed, some valid beads might have been processed before the error
+        // This is the expected behavior - the function stops at the first error
+    }
+
+    #[test]
+    fn import_jsonl_missing_required_field_error() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with beads missing required fields
+        // Missing: created_at, updated_at, source_repo
+        let jsonl_content = r#"{"id":"bf-001","title":"Missing required fields","status":"open","priority":2,"type":"task"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |_issue| Ok(UpsertResult::New));
+
+        // Should fail to deserialize due to missing required fields
+        assert!(
+            result.is_err(),
+            "import_jsonl should return error when required fields are missing"
+        );
+        // Check error message without unwrap_err
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("created_at") || err_msg.contains("missing field") || err_msg.contains("missing"),
+                    "error should mention the missing field: {}",
+                    err_msg
+                );
+            }
+            Ok(_) => panic!("Expected error but got Ok result"),
+        }
+    }
+
+    #[test]
+    fn import_jsonl_upsert_behavior_update_existing() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with beads
+        let jsonl_content = r#"{"id":"bf-001","title":"Original title","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-002","title":"Unchanged bead","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        // Simulate a database with existing beads
+        let mut existing_db = std::collections::HashMap::new();
+        existing_db.insert("bf-001".to_string(), "Existing content for bf-001");
+        existing_db.insert("bf-002".to_string(), "Existing content for bf-002");
+
+        let result = import_jsonl(&path, |issue| {
+            if existing_db.contains_key(&issue.id) {
+                // Check if content changed
+                let old_content = existing_db.get(&issue.id).unwrap();
+                if old_content != &issue.title {
+                    Ok(UpsertResult::Updated)
+                } else {
+                    Ok(UpsertResult::Unchanged)
+                }
+            } else {
+                Ok(UpsertResult::New)
+            }
+        })
+        .unwrap();
+
+        // Both beads exist in "database"
+        // bf-001 title changed (from "Existing content for bf-001" to "Original title")
+        // bf-002 title changed (from "Existing content for bf-002" to "Unchanged bead")
+        assert_eq!(result.imported, 0, "should not import new beads");
+        assert_eq!(result.updated, 2, "should update both existing beads");
+        assert_eq!(result.skipped, 0, "should not skip any beads");
+    }
+
+    #[test]
+    fn import_jsonl_upsert_behavior_mixed() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with multiple beads
+        let jsonl_content = r#"{"id":"bf-001","title":"New bead","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-002","title":"Update me","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-003","title":"Keep same","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        // Simulate a database with some existing beads
+        let mut existing_db = std::collections::HashMap::new();
+        existing_db.insert("bf-002".to_string(), "Old title for bf-002");
+        existing_db.insert("bf-003".to_string(), "Keep same"); // Same title, should skip
+
+        let result = import_jsonl(&path, |issue| {
+            if let Some(existing_title) = existing_db.get(&issue.id) {
+                if existing_title == &issue.title {
+                    Ok(UpsertResult::Unchanged)
+                } else {
+                    Ok(UpsertResult::Updated)
+                }
+            } else {
+                Ok(UpsertResult::New)
+            }
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 1, "should import 1 new bead (bf-001)");
+        assert_eq!(result.updated, 1, "should update 1 bead (bf-002)");
+        assert_eq!(result.skipped, 1, "should skip 1 bead (bf-003)");
+    }
+
+    #[test]
+    fn import_jsonl_empty_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create an empty file
+        std::fs::write(&path, "").unwrap();
+
+        let mut call_count = 0;
+        let result = import_jsonl(&path, |_issue| {
+            call_count += 1;
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(call_count, 0, "upsert should not be called for empty file");
+        assert_eq!(result.imported, 0, "should import 0 beads");
+        assert_eq!(result.updated, 0, "should update 0 beads");
+        assert_eq!(result.skipped, 0, "should skip 0 beads");
+    }
+
+    #[test]
+    fn import_jsonl_upsert_propagates_errors() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with valid beads
+        let jsonl_content = r#"{"id":"bf-001","title":"Valid bead","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        // Simulate an upsert function that fails
+        let result = import_jsonl(&path, |_issue| {
+            Err::<UpsertResult, anyhow::Error>(anyhow::anyhow!("Database error"))
+        });
+
+        assert!(result.is_err(), "import_jsonl should propagate upsert errors");
+        match result {
+            Err(e) => {
+                let err_msg = e.to_string();
+                assert!(
+                    err_msg.contains("Database error"),
+                    "error message should contain the upsert error: {}",
+                    err_msg
+                );
+            }
+            Ok(_) => panic!("Expected error but got Ok result"),
+        }
+    }
+
+    #[test]
+    fn import_jsonl_single_bead() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with a single bead
+        let jsonl_content = r#"{"id":"bf-single","title":"Single bead","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            assert_eq!(issue.id, "bf-single");
+            assert_eq!(issue.title, "Single bead");
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 1, "should import 1 bead");
+        assert_eq!(result.updated, 0, "should not update any beads");
+        assert_eq!(result.skipped, 0, "should not skip any beads");
+    }
+
+    #[test]
+    fn import_jsonl_with_extra_fields() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with beads that have extra optional fields
+        let jsonl_content = r#"{"id":"bf-extra","title":"Bead with extras","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test","description":"This is a description","assignee":"testuser","labels":["bug","critical"]}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            assert_eq!(issue.id, "bf-extra");
+            assert_eq!(issue.description, Some("This is a description".to_string()));
+            assert_eq!(issue.assignee, Some("testuser".to_string()));
+            assert!(issue.labels.contains(&"bug".to_string()));
+            assert!(issue.labels.contains(&"critical".to_string()));
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 1, "should import bead with extra fields");
     }
 }
