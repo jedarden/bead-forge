@@ -259,6 +259,230 @@ fn test_search_json_empty_result() {
 }
 
 #[test]
+fn test_search_json_empty_result_valid_format() {
+    let temp_dir = create_isolated_workspace();
+    let workspace = temp_dir.path();
+
+    // Test that empty output is still valid (empty string is valid JSONL)
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("completely nonexistent search term 12345")
+            .arg("--format")
+            .arg("json")
+    );
+
+    let json_str = output.trim();
+
+    // Empty output should be empty string (not an error)
+    // An empty JSONL stream has zero lines, which is valid
+    assert_eq!(json_str, "", "empty search should return empty string");
+
+    // Empty string is valid JSONL (zero JSON objects)
+    // When split into lines, we get zero lines
+    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
+    assert_eq!(lines.len(), 0, "empty search should have zero JSONL lines");
+}
+
+#[test]
+fn test_search_json_empty_database() {
+    // Create a completely empty workspace with no beads whatsoever
+    let temp_dir = tempfile::TempDir::new().expect("Failed to create temp dir");
+    let empty_workspace = temp_dir.path();
+    let beads_dir = empty_workspace.join(".beads");
+    std::fs::create_dir(&beads_dir).expect("Failed to create .beads directory");
+
+    // Initialize the empty workspace
+    crate::config::init_workspace(&beads_dir, "bf-empty-db-test")
+        .expect("Failed to initialize empty test workspace");
+
+    let metadata = crate::config::load_metadata(&beads_dir)
+        .expect("Failed to load metadata");
+    let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
+        .expect("Failed to create database");
+
+    // Search in the completely empty database
+    let mut cmd = std::process::Command::new(bf_binary());
+    cmd.arg("-w").arg(&beads_dir)
+        .arg("search")
+        .arg("anything")
+        .arg("--format")
+        .arg("json");
+    let output = cmd.output().expect("Failed to execute bf search");
+    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+
+    // Should return empty string
+    let json_str = stdout.trim();
+    assert_eq!(json_str, "", "search in empty database should return empty string");
+}
+
+#[test]
+fn test_search_json_filter_excludes_all_beads() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create some test beads
+    let bead1_id = fixtures::create_bead("Filter exclude test 1");
+    let bead2_id = fixtures::create_bead("Filter exclude test 2");
+
+    // Update both to open status (they should be open by default, but let's be sure)
+    for bead_id in [&bead1_id, &bead2_id].iter() {
+        let mut cmd = bf_command();
+        cmd.arg("update")
+            .arg(bead_id)
+            .arg("--status")
+            .arg("open");
+        let update_output = cmd.output().expect("Failed to update");
+        assert!(update_output.status.success(), "Update should succeed");
+    }
+
+    // Search with a status filter that excludes all beads (they're all open, not closed)
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Filter exclude")
+            .arg("--status")
+            .arg("closed")
+            .arg("--format")
+            .arg("json")
+    );
+
+    // Should return empty string since no beads match the filter
+    let json_str = output.trim();
+    assert_eq!(json_str, "", "search with filter that excludes all beads should return empty string");
+
+    // Verify by counting lines
+    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
+    assert_eq!(lines.len(), 0, "should have zero results when filter excludes all beads");
+
+    fixtures::close_bead(&bead1_id, "Filter exclude cleanup 1");
+    fixtures::close_bead(&bead2_id, "Filter exclude cleanup 2");
+}
+
+#[test]
+fn test_search_json_priority_filter_excludes_all() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create test beads with default priority (2)
+    let bead1_id = fixtures::create_bead("Priority filter exclude 1");
+    let bead2_id = fixtures::create_bead("Priority filter exclude 2");
+
+    // Update both to priority 2 (normal)
+    for bead_id in [&bead1_id, &bead2_id].iter() {
+        let mut cmd = bf_command();
+        cmd.arg("update")
+            .arg(bead_id)
+            .arg("--priority")
+            .arg("2");
+        let update_output = cmd.output().expect("Failed to update");
+        assert!(update_output.status.success(), "Update should succeed");
+    }
+
+    // Search with priority range that excludes all beads (priority < 1, but all are 2)
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Priority filter exclude")
+            .arg("--priority-max")
+            .arg("0")
+            .arg("--format")
+            .arg("json")
+    );
+
+    // Should return empty string
+    let json_str = output.trim();
+    assert_eq!(json_str, "", "search with priority filter that excludes all beads should return empty string");
+
+    fixtures::close_bead(&bead1_id, "Priority filter exclude cleanup 1");
+    fixtures::close_bead(&bead2_id, "Priority filter exclude cleanup 2");
+}
+
+#[test]
+fn test_search_json_label_filter_excludes_all() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create beads without the label we'll filter by
+    let bead1_id = fixtures::create_bead_with_labels("Label exclude test 1", &["other"]);
+    let bead2_id = fixtures::create_bead_with_labels("Label exclude test 2", &["different"]);
+
+    // Search with label filter that no bead has
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Label exclude")
+            .arg("--label")
+            .arg("nonexistent-label-xyz")
+            .arg("--format")
+            .arg("json")
+    );
+
+    // Should return empty string
+    let json_str = output.trim();
+    assert_eq!(json_str, "", "search with label filter that excludes all beads should return empty string");
+
+    fixtures::close_bead(&bead1_id, "Label exclude cleanup 1");
+    fixtures::close_bead(&bead2_id, "Label exclude cleanup 2");
+}
+
+#[test]
+fn test_search_json_type_filter_excludes_all() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create beads with type "task"
+    let bead1_id = create_bead_with_type("Type exclude test 1", "task");
+    let bead2_id = create_bead_with_type("Type exclude test 2", "task");
+
+    // Search with type filter that excludes all beads (they're tasks, not bugs)
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Type exclude")
+            .arg("--type")
+            .arg("bug")
+            .arg("--format")
+            .arg("json")
+    );
+
+    // Should return empty string
+    let json_str = output.trim();
+    assert_eq!(json_str, "", "search with type filter that excludes all beads should return empty string");
+
+    fixtures::close_bead(&bead1_id, "Type exclude cleanup 1");
+    fixtures::close_bead(&bead2_id, "Type exclude cleanup 2");
+}
+
+#[test]
+fn test_search_json_assignee_filter_excludes_all() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create beads with one assignee
+    let bead1_id = fixtures::create_bead_with_assignee("Assignee exclude test 1", "alice");
+    let bead2_id = fixtures::create_bead_with_assignee("Assignee exclude test 2", "alice");
+
+    // Search with assignee filter that excludes all beads (they're assigned to alice, not bob)
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("search")
+            .arg("Assignee exclude")
+            .arg("--assignee")
+            .arg("bob")
+            .arg("--format")
+            .arg("json")
+    );
+
+    // Should return empty string
+    let json_str = output.trim();
+    assert_eq!(json_str, "", "search with assignee filter that excludes all beads should return empty string");
+
+    fixtures::close_bead(&bead1_id, "Assignee exclude cleanup 1");
+    fixtures::close_bead(&bead2_id, "Assignee exclude cleanup 2");
+}
+
+#[test]
 fn test_search_json_required_fields_types() {
     let _ws = create_isolated_workspace();
     let workspace = test_workspace();
