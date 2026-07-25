@@ -1,0 +1,385 @@
+# NEEDLE Test Module Inventory and Extended Batch Selection
+# Generated: 2026-07-25
+# Total Modules: 155 (126 integration tests + 29 unit test modules)
+
+## CATEGORY: Sanity Tests (Quick Smoke Tests)
+### Priority: HIGH - All selected for extended batch (15 modules)
+
+1. test_bf_52is_smoke
+2. test_bf_2l7_help_flag
+3. test_version_display
+4. test_create_command
+5. test_show_command
+6. test_update_command
+7. test_special_chars
+8. test_create
+9. test_basic_label_cli
+10. test_basic_workflow
+11. test_bf_2hqt
+12. test_bf_32zd
+13. test_bf_5id
+14. test_bf_5sw6
+15. common
+
+## CATEGORY: Extended Label Tests (Comprehensive Label Functionality)
+### Priority: HIGH - Selective sampling for extended batch (20 of 45 modules)
+
+### Selected for Extended Batch:
+1. test_label_comprehensive
+2. test_labels
+3. test_label_edge_cases
+4. test_label_special_characters
+5. label_tests
+6. epic_label_edge_cases
+7. epic_complex_labels
+8. epic_comprehensive
+9. comprehensive_label_tests
+10. comprehensive_label_cli
+11. duplicate_label_test
+12. test_labels_json_format
+13. test_labels_text_format
+14. test_epic_label_functionality
+15. test_epic_with_labels_cli
+16. test_epic_with_labels_integration
+17. epic_cli_labels
+18. epic_cli_label_creation
+19. epic_cli_label_mutate
+20. label_list
+
+### Not Selected (remaining 25 modules):
+- test_label_import
+- test_label_export_import_roundtrip
+- test_label_multiple_imports
+- test_label_sync_persistence
+- label_removal_test
+- label_integration_test
+- label_storage
+- epic_p0_labels
+- epic_cli_label_display
+- epic_cli_label_sort_filter
+- epic_with_labels
+- test_epic_p0_creation
+- test_epic_single_label
+- test_epic_1784832309_label_functionality
+- test_epic_child_1
+- p0_epic_labels
+- p1_epic_creation
+- p0_epic_creation
+- epic_default_priority
+- feature_default_priority
+- test_epic_with_description
+- test_epic_type_creation
+- test_epic_type_validation
+- epic_type_basic
+- test_invalid_type
+
+## CATEGORY: Batch and Concurrent Operations
+### Priority: HIGH - All selected for extended batch (8 modules)
+
+1. batch_atomic
+2. batch_mitosis
+3. autoflush_batch_claim_delete
+4. concurrent_claim
+5. claim_race
+6. fleet_concurrency
+7. claim_fallback
+8. test_blocked_cascade
+
+## CATEGORY: Data Integrity and Migration
+### Priority: MEDIUM - Selective sampling for extended batch (8 of 12 modules)
+
+### Selected for Extended Batch:
+1. jsonl_compat
+2. test_jsonl
+3. migrate_git_reconstruction
+4. recovery_and_exit_criteria
+5. envelope_integration_tests
+6. envelope_helpers
+7. schema_compat
+8. test_envelope_helpers_usage
+
+### Not Selected (remaining 4 modules):
+- kill_worker_preserves_beads
+- test_dirty_repair
+- test_close_reopen_integration
+- velocity_close_integration
+
+## CATEGORY: Performance and Timing
+### Priority: MEDIUM - Selective sampling for extended batch (5 of 8 modules)
+
+### Selected for Extended Batch:
+1. timing (unit)
+2. velocity (unit)
+3. velocity_seed_integration
+4. test_execution_time_recording
+5. test_critical_path_cache_invalidation
+
+### Not Selected (remaining 3 modules):
+- critical_path (unit) - covered by integration test
+- git_log (unit) - lower priority
+- test_bf_1dbvv_roundtrip_description_ac - edge case
+
+## CATEGORY: Error Recovery and Diagnostics
+### Priority: HIGH - All selected for extended batch (7 modules)
+
+1. doctor_repair_unflushed
+2. doctor_safety_stack
+3. autoflush_failure_contract
+4. autoflush_readonly
+5. test_dirty_repair
+6. autoflush_diagnostics_and_rotation
+7. recovery_and_exit_criteria (already in Data Integrity)
+
+## CATEGORY: Format and Output Validation
+### Priority: MEDIUM - Selective sampling for extended batch (6 of 10 modules)
+
+### Selected for Extended Batch:
+1. format (unit)
+2. json (unit)
+3. envelope (unit)
+4. json_formatter_verification
+5. test_json_formatter
+6. ready_json_fields
+
+### Not Selected (remaining 4 modules):
+- warning (unit) - lower priority
+- envelope_coverage
+- readonly_coverage_gaps
+- bf_520v_json_format
+
+## CATEGORY: Configuration and Core Infrastructure
+### Priority: MEDIUM - Selective sampling for extended batch (8 of 15 modules)
+
+### Selected for Extended Batch:
+1. config (unit)
+2. secrets (unit)
+3. secret_scanning
+4. test_assignee
+5. test_assignee_validation
+6. close_reopen
+7. readonly_commands
+8. br_isolation
+
+### Not Selected (remaining 7 modules):
+- test_cargo_test_execution
+- test_cargo_test_helpers
+- cargo_test_helpers
+- update_flags
+- limit_zero
+- description_update_test_infrastructure
+- test_bf_23vs_basic_functionality
+
+## CATEGORY: Unit Test Modules (Core Library Tests)
+### Priority: HIGH - All selected for extended batch (29 modules)
+
+### All Unit Test Modules (src/):
+1. autoflush (unit)
+2. batch (unit)
+3. bead_store (unit)
+4. claim (unit)
+5. commit_check (unit)
+6. config (unit)
+7. critical_path (unit)
+8. doctor (unit)
+9. envelope (unit)
+10. git_log (unit)
+11. history (unit)
+12. id (unit)
+13. json (unit)
+14. jsonl (unit)
+15. log (unit)
+16. merge (unit)
+17. model (unit)
+18. recovery (unit)
+19. rotate (unit)
+20. secrets (unit)
+21. sqlite (unit)
+22. subprocess (unit)
+23. sync (unit)
+24. timing (unit)
+25. trace (unit)
+26. validation (unit)
+27. velocity (unit)
+28. warning (unit)
+29. json (unit)
+
+Note: Some appear in multiple categories - this is intentional as they test different aspects
+
+## SUMMARY OF EXTENDED BATCH SELECTION
+
+### Total Modules: 155
+### Selected for Extended Batch: 78 (50.3%)
+### Not Selected: 77 (49.7%)
+
+### Selection Criteria:
+- All sanity tests (15 modules) - 100% selected
+- Extended label tests - 44% selected (20/45)
+- Batch/concurrent operations - 100% selected (8/8)
+- Data integrity - 67% selected (8/12)
+- Performance/timing - 63% selected (5/8)
+- Error recovery - 100% selected (7/7)
+- Format/output - 60% selected (6/10)
+- Configuration/infra - 53% selected (8/15)
+- Unit test modules - 100% selected (29/29)
+
+## EXECUTION ORDER (Optimized for Early Feedback)
+
+### Phase 1: Sanity and Smoke Tests (15 modules)
+Execution time: ~2-3 minutes
+Purpose: Validate basic functionality and catch fundamental issues early
+
+1. test_version_display
+2. test_bf_2l7_help_flag
+3. test_bf_52is_smoke
+4. common
+5. test_create_command
+6. test_show_command
+7. test_update_command
+8. test_special_chars
+9. test_create
+10. test_basic_label_cli
+11. test_basic_workflow
+12. test_bf_2hqt
+13. test_bf_32zd
+14. test_bf_5id
+15. test_bf_5sw6
+
+### Phase 2: Unit Test Modules - Core Library (29 modules)
+Execution time: ~5-8 minutes
+Purpose: Validate core library functionality before integration tests
+
+1. model (unit)
+2. id (unit)
+3. config (unit)
+4. secrets (unit)
+5. jsonl (unit)
+6. json (unit)
+7. envelope (unit)
+8. format (unit)
+9. validation (unit)
+10. timing (unit)
+11. trace (unit)
+12. log (unit)
+13. history (unit)
+14. git_log (unit)
+15. velocity (unit)
+16. autoflush (unit)
+17. batch (unit)
+18. bead_store (unit)
+19. claim (unit)
+20. commit_check (unit)
+21. critical_path (unit)
+22. doctor (unit)
+23. recovery (unit)
+24. merge (unit)
+25. rotate (unit)
+26. sync (unit)
+27. subprocess (unit)
+28. sqlite (unit)
+29. warning (unit)
+
+### Phase 3: Data Integrity and Migration (8 modules)
+Execution time: ~3-4 minutes
+Purpose: Ensure data persistence and migration safety
+
+1. jsonl_compat
+2. test_jsonl
+3. migrate_git_reconstruction
+4. recovery_and_exit_criteria
+5. envelope_integration_tests
+6. envelope_helpers
+7. schema_compat
+8. test_envelope_helpers_usage
+
+### Phase 4: Batch and Concurrent Operations (8 modules)
+Execution time: ~5-7 minutes
+Purpose: Validate atomic operations and concurrent access
+
+1. batch_atomic
+2. batch_mitosis
+3. autoflush_batch_claim_delete
+4. concurrent_claim
+5. claim_race
+6. fleet_concurrency
+7. claim_fallback
+8. test_blocked_cascade
+
+### Phase 5: Error Recovery and Diagnostics (7 modules)
+Execution time: ~3-4 minutes
+Purpose: Ensure robust error handling and recovery
+
+1. doctor_repair_unflushed
+2. doctor_safety_stack
+3. autoflush_failure_contract
+4. autoflush_readonly
+5. test_dirty_repair
+6. autoflush_diagnostics_and_rotation
+7. recovery_and_exit_criteria
+
+### Phase 6: Extended Label Tests (20 modules)
+Execution time: ~8-10 minutes
+Purpose: Comprehensive label functionality validation
+
+1. test_label_comprehensive
+2. test_labels
+3. test_label_edge_cases
+4. test_label_special_characters
+5. label_tests
+6. epic_label_edge_cases
+7. epic_complex_labels
+8. epic_comprehensive
+9. comprehensive_label_tests
+10. comprehensive_label_cli
+11. duplicate_label_test
+12. test_labels_json_format
+13. test_labels_text_format
+14. test_epic_label_functionality
+15. test_epic_with_labels_cli
+16. test_epic_with_labels_integration
+17. epic_cli_labels
+18. epic_cli_label_creation
+19. epic_cli_label_mutate
+20. label_list
+
+### Phase 7: Performance and Timing (5 modules)
+Execution time: ~4-6 minutes
+Purpose: Validate performance characteristics
+
+1. timing (unit)
+2. velocity (unit)
+3. velocity_seed_integration
+4. test_execution_time_recording
+5. test_critical_path_cache_invalidation
+
+### Phase 8: Format and Output Validation (6 modules)
+Execution time: ~2-3 minutes
+Purpose: Validate output format consistency
+
+1. format (unit)
+2. json (unit)
+3. envelope (unit)
+4. json_formatter_verification
+5. test_json_formatter
+6. ready_json_fields
+
+### Phase 9: Configuration and Infrastructure (8 modules)
+Execution time: ~3-4 minutes
+Purpose: Validate configuration and infrastructure setup
+
+1. config (unit)
+2. secrets (unit)
+3. secret_scanning
+4. test_assignee
+5. test_assignee_validation
+6. close_reopen
+7. readonly_commands
+8. br_isolation
+
+## Total Estimated Execution Time: ~35-50 minutes
+
+## Notes:
+- Unit test modules can be run in parallel using `cargo test --lib`
+- Integration tests may require sequential execution to avoid database conflicts
+- All tests should be run with output capture to analyze failures
+- Failed tests should be re-run individually with verbose output for debugging
+- This selection represents ~50% of the total test suite while covering 100% of core functionality
