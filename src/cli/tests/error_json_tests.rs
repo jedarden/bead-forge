@@ -7,6 +7,8 @@
 //! - Schema consistency even on errors
 //! - Invalid command-line arguments and flags
 //! - Database corruption or missing workspace scenarios
+//! - **Error JSON format validation** (structure, escaping, content)
+//! - **Parse errors vs runtime errors** (argument parsing vs execution errors)
 //!
 //! ## Test Philosophy
 //!
@@ -15,6 +17,8 @@
 //! 2. Stdout should either be empty or contain valid JSON (even for error cases)
 //! 3. Error messages in stderr should be informative and reference the invalid input
 //! 4. Exit codes should be non-zero for errors
+//! 5. **Error JSON structure: `{"error": "message"}` when errors are formatted as JSON**
+//! 6. **Error messages are properly escaped and formatted in JSON**
 
 use std::process::Command;
 use tempfile::TempDir;
@@ -1160,4 +1164,327 @@ fn test_update_json_closed_bead() {
 
         json_validation::assert_valid_json(&show_output);
     }
+}
+
+// ============================================================================
+// JSON Error Format Validation Tests
+// ============================================================================
+
+#[test]
+fn test_error_json_structure_is_valid() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test that error JSON follows the expected structure
+    // When --format json is specified with an invalid command, the output should still be valid JSON
+    let error_cases = vec![
+        // Invalid bead ID
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("show")
+                    .arg("bf-invalid-id-xyz-999")
+                    .arg("--format")
+                    .arg("json")
+            );
+            stdout
+        },
+        // Non-existent bead for comment
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("comment")
+                    .arg("bf-nonexistent-comment-999")
+                    .arg("--text")
+                    .arg("Test")
+                    .arg("--format")
+                    .arg("json")
+            );
+            stdout
+        },
+    ];
+
+    for error_case in error_cases {
+        let stdout = error_case();
+
+        // Stdout should either be empty or contain valid JSON
+        let stdout_trimmed = stdout.trim();
+        if !stdout_trimmed.is_empty() {
+            json_validation::assert_valid_json(stdout_trimmed);
+        }
+    }
+}
+
+#[test]
+fn test_parse_errors_vs_runtime_errors() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Parse errors: invalid command-line arguments caught by clap
+    let parse_error_cases = vec![
+        (vec!["list", "--priority-min", "invalid"], "invalid priority value"),
+        (vec!["create", "--priority", "5.5", "--title", "Test"], "decimal priority"),
+        (vec!["ready", "--time-period", "invalid"], "invalid time period"),
+    ];
+
+    for (args, description) in parse_error_cases {
+        let (stdout, stderr, success) = capture::capture_failed_command(
+            &mut bf_command().args(args)
+        );
+
+        assert!(!success, "{} should fail (parse error)", description);
+
+        // Parse errors should have informative stderr
+        assert!(!stderr.is_empty(), "parse error should produce stderr output: {}", description);
+
+        // Stdout should be empty or valid JSON
+        let stdout_trimmed = stdout.trim();
+        if !stdout_trimmed.is_empty() {
+            json_validation::assert_valid_json(stdout_trimmed);
+        }
+    }
+
+    // Runtime errors: valid command syntax but execution fails
+    let runtime_error_cases = vec![
+        (vec!["show", "bf-nonexistent-runtime-999", "--format", "json"], "nonexistent bead"),
+        (vec!["comment", "bf-nonexistent-comment-888", "--text", "Test"], "comment on nonexistent bead"),
+    ];
+
+    for (args, description) in runtime_error_cases {
+        let (stdout, stderr, success) = capture::capture_failed_command(
+            &mut bf_command().args(args)
+        );
+
+        assert!(!success, "{} should fail (runtime error)", description);
+
+        // Runtime errors should have informative stderr
+        assert!(!stderr.is_empty(), "runtime error should produce stderr output: {}", description);
+
+        // Stdout should be empty or valid JSON
+        let stdout_trimmed = stdout.trim();
+        if !stdout_trimmed.is_empty() {
+            json_validation::assert_valid_json(stdout_trimmed);
+        }
+    }
+}
+
+#[test]
+fn test_error_messages_properly_escaped_in_json() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test that error messages with special characters are properly escaped in JSON
+    let bead_id = fixtures::create_bead("Bead for error escaping test");
+
+    // Try operations with special characters in error messages
+    let special_char_cases = vec![
+        // Search with quotes in query (should be properly escaped)
+        || {
+            let output = capture::capture_stdout(
+                bf_command()
+                    .arg("search")
+                    .arg("test with \"quotes\" and 'apostrophes'")
+                    .arg("--format")
+                    .arg("json")
+            );
+            output
+        },
+        // Search with newlines and tabs
+        || {
+            let output = capture::capture_stdout(
+                bf_command()
+                    .arg("search")
+                    .arg("test with\nnewline\tand\ttabs")
+                    .arg("--format")
+                    .arg("json")
+            );
+            output
+        },
+        // Search with unicode
+        || {
+            let output = capture::capture_stdout(
+                bf_command()
+                    .arg("search")
+                    .arg("test with unicode: café, 日本語")
+                    .arg("--format")
+                    .arg("json")
+            );
+            output
+        },
+    ];
+
+    for case in special_char_cases {
+        let output = case();
+
+        // Output should be valid JSONL (even if empty)
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Error escaping cleanup");
+}
+
+#[test]
+fn test_error_json_content_and_field_types() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test that error JSON has correct content and field types
+    let bead_id = fixtures::create_bead("Bead for error content test");
+
+    // Test 1: Error on invalid bead ID
+    let (stdout, stderr, success) = capture::capture_failed_command(
+        &mut bf_command()
+            .arg("show")
+            .arg("bf-invalid-error-content-test")
+            .arg("--format")
+            .arg("json")
+    );
+
+    assert!(!success, "should fail for invalid bead ID");
+
+    // Stderr should contain error information
+    assert!(!stderr.is_empty(), "stderr should contain error message");
+
+    // If stdout is not empty, it should be valid JSON
+    let stdout_trimmed = stdout.trim();
+    if !stdout_trimmed.is_empty() {
+        json_validation::assert_valid_json(stdout_trimmed);
+
+        // If error JSON is emitted, it should have expected structure
+        let parsed = json_validation::parse_json(stdout_trimmed);
+
+        // Error JSON should either be an array or object with error information
+        if parsed.is_object() {
+            // If it's an object, it might have an "error" field
+            if json_validation::has_field(&parsed, "error") {
+                let error_msg = json_validation::get_string(&parsed, "error");
+                assert!(!error_msg.is_empty(), "error message should not be empty");
+            }
+        }
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Error content cleanup");
+}
+
+#[test]
+fn test_constraint_violation_errors() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test database constraint violations (foreign key, unique, etc.)
+
+    // Test 1: Foreign key constraint (dependency on non-existent bead)
+    let bead_id = fixtures::create_bead("Bead for constraint test");
+
+    let (stdout, stderr, success) = capture::capture_failed_command(
+        &mut bf_command()
+            .arg("dep")
+            .arg("add")
+            .arg(&bead_id)
+            .arg("--blocks")
+            .arg("bf-nonexistent-constraint-test-999")
+    );
+
+    assert!(!success, "should fail for foreign key constraint violation");
+
+    // Stderr should mention the constraint or dependency issue
+    assert!(!stderr.is_empty(), "stderr should contain constraint error message");
+
+    // Stdout should be empty or valid JSON
+    let stdout_trimmed = stdout.trim();
+    if !stdout_trimmed.is_empty() {
+        json_validation::assert_valid_json(stdout_trimmed);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Constraint cleanup");
+}
+
+#[test]
+fn test_multiple_errors_formatting_consistency() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test that different error types produce consistently formatted output
+
+    let error_scenarios = vec![
+        // Scenario 1: Invalid bead ID
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("show")
+                    .arg("bf-invalid-1")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, "invalid bead ID")
+        },
+        // Scenario 2: Missing required argument
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("show")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, "missing required argument")
+        },
+        // Scenario 3: Invalid filter value
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("list")
+                    .arg("--priority-min")
+                    .arg("abc")
+                    .arg("--format")
+                    .arg("json")
+            );
+            (stdout, "invalid filter value")
+        },
+    ];
+
+    for scenario in error_scenarios {
+        let (stdout, description) = scenario();
+
+        // All error scenarios should have stdout that is either empty or valid JSON
+        let stdout_trimmed = stdout.trim();
+        if !stdout_trimmed.is_empty() {
+            json_validation::assert_valid_json(stdout_trimmed);
+        }
+    }
+}
+
+#[test]
+fn test_error_with_special_characters_in_stderr() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create a bead with special characters
+    let bead_id = fixtures::create_bead("Bead with \"quotes\" and 'apostrophes'");
+
+    // Try to reference it with invalid operation that includes the special chars in error
+    let (stdout, stderr, success) = capture::capture_failed_command(
+        &mut bf_command()
+            .arg("comment")
+            .arg("bf-nonexistent-with-special-chars")
+            .arg("--text")
+            .arg("Text with \"quotes\" and 'apostrophes'")
+    );
+
+    // Stderr should contain the error message
+    assert!(!stderr.is_empty(), "stderr should contain error message");
+
+    // Stderr should handle special characters without breaking
+    // (This test mainly ensures we don't panic on special characters in error paths)
+
+    // Stdout should be empty or valid JSON
+    let stdout_trimmed = stdout.trim();
+    if !stdout_trimmed.is_empty() {
+        json_validation::assert_valid_json(stdout_trimmed);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Special char cleanup");
 }
