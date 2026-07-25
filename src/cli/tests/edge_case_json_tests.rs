@@ -654,9 +654,15 @@ fn test_recent_json_empty_workspace() {
             .arg("json")
     );
 
-    // Empty output is valid JSONL
-    let trimmed = output.trim();
-    assert!(trimmed.is_empty() || trimmed == "[]", "Empty recent should return empty JSONL");
+    // recent command ALWAYS uses envelope format
+    let envelope = envelope::validate_envelope(&output.trim(), "recent");
+
+    // Data field should be empty string (no beads to show)
+    let data = envelope::get_envelope_data(&envelope);
+    assert!(data.is_string(), "recent envelope data should be a string");
+
+    let jsonl_str = data.as_str().expect("data should be string");
+    assert_eq!(jsonl_str, "", "recent data should be empty string for empty workspace");
 }
 
 #[test]
@@ -691,38 +697,38 @@ fn test_list_json_no_open_beads() {
 
 #[test]
 fn test_ready_json_all_blocked_beads() {
-    let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    // Use a truly isolated workspace to avoid interference from other tests
+    let temp_dir = create_isolated_workspace();
+    let workspace = temp_dir.path();
 
-    // Create a chain of dependencies where all beads are blocked
+    // Create beads that will all be blocked or closed
     let bead1_id = fixtures::create_bead("Blocked bead 1");
     let bead2_id = fixtures::create_bead("Blocked bead 2");
     let bead3_id = fixtures::create_bead("Blocked bead 3");
 
-    // Create dependency chain: bead3 -> bead2 -> bead1
+    // Create dependency chain: bead2 -> bead1, bead3 -> bead1
     fixtures::add_dependency(&bead2_id, &bead1_id);
-    fixtures::add_dependency(&bead3_id, &bead2_id);
+    fixtures::add_dependency(&bead3_id, &bead1_id);
 
-    // Ready should return no beads (all are blocked)
+    // Close bead1 so that the dependent beads (bead2, bead3) are blocked
+    // and bead1 itself is closed (not returned by ready)
+    fixtures::close_bead(&bead1_id, "Blocker closed");
+
+    // Ready should return no beads (all are either blocked or closed)
     let output = capture::capture_stdout(
-        bf_command()
+        bf_command_with_workspace(workspace)
             .arg("ready")
             .arg("--format")
             .arg("json")
     );
 
-    // Ready with all blocked beads should return empty JSONL
+    // Ready with all blocked/closed beads should return empty JSONL
     let trimmed = output.trim();
-    if !trimmed.is_empty() {
-        eprintln!("Expected empty output for ready with all blocked, got: {}", output);
-        eprintln!("Trimmed: '{}'", trimmed);
-    }
-    assert!(trimmed.is_empty(), "Ready with all blocked beads should return empty JSONL");
+    assert!(trimmed.is_empty(), "Ready with all blocked/closed beads should return empty JSONL");
 
     // Cleanup
-    fixtures::close_bead(&bead1_id, "Blocked test cleanup");
-    fixtures::close_bead(&bead2_id, "Blocked test cleanup");
-    fixtures::close_bead(&bead3_id, "Blocked test cleanup");
+    fixtures::close_bead(&bead2_id, "Blocked test cleanup 2");
+    fixtures::close_bead(&bead3_id, "Blocked test cleanup 3");
 }
 
 // ============================================================================

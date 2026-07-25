@@ -3663,6 +3663,9 @@ mod tests {
     pub mod json_output;
     pub mod list_ready_recent_json_tests;
     pub mod show_json_tests;
+    pub mod search_json_tests;
+    pub mod edge_case_json_tests;
+    pub mod error_json_tests;
     pub use crate::config::init_workspace;
     pub use crate::Storage;
 }
