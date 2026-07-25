@@ -8,6 +8,7 @@ use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metada
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, ClaimResultOutput, OutputFormat, StatsOutput};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
+use serde_json::Value;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
 use crate::validation::normalize_assignee;
@@ -1892,8 +1893,16 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
             let jsonl = formatter.format_issues(&issues);
             if envelope {
                 // Wrap in envelope with kind="ready"
-                // Ensure empty results are "[]" not "" so format_with_envelope parses as array
-                let data = if jsonl.is_empty() { "[]".to_string() } else { jsonl };
+                // Convert JSONL to JSON array for the envelope data field
+                let data = if jsonl.is_empty() {
+                    "[]".to_string()
+                } else {
+                    let objects: Vec<Value> = jsonl
+                        .lines()
+                        .filter_map(|line| serde_json::from_str(line).ok())
+                        .collect();
+                    serde_json::to_string(&objects).unwrap_or_else(|_| "[]".to_string())
+                };
                 println!("{}", formatter.format_with_envelope("ready", &data));
             } else {
                 // Raw JSONL output; empty ready prints `[]` as a special case
