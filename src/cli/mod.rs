@@ -3660,3 +3660,10 @@ fn cmd_recent(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    pub mod json_output;
+    pub use crate::config::init_workspace;
+    pub use crate::Storage;
+}
+

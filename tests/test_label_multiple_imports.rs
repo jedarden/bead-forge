@@ -45,7 +45,10 @@ fn run_import_export_cycle(storage: &Storage, jsonl_path: &std::path::PathBuf) -
     // Clear the storage (simulating a fresh import)
     let beads = storage.list_all_issues().expect("Failed to list beads");
     for bead in beads {
-        storage.delete_issue(&bead.id).expect("Failed to delete bead");
+        storage.with_immediate_transaction(|tx| {
+            tx.execute("DELETE FROM issues WHERE id = ?", [&bead.id])?;
+            Ok(())
+        }).expect("Failed to delete bead");
     }
 
     // Import from JSONL with upsert logic
