@@ -63,7 +63,9 @@ pub fn export_jsonl<F>(path: &Path, mut list_all: F) -> Result<ExportResult>
 where
     F: FnMut() -> Result<Vec<Issue>>,
 {
-    let issues = list_all()?;
+    let mut issues = list_all()?;
+    // Sort by ID for stable diffs
+    issues.sort_by(|a, b| a.id.cmp(&b.id));
     let temp_path = path.with_extension("jsonl.tmp");
 
     {
@@ -357,5 +359,237 @@ mod tests {
         let contents = std::fs::read_to_string(&path).unwrap();
         // Empty arrays should be skipped due to skip_serializing_if
         assert!(!contents.contains("\"labels\""), "empty labels should be skipped in JSON");
+    }
+
+    #[test]
+    fn debug_label_export_import() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create an issue with labels
+        let mut issue = issue("bf-debug", "Debug Label Test");
+        issue.labels = vec!["auto-flushed".to_string(), "test-label".to_string()];
+
+        println!("Before export - issue.labels: {:?}", issue.labels);
+
+        // Export to JSONL using merge (same as auto-flush)
+        export_jsonl_merge(&path, &[issue.clone()], &[]).unwrap();
+
+        // Read back the JSONL contents
+        let contents = std::fs::read_to_string(&path).unwrap();
+        println!("JSONL contents: {}", contents);
+
+        // Parse the JSONL
+        let parsed: Issue = serde_json::from_str(&contents.trim()).unwrap();
+        println!("After import - parsed.labels: {:?}", parsed.labels);
+
+        // Verify labels are preserved
+        assert_eq!(parsed.labels.len(), 2, "Should have 2 labels");
+        assert!(parsed.labels.contains(&"auto-flushed".to_string()), "Should contain 'auto-flushed' label");
+        assert!(parsed.labels.contains(&"test-label".to_string()), "Should contain 'test-label' label");
+    }
+
+    #[test]
+    fn export_jsonl_writes_multiple_beads_sorted() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create beads in random order
+        let beads = vec![
+            issue("bf-z", "Zebra"),
+            issue("bf-a", "Apple"),
+            issue("bf-m", "Middle"),
+        ];
+
+        // Export using export_jsonl
+        let result = export_jsonl(&path, || Ok(beads.clone())).unwrap();
+        assert_eq!(result.count, 3, "should export all 3 beads");
+
+        // Verify file exists and has content
+        assert!(path.exists(), "export file should exist");
+        let contents = std::fs::read_to_string(&path).unwrap();
+
+        // Verify output is sorted by ID (alphabetically)
+        let ids = ids_in(&path);
+        assert_eq!(ids, vec!["bf-a", "bf-m", "bf-z"], "output should be sorted by ID");
+
+        // Verify all beads are present and valid JSON
+        let lines: Vec<&str> = contents.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(lines.len(), 3, "should have 3 lines");
+
+        for line in lines {
+            let parsed: Issue = serde_json::from_str(line).unwrap();
+            assert!(parsed.id == "bf-a" || parsed.id == "bf-m" || parsed.id == "bf-z");
+        }
+    }
+
+    #[test]
+    fn export_jsonl_atomic_temp_rename() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create beads
+        let beads = vec![issue("bf-test", "Test Issue")];
+
+        // Export using export_jsonl
+        export_jsonl(&path, || Ok(beads.clone())).unwrap();
+
+        // Verify atomic behavior: temp file should not exist after successful export
+        let temp_path = path.with_extension("jsonl.tmp");
+        assert!(!temp_path.exists(), "temp file should be cleaned up after atomic rename");
+
+        // Verify final file exists
+        assert!(path.exists(), "final file should exist");
+
+        // Verify content is correct
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("bf-test"), "final file should contain the bead");
+    }
+
+    #[test]
+    fn export_jsonl_dirty_only_exports_modified_beads() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // First, export all beads using export_jsonl
+        let all_beads = vec![
+            issue("bf-1", "First"),
+            issue("bf-2", "Second"),
+            issue("bf-3", "Third"),
+        ];
+        export_jsonl(&path, || Ok(all_beads.clone())).unwrap();
+        let before_export = std::fs::read_to_string(&path).unwrap();
+
+        // Now, export only dirty beads using export_jsonl_dirty
+        let dirty_beads = vec![issue("bf-2", "Second Modified")];
+        let mut clear_called = false;
+        let result = export_jsonl_dirty(
+            &path,
+            || Ok(dirty_beads.clone()),
+            || {
+                clear_called = true;
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.count, 1, "should report 1 dirty bead exported");
+        assert!(clear_called, "clear_dirty should be called after successful export");
+
+        // Verify final state: all beads present, only bf-2 modified
+        let after_export = std::fs::read_to_string(&path).unwrap();
+        let ids = ids_in(&path);
+        assert_eq!(ids, vec!["bf-1", "bf-2", "bf-3"], "all beads should be present");
+        assert!(after_export.contains("Second Modified"), "modified bead should be updated");
+        assert!(!after_export.contains("Second\n"), "old version should be replaced");
+
+        // Verify other beads preserved byte-for-byte (surgical update)
+        assert!(after_export.contains("First"), "bf-1 should be preserved");
+        assert!(after_export.contains("Third"), "bf-3 should be preserved");
+    }
+
+    #[test]
+    fn export_jsonl_dirty_no_op_when_no_dirty_beads() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create initial file
+        let beads = vec![issue("bf-1", "Initial")];
+        export_jsonl(&path, || Ok(beads.clone())).unwrap();
+        let before = std::fs::read_to_string(&path).unwrap();
+
+        // Export with no dirty beads
+        let mut clear_called = false;
+        let result = export_jsonl_dirty(
+            &path,
+            || Ok(vec![]), // no dirty beads
+            || {
+                clear_called = true;
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.count, 0, "should report 0 beads exported");
+        assert!(!clear_called, "clear_dirty should NOT be called when no dirty beads");
+
+        // Verify file unchanged
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(before, after, "file should be unchanged when no dirty beads");
+    }
+
+    #[test]
+    fn export_jsonl_dirty_atomic_behavior() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Export dirty beads
+        let dirty_beads = vec![issue("bf-dirty", "Dirty Bead")];
+        export_jsonl_dirty(
+            &path,
+            || Ok(dirty_beads.clone()),
+            || Ok(()),
+        )
+        .unwrap();
+
+        // Verify atomic behavior: temp file should not exist after successful export
+        let temp_path = path.with_extension("jsonl.tmp");
+        assert!(!temp_path.exists(), "temp file should be cleaned up after atomic rename");
+
+        // Verify final file exists
+        assert!(path.exists(), "final file should exist");
+    }
+
+    #[test]
+    fn export_jsonl_preserves_stable_ordering() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Export in reverse order
+        let beads_reverse = vec![
+            issue("bf-3", "Third"),
+            issue("bf-2", "Second"),
+            issue("bf-1", "First"),
+        ];
+        export_jsonl(&path, || Ok(beads_reverse.clone())).unwrap();
+
+        // Verify sorted order after first export
+        let ids = ids_in(&path);
+        assert_eq!(ids, vec!["bf-1", "bf-2", "bf-3"], "beads should be sorted by ID");
+
+        // Export again in different order
+        let beads_forward = vec![
+            issue("bf-1", "First"),
+            issue("bf-2", "Second"),
+            issue("bf-3", "Third"),
+        ];
+        export_jsonl(&path, || Ok(beads_forward.clone())).unwrap();
+
+        // Verify sorted order after second export (regardless of input order, output is sorted)
+        let ids = ids_in(&path);
+        assert_eq!(ids, vec!["bf-1", "bf-2", "bf-3"], "beads should be sorted by ID");
+
+        // Verify both exports contain the same IDs (regardless of timestamps)
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("bf-1"), "should contain bf-1");
+        assert!(contents.contains("bf-2"), "should contain bf-2");
+        assert!(contents.contains("bf-3"), "should contain bf-3");
+    }
+
+    #[test]
+    fn export_jsonl_empty_list() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Export empty list
+        let result = export_jsonl(&path, || Ok(vec![])).unwrap();
+        assert_eq!(result.count, 0, "should report 0 beads");
+
+        // File should still exist (empty file is valid)
+        assert!(path.exists(), "file should exist even when empty");
+
+        // But should have no content
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(contents.trim(), "", "file should be empty");
     }
 }
