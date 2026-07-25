@@ -1,0 +1,35 @@
+
+running 30 tests
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test test_jsonl_handles_empty_optional_fields ... ok
+test test_jsonl_export_dirty_only ... ok
+test test_jsonl_handles_special_characters ... ok
+test test_jsonl_import_empty_file ... ok
+test test_jsonl_handles_unicode ... ok
+test test_jsonl_import_mixed_statuses ... ok
+test test_jsonl_import_preserves_issue_types ... ok
+test test_jsonl_import_with_comments ... ok
+test test_jsonl_import_updates_changed_content ... ok
+test test_jsonl_round_trip_closed_bead ... ok
+test test_jsonl_round_trip_preserves_timestamps ... ok
+test test_jsonl_round_trip_simple_bead ... ok
+test test_jsonl_round_trip_recomputes_content_hash ... ok
+test test_jsonl_round_trip_with_all_fields ... ok
+test test_jsonl_round_trip_with_dependencies ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

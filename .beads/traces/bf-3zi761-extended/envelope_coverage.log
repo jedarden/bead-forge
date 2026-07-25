@@ -1,0 +1,607 @@
+
+running 41 tests
+test claim_stats::envelope_claim_bead_id_is_valid ... FAILED
+test claim_stats::envelope_claim_and_stats_consistent_structure ... FAILED
+test claim_stats::envelope_claim_json_has_metadata_fields ... FAILED
+test claim_stats::envelope_claim_json_returns_claim_result ... FAILED
+test claim_stats::envelope_claim_no_beads_returns_empty_object ... FAILED
+test claim_stats::envelope_stats_empty_returns_zero_stats ... ok
+test claim_stats::envelope_claim_reflects_assignee ... FAILED
+test claim_stats::envelope_stats_fields_are_numeric ... ok
+test claim_stats::envelope_stats_json_has_metadata_fields ... ok
+test claim_stats::envelope_stats_json_returns_stats_result ... ok
+test envelope_batch_command_has_stable_structure ... FAILED
+test claim_stats::envelope_stats_reflects_bead_count ... ok
+test envelope_batch_empty_emits_empty_array ... FAILED
+test envelope_claim_no_bead_emits_empty_object ... FAILED
+test envelope_claim_command_has_stable_structure ... FAILED
+test envelope_create_command_has_stable_structure ... ok
+test envelope_create_command_metadata_fields_present ... ok
+test envelope_data_field_always_present ... FAILED
+test envelope_kind_matches_command ... FAILED
+test envelope_list_empty_emits_empty_array ... ok
+test envelope_parses_as_valid_json_object ... ok
+test envelope_list_command_has_stable_structure ... ok
+test envelope_ready_empty_emits_empty_array ... ok
+test envelope_ready_command_has_stable_structure ... FAILED
+test envelope_recent_empty_emits_empty_array ... FAILED
+test envelope_recent_command_has_stable_structure ... FAILED
+test envelope_search_empty_emits_empty_array ... FAILED
+test envelope_search_command_has_stable_structure ... FAILED
+test envelope_serializes_and_deserializes_correctly ... ok
+test envelope_show_command_has_stable_structure ... ok
+test envelope_velocity_command_has_stable_structure ... FAILED
+test envelope_stats_command_has_stable_structure ... ok
+test envelope_velocity_empty_emits_empty_array ... FAILED
+test envelope_version_is_always_one ... FAILED
+test list_show::envelope_list_and_show_consistent_structure ... ok
+test list_show::envelope_list_empty_returns_empty_array ... ok
+test list_show::envelope_list_json_has_metadata_fields ... ok
+test list_show::envelope_list_items_match_show_structure ... ok
+test list_show::envelope_show_json_has_metadata_fields ... ok
+test list_show::envelope_show_json_returns_single_object ... ok
+test list_show::envelope_list_json_returns_array_data ... ok
+
+failures:
+
+---- claim_stats::envelope_claim_bead_id_is_valid stdout ----
+
+thread 'claim_stats::envelope_claim_bead_id_is_valid' (3420130) panicked at tests/envelope_coverage.rs:1055:9:
+claim result must have bead_id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- claim_stats::envelope_claim_and_stats_consistent_structure stdout ----
+
+thread 'claim_stats::envelope_claim_and_stats_consistent_structure' (3420129) panicked at tests/envelope_coverage.rs:1016:9:
+assertion `left == right` failed: claim envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_json_has_metadata_fields stdout ----
+
+thread 'claim_stats::envelope_claim_json_has_metadata_fields' (3420137) panicked at tests/envelope_coverage.rs:887:9:
+claim envelope must have 'version' field
+
+---- claim_stats::envelope_claim_json_returns_claim_result stdout ----
+
+thread 'claim_stats::envelope_claim_json_returns_claim_result' (3420140) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_no_beads_returns_empty_object stdout ----
+
+thread 'claim_stats::envelope_claim_no_beads_returns_empty_object' (3420151) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_reflects_assignee stdout ----
+
+thread 'claim_stats::envelope_claim_reflects_assignee' (3420156) panicked at tests/envelope_coverage.rs:1097:9:
+assertion `left == right` failed: claim envelope must reflect the specified assignee
+  left: None
+ right: Some("specific-test-worker")
+
+---- envelope_batch_command_has_stable_structure stdout ----
+
+thread 'envelope_batch_command_has_stable_structure' (3420191) panicked at tests/envelope_coverage.rs:421:5:
+batch data must be an array
+
+---- envelope_batch_empty_emits_empty_array stdout ----
+
+thread 'envelope_batch_empty_emits_empty_array' (3420195) panicked at tests/envelope_coverage.rs:459:5:
+batch data must be an array
+
+---- envelope_claim_no_bead_emits_empty_object stdout ----
+
+thread 'envelope_claim_no_bead_emits_empty_object' (3420202) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_claim_command_has_stable_structure stdout ----
+
+thread 'envelope_claim_command_has_stable_structure' (3420198) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_data_field_always_present stdout ----
+
+thread 'envelope_data_field_always_present' (3420212) panicked at tests/envelope_coverage.rs:568:17:
+Data field must be present for command: ["velocity", "--format", "json"]
+
+---- envelope_kind_matches_command stdout ----
+
+thread 'envelope_kind_matches_command' (3420214) panicked at tests/envelope_coverage.rs:530:17:
+assertion `left == right` failed: Kind mismatch for command ["velocity", "--format", "json"], expected 'velocity'
+  left: None
+ right: Some("velocity")
+
+---- envelope_ready_command_has_stable_structure stdout ----
+
+thread 'envelope_ready_command_has_stable_structure' (3420235) panicked at tests/envelope_coverage.rs:206:5:
+ready data must be an array
+
+---- envelope_recent_empty_emits_empty_array stdout ----
+
+thread 'envelope_recent_empty_emits_empty_array' (3420245) panicked at tests/envelope_coverage.rs:375:5:
+recent data must be an array
+
+---- envelope_recent_command_has_stable_structure stdout ----
+
+thread 'envelope_recent_command_has_stable_structure' (3420241) panicked at tests/envelope_coverage.rs:362:5:
+recent data must be an array
+
+---- envelope_search_empty_emits_empty_array stdout ----
+
+thread 'envelope_search_empty_emits_empty_array' (3420251) panicked at tests/envelope_coverage.rs:69:29:
+Invalid JSON output from ["--envelope", "search", "nonexistent", "--format", "json"]: EOF while parsing a value at line 1 column 0
+Output: 
+stderr: 
+
+---- envelope_search_command_has_stable_structure stdout ----
+
+thread 'envelope_search_command_has_stable_structure' (3420249) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_velocity_command_has_stable_structure stdout ----
+
+thread 'envelope_velocity_command_has_stable_structure' (3420267) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_velocity_empty_emits_empty_array stdout ----
+
+thread 'envelope_velocity_empty_emits_empty_array' (3420271) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_version_is_always_one stdout ----
+
+thread 'envelope_version_is_always_one' (3420273) panicked at tests/envelope_coverage.rs:493:17:
+assertion `left == right` failed: Version must be 1 for command: ["velocity", "--format", "json"]
+  left: None
+ right: Some(1)
+
+
+failures:
+    claim_stats::envelope_claim_and_stats_consistent_structure
+    claim_stats::envelope_claim_bead_id_is_valid
+    claim_stats::envelope_claim_json_has_metadata_fields
+    claim_stats::envelope_claim_json_returns_claim_result
+    claim_stats::envelope_claim_no_beads_returns_empty_object
+    claim_stats::envelope_claim_reflects_assignee
+    envelope_batch_command_has_stable_structure
+    envelope_batch_empty_emits_empty_array
+    envelope_claim_command_has_stable_structure
+    envelope_claim_no_bead_emits_empty_object
+    envelope_data_field_always_present
+    envelope_kind_matches_command
+    envelope_ready_command_has_stable_structure
+    envelope_recent_command_has_stable_structure
+    envelope_recent_empty_emits_empty_array
+    envelope_search_command_has_stable_structure
+    envelope_search_empty_emits_empty_array
+    envelope_velocity_command_has_stable_structure
+    envelope_velocity_empty_emits_empty_array
+    envelope_version_is_always_one
+
+test result: FAILED. 21 passed; 20 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+warning: unused import: `load_config`
+ --> src/rotate.rs:7:21
+  |
+7 | use crate::config::{load_config, load_metadata};
+  |                     ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `IssueChanges`
+  --> src/sync.rs:10:27
+   |
+10 | use crate::model::{Issue, IssueChanges};
+   |                           ^^^^^^^^^^^^
+
+warning: unused import: `rusqlite::params`
+  --> src/sync.rs:14:5
+   |
+14 | use rusqlite::params;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `SystemTime`
+  --> src/timing.rs:39:26
+   |
+39 | use std::time::{Instant, SystemTime};
+   |                          ^^^^^^^^^^
+
+warning: unused import: `NaiveDateTime`
+  --> src/velocity.rs:15:24
+   |
+15 | use chrono::{DateTime, NaiveDateTime, Utc};
+   |                        ^^^^^^^^^^^^^
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2228:9
+     |
+2228 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:2890:5
+     |
+2890 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:612:25
+    |
+612 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:248:13
+    |
+248 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1213:51
+     |
+1213 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1453:13
+     |
+1453 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1595:13
+     |
+1595 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:297:9
+    |
+297 |     let mut result = execute_command(command, args, config)?;
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:428:17
+    |
+428 |     if let Some(mut stdout) = child.stdout.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:447:17
+    |
+447 |     if let Some(mut stderr) = child.stderr.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/timing.rs:336:35
+    |
+336 |     pub fn complete_with_metadata(mut self, bead_id: &str) -> Result<crate::trace::TraceMetadata> {
+    |                                   ----^^^^
+    |                                   |
+    |                                   help: remove this `mut`
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:365:9
+    |
+365 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: function `wrap_envelope` is never used
+    --> src/cli/mod.rs:1049:4
+     |
+1049 | fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+     |    ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `commit_hash` is never read
+  --> src/migrate.rs:58:5
+   |
+57 | struct JsonlSnapshot {
+   |        ------------- field in this struct
+58 |     commit_hash: String,
+   |     ^^^^^^^^^^^
+
+warning: function `verify_forward_compat` is never used
+   --> src/migrate.rs:352:4
+    |
+352 | fn verify_forward_compat(storage: &Storage) -> Result<bool> {
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `cleanup_old_archives` is never used
+   --> src/rotate.rs:284:4
+    |
+284 | fn cleanup_old_archives(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `split_sql_statements` is never used
+   --> src/storage/schema.rs:335:4
+    |
+335 | fn split_sql_statements(sql: &str) -> Vec<&str> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `local_start` is never read
+   --> src/timing.rs:102:5
+    |
+100 | pub struct ExecutionTimer {
+    |            -------------- field in this struct
+101 |     /// In-memory start time (for calculating duration within this process)
+102 |     local_start: Instant,
+    |     ^^^^^^^^^^^
+
+warning: `bead-forge` (lib) generated 27 warnings (run `cargo fix --lib -p bead-forge` to apply 17 suggestions)
+warning: unused import: `std::path::PathBuf`
+ --> tests/envelope_coverage.rs:9:5
+  |
+9 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `id`
+    --> tests/envelope_coverage.rs:1048:13
+     |
+1048 |         let id = create_bead(ws.path(), "bead id validation");
+     |             ^^ help: if this is intentional, prefix it with an underscore: `_id`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: comparison is useless due to type limits
+    --> tests/envelope_coverage.rs:1071:21
+     |
+1071 |             assert!(total >= 0, "stats total must be non-negative");
+     |                     ^^^^^^^^^^
+     |
+     = note: `#[warn(unused_comparisons)]` on by default
+
+warning: `bead-forge` (test "envelope_coverage") generated 3 warnings (run `cargo fix --test "envelope_coverage" -p bead-forge` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests/envelope_coverage.rs (target/debug/deps/envelope_coverage-5c3e0b4039b2d2c4)
+
+running 41 tests
+test claim_stats::envelope_claim_bead_id_is_valid ... FAILED
+test claim_stats::envelope_claim_and_stats_consistent_structure ... FAILED
+test claim_stats::envelope_claim_json_has_metadata_fields ... FAILED
+test claim_stats::envelope_claim_json_returns_claim_result ... FAILED
+test claim_stats::envelope_claim_no_beads_returns_empty_object ... FAILED
+test claim_stats::envelope_stats_empty_returns_zero_stats ... ok
+test claim_stats::envelope_claim_reflects_assignee ... FAILED
+test claim_stats::envelope_stats_fields_are_numeric ... ok
+test claim_stats::envelope_stats_json_has_metadata_fields ... ok
+test claim_stats::envelope_stats_json_returns_stats_result ... ok
+test envelope_batch_command_has_stable_structure ... FAILED
+test claim_stats::envelope_stats_reflects_bead_count ... ok
+test envelope_batch_empty_emits_empty_array ... FAILED
+test envelope_claim_no_bead_emits_empty_object ... FAILED
+test envelope_claim_command_has_stable_structure ... FAILED
+test envelope_create_command_has_stable_structure ... ok
+test envelope_create_command_metadata_fields_present ... ok
+test envelope_data_field_always_present ... FAILED
+test envelope_kind_matches_command ... FAILED
+test envelope_list_empty_emits_empty_array ... ok
+test envelope_parses_as_valid_json_object ... ok
+test envelope_list_command_has_stable_structure ... ok
+test envelope_ready_empty_emits_empty_array ... ok
+test envelope_ready_command_has_stable_structure ... FAILED
+test envelope_recent_empty_emits_empty_array ... FAILED
+test envelope_recent_command_has_stable_structure ... FAILED
+test envelope_search_empty_emits_empty_array ... FAILED
+test envelope_search_command_has_stable_structure ... FAILED
+test envelope_serializes_and_deserializes_correctly ... ok
+test envelope_show_command_has_stable_structure ... ok
+test envelope_velocity_command_has_stable_structure ... FAILED
+test envelope_stats_command_has_stable_structure ... ok
+test envelope_velocity_empty_emits_empty_array ... FAILED
+test envelope_version_is_always_one ... FAILED
+test list_show::envelope_list_and_show_consistent_structure ... ok
+test list_show::envelope_list_empty_returns_empty_array ... ok
+test list_show::envelope_list_json_has_metadata_fields ... ok
+test list_show::envelope_list_items_match_show_structure ... ok
+test list_show::envelope_show_json_has_metadata_fields ... ok
+test list_show::envelope_show_json_returns_single_object ... ok
+test list_show::envelope_list_json_returns_array_data ... ok
+
+failures:
+
+---- claim_stats::envelope_claim_bead_id_is_valid stdout ----
+
+thread 'claim_stats::envelope_claim_bead_id_is_valid' (3420321) panicked at tests/envelope_coverage.rs:1055:9:
+claim result must have bead_id
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- claim_stats::envelope_claim_and_stats_consistent_structure stdout ----
+
+thread 'claim_stats::envelope_claim_and_stats_consistent_structure' (3420320) panicked at tests/envelope_coverage.rs:1016:9:
+assertion `left == right` failed: claim envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_json_has_metadata_fields stdout ----
+
+thread 'claim_stats::envelope_claim_json_has_metadata_fields' (3420328) panicked at tests/envelope_coverage.rs:887:9:
+claim envelope must have 'version' field
+
+---- claim_stats::envelope_claim_json_returns_claim_result stdout ----
+
+thread 'claim_stats::envelope_claim_json_returns_claim_result' (3420331) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_no_beads_returns_empty_object stdout ----
+
+thread 'claim_stats::envelope_claim_no_beads_returns_empty_object' (3420337) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- claim_stats::envelope_claim_reflects_assignee stdout ----
+
+thread 'claim_stats::envelope_claim_reflects_assignee' (3420339) panicked at tests/envelope_coverage.rs:1097:9:
+assertion `left == right` failed: claim envelope must reflect the specified assignee
+  left: None
+ right: Some("specific-test-worker")
+
+---- envelope_batch_command_has_stable_structure stdout ----
+
+thread 'envelope_batch_command_has_stable_structure' (3420364) panicked at tests/envelope_coverage.rs:421:5:
+batch data must be an array
+
+---- envelope_batch_empty_emits_empty_array stdout ----
+
+thread 'envelope_batch_empty_emits_empty_array' (3420368) panicked at tests/envelope_coverage.rs:459:5:
+batch data must be an array
+
+---- envelope_claim_no_bead_emits_empty_object stdout ----
+
+thread 'envelope_claim_no_bead_emits_empty_object' (3420375) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_claim_command_has_stable_structure stdout ----
+
+thread 'envelope_claim_command_has_stable_structure' (3420371) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_data_field_always_present stdout ----
+
+thread 'envelope_data_field_always_present' (3420392) panicked at tests/envelope_coverage.rs:568:17:
+Data field must be present for command: ["velocity", "--format", "json"]
+
+---- envelope_kind_matches_command stdout ----
+
+thread 'envelope_kind_matches_command' (3420401) panicked at tests/envelope_coverage.rs:530:17:
+assertion `left == right` failed: Kind mismatch for command ["velocity", "--format", "json"], expected 'velocity'
+  left: None
+ right: Some("velocity")
+
+---- envelope_ready_command_has_stable_structure stdout ----
+
+thread 'envelope_ready_command_has_stable_structure' (3420423) panicked at tests/envelope_coverage.rs:206:5:
+ready data must be an array
+
+---- envelope_recent_empty_emits_empty_array stdout ----
+
+thread 'envelope_recent_empty_emits_empty_array' (3420433) panicked at tests/envelope_coverage.rs:375:5:
+recent data must be an array
+
+---- envelope_recent_command_has_stable_structure stdout ----
+
+thread 'envelope_recent_command_has_stable_structure' (3420429) panicked at tests/envelope_coverage.rs:362:5:
+recent data must be an array
+
+---- envelope_search_empty_emits_empty_array stdout ----
+
+thread 'envelope_search_empty_emits_empty_array' (3420439) panicked at tests/envelope_coverage.rs:69:29:
+Invalid JSON output from ["--envelope", "search", "nonexistent", "--format", "json"]: EOF while parsing a value at line 1 column 0
+Output: 
+stderr: 
+
+---- envelope_search_command_has_stable_structure stdout ----
+
+thread 'envelope_search_command_has_stable_structure' (3420436) panicked at tests/envelope_coverage.rs:78:5:
+assertion `left == right` failed: Envelope version must be 1
+  left: None
+ right: Some(1)
+
+---- envelope_velocity_command_has_stable_structure stdout ----
+
+thread 'envelope_velocity_command_has_stable_structure' (3420455) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_velocity_empty_emits_empty_array stdout ----
+
+thread 'envelope_velocity_empty_emits_empty_array' (3420458) panicked at tests/envelope_coverage.rs:75:5:
+Envelope must be an object
+
+---- envelope_version_is_always_one stdout ----
+
+thread 'envelope_version_is_always_one' (3420461) panicked at tests/envelope_coverage.rs:493:17:
+assertion `left == right` failed: Version must be 1 for command: ["velocity", "--format", "json"]
+  left: None
+ right: Some(1)
+
+
+failures:
+    claim_stats::envelope_claim_and_stats_consistent_structure
+    claim_stats::envelope_claim_bead_id_is_valid
+    claim_stats::envelope_claim_json_has_metadata_fields
+    claim_stats::envelope_claim_json_returns_claim_result
+    claim_stats::envelope_claim_no_beads_returns_empty_object
+    claim_stats::envelope_claim_reflects_assignee
+    envelope_batch_command_has_stable_structure
+    envelope_batch_empty_emits_empty_array
+    envelope_claim_command_has_stable_structure
+    envelope_claim_no_bead_emits_empty_object
+    envelope_data_field_always_present
+    envelope_kind_matches_command
+    envelope_ready_command_has_stable_structure
+    envelope_recent_command_has_stable_structure
+    envelope_recent_empty_emits_empty_array
+    envelope_search_command_has_stable_structure
+    envelope_search_empty_emits_empty_array
+    envelope_velocity_command_has_stable_structure
+    envelope_velocity_empty_emits_empty_array
+    envelope_version_is_always_one
+
+test result: FAILED. 21 passed; 20 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+error: test failed, to rerun pass `--test envelope_coverage`

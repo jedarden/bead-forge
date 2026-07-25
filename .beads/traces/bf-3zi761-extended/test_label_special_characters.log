@@ -1,0 +1,15 @@
+
+running 10 tests
+test test_label_with_multiple_colons ... ok
+test test_complex_label_patterns ... ok
+test test_label_with_multiple_slashes ... ok
+test test_labels_with_colons ... ok
+test test_labels_with_hyphens ... ok
+test test_labels_with_slashes ... ok
+test test_labels_with_underscores ... ok
+test test_mixed_special_character_labels ... ok
+test test_special_character_label_persistence ... ok
+test test_special_character_label_removal ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+

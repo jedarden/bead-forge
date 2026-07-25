@@ -1,0 +1,9 @@
+
+running 4 tests
+test test_labels_returns_exactly_the_labels_one_per_line ... ok
+test test_label_list_returns_same_set_as_labels ... ok
+test test_show_epic_prints_labels_and_type ... ok
+test test_show_epic_with_zero_labels_displays_gracefully ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+

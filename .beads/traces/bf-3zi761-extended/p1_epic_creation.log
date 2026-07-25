@@ -1,0 +1,17 @@
+
+running 12 tests
+test test_p1_epic_creation ... ok
+test test_p1_epic_display_formatting ... ok
+test test_p1_epic_json_roundtrip ... ok
+test test_p1_epic_serialization ... ok
+test test_multiple_p1_epics ... ok
+test test_p1_epic_with_different_statuses ... ok
+test test_p1_epic_with_children ... ok
+test test_p1_priority_from_string ... ok
+test test_p1_priority_ordering ... ok
+test test_p1_priority_value ... ok
+test test_p1_vs_other_priorities ... ok
+test test_p1_epic_with_full_metadata ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

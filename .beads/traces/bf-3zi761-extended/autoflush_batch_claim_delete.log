@@ -1,0 +1,13 @@
+
+running 8 tests
+test batch_no_auto_flush_leaves_jsonl_untouched ... ok
+test batch_flushes_all_ops_and_preserves_existing ... ok
+test claim_flush_failure_warns_without_failing ... ok
+test claim_flushes_claimed_bead_state ... ok
+test delete_no_auto_flush_leaves_jsonl_untouched ... ok
+test execute_batch_performs_no_jsonl_write ... ok
+test delete_removes_line_and_preserves_others ... ok
+test mitosis_flushes_once_children_and_closed_parent ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+

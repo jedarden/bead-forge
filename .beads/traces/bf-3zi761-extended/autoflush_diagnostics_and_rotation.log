@@ -1,0 +1,9 @@
+
+running 4 tests
+test commit_check_never_writes_jsonl ... ok
+test autoflush_targets_only_active_jsonl_not_archives ... ok
+test unknown_readonly_invocations_leave_jsonl_untouched ... ok
+test doctor_write_flags_on_healthy_workspace_leave_jsonl_untouched ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.35s
+

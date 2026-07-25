@@ -1,0 +1,7 @@
+
+running 5 tests
+test test_foreign_key_enforcement_bead_labels ... FAILED
+test test_labels_within_same_transaction ... ok
+test test_labels_written_to_bead_labels_table_on_create ... ok
+test test_labels_written_to_bead_labels_table_on_update ... ok
+test test_empty_labels_does_not_create_orphan_records has been running for over 60 seconds

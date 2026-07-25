@@ -1,0 +1,14 @@
+
+running 9 tests
+test label_tests::test_epic_label_duplicates ... ok
+test label_tests::test_epic_label_add ... ok
+test label_tests::test_epic_label_list_all ... ok
+test label_tests::test_epic_label_persistence ... ok
+test label_tests::test_epic_label_remove ... ok
+test label_tests::test_epic_label_search ... ok
+test label_tests::test_epic_label_list ... ok
+test label_tests::test_epic_label_show ... ok
+test label_tests::test_epic_labels_command ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,14 @@
+
+running 9 tests
+test test_create_epic_via_cli ... ok
+test test_create_epic_with_all_fields ... ok
+test test_epic_appears_in_json_with_correct_type ... ok
+test test_create_multiple_epics ... ok
+test test_list_json_format_epics ... ok
+test test_list_filters_epic_type_issues ... ok
+test test_show_displays_epic_type_correctly ... ok
+test test_show_json_format_epic ... ok
+test test_multiple_epics_in_list_output ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+

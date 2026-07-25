@@ -1,0 +1,9 @@
+
+running 4 tests
+test test_batch_rollback_on_error ... ok
+test test_mitosis_atomic_batch ... ok
+test test_mitosis_helper_produces_at_references ... ok
+test test_cli_batch_json_at_references ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+

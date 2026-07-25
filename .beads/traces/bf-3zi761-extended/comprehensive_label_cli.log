@@ -1,0 +1,21 @@
+
+running 16 tests
+test test_empty_label_is_rejected_or_ignored ... ok
+test test_create_with_duplicate_labels ... ok
+test test_label_case_sensitivity ... ok
+test test_label_add_duplicate_is_idempotent ... ok
+test test_label_persistence_after_flush ... ok
+test test_label_list_all_with_counts ... ok
+test test_label_remove_duplicates_fully ... ok
+test test_label_remove_nonexistent_is_safe ... ok
+test test_label_whitespace_handling ... ok
+test test_labels_in_show_output ... ok
+test test_labels_json_format ... ok
+test test_labels_text_format ... ok
+test test_special_characters_in_labels ... ok
+test test_search_by_label ... ok
+test test_unicode_labels ... ok
+test test_very_long_label ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+

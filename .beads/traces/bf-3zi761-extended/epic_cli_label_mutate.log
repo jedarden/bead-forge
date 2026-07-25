@@ -1,0 +1,10 @@
+
+running 5 tests
+test test_label_add_duplicate_is_set_semantics ... ok
+test test_label_add_multiple_labels ... ok
+test test_label_add_single_label ... ok
+test test_label_remove_not_present_is_noop ... ok
+test test_label_remove_single_label ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+

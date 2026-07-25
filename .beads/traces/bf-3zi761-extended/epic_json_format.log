@@ -1,0 +1,17 @@
+
+running 12 tests
+test test_epic_json_deserialization_from_string ... ok
+test test_epic_json_all_priority_levels ... ok
+test test_epic_json_empty_fields_handling ... ok
+test test_epic_json_format_basic ... ok
+test test_epic_json_format_pretty_print ... ok
+test test_epic_json_format_with_assignee ... ok
+test test_epic_json_format_with_description ... ok
+test test_epic_json_format_with_labels ... ok
+test test_epic_json_formatter_output ... ok
+test test_epic_json_multiple_issues_format ... ok
+test test_epic_json_output_format_integration ... ok
+test test_epic_json_roundtrip_comprehensive ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

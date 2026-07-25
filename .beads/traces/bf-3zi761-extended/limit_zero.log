@@ -1,0 +1,7 @@
+
+running 2 tests
+test test_ready_limit_zero_direct_sql_check ... ok
+test test_ready_limit_zero_returns_all ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

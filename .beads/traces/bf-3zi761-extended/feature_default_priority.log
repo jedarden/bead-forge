@@ -1,0 +1,15 @@
+
+running 10 tests
+test test_feature_default_priority_is_p2 ... ok
+test test_feature_default_priority_serialization ... ok
+test test_feature_all_priorities_exist ... ok
+test test_feature_default_vs_explicit_priorities ... ok
+test test_feature_explicit_p0_critical_priority ... ok
+test test_feature_explicit_p1_priority ... ok
+test test_feature_vs_bug_default_priority ... ok
+test test_issue_new_default_priority_for_feature ... ok
+test test_feature_default_priority_storage ... ok
+test test_multiple_features_with_default_priority ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

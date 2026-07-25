@@ -1,0 +1,28 @@
+
+running 23 tests
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test backup_restore_round_trips ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test healthy_workspace_repair_is_a_noop ... ok
+test force_discards_unflushed_instead_of_preserving ... ok
+test preflight_refuses_rebuild_on_conflict_marker ... ok
+test induced_rebuild_preserves_unflushed_bead_with_labels_and_comments ... ok
+test preflight_refuses_rebuild_on_invalid_record ... ok
+test unflushed_beads_alone_do_not_trigger_rebuild ... ok
+test repeat_failure_gate_blocks_then_allows ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+

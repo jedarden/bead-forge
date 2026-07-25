@@ -1,0 +1,25 @@
+
+running 20 tests
+test test_all_priority_constants ... ok
+test test_p0_clone_and_copy ... ok
+test test_p0_debug_formatting ... ok
+test test_p0_deserialization ... ok
+test test_p0_display_variations ... ok
+test test_p0_equality ... ok
+test test_p0_from_string_conversion ... ok
+test test_p0_inequality ... ok
+test test_p0_invalid_string_parsing ... ok
+test test_p0_is_highest_priority ... ok
+test test_p0_ord_trait_implementation ... ok
+test test_p0_partial_ord_trait_implementation ... ok
+test test_p0_priority_const_definition ... ok
+test test_p0_priority_exists ... ok
+test test_p0_range_validation ... ok
+test test_p0_serialization ... ok
+test test_p0_to_string_conversion ... ok
+test test_p0_with_rusqlite_compatibility ... ok
+test test_priority_default_is_not_p0 ... ok
+test test_priority_ordering ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

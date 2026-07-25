@@ -1,0 +1,25 @@
+
+running 20 tests
+test test_annotate_get ... ok
+test test_annotate_list ... ok
+test test_comments_list ... ok
+test test_config_variants ... ok
+test test_count ... ok
+test test_critical_path ... ok
+test test_dep_list ... ok
+test test_dep_tree ... ok
+test test_label_list ... ok
+test test_doctor ... ok
+test test_labels_variants ... ok
+test test_list_variants ... ok
+test test_log ... ok
+test test_ready_variants ... ok
+test test_recent ... ok
+test test_schema ... ok
+test test_search ... ok
+test test_show_variants ... ok
+test test_stats_variants ... ok
+test test_velocity_variants ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+

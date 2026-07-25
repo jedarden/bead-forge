@@ -1,0 +1,13 @@
+
+running 8 tests
+test test_p0_epic_creation ... ok
+test test_p0_epic_display_formatting ... ok
+test test_p0_epic_json_roundtrip ... ok
+test test_p0_epic_serialization ... ok
+test test_multiple_p0_epics ... ok
+test test_p0_priority_value ... ok
+test test_p0_vs_other_priorities ... ok
+test test_p0_epic_with_full_metadata ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

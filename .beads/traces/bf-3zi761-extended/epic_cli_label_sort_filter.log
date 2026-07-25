@@ -1,0 +1,10 @@
+
+running 5 tests
+test test_label_list_all_includes_epic_labels ... ok
+test test_distinct_epics_keep_independent_label_sets ... ok
+test test_labels_command_returns_stable_alphabetical_order ... ok
+test test_list_type_epic_includes_labeled_epic_and_renders_labels ... ok
+test test_show_labels_line_in_stable_alphabetical_order ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+

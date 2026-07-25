@@ -1,0 +1,26 @@
+
+running 21 tests
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test test_migrate_from_jsonl_preserves_all_fields ... ok
+test test_migrate_from_jsonl_creates_synthetic_events_for_status_changes ... ok
+test test_migrate_from_jsonl_reconstructs_created_events ... ok
+test test_parse_git_log_handles_empty_output ... ok
+test test_seed_velocity_from_closed_events ... ok
+test test_synthetic_events_get_git_reconstructed_annotation ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+

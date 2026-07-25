@@ -1,0 +1,18 @@
+
+running 13 tests
+test test_batch_empty_operations ... ok
+test test_batch_literal_id_references ... ok
+test test_batch_placeholder_out_of_bounds_fails_gracefully ... ok
+test test_batch_multiple_independent_creates ... ok
+test test_batch_rollback_on_invalid_close ... ok
+test test_batch_placeholder_resolution_multiple_references ... ok
+test test_batch_rollback_on_invalid_dependency ... ok
+test test_batch_single_create ... ok
+test test_mitosis_atomicity_all_operations ... ok
+test test_mitosis_rollback_on_dependency_failure ... ok
+test test_sqlite_rollback_on_database_reopen ... ok
+test test_crash_mid_transaction_rolls_back_on_reopen ... ok
+test test_successful_batch_persists_on_reopen ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+

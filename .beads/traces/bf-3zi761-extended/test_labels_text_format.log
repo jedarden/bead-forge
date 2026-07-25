@@ -1,0 +1,13 @@
+
+running 8 tests
+test test_label_list_alphabetical_order_single_bead ... ok
+test test_label_list_all_unique_text_format ... ok
+test test_label_list_empty_bead_text_format ... ok
+test test_label_list_single_bead_text_format ... ok
+test test_label_list_multiple_labels_text_format ... ok
+test test_labels_command_text_format_multiple_labels ... ok
+test test_labels_command_text_format_no_labels ... ok
+test test_labels_command_text_format_single_label ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+

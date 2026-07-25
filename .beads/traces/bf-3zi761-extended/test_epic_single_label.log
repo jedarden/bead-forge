@@ -1,0 +1,16 @@
+
+running 11 tests
+test test_epic_creation_single_label ... ok
+test test_epic_single_label_add_and_remove ... ok
+test test_epic_single_label_get_labels ... ok
+test test_epic_single_label_serialization ... ok
+test test_epic_single_label_json_roundtrip ... ok
+test test_epic_single_label_status_computation ... ok
+test test_epic_single_label_various_types ... ok
+test test_epic_single_label_with_children ... ok
+test test_epic_single_label_with_priority ... ok
+test test_epic_single_label_with_closed_children ... ok
+test test_multiple_epics_different_single_labels ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

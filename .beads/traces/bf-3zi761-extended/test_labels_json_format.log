@@ -1,0 +1,15 @@
+
+running 10 tests
+test test_labels_json_all_beads_empty_workspace ... ok
+test test_labels_json_compact_format ... ok
+test test_labels_json_single_bead_empty_labels ... ok
+test test_labels_json_all_beads_with_labels ... ok
+test test_labels_json_single_bead_multiple_labels ... ok
+test test_labels_json_single_bead_single_label ... ok
+test test_labels_json_special_characters ... ok
+test test_labels_json_structure_all_beads_schema ... ok
+test test_labels_json_structure_matches_schema ... ok
+test test_labels_json_unicode_characters ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+

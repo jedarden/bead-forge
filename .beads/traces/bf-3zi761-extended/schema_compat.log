@@ -1,0 +1,32 @@
+
+running 27 tests
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test test_bf_annotations_dont_pollute_issues_table ... ok
+test test_bf_tables_dont_interfere_with_br ... ok
+test test_bf_velocity_stats_table_structure ... ok
+test test_bf_worker_sessions_table_structure ... ok
+test test_br_check_constraint_on_closed_at ... ok
+test test_br_can_read_bf_created_issues ... ok
+test test_foreign_keys_enforced ... ok
+test test_critical_path_cache_table_structure ... ok
+test test_indexes_created ... ok
+test test_migration_lock_table_structure ... ok
+test test_schema_matches_br_column_order ... ok
+test test_wal_mode_enabled ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+

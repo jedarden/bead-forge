@@ -1,0 +1,17 @@
+
+running 12 tests
+test claim_marks_dirty ... ok
+test annotation_set_and_remove_mark_dirty ... ok
+test comment_marks_dirty ... ok
+test close_marks_dirty ... ok
+test create_marks_dirty ... ok
+test dep_add_marks_dirty ... ok
+test label_add_marks_dirty ... ok
+test dep_remove_marks_dirty ... ok
+test label_remove_marks_dirty ... ok
+test read_only_commands_do_not_mark_dirty ... ok
+test update_priority_marks_dirty ... ok
+test update_status_marks_dirty ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

@@ -1,0 +1,9 @@
+
+running 4 tests
+test test_create_epic_with_multiple_labels ... ok
+test test_create_epic_type_recorded_alongside_labels ... ok
+test test_create_epic_with_no_labels_is_not_an_error ... ok
+test test_create_epic_with_single_label ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

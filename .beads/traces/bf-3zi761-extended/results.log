@@ -1,0 +1,65 @@
+Starting extended test batch at Sat Jul 25 06:49:25 AM EDT 2026
+2026-07-25 06:49:29 - autoflush_batch_claim_delete - PASSED
+2026-07-25 06:49:32 - autoflush_diagnostics_and_rotation - PASSED
+2026-07-25 06:49:32 - autoflush_failure_contract - FAILED (exit code: 101)
+2026-07-25 06:49:32 - autofush_mutation - FAILED (exit code: 101)
+2026-07-25 06:49:34 - autoflush_readonly - PASSED
+2026-07-25 06:49:34 - autoflush_wiring - FAILED (exit code: 101)
+2026-07-25 06:49:35 - batch_atomic - PASSED
+2026-07-25 06:49:36 - batch_cascade_and_rotation - PASSED
+2026-07-25 06:49:36 - batch_mitosis - PASSED
+2026-07-25 06:49:36 - bf_520v_json_format - FAILED (exit code: 101)
+2026-07-25 06:49:41 - br_isolation - FAILED (exit code: 101)
+2026-07-25 06:49:41 - bug_default_priority - PASSED
+2026-07-25 06:49:42 - claim_fallback - PASSED
+2026-07-25 06:49:42 - claim_race - PASSED
+2026-07-25 06:49:42 - close_reopen - PASSED
+2026-07-25 06:49:43 - comments_cli - PASSED
+2026-07-25 06:49:43 - comprehensive_label_cli - PASSED
+2026-07-25 06:49:44 - comprehensive_label_tests - PASSED
+2026-07-25 06:49:44 - concurrent_claim - PASSED
+2026-07-25 06:49:44 - count_command - PASSED
+2026-07-25 06:49:48 - description_update_test_infrastructure - PASSED
+2026-07-25 06:49:49 - dirty_tracking - PASSED
+2026-07-25 06:49:49 - doctor_repair_unflushed - PASSED
+2026-07-25 06:49:49 - doctor_safety_stack - PASSED
+2026-07-25 06:49:50 - duplicate_label_test - PASSED
+2026-07-25 06:49:51 - envelope_coverage - FAILED (exit code: 101)
+2026-07-25 06:49:51 - envelope_helpers - PASSED
+2026-07-25 06:49:55 - envelope_integration_tests - FAILED (exit code: 101)
+2026-07-25 06:49:55 - epic_cli_label_creation - PASSED
+2026-07-25 06:49:55 - epic_cli_label_display - PASSED
+2026-07-25 06:50:01 - epic_cli_label_mutate - PASSED
+2026-07-25 06:50:01 - epic_cli_label_sort_filter - PASSED
+2026-07-25 06:50:02 - epic_cli_labels - FAILED (exit code: 101)
+2026-07-25 06:50:02 - epic_cli - PASSED
+2026-07-25 06:50:03 - epic_complex_labels - PASSED
+2026-07-25 06:50:03 - epic_comprehensive - PASSED
+2026-07-25 06:50:03 - epic_default_priority - PASSED
+2026-07-25 06:50:03 - epic_json_format - PASSED
+2026-07-25 06:50:04 - epic_label_edge_cases - PASSED
+2026-07-25 06:50:04 - epic_p0_labels - PASSED
+2026-07-25 06:50:10 - epic_type_basic - PASSED
+2026-07-25 06:50:10 - epic_with_labels - PASSED
+2026-07-25 06:50:10 - feature_default_priority - PASSED
+2026-07-25 06:50:12 - fleet_concurrency - PASSED
+2026-07-25 06:50:12 - integration_trace_stderr_timing - PASSED
+2026-07-25 06:50:13 - json_formatter_verification - FAILED (exit code: 101)
+2026-07-25 06:50:13 - jsonl_compat - PASSED
+2026-07-25 06:50:14 - kill_worker_preserves_beads - FAILED (exit code: 101)
+2026-07-25 06:55:14 - label_integration_test - FAILED (exit code: 124)
+2026-07-25 06:55:15 - label_list - PASSED
+2026-07-25 06:55:20 - label_removal_test - FAILED (exit code: 101)
+2026-07-25 06:55:20 - label_storage - PASSED
+2026-07-25 06:55:20 - label_tests - PASSED
+2026-07-25 06:55:20 - limit_zero - PASSED
+2026-07-25 06:55:21 - migrate_git_reconstruction - PASSED
+2026-07-25 06:55:21 - p0_epic_creation - PASSED
+2026-07-25 06:55:21 - p0_epic_labels - PASSED
+2026-07-25 06:55:21 - p1_epic_creation - PASSED
+2026-07-25 06:55:21 - priority_p0_validation - PASSED
+2026-07-25 06:55:22 - readonly_commands - PASSED
+2026-07-25 06:55:22 - readonly_coverage_gaps - PASSED
+2026-07-25 06:55:27 - ready_json_fields - PASSED
+2026-07-25 06:55:27 - recovery_and_exit_criteria - FAILED (exit code: 101)
+2026-07-25 06:55:28 - schema_compat - PASSED

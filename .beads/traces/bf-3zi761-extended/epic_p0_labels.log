@@ -1,0 +1,17 @@
+
+running 12 tests
+test test_epic_p0_creation_with_labels ... ok
+test test_epic_p0_default_comparison_with_other_priorities ... ok
+test test_epic_p0_json_roundtrip ... ok
+test test_epic_p0_labels_serialization ... ok
+test test_epic_p0_filtering_by_labels ... ok
+test test_epic_p0_labels_update ... ok
+test test_epic_p0_labels_with_closed_status ... ok
+test test_epic_p0_priority_display ... ok
+test test_epic_p0_multiple_labels ... ok
+test test_epic_p0_single_label ... ok
+test test_epic_p0_with_children_labels ... ok
+test test_multiple_epics_p0_with_different_labels ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+

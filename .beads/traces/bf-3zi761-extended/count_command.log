@@ -4,5 +4,5 @@ test test_count_by_status_filters ... ok
 test test_count_filtered_subset_of_total ... ok
 test test_count_total_reflects_created_beads ... ok
 
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
 

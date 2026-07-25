@@ -1,0 +1,17 @@
+
+running 12 tests
+test test_epic_creation_with_labels ... ok
+test test_epic_default_priority_with_labels ... ok
+test test_epic_children_with_labels ... ok
+test test_epic_get_labels_with_children ... ok
+test test_epic_labels_serialization ... ok
+test test_epic_hierarchy_with_label_propagation ... ok
+test test_epic_labels_update ... ok
+test test_epic_labels_with_closed_children ... ok
+test test_epic_status_computation_with_labels ... ok
+test test_epic_with_labels_aggregation ... ok
+test test_epic_with_no_labels ... ok
+test test_multiple_epics_with_distinct_labels ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

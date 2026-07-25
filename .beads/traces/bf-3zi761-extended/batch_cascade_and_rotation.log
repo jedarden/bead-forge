@@ -1,0 +1,7 @@
+
+running 2 tests
+test batch_close_cascade_marked_dirty_and_exported_in_single_flush ... ok
+test incremental_flush_targets_only_active_jsonl_not_archive ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+

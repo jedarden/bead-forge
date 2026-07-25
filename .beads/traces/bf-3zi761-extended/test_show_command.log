@@ -13,5 +13,5 @@ test test_show_with_all_fields ... ok
 test test_show_with_labels_only ... ok
 test test_show_with_dependencies ... ok
 
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
 

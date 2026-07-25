@@ -1,0 +1,20 @@
+
+running 15 tests
+test test_epic_child_relationship_storage ... ok
+test test_epic_child_types_mixed ... ok
+test test_epic_default_is_task ... ok
+test test_epic_children_closure_affects_eligibility ... ok
+test test_epic_status_computation_all_closed_eligible ... ok
+test test_epic_status_computation_all_open ... ok
+test test_epic_status_serialization ... ok
+test test_epic_string_roundtrip ... ok
+test test_epic_type_creation_and_serialization ... ok
+test test_epic_with_all_issue_types ... ok
+test test_epic_status_computation_partial_closed ... ok
+test test_epic_with_blocked_child ... ok
+test test_epic_with_deferred_child ... ok
+test test_epic_with_no_children ... ok
+test test_multiple_epics_independent ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+

@@ -1,0 +1,25 @@
+
+running 20 tests
+test test_labels_invalid_bead_id ... ok
+test test_labels_json_format ... ok
+test test_list_all_with_annotation_filter ... ok
+test test_list_all_with_multiple_filters ... ok
+test test_list_annotation_filter_invalid_format ... ok
+test test_list_annotation_filter_valid ... ok
+test test_list_envelope_output ... ok
+test test_list_limit_zero_unlimited ... ok
+test test_ready_empty_candidates ... ok
+test test_ready_envelope_output ... ok
+test test_ready_toon_format ... ok
+test test_show_archive_fallback ... ok
+test test_show_envelope_output ... ok
+test test_show_dependencies_default_format ... ok
+test test_show_nonexistent_bead_error ... ok
+test test_show_toon_format_with_dependencies ... ok
+test test_velocity_dynamic_query_both_filters ... ok
+test test_velocity_get_expected_seconds_fallback_chain ... ok
+test test_velocity_parse_failure_fallback ... ok
+test test_velocity_session_not_found ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+

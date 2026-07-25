@@ -1,0 +1,29 @@
+
+running 24 tests
+test common::tests::test_assert_p0_epic_display ... ok
+test common::tests::test_assert_p0_epic ... ok
+test common::tests::test_assert_p0_epic_json_serialization ... ok
+test common::tests::test_p0_epic_builder_full ... ok
+test common::tests::test_p0_epic_builder_minimal ... ok
+test common::tests::test_p0_epic_roundtrip_through_workspace ... ok
+test common::tests::test_sample_p0_epic_full_jsonl ... ok
+test common::tests::test_sample_p0_epic_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_description_jsonl ... ok
+test common::tests::test_sample_p0_epic_with_labels_jsonl ... ok
+test common::tests::test_count_p0_epics ... ok
+test common::tests::test_temp_workspace_create_bead ... ok
+test common::tests::test_seed_p0_epics ... ok
+test common::tests::test_temp_workspace_creation ... ok
+test common::tests::test_temp_workspace_with_jsonl ... ok
+test test_count_unflushed_zero_after_repair ... ok
+test test_count_unflushed_zero_after_repair_with_flush_first ... ok
+test test_count_unflushed_zero_after_sync_import ... ok
+test test_doctor_repair_detects_modified_beads ... ok
+test test_doctor_repair_corrupt_db_with_unflushed ... ok
+test test_doctor_repair_flush_first_preserves_unflushed ... ok
+test test_doctor_repair_force_loses_unflushed_beads ... ok
+test test_doctor_repair_refuses_unflushed_beads ... ok
+test test_doctor_repair_multiple_unflushed_reported ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+

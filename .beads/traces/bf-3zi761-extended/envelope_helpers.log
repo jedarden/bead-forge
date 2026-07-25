@@ -1,0 +1,31 @@
+
+running 26 tests
+test tests::test_assert_data_array_length ... ok
+test tests::test_assert_data_array_empty ... ok
+test tests::test_assert_data_array_non_empty ... ok
+test tests::test_assert_data_is_array ... ok
+test tests::test_assert_data_is_object ... ok
+test tests::test_assert_data_object_has_key ... ok
+test tests::test_assert_data_object_has_value ... ok
+test tests::test_data_array_length ... ok
+test tests::test_data_is_array ... ok
+test tests::test_data_is_boolean ... ok
+test tests::test_data_is_null ... ok
+test tests::test_data_is_number ... ok
+test tests::test_data_is_object ... ok
+test tests::test_data_is_string ... ok
+test tests::test_get_data ... ok
+test tests::test_get_kind ... ok
+test tests::test_get_version ... ok
+test tests::test_parse_envelope ... ok
+test tests::test_parse_envelope_invalid_json ... ok
+test tests::test_validate_envelope_structure ... ok
+test tests::test_validate_envelope_structure_wrong_kind ... ok
+test tests::test_validate_metadata_fields ... ok
+test tests::test_validate_no_warning ... ok
+test tests::test_validate_no_warning_with_warning ... ok
+test tests::test_validate_warning_present ... ok
+test tests::test_validate_warning_present_missing ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
