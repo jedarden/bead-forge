@@ -15,7 +15,7 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    test_workspace, bf_binary, bf_command,
+    test_workspace, bf_binary, bf_command, bf_command_with_workspace,
     json_validation, format_detection, fixtures, capture, envelope,
 };
 
@@ -152,12 +152,12 @@ fn test_list_json_jsonl_format_structure() {
 
 #[test]
 fn test_list_json_empty_result() {
-    let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let temp_dir = create_isolated_workspace();
+    let workspace = temp_dir.path();
 
     // Ensure no beads exist by using a fresh workspace
     let output = capture::capture_stdout(
-        bf_command()
+        bf_command_with_workspace(workspace)
             .arg("list")
             .arg("--format")
             .arg("json")
@@ -362,11 +362,11 @@ fn test_list_json_envelope_wrapping() {
 
 #[test]
 fn test_list_json_empty_with_envelope() {
-    let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let temp_dir = create_isolated_workspace();
+    let workspace = temp_dir.path();
 
     let output = capture::capture_stdout(
-        bf_command()
+        bf_command_with_workspace(workspace)
             .arg("list")
             .arg("--format")
             .arg("json")
@@ -437,12 +437,12 @@ fn test_ready_json_structure_validity() {
 
 #[test]
 fn test_ready_json_empty_result() {
-    let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let temp_dir = create_isolated_workspace();
+    let workspace = temp_dir.path();
 
     // Ensure no ready beads exist by using a fresh workspace
     let output = capture::capture_stdout(
-        bf_command()
+        bf_command_with_workspace(workspace)
             .arg("ready")
             .arg("--format")
             .arg("json")
@@ -610,11 +610,11 @@ fn test_ready_json_envelope_wrapping() {
 
 #[test]
 fn test_ready_json_empty_with_envelope() {
-    let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let temp_dir = create_isolated_workspace();
+    let workspace = temp_dir.path();
 
     let output = capture::capture_stdout(
-        bf_command()
+        bf_command_with_workspace(workspace)
             .arg("ready")
             .arg("--format")
             .arg("json")
