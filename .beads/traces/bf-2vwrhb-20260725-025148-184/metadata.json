@@ -1,0 +1,18 @@
+{
+  "bead_id": "bf-2vwrhb",
+  "agent": "test-multi-module-trace-3",
+  "provider": "test-runner",
+  "model": "cargo-test",
+  "exit_code": 0,
+  "outcome": "success",
+  "start_time": "2026-07-25T02:51:47.772658568+00:00",
+  "end_time": "2026-07-25T02:51:48.184326154+00:00",
+  "duration_ms": 411,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-25T02:51:48.184344069+00:00",
+  "trace_format": "claude_json",
+  "pruned": false,
+  "template_version": null
+}
