@@ -1,0 +1,9 @@
+
+running 4 tests
+test tests::test_version_flag_output ... ok
+test tests::test_version_exit_code ... ok
+test tests::test_version_matches_cargo_toml ... ok
+test tests::test_version_short_flag ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
