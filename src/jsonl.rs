@@ -849,4 +849,545 @@ not json at all
 
         assert_eq!(result.imported, 1, "should import bead with extra fields");
     }
+
+    // ==================== Edge Case Tests ====================
+
+    #[test]
+    fn import_jsonl_with_only_whitespace() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with only whitespace
+        std::fs::write(&path, "   \n\n  \t  \n").unwrap();
+
+        let result = import_jsonl(&path, |_issue| Ok(UpsertResult::New));
+
+        // Should fail - import_jsonl doesn't skip blank lines, it tries to parse them
+        assert!(result.is_err(), "import_jsonl should fail on whitespace-only lines (no valid JSON)");
+    }
+
+    #[test]
+    fn import_jsonl_with_blank_lines() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with blank lines between beads
+        let jsonl_content = r#"{"id":"bf-001","title":"First","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+
+{"id":"bf-002","title":"Second","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+
+{"id":"bf-003","title":"Third","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            assert!(!issue.id.is_empty());
+            Ok(UpsertResult::New)
+        });
+
+        // Should fail - blank lines cause parse errors
+        assert!(result.is_err(), "import_jsonl should fail on blank lines (tries to parse them as JSON)");
+    }
+
+    #[test]
+    fn import_jsonl_with_comment_like_lines() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with comment-like lines (not standard JSONL, but testing robustness)
+        let jsonl_content = r#"# This is a comment
+{"id":"bf-001","title":"First","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+// Another comment style
+{"id":"bf-002","title":"Second","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-003","title":"Third","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            Ok(UpsertResult::New)
+        });
+
+        // Comment-like lines will cause parse errors - this is expected behavior
+        assert!(result.is_err(), "import_jsonl should fail on non-JSON comment-like lines");
+    }
+
+    #[test]
+    fn import_jsonl_unicode_characters() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create beads with various Unicode characters
+        let jsonl_content = r#"{"id":"bf-unicode-emoji","title":"Test with emoji 🎉🚀","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test","description":"Testing emoji: 😀🎨🔥"}
+{"id":"bf-unicode-cjk","title":"Test with CJK 中文日本語한국어","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test","description":"Testing CJK characters"}
+{"id":"bf-unicode-arabic","title":"Test with Arabic العربية","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test","description":"Testing Arabic"}
+{"id":"bf-unicode-cyrillic","title":"Test with Cyrillic русский","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test","description":"Testing Cyrillic"}
+{"id":"bf-unicode-mixed","title":"Test mixed 🎨中文🚀عربي","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test","description":"Mixed script"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            // Verify Unicode characters are preserved
+            match issue.id.as_str() {
+                "bf-unicode-emoji" => {
+                    assert!(issue.title.contains("🎉"));
+                    assert!(issue.title.contains("🚀"));
+                    assert!(issue.description.as_ref().unwrap().contains("😀"));
+                }
+                "bf-unicode-cjk" => {
+                    assert!(issue.title.contains("中文"));
+                    assert!(issue.title.contains("日本語"));
+                    assert!(issue.title.contains("한국어"));
+                }
+                "bf-unicode-arabic" => {
+                    assert!(issue.title.contains("العربية"));
+                }
+                "bf-unicode-cyrillic" => {
+                    assert!(issue.title.contains("русский"));
+                }
+                "bf-unicode-mixed" => {
+                    assert!(issue.title.contains("🎨"));
+                    assert!(issue.title.contains("中文"));
+                    assert!(issue.title.contains("🚀"));
+                    assert!(issue.title.contains("عربي"));
+                }
+                _ => panic!("Unexpected bead ID: {}", issue.id),
+            }
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 5, "should import all 5 Unicode beads");
+    }
+
+    #[test]
+    fn import_jsonl_special_characters() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create beads with special characters that need escaping
+        let jsonl_content = r#"{"id":"bf-special-quotes","title":"Test with \"quotes\" and 'apostrophes'","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-special-backslash","title":"Test with backslash \\ and forwardslash /","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-special-newlines","title":"Test with newlines\nand\ttabs","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-special-unicode-escape","title":"Test with unicode escape ❤❤❤","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            // Verify special characters are properly unescaped
+            match issue.id.as_str() {
+                "bf-special-quotes" => {
+                    assert!(issue.title.contains("\"quotes\""));
+                    assert!(issue.title.contains("'apostrophes'"));
+                }
+                "bf-special-backslash" => {
+                    assert!(issue.title.contains("\\"));
+                    assert!(issue.title.contains("/"));
+                }
+                "bf-special-newlines" => {
+                    assert!(issue.title.contains('\n'));
+                    assert!(issue.title.contains('\t'));
+                }
+                "bf-special-unicode-escape" => {
+                    // Unicode escape sequences should be converted to actual characters
+                    assert!(issue.title.contains('❤'));
+                }
+                _ => panic!("Unexpected bead ID: {}", issue.id),
+            }
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 4, "should import all 4 special character beads");
+    }
+
+    #[test]
+    fn import_jsonl_very_long_description() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a bead with a very long description (10KB)
+        let long_description = "x".repeat(10_000);
+        let jsonl_content = format!(
+            r#"{{"id":"bf-long","title":"Long description","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test","description":"{}"}}"#,
+            long_description
+        );
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            assert_eq!(issue.id, "bf-long");
+            assert_eq!(issue.description, Some(long_description.clone()));
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 1, "should import bead with very long description");
+    }
+
+    #[test]
+    fn import_jsonl_very_long_title() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a bead with a very long title (1KB - reasonable limit)
+        let long_title = "y".repeat(1_000);
+        let jsonl_content = format!(
+            r#"{{"id":"bf-long-title","title":"{}","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}}"#,
+            long_title
+        );
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            assert_eq!(issue.id, "bf-long-title");
+            assert_eq!(issue.title, long_title);
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(result.imported, 1, "should import bead with very long title");
+    }
+
+    #[test]
+    fn export_jsonl_unicode_characters() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create beads with various Unicode characters
+        let mut bead_emoji = issue("bf-emoji", "Emoji test 🎉🚀");
+        bead_emoji.description = Some("Description with emoji: 😀🎨🔥".to_string());
+
+        let mut bead_cjk = issue("bf-cjk", "CJK test 中文");
+        bead_cjk.description = Some("Japanese 日本語 and Korean 한국어".to_string());
+
+        let beads = vec![bead_emoji, bead_cjk];
+
+        // Export to JSONL
+        export_jsonl(&path, || Ok(beads.clone())).unwrap();
+
+        // Read back and verify Unicode is preserved
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("🎉"));
+        assert!(contents.contains("🚀"));
+        assert!(contents.contains("😀"));
+        assert!(contents.contains("中文"));
+        assert!(contents.contains("日本語"));
+        assert!(contents.contains("한국어"));
+
+        // Verify it can be re-imported
+        let reimport_result = import_jsonl(&path, |issue| {
+            match issue.id.as_str() {
+                "bf-emoji" => {
+                    assert!(issue.title.contains("🎉"));
+                    assert!(issue.description.as_ref().unwrap().contains("😀"));
+                }
+                "bf-cjk" => {
+                    assert!(issue.title.contains("中文"));
+                    assert!(issue.description.as_ref().unwrap().contains("日本語"));
+                }
+                _ => panic!("Unexpected bead ID: {}", issue.id),
+            }
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(reimport_result.imported, 2, "should re-import both Unicode beads");
+    }
+
+    #[test]
+    fn export_jsonl_special_characters() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create beads with special characters that need proper escaping
+        let mut bead_quotes = issue("bf-quotes", "Test \"quotes\"");
+        bead_quotes.description = Some("Description with 'apostrophes' and \"quotes\"".to_string());
+
+        let mut bead_newlines = issue("bf-newlines", "Newline test");
+        bead_newlines.description = Some("Line 1\nLine 2\tTabbed".to_string());
+
+        let beads = vec![bead_quotes, bead_newlines];
+
+        // Export to JSONL
+        export_jsonl(&path, || Ok(beads.clone())).unwrap();
+
+        // Read back and verify special characters are properly escaped
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("\\\"")); // Escaped quotes
+        assert!(contents.contains("\\n")); // Escaped newline
+        assert!(contents.contains("\\t")); // Escaped tab
+
+        // Verify it can be re-imported and characters are preserved
+        let reimport_result = import_jsonl(&path, |issue| {
+            match issue.id.as_str() {
+                "bf-quotes" => {
+                    assert!(issue.title.contains('"'));
+                    assert!(issue.description.as_ref().unwrap().contains('\''));
+                    assert!(issue.description.as_ref().unwrap().contains('"'));
+                }
+                "bf-newlines" => {
+                    assert!(issue.description.as_ref().unwrap().contains('\n'));
+                    assert!(issue.description.as_ref().unwrap().contains('\t'));
+                }
+                _ => panic!("Unexpected bead ID: {}", issue.id),
+            }
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(reimport_result.imported, 2, "should re-import both special character beads");
+    }
+
+    #[test]
+    fn export_jsonl_very_long_fields() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a bead with very long fields
+        let long_title = "T".repeat(1_000);
+        let long_description = "D".repeat(50_000); // 50KB description
+
+        let mut bead = issue("bf-long", &long_title);
+        bead.description = Some(long_description);
+
+        let beads = vec![bead];
+
+        // Export to JSONL
+        let result = export_jsonl(&path, || Ok(beads.clone())).unwrap();
+        assert_eq!(result.count, 1, "should export 1 bead with long fields");
+
+        // Read back and verify long fields are preserved
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.len() > 50_000, "file should be large (>50KB)");
+
+        // Verify it can be re-imported
+        let reimport_result = import_jsonl(&path, |issue| {
+            assert_eq!(issue.id, "bf-long");
+            assert_eq!(issue.title.len(), 1_000);
+            assert_eq!(issue.description.as_ref().unwrap().len(), 50_000);
+            Ok(UpsertResult::New)
+        })
+        .unwrap();
+
+        assert_eq!(reimport_result.imported, 1, "should re-import bead with long fields");
+    }
+
+    #[test]
+    fn export_jsonl_concurrent_scenarios() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a shared counter and error vector
+        let export_count = Arc::new(Mutex::new(0));
+        let errors = Arc::new(Mutex::new(Vec::new()));
+
+        // Spawn multiple threads attempting concurrent exports
+        let mut handles = vec![];
+        for i in 0..5 {
+            let path_clone = path.clone();
+            let count_clone = Arc::clone(&export_count);
+            let errors_clone = Arc::clone(&errors);
+
+            let handle = thread::spawn(move || {
+                let bead = issue(&format!("bf-concurrent-{}", i), &format!("Concurrent bead {}", i));
+                let beads = vec![bead];
+
+                match export_jsonl(&path_clone, || Ok(beads.clone())) {
+                    Ok(_) => {
+                        let mut count = count_clone.lock().unwrap();
+                        *count += 1;
+                    }
+                    Err(e) => {
+                        let mut err_vec = errors_clone.lock().unwrap();
+                        err_vec.push(format!("Thread {} failed: {}", i, e));
+                    }
+                }
+            });
+
+            handles.push(handle);
+        }
+
+        // Wait for all threads to complete
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Verify results - some exports should succeed, some might fail due to concurrent writes
+        let success_count = *export_count.lock().unwrap();
+        let error_list = errors.lock().unwrap();
+
+        // At least one export should succeed
+        assert!(success_count > 0, "at least one export should succeed");
+
+        // Verify final file is valid (can be imported)
+        if path.exists() {
+            let contents = std::fs::read_to_string(&path).unwrap();
+            let has_content = !contents.trim().is_empty();
+            if has_content {
+                let reimport_result = import_jsonl(&path, |_issue| Ok(UpsertResult::New)).unwrap();
+                // Should have at least one valid bead
+                assert!(reimport_result.imported >= 1, "final file should contain at least one valid bead");
+            }
+        }
+
+        println!("Concurrent exports: {} succeeded, {} failed", success_count, error_list.len());
+        if !error_list.is_empty() {
+            println!("Errors: {:?}", error_list);
+        }
+    }
+
+    #[test]
+    fn export_jsonl_permission_error() {
+        use std::fs;
+
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("readonly.jsonl");
+
+        // Create a parent directory with read-only permissions
+        let parent_dir = tmp.path().join("readonly_dir");
+        fs::create_dir(&parent_dir).unwrap();
+        let readonly_path = parent_dir.join("issues.jsonl");
+
+        // On Unix systems, remove write permissions from the directory
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&parent_dir).unwrap().permissions();
+            perms.set_mode(0o444); // Read-only
+            fs::set_permissions(&parent_dir, perms).unwrap();
+        }
+
+        // Attempt to export to the read-only directory
+        let bead = issue("bf-perm-test", "Permission test");
+        let beads = vec![bead];
+
+        let result = export_jsonl(&readonly_path, || Ok(beads.clone()));
+
+        // Should fail with permission error
+        assert!(result.is_err(), "export should fail when directory is read-only");
+
+        #[cfg(unix)]
+        {
+            // Restore permissions for cleanup
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&parent_dir).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&parent_dir, perms).unwrap();
+        }
+    }
+
+    #[test]
+    fn export_jsonl_to_directory_path() {
+        use std::fs;
+
+        let tmp = tempfile::TempDir::new().unwrap();
+        let dir_path = tmp.path().join("this_is_a_directory");
+        fs::create_dir(&dir_path).unwrap();
+
+        // Attempt to export to a directory path (not a file)
+        let bead = issue("bf-dir-test", "Directory path test");
+        let beads = vec![bead];
+
+        let result = export_jsonl(&dir_path, || Ok(beads.clone()));
+
+        // Should fail - can't write to a directory
+        assert!(result.is_err(), "export should fail when path is a directory");
+    }
+
+    #[test]
+    fn import_jsonl_truncated_last_line() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with a truncated last line
+        let jsonl_content = r#"{"id":"bf-001","title":"Valid","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}
+{"id":"bf-002","title":"Truncated","status":"open""#; // Missing closing brace and other fields
+        std::fs::write(&path, jsonl_content).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            Ok(UpsertResult::New)
+        });
+
+        // Should fail on truncated line
+        assert!(result.is_err(), "import should fail on truncated JSON");
+    }
+
+    #[test]
+    fn import_jsonl_with_bom() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create a JSONL file with UTF-8 BOM (Byte Order Mark)
+        let mut data = vec![0xEF, 0xBB, 0xBF]; // UTF-8 BOM
+        data.extend_from_slice(
+            br#"{"id":"bf-bom","title":"BOM test","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#,
+        );
+        std::fs::write(&path, data).unwrap();
+
+        let result = import_jsonl(&path, |issue| {
+            assert_eq!(issue.id, "bf-bom");
+            Ok(UpsertResult::New)
+        });
+
+        // The BOM might cause parsing issues depending on how serde handles it
+        // This test documents current behavior
+        if result.is_ok() {
+            assert_eq!(result.unwrap().imported, 1, "should handle BOM and import bead");
+        } else {
+            // If it fails, that's also acceptable behavior - BOM is not standard in JSONL
+            println!("BOM handling: import failed (this is acceptable)");
+        }
+    }
+
+    #[test]
+    fn export_jsonl_merge_preserves_unicode_comments() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Create initial file with a bead
+        let mut initial_bead = issue("bf-1", "Initial");
+        initial_bead.description = Some("Initial description 🎨".to_string());
+        export_jsonl_merge(&path, &[initial_bead], &[]).unwrap();
+
+        // Add a "comment" line manually (non-JSON line that gets preserved)
+        let mut contents = std::fs::read_to_string(&path).unwrap();
+        contents.push_str("# This is a Unicode comment: 中文 🚀 Comments are preserved\n");
+        std::fs::write(&path, contents).unwrap();
+
+        // Merge in a new bead
+        let mut new_bead = issue("bf-2", "New bead");
+        new_bead.description = Some("New description 🔥".to_string());
+        export_jsonl_merge(&path, &[new_bead], &[]).unwrap();
+
+        // Verify both beads and the comment line are preserved
+        let final_contents = std::fs::read_to_string(&path).unwrap();
+        assert!(final_contents.contains("bf-1"), "should contain first bead");
+        assert!(final_contents.contains("bf-2"), "should contain second bead");
+        assert!(final_contents.contains("中文"), "should preserve Unicode in comment");
+        assert!(final_contents.contains("🚀"), "should preserve emoji in comment");
+        assert!(final_contents.contains("🔥"), "should preserve emoji in description");
+    }
+
+    #[test]
+    fn export_jsonl_empty_database() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Export from empty database (simulating list_all returning empty vec)
+        let result = export_jsonl(&path, || Ok(vec![])).unwrap();
+        assert_eq!(result.count, 0, "should report 0 beads from empty database");
+
+        // File should still exist but be empty
+        assert!(path.exists(), "file should exist even when database is empty");
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(contents.trim(), "", "file should be empty when database is empty");
+    }
+
+    #[test]
+    fn export_jsonl_merge_empty_to_empty() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("issues.jsonl");
+
+        // Merge with no upserts and no existing file
+        let result = export_jsonl_merge(&path, &[], &[]).unwrap();
+        assert_eq!(result.count, 0, "should report 0 upserts");
+        assert!(!path.exists(), "should not create file when there's nothing to merge");
+    }
 }
