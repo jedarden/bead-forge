@@ -1,0 +1,20 @@
+{
+  "bead_id": "bf-5u1aei",
+  "agent": "claude-code-glm-4.7",
+  "provider": "zai",
+  "model": "glm-4.7",
+  "exit_code": 0,
+  "outcome": "success",
+  "duration_ms": 362,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_usd": null,
+  "captured_at": "2026-07-24T22:49:26.694303552Z",
+  "trace_format": "cargo_test_single_module",
+  "pruned": false,
+  "template_version": null,
+  "test_module": "test_basic_label_cli",
+  "tests_run": 10,
+  "tests_passed": 10,
+  "tests_failed": 0
+}

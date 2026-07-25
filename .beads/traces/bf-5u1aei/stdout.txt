@@ -1,0 +1,15 @@
+
+running 10 tests
+test test_label_add_single ... ok
+test test_label_add_multiple ... ok
+test test_label_duplicate_handling_multiple ... ok
+test test_label_duplicate_handling ... ok
+test test_label_list_empty_bead ... ok
+test test_label_list_empty_workspace ... ok
+test test_label_list_all_beads ... ok
+test test_label_list_single_bead ... ok
+test test_label_remove ... ok
+test test_label_remove_nonexistent ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
