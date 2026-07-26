@@ -36,3 +36,8 @@ __pycache__/
 /test_*.py
 /test_*.rs
 /test_version
+# Stray root-level test-output logs (e.g. `cargo test > test-run.log`).
+# Same root-anchored rule: only files directly in the repo root, so logs
+# under tests/ or target/ stay unaffected.
+/test-run.log
+/test-*.log
