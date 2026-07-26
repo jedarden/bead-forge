@@ -27,3 +27,12 @@ __pycache__/
 # recovery/merge insurance kept locally, never shared through git.
 .beads/.bf_history/
 .beads/beads.base.jsonl
+
+# Ad hoc root-level test scripts / stray binaries (bf-3o9 hygiene guard).
+# Root-anchored (leading /) so these ONLY match files directly in the repo
+# root — legit tests under tests/ and src/**/tests/*.rs stay tracked. Pairs
+# with the root-ad-hoc-files rule in repo_hygiene.sh (defense in depth).
+/test_*.sh
+/test_*.py
+/test_*.rs
+/test_version
