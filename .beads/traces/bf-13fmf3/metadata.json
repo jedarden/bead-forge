@@ -1,0 +1,28 @@
+{
+  "bead_id": "bf-13fmf3",
+  "bead_title": "Execute full cargo test suite with output capture",
+  "agent": "claude-code-glm-4.7",
+  "provider": "zai",
+  "model": "glm-4.7",
+  "exit_code": 101,
+  "outcome": "test_failures_captured",
+  "duration_ms": 66000,
+  "command": "cargo test > .beads/traces/bf-13fmf3/test-run.log 2>&1",
+  "redirection_syntax": "bf-1yxdgq",
+  "tests_total": 629,
+  "tests_passed": 616,
+  "tests_failed": 3,
+  "tests_ignored": 10,
+  "failed_tests": [
+    "batch::tests::test_mixed_op_batch_all_operations_atomic (src/batch.rs:2404)",
+    "sync::tests::test_find_workspace_not_found (src/sync.rs:360)",
+    "sync::tests::test_labels_persist_through_full_sync (src/sync.rs:948)"
+  ],
+  "started_utc": "2026-07-26T00:55:55Z",
+  "finished_utc": "2026-07-26T00:57:01Z",
+  "captured_at": "2026-07-26T00:57:01Z",
+  "trace_format": "merged_stdout_stderr",
+  "log_lines": 4384,
+  "log_bytes": 215131,
+  "pruned": false
+}
