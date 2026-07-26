@@ -1,0 +1,18 @@
+=== bf-13fmf3 hang verification ===
+workspace: /home/coding/bead-forge
+purpose:   prove test_empty_labels_does_not_create_orphan_records deadlocks,
+           justifying the --skip used by run-full-suite.sh
+command:   timeout -k 5 30 cargo test --test label_integration_test \
+             test_empty_labels_does_not_create_orphan_records -- --exact
+started:   2026-07-26T01:49:54Z
+--------------------------------------------
+
+running 1 test
+--------------------------------------------
+cargo_exit_code: 124   (124 = timeout/killed => HANG confirmed)
+finished: 2026-07-26T01:50:24Z
+
+Interpretation: 'running 1 test' printed but NO 'test result:' line ever
+appeared before the 30s kill => the test blocked forever. Cause: the test
+calls storage.create_issue() then storage.conn.lock() (label_integration_test.rs:176);
+create_issue() does not release the Mutex, so the re-lock deadlocks.
