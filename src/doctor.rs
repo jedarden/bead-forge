@@ -1001,20 +1001,16 @@ pub fn repair_stack(workspace_dir: &Path, opts: &RepairOptions) -> Result<Repair
 
     if !needs_rebuild || !still_needs_rebuild {
         // Healthy (or locally repaired) — the JSONL rebuild is unreachable from here.
+        // A repair that repairs nothing must not write: honor the read-only contract.
+        // `--flush-first` is scoped to the rebuild ("flush unflushed beads *before*
+        // repair"); with no rebuild pending there is nothing to protect, so this branch
+        // never flushes regardless of the flag. If unflushed beads are present, point
+        // the user at the canonical checkpoint command (`bf sync --flush-only`) rather
+        // than silently writing the JSONL checkpoint (bf-ku8hv).
         report.healthy = true;
         // A clean state clears any prior repeat-failure marker.
         let _ = recovery::clear_repair_failed_marker(&beads_dir);
-        if opts.flush_first && post_local.unflushed_count > 0 && db_path.exists() {
-            // The user explicitly asked to checkpoint; flushing is a safe, non-rebuild
-            // operation, so honor it even though no rebuild was needed.
-            if let Ok(storage) = Storage::open(&db_path) {
-                if let Ok(flushed) = storage.sync_to_jsonl(&jsonl_path, false) {
-                    report
-                        .messages
-                        .push(format!("Flushed {} unflushed bead(s) to JSONL", flushed));
-                }
-            }
-        } else if post_local.unflushed_count > 0 {
+        if post_local.unflushed_count > 0 {
             report.messages.push(format!(
                 "{} unflushed bead(s) present; run `bf sync --flush-only` to checkpoint them",
                 post_local.unflushed_count

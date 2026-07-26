@@ -171,6 +171,70 @@ fn unflushed_beads_alone_do_not_trigger_rebuild() {
     assert!(ws.get_bead("bf-unflushed").unwrap().is_some());
 }
 
+/// `bf doctor --repair --flush-first` on a healthy workspace (no corruption, no
+/// JSONL→DB divergence) must NOT write the JSONL checkpoint, even when unflushed
+/// beads are present. `--flush-first` is scoped to the rebuild ("flush before
+/// repair"); with no rebuild pending there is nothing to protect, so the healthy
+/// path stays read-only and points the user at `bf sync --flush-only` instead.
+/// Regression test for bf-ku8hv.
+#[test]
+fn healthy_repair_with_flush_first_does_not_write_jsonl() {
+    let ws = common::TempWorkspace::new().unwrap();
+    ws.create_bead("bf-clean", "Clean").unwrap();
+    ws.export_jsonl(false).unwrap();
+    // Unflushed bead, but nothing is corrupt or divergent → healthy.
+    ws.create_bead("bf-unflushed", "Unflushed").unwrap();
+
+    let metadata = ws.metadata().unwrap();
+    let db_path = ws.workspace_path().join(".beads").join(&metadata.database);
+
+    // Sanity: the workspace is healthy but carries one unflushed bead — exactly
+    // the state the old code used to flush on the no-rebuild path.
+    assert_eq!(doctor::count_unflushed(&db_path).unwrap(), 1);
+
+    // Snapshot the JSONL checkpoint before repair.
+    let before = fs::read(&ws.jsonl_path).unwrap();
+
+    let opts = RepairOptions {
+        flush_first: true,
+        ..Default::default()
+    };
+    let report = doctor::repair_stack(ws.workspace_path(), &opts).unwrap();
+
+    // No rebuild, reported healthy.
+    assert!(report.healthy, "healthy workspace reported healthy");
+    assert!(!report.rebuilt, "healthy workspace must NOT rebuild");
+
+    // The JSONL checkpoint is byte-identical — no write happened.
+    let after = fs::read(&ws.jsonl_path).unwrap();
+    assert_eq!(
+        before, after,
+        "JSONL must be unchanged on a healthy repair even with --flush-first"
+    );
+
+    // The unflushed bead is still unflushed (nothing was flushed for it).
+    assert_eq!(
+        doctor::count_unflushed(&db_path).unwrap(),
+        1,
+        "unflushed bead must still be dirty — nothing was flushed"
+    );
+
+    // The user is pointed at the canonical checkpoint command, not silently flushed.
+    assert!(
+        report
+            .messages
+            .iter()
+            .any(|m| m.contains("bf sync --flush-only")),
+        "should advise `bf sync --flush-only`, got: {:?}",
+        report.messages
+    );
+    assert!(
+        !report.messages.iter().any(|m| m.contains("Flushed")),
+        "must not report a flush on the healthy path, got: {:?}",
+        report.messages
+    );
+}
+
 /// Layer 4: refuse to rebuild when the JSONL authority carries a git
 /// merge-conflict marker (rebuilding from a conflicted authority would make the
 /// corruption permanent).
