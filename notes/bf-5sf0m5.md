@@ -39,3 +39,17 @@ The previous run (metadata.json: `exit_code 1`) terminated with
 `terminal_reason: max_turns` / "Reached maximum number of turns (30)" — the
 agent ran out of turns exploring and never committed. It was not a real
 failure of the feature. This run completes the verification efficiently.
+
+## Re-dispatch re-verification (independent)
+
+Bead re-dispatched with `failure-count:2`. Independent re-verification via a
+throwaway temp workspace (`bf -w <tmp> ...`, untouched real store):
+
+- `search "Search   with"`   → 1 match (multi-space exact substring) ✓
+- `search "Search with"`     → 0 matches (single-space spacing mismatch) ✓
+- `search spaces`            → 1 match (single word) ✓
+- `search Search with spaces` → 0 matches (unquoted positionals join with
+  single space → doesn't match the stored multi-space runs) ✓
+
+Plus `cargo test --lib search_json_whitespace` and `search_json_multiword`
+both pass (1 passed; 0 failed). No code change required — feature is sound.
