@@ -1,0 +1,17 @@
+{
+  "bead_id": "bf-j8kt54",
+  "bead_title": "Execute single test module with output capture",
+  "agent": "claude-code-glm-4.7-h1-bforge",
+  "provider": "zai",
+  "model": "glm-4.7",
+  "exit_code": 0,
+  "outcome": "success",
+  "duration_ms": 9000,
+  "captured_at": "2026-07-25T20:52:00.000000000Z",
+  "trace_type": "test_output_capture",
+  "description": "Single test module (cargo test --lib id) run with combined stdout+stderr capture",
+  "command": "cargo test --lib id > .beads/traces/bf-j8kt54/test-run.log 2>&1",
+  "tests_passed": 97,
+  "tests_failed": 0,
+  "tests_filtered_out": 532
+}
