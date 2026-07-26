@@ -545,7 +545,7 @@ fn test_mixed_whitespace_variations() {
     };
     storage.create_issue(&bead).unwrap();
 
-    // Test various whitespace combinations
+    // Whitespace-only labels are rejected after trimming
     let whitespace_labels = vec![
         " ",
         "  ",
@@ -560,12 +560,13 @@ fn test_mixed_whitespace_variations() {
     ];
 
     for label in &whitespace_labels {
-        storage.add_label("mixed-space-test", label).unwrap();
+        assert!(storage.add_label("mixed-space-test", label).is_err(),
+            "Whitespace-only label {:?} should be rejected", label);
     }
 
     let labels = storage.get_labels("mixed-space-test").unwrap();
-    // Current implementation treats different whitespace as different labels
-    assert_eq!(labels.len(), whitespace_labels.len(), "Different whitespace patterns should be distinct labels");
+    // All whitespace-only labels are rejected, so none are stored
+    assert!(labels.is_empty(), "No whitespace-only labels should be stored");
 }
 
 //
@@ -653,9 +654,7 @@ fn test_mixed_edge_case_labels() {
 
     // Test a mix of edge cases together
     let long_label = "a".repeat(1000);
-    let mixed_labels = vec![
-        "",                              // empty
-        " ",                             // single space
+    let valid_labels = vec![
         "a",                             // single char
         "123",                           // numeric
         "🔥",                            // single emoji
@@ -664,15 +663,24 @@ fn test_mixed_edge_case_labels() {
         "label with spaces",              // internal spaces
         long_label.as_str(),             // long label
     ];
+    // Empty and whitespace-only labels are rejected by add_label
+    let invalid_labels = vec![
+        "",                              // empty
+        " ",                             // whitespace-only
+    ];
 
-    for label in &mixed_labels {
+    for label in &valid_labels {
         storage.add_label("mixed-test", label).unwrap();
+    }
+    for label in &invalid_labels {
+        assert!(storage.add_label("mixed-test", label).is_err(),
+            "Label {:?} should be rejected", label);
     }
 
     let labels = storage.get_labels("mixed-test").unwrap();
-    assert_eq!(labels.len(), mixed_labels.len());
+    assert_eq!(labels.len(), valid_labels.len());
 
-    for label in &mixed_labels {
+    for label in &valid_labels {
         assert!(labels.contains(&label.to_string()), "Mixed edge case label '{}' should be present", label);
     }
 }
@@ -784,19 +792,16 @@ fn test_whitespace_only_labels() {
     };
     storage.create_issue(&bead).unwrap();
 
-    // Test various whitespace-only labels
+    // Whitespace-only labels are all rejected after trimming
     let whitespace_labels = vec![" ", "  ", "\t", "\n", " \t\n"];
 
     for label in &whitespace_labels {
-        storage.add_label("whitespace-only-test", label).unwrap();
+        assert!(storage.add_label("whitespace-only-test", label).is_err(),
+            "Whitespace-only label {:?} should be rejected", label);
     }
 
     let labels = storage.get_labels("whitespace-only-test").unwrap();
-    assert_eq!(labels.len(), whitespace_labels.len(), "Different whitespace-only labels should be distinct");
-
-    for label in &whitespace_labels {
-        assert!(labels.contains(&label.to_string()), "Whitespace-only label '{}' should be present", label);
-    }
+    assert!(labels.is_empty(), "No whitespace-only labels should be stored");
 }
 
 #[test]
@@ -814,14 +819,13 @@ fn test_whitespace_only_label_deduplication() {
     };
     storage.create_issue(&bead).unwrap();
 
-    // Add same whitespace-only label multiple times
-    storage.add_label("space-dedup-test", " ").unwrap();
-    storage.add_label("space-dedup-test", " ").unwrap();
-    storage.add_label("space-dedup-test", " ").unwrap();
+    // Repeated whitespace-only labels are all rejected (nothing stored to dedup)
+    assert!(storage.add_label("space-dedup-test", " ").is_err());
+    assert!(storage.add_label("space-dedup-test", " ").is_err());
+    assert!(storage.add_label("space-dedup-test", " ").is_err());
 
     let labels = storage.get_labels("space-dedup-test").unwrap();
-    let space_count = labels.iter().filter(|l| *l == " ").count();
-    assert_eq!(space_count, 1, "Whitespace-only duplicate labels should be deduplicated");
+    assert!(labels.is_empty(), "Whitespace-only labels should never be stored");
 }
 
 //
