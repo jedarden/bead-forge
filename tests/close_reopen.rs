@@ -377,3 +377,127 @@ fn test_close_preserves_other_fields() {
     assert_eq!(closed_bead.owner.as_ref().unwrap(), "owner1");
     assert_eq!(closed_bead.estimated_minutes, Some(120));
 }
+
+#[test]
+fn test_reopen_clears_assignee() {
+    let (_temp_dir, beads_dir) = setup_test_workspace();
+    let db_path = beads_dir.join("beads.db");
+    let storage = Storage::open(&db_path).unwrap();
+
+    // Create a bead with an assignee
+    let id = format!("bf-test-{}", TEST_ID_COUNTER.fetch_add(1, Ordering::SeqCst));
+    let now = Utc::now();
+
+    let issue = Issue {
+        id: id.clone(),
+        title: "Test bead assignee clearing".to_string(),
+        description: Some("Test description".to_string()),
+        acceptance_criteria: None,
+        design: None,
+        notes: None,
+        status: Status::Open,
+        priority: Priority(2),
+        issue_type: IssueType::Task,
+        assignee: Some("worker-1".to_string()), // Bead has an assignee
+        owner: None,
+        estimated_minutes: None,
+        created_at: now,
+        created_by: Some("creator".to_string()),
+        updated_at: now,
+        closed_at: None,
+        close_reason: None,
+        closed_by_session: None,
+        due_at: None,
+        defer_until: None,
+        external_ref: None,
+        source_system: None,
+        source_repo: None,
+        deleted_at: None,
+        deleted_by: None,
+        delete_reason: None,
+        original_type: None,
+        compaction_level: None,
+        compacted_at: None,
+        compacted_at_commit: None,
+        original_size: None,
+        sender: None,
+        ephemeral: false,
+        pinned: false,
+        is_template: false,
+        content_hash: None,
+        labels: vec![],
+        dependencies: vec![],
+        comments: vec![],
+        annotations: Default::default(),
+    };
+
+    storage.create_issue(&issue).unwrap();
+
+    // Close the bead
+    storage.close_issue(&id, "Completed", "closer").unwrap();
+
+    // Verify assignee is preserved on close
+    let closed_bead = storage.get_issue(&id).unwrap().unwrap();
+    assert_eq!(closed_bead.status, Status::Closed);
+    assert_eq!(
+        closed_bead.assignee.as_ref().unwrap(),
+        "worker-1",
+        "Assignee should be preserved when bead is closed"
+    );
+
+    // Reopen the bead with assignee clearing (mimics cmd_reopen behavior)
+    use bead_forge::model::IssueChanges;
+    let changes = IssueChanges {
+        status: Some(Status::Open),
+        assignee: Some(String::new()), // Empty string clears to NULL
+        actor: Some("reopener".to_string()),
+        ..Default::default()
+    };
+    storage.update_issue(&id, &changes).unwrap();
+
+    // Verify the bead is open and assignee is cleared
+    let reopened_bead = storage.get_issue(&id).unwrap().unwrap();
+    assert_eq!(
+        reopened_bead.status,
+        Status::Open,
+        "Bead should be open after reopen"
+    );
+    assert!(
+        reopened_bead.assignee.is_none(),
+        "Assignee should be cleared after reopen (should be NULL, not empty string)"
+    );
+}
+
+#[test]
+fn test_reopen_with_no_assignee_is_noop() {
+    let (_temp_dir, beads_dir) = setup_test_workspace();
+    let db_path = beads_dir.join("beads.db");
+    let storage = Storage::open(&db_path).unwrap();
+
+    // Create a bead without an assignee
+    let bead = create_test_bead(&storage, "Test bead with no assignee");
+    assert!(bead.assignee.is_none());
+
+    // Close the bead
+    storage
+        .close_issue(&bead.id, "Completed", "closer")
+        .unwrap();
+
+    // Reopen the bead with assignee clearing
+    use bead_forge::model::IssueChanges;
+    let changes = IssueChanges {
+        status: Some(Status::Open),
+        assignee: Some(String::new()), // Empty string clears to NULL
+        actor: Some("reopener".to_string()),
+        ..Default::default()
+    };
+    storage.update_issue(&bead.id, &changes).unwrap();
+
+    // Verify the bead is open and still has no assignee
+    let reopened_bead = storage.get_issue(&bead.id).unwrap().unwrap();
+    assert_eq!(reopened_bead.status, Status::Open);
+    assert!(
+        reopened_bead.assignee.is_none(),
+        "Bead with no assignee should still have no assignee after reopen"
+    );
+}
