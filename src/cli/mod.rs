@@ -1032,15 +1032,20 @@ pub fn run(cli: Cli) -> Result<()> {
             description,
             assignee,
             label,
-        } => cmd_create(
-            &beads_dir,
-            title,
-            type_,
-            priority,
-            description,
-            assignee,
-            label,
-        ),
+        } => {
+            let config = load_config(&beads_dir).unwrap_or_default();
+            cmd_create(
+                &beads_dir,
+                title,
+                type_,
+                priority,
+                description,
+                assignee,
+                label,
+                cli.no_auto_flush,
+                config.sync.auto_flush,
+            )
+        },
         Commands::List {
             status,
             type_,
@@ -1074,6 +1079,7 @@ pub fn run(cli: Cli) -> Result<()> {
             design,
             due_at,
         } => {
+            let config = load_config(&beads_dir).unwrap_or_default();
             // --clear-assignee is sugar for --assignee "": both flow the
             // empty-string "clear to NULL" signal into update_issue. clap
             // guarantees the two flags are mutually exclusive.
@@ -1094,11 +1100,28 @@ pub fn run(cli: Cli) -> Result<()> {
                 notes,
                 design,
                 due_at,
+                cli.no_auto_flush,
+                config.sync.auto_flush,
             )
         }
-        Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason),
-        Commands::Reopen { id } => cmd_reopen(&beads_dir, &id),
-        Commands::Delete { id } => cmd_delete(&beads_dir, &id),
+        Commands::Close { id, reason } => {
+            let config = load_config(&beads_dir).unwrap_or_default();
+            cmd_close(
+                &beads_dir,
+                &id,
+                &reason,
+                cli.no_auto_flush,
+                config.sync.auto_flush,
+            )
+        },
+        Commands::Reopen { id } => {
+            let config = load_config(&beads_dir).unwrap_or_default();
+            cmd_reopen(&beads_dir, &id, cli.no_auto_flush, config.sync.auto_flush)
+        }
+        Commands::Delete { id } => {
+            let config = load_config(&beads_dir).unwrap_or_default();
+            cmd_delete(&beads_dir, &id, cli.no_auto_flush, config.sync.auto_flush)
+        },
         Commands::Ready {
             limit,
             format,
@@ -1157,13 +1180,19 @@ pub fn run(cli: Cli) -> Result<()> {
         ),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
-        Commands::Batch { file, json, stdin } => cmd_batch(&beads_dir, file, json, stdin),
+        Commands::Batch { file, json, stdin } => {
+            let config = load_config(&beads_dir).unwrap_or_default();
+            cmd_batch(&beads_dir, file, json, stdin, cli.no_auto_flush, config.sync.auto_flush)
+        },
         Commands::Mitosis {
             id,
             children,
             reason,
             format,
-        } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format),
+        } => {
+            let config = load_config(&beads_dir).unwrap_or_default();
+            cmd_mitosis(&beads_dir, &id, &children, &reason, &format, cli.no_auto_flush, config.sync.auto_flush)
+        },
         Commands::Dep(dep) => cmd_dep(&beads_dir, dep),
         Commands::Label(label) => cmd_label(&beads_dir, label),
         Commands::Comments(comments) => cmd_comments(&beads_dir, comments),
@@ -1328,6 +1357,8 @@ fn cmd_create(
     description: Option<String>,
     assignee: Option<String>,
     labels: Vec<String>,
+    no_auto_flush: bool,
+    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -1374,6 +1405,12 @@ fn cmd_create(
     }
 
     println!("{}", id);
+
+    // Auto-flush after successful mutation
+    let default_workspace = PathBuf::from(".");
+    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
+    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+
     Ok(())
 }
 
@@ -1552,6 +1589,8 @@ fn cmd_update(
     notes: Option<String>,
     design: Option<String>,
     due_at: Option<String>,
+    no_auto_flush: bool,
+    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -1588,19 +1627,42 @@ fn cmd_update(
 
     storage.update_issue(id, &changes)?;
     println!("Updated bead {}", id);
+
+    // Auto-flush after successful mutation
+    let default_workspace = PathBuf::from(".");
+    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
+    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+
     Ok(())
 }
 
-fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str) -> Result<()> {
+fn cmd_close(
+    beads_dir: &PathBuf,
+    id: &str,
+    reason: &str,
+    no_auto_flush: bool,
+    config_auto_flush: bool,
+) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
     close_bead(&db_path, id, reason, "cli")?;
     println!("Closed bead {}", id);
+
+    // Auto-flush after successful mutation
+    let default_workspace = PathBuf::from(".");
+    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
+    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+
     Ok(())
 }
 
-fn cmd_reopen(beads_dir: &PathBuf, id: &str) -> Result<()> {
+fn cmd_reopen(
+    beads_dir: &PathBuf,
+    id: &str,
+    no_auto_flush: bool,
+    config_auto_flush: bool,
+) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1620,10 +1682,21 @@ fn cmd_reopen(beads_dir: &PathBuf, id: &str) -> Result<()> {
 
     storage.update_issue(id, &changes)?;
     println!("Reopened bead {}", id);
+
+    // Auto-flush after successful mutation
+    let default_workspace = PathBuf::from(".");
+    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
+    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+
     Ok(())
 }
 
-fn cmd_delete(beads_dir: &PathBuf, id: &str) -> Result<()> {
+fn cmd_delete(
+    beads_dir: &PathBuf,
+    id: &str,
+    no_auto_flush: bool,
+    config_auto_flush: bool,
+) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1634,6 +1707,12 @@ fn cmd_delete(beads_dir: &PathBuf, id: &str) -> Result<()> {
     })?;
 
     println!("Deleted bead {}", id);
+
+    // Auto-flush after successful mutation
+    let default_workspace = PathBuf::from(".");
+    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
+    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+
     Ok(())
 }
 
@@ -2181,6 +2260,8 @@ fn cmd_batch(
     file: Option<PathBuf>,
     json: Option<String>,
     stdin: bool,
+    no_auto_flush: bool,
+    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -2200,6 +2281,11 @@ fn cmd_batch(
 
     let results = execute_batch(&storage, ops, beads_dir)?;
 
+    // Auto-flush after successful batch operations (flushes once at transaction end)
+    let default_workspace = PathBuf::from(".");
+    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
+    let flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+
     // Print results
     for result in results {
         if result.status == "ok" {
@@ -2217,6 +2303,13 @@ fn cmd_batch(
         }
     }
 
+    // Print auto-flush warning if any
+    if let Ok(flush_res) = flush_result {
+        if let Some(warning) = flush_res.warning {
+            eprintln!("WARNING: {}", warning);
+        }
+    }
+
     Ok(())
 }
 
@@ -2226,6 +2319,8 @@ fn cmd_mitosis(
     children: &str,
     reason: &str,
     format: &str,
+    no_auto_flush: bool,
+    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -2240,6 +2335,11 @@ fn cmd_mitosis(
 
     // Execute atomically
     let results = execute_batch(&storage, ops, beads_dir)?;
+
+    // Auto-flush after successful batch operations (flushes once at transaction end)
+    let default_workspace = PathBuf::from(".");
+    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
+    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
 
     match format {
         "json" => {

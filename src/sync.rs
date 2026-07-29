@@ -279,6 +279,69 @@ pub fn get_db_path(workspace_dir: &Path) -> Result<PathBuf> {
     Ok(beads_dir.join(metadata.database))
 }
 
+/// Auto-flush result with warning information for JSON output.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct AutoFlushResult {
+    pub flushed: bool,
+    pub count: Option<usize>,
+    pub warning: Option<String>,
+}
+
+/// Best-effort auto-flush after mutations.
+///
+/// Attempts to incrementally export dirty issues to JSONL. On failure:
+/// - Prints warning to stderr
+/// - Returns warning text for JSON envelope inclusion
+/// - Never fails the calling operation (mutations succeed regardless)
+/// - Dirty marks are preserved for manual `bf sync --flush-only` recovery
+///
+/// # Arguments
+/// * `workspace_dir` - Path to the workspace root (contains .beads/)
+/// * `config_enabled` - Whether sync.auto_flush is enabled in config
+/// * `cli_disabled` - Whether --no-auto-flush flag was passed
+///
+/// # Returns
+/// * `Ok(AutoFlushResult)` - Result with warning if flush failed
+pub fn auto_flush(workspace_dir: &Path, config_enabled: bool, cli_disabled: bool) -> Result<AutoFlushResult> {
+    // Check if auto-flush is disabled
+    if cli_disabled {
+        return Ok(AutoFlushResult {
+            flushed: false,
+            count: None,
+            warning: None,
+        });
+    }
+
+    if !config_enabled {
+        return Ok(AutoFlushResult {
+            flushed: false,
+            count: None,
+            warning: None,
+        });
+    }
+
+    // Attempt best-effort flush
+    match flush_dirty(workspace_dir) {
+        Ok(count) => Ok(AutoFlushResult {
+            flushed: true,
+            count: Some(count),
+            warning: None,
+        }),
+        Err(e) => {
+            let warning_msg = format!(
+                "Auto-flush failed: {}. Beads remain in SQLite; run 'bf sync --flush-only' to manually flush.",
+                e
+            );
+            eprintln!("WARNING: {}", warning_msg);
+            Ok(AutoFlushResult {
+                flushed: false,
+                count: None,
+                warning: Some(warning_msg),
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
