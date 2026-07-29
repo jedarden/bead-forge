@@ -269,3 +269,136 @@ Listed roughly in order of value-to-effort.
   require a trait method per data type (`format_stats`, `format_velocity`, …) with no
   cross-format benefit. The split in §1 is the right architecture; only the *output shape*
   conventions need harmonizing (recs 1–5), not the routing.
+
+---
+
+## 8. Appendix: Deep dive on `search` and `claim` commands (bf-2x0p)
+
+This appendix provides detailed implementation analysis of the `search` and `claim` commands'
+JSON output mechanisms, as specified in bead bf-2x0p.
+
+### 8.1 `search` command (Family A — Shared formatter)
+
+**Implementation location:** `src/cli/mod.rs:2796-2837` (`cmd_search`)
+
+**How it outputs JSON:**
+1. Uses **shared formatter** via `get_formatter(OutputFormat::Json).format_issues(&issues)`
+2. Follows canonical Family A pattern:
+   ```rust
+   let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+   let formatter = get_formatter(output_format);
+   print!("{}", formatter.format_issues(&issues));
+   ```
+
+**Formatter methods used:**
+- `format_issues(&[Issue])` → returns JSONL (newline-separated JSON objects)
+- Does NOT use `format_issue` (singular) or `format_error`
+
+**Array/object structure patterns:**
+- **Container shape:** JSONL (one JSON object per line, no array wrapper)
+- **Object structure:** Full `Issue` records with `dependencies` and `comments` stripped
+- **Format:** Compact (no pretty-printing)
+- **Empty case:** No output (empty string, not even `[]`)
+- **Trailing newline:** None (uses `print!`, not `println!`)
+
+**Data flow:**
+1. `storage.search_issues()` returns `Vec<Issue>` with applied filters
+2. Issues are passed directly to `format_issues()` 
+3. `JsonFormatter::format_issues()` strips dependencies/comments, serializes each to JSON string, joins with `\n`
+4. Result printed via `print!()` (no trailing newline)
+
+**Example output:**
+```json
+{"id":"bf-abc","title":"Fix bug","status":"open","priority":2,"assignee":null,"labels":[]}
+{"id":"bf-def","title":"Add feature","status":"in_progress","priority":1,"assignee":"worker","labels":["urgent"]}
+```
+
+### 8.2 `claim` command (Family B — Custom serialization)
+
+**Implementation location:** `src/cli/mod.rs:1789-2148` (`cmd_claim`)
+
+**How it outputs JSON:**
+- **Custom loop** — bypasses `JsonFormatter` entirely
+- Uses `serde_json::json!({...})` macro for object construction
+- Four mutually exclusive execution paths, each with separate JSON handling:
+  1. Dry-run mode (single workspace)
+  2. Dry-run mode (multi-workspace with `--any` or `--fallback any`)
+  3. Normal claim from any workspace (`--any`)
+  4. Fallback mode (`--fallback any`): tries current workspace, falls back to any
+  5. Normal single-workspace claim
+
+**Formatter methods used:**
+- None (custom `serde_json::json!` macro serialization)
+
+**Array/object structure patterns:**
+- **Container shape:** Single JSON object `{…}` (never array)
+- **Object structure:** Hand-picked projection mixing fields from `ScoredBead`, `ClaimResult`, worker metadata
+- **Format:** Generally compact, but `to_string_pretty` used when `flush_warning` present
+- **Empty case:** Literal `{}` via `println!("{{}}")` in all five branches
+- **Trailing newline:** Yes (uses `println!`)
+- **Key ordering:** Alphabetical (due to `json!` macro using `BTreeMap`)
+
+**Detailed object shapes by execution path:**
+
+1. **Dry-run (single workspace):**
+   ```json
+   {
+     "assignee": "...",
+     "bead_id": "...",
+     "dry_run": true,
+     "downstream_impact": 5,
+     "priority": 2,
+     "title": "...",
+     "workspace": "..."
+   }
+   ```
+
+2. **Dry-run (multi-workspace):** Same as single-workspace dry-run
+
+3. **Normal claim from any workspace (`--any`):**
+   ```json
+   {
+     "assignee": "...",
+     "bead_id": "...",
+     "reclaimed": false,
+     "workspace": "/path/to/workspace"
+   }
+   ```
+   Plus optional `flush_warning` key if auto-flush had warnings (uses `to_string_pretty` in this case)
+
+4. **Fallback mode (current workspace success):**
+   ```json
+   {
+     "assignee": "...",
+     "bead_id": "...",
+     "reclaimed": false
+   }
+   ```
+   Plus optional `flush_warning` key
+
+5. **Fallback mode (fallback to any workspace):** Same as normal `--any` claim
+
+**Data flow:**
+1. For dry-run: `get_ready_candidates()` returns `Vec<ScoredBead>`, selects top 1, constructs JSON from fields
+2. For normal/fallback claims: `claim()` or `claim_any()` returns `Option<ClaimResult>`, constructs JSON from result fields
+3. Optionally adds `flush_warning` from auto-flush result
+4. Uses `json!` macro → compact output, or `to_string_pretty` when flush warning present
+
+**Key differences from `search`:**
+- Custom serialization vs. shared formatter
+- Single object vs. JSONL array  
+- Always emits at least `{}` on empty vs. no output on empty
+- `println!` (trailing newline) vs. `print!` (no trailing newline)
+- Alphabetical key ordering vs. struct field order
+- Hand-picked projections vs. full `Issue` records
+- Sometimes uses pretty-printing (when flush warning present) vs. always compact
+
+**Implementation complexity note:**
+The `claim` command has significant implementation complexity due to:
+- Five mutually exclusive code paths
+- Different data structures (`ScoredBead` vs. `ClaimResult`)
+- Conditional inclusion of `flush_warning` field
+- Multi-workspace discovery logic
+- All embedded within a single 360-line function
+
+This complexity justifies bypassing the shared formatter — the output shapes are not `Issue` records and vary significantly per execution path.
