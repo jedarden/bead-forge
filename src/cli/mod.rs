@@ -29,6 +29,10 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub workspace: Option<PathBuf>,
 
+    /// Disable automatic flushing to JSONL after mutations
+    #[arg(long, global = true)]
+    no_auto_flush: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }

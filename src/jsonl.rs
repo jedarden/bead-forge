@@ -99,25 +99,70 @@ where
         return Ok(ExportResult { count: 0 });
     }
 
+    // Build a map of dirty issues by ID for O(1) lookup
+    let dirty_map: std::collections::HashMap<String, Issue> = issues
+        .into_iter()
+        .map(|issue| (issue.id.clone(), issue))
+        .collect();
+
     let temp_path = path.with_extension("jsonl.tmp");
 
-    {
-        let file = File::create(&temp_path)?;
-        let mut writer = BufWriter::new(file);
+    // Read existing JSONL and perform surgical line replacement
+    let input_file = File::open(path)?;
+    let reader = BufReader::new(input_file);
+    let output_file = File::create(&temp_path)?;
+    let mut writer = BufWriter::new(output_file);
 
-        for issue in &issues {
-            serde_json::to_writer(&mut writer, issue)?;
+    let mut replaced_count = 0;
+
+    for line_result in reader.lines() {
+        let line = line_result?;
+        if let Ok(existing_issue) = serde_json::from_str::<Issue>(&line) {
+            if let Some(dirty_issue) = dirty_map.get(&existing_issue.id) {
+                // Replace this line with the dirty issue
+                serde_json::to_writer(&mut writer, dirty_issue)?;
+                writer.write_all(b"\n")?;
+                replaced_count += 1;
+            } else {
+                // Keep existing line
+                writer.write_all(line.as_bytes())?;
+                writer.write_all(b"\n")?;
+            }
+        } else {
+            // Line is malformed - keep it as-is
+            writer.write_all(line.as_bytes())?;
             writer.write_all(b"\n")?;
         }
-
-        writer.flush()?;
     }
+
+    // Append any dirty issues that weren't in the file (newly created issues)
+    for (id, issue) in &dirty_map {
+        // Check if we already replaced this issue
+        let was_replaced = {
+            let input_file = File::open(path)?;
+            let reader = BufReader::new(input_file);
+            reader.lines().any(|l| {
+                l.ok().and_then(|line| serde_json::from_str::<Issue>(&line).ok())
+                    .map(|existing| existing.id == *id)
+                    .unwrap_or(false)
+            })
+        };
+
+        if !was_replaced {
+            serde_json::to_writer(&mut writer, issue)?;
+            writer.write_all(b"\n")?;
+            replaced_count += 1;
+        }
+    }
+
+    writer.flush()?;
+    drop(writer);
 
     std::fs::rename(&temp_path, path)?;
     clear_dirty()?;
 
     Ok(ExportResult {
-        count: issues.len(),
+        count: replaced_count,
     })
 }
 

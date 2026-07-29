@@ -23,6 +23,8 @@ pub struct Config {
     pub checkpoint: CheckpointConfig,
     #[serde(default)]
     pub history: HistoryConfig,
+    #[serde(default)]
+    pub sync: SyncConfig,
 }
 
 /// Pre-export JSONL history backups (Phase 7.9).
@@ -48,6 +50,29 @@ impl Default for HistoryConfig {
         HistoryConfig {
             enabled: default_history_enabled(),
             max_backups: default_history_max_backups(),
+        }
+    }
+}
+
+/// Incremental auto-flush configuration (Phase 7.1).
+///
+/// Controls automatic incremental export of dirty issues to JSONL after each
+/// successful mutation. When enabled (default), the workspace state in `issues.jsonl`
+/// tracks the live SQLite store in near-real-time, eliminating the flush-before-repair
+/// ritual and protecting against data loss.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncConfig {
+    /// Master switch for auto-flush. `true` (default) means every successful mutation
+    /// (create/update/close/batch) incrementally exports dirty issues to JSONL.
+    /// Set `false` to disable automatic flushing and rely on explicit `bf sync --flush-only`.
+    #[serde(default = "default_sync_auto_flush")]
+    pub auto_flush: bool,
+}
+
+impl Default for SyncConfig {
+    fn default() -> Self {
+        SyncConfig {
+            auto_flush: default_sync_auto_flush(),
         }
     }
 }
@@ -199,6 +224,10 @@ fn default_history_max_backups() -> usize {
     20
 }
 
+fn default_sync_auto_flush() -> bool {
+    true
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -211,6 +240,7 @@ impl Default for Config {
             secret_protection: SecretProtectionConfig::default(),
             checkpoint: CheckpointConfig::default(),
             history: HistoryConfig::default(),
+            sync: SyncConfig::default(),
         }
     }
 }
