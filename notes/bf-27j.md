@@ -1,30 +1,37 @@
-# Bead Update and Status Change Tests (bf-27j)
+# bf-27j — Test bead update and status changes
 
-## Test Results
+Verified the `bf update` title/status lifecycle end-to-end against the built
+`bf` 0.3.0 binary (`target/debug/bf`; the PATH `/home/coding/.local/bin/bf`
+reports the same version). Tested in an **isolated** workspace
+(`~/scratch/bf-27j-test`) so the shared bead-forge `.beads/` was not touched.
 
-Tested `bf update` command functionality with bead bf-4i48e:
+## Steps
 
-1. **Title update**: `bf update bf-4i48e --title 'Updated test title'`
-   - ✅ Title changed from "test" to "Updated test title"
-   - ✅ Verified with `bf show bf-4i48e`
+Created a throwaway bead `bf-34b` in the isolated workspace, then:
 
-2. **Status update to in_progress**: `bf update bf-4i48e --status in_progress`
-   - ✅ Status changed from "open" to "in_progress"
-   - ✅ Verified with `bf show bf-4i48e`
+1. **Title update** — `bf update bf-34b --title 'New title'` → `Updated bead bf-34b`,
+   exit 0. `bf show` now prints `Title: New title`. ✅
+2. **Status → in_progress** — `bf update bf-34b --status in_progress` → exit 0.
+   `bf show` now prints `Status: in_progress`. ✅ (`in_progress` → `Status::InProgress`.)
+3. **Status → done** — `bf update bf-34b --status done` → exit 0.
+   `bf show` now prints `Status: done`. ✅ (`done` is not a named status, so
+   `Status::from_str` maps it to `Custom("done")`, which persists normally.)
+4. **Persistence** — a fresh `bf show bf-34b` process reads back `Title: New title`
+   / `Status: done`, and the auto-flushed `issues.jsonl` checkpoint carries
+   `title: "New title"`, `status: "done"`. ✅
 
-3. **Status update to done**: `bf update bf-4i48e --status done`
-   - ✅ Status changed from "in_progress" to "done"
-   - ✅ Verified with `bf show bf-4i48e`
+## Result
 
-4. **Persistence check**: All updates verified with `bf show`
-   - ✅ Title persisted: "Updated test title"
-   - ✅ Status persisted: "done"
-   - ✅ Priority unchanged: P2
-   - ✅ Type unchanged: task
+All four acceptance criteria pass. No source changes — `bf update` already
+handles `--title`, `--status in_progress`, and `--status done` correctly, and the
+changes persist across processes and to the JSONL checkpoint.
 
-## Conclusion
+## Notes
 
-The `bf update` command works correctly for:
-- Updating bead titles
-- Updating bead status (open, in_progress, done)
-- Persisting all changes across updates
+- `Status::from_str` is intentionally permissive (model.rs:131): any unrecognized
+  string becomes a `Custom` status rather than erroring, so the parser never
+  rejects a status string. This is documented behavior, not a defect, and is
+  outside this bead's acceptance criteria.
+- Test artifacts live only under `~/scratch/bf-27j-test/.beads/` (untracked,
+  outside the repo). The bead-forge repo's `.beads/issues.jsonl` and `beads.db`
+  were not modified by this bead.

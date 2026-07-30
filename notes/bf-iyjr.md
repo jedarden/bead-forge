@@ -1,57 +1,33 @@
-# Verification of bf --version
+# bf-iyjr — Verify `bf --version` outputs version
 
-## Task
-Verify bf --version outputs version information
+## Result: PASS (already complete)
 
-## Verification Results
+Ran `bf --version` against the freshly built debug binary (`./target/debug/bf`).
 
-### Command Execution
-```bash
-$ bf --version
+### Acceptance criteria
+
+| Criterion | Result |
+|-----------|--------|
+| `bf --version` (or `bf version`) outputs version information | ✅ — `bf --version` prints `bf 0.3.0` |
+| Version format is semantic (e.g., v0.1.0 or similar) | ✅ — `0.3.0` is a semantic version |
+| Command returns exit code 0 | ✅ — `EXIT_CODE=0` |
+
+### Captured output
+
+```
+$ ./target/debug/bf --version
 bf 0.3.0
-$ echo $?
-0
+EXIT_CODE=0
 ```
 
-### Acceptance Criteria Met
+Note: `bf --version` satisfies the criterion (the criteria accept `--version` **or** `version`). The `bf version`
+subcommand is intentionally not wired — clap rejects it as an unrecognized subcommand, which is expected.
 
-✅ **Run `bf --version` and verify it outputs version information**
-- Command outputs: `bf 0.3.0`
-- Version is clearly displayed
+### Wiring
 
-✅ **Version format should be semantic (e.g., v0.1.0 or similar)**
-- Version `0.3.0` follows semantic versioning (major.minor.patch)
-- Format matches `CARGO_PKG_VERSION` from Cargo.toml
+- `Cargo.toml:3` — `version = "0.3.0"`
+- `Cargo.toml:60` — `name = "bf"` (binary name)
+- `src/cli/mod.rs:24` — `#[command(name = "bf")]`
+- `src/cli/mod.rs:25` — `#[command(version = env!("CARGO_PKG_VERSION"))]` drives the `--version` flag
 
-✅ **Command should return exit code 0**
-- Exit code: 0 (success)
-
-### Implementation Details
-
-The version display is implemented using clap's built-in version flag:
-
-**File: src/cli/mod.rs (lines 20-26)**
-```rust
-/// Version of bead-forge, read from Cargo.toml
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-#[derive(Parser)]
-#[command(name = "bf")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
-pub struct Cli {
-```
-
-The version is automatically pulled from `Cargo.toml` via the `CARGO_PKG_VERSION` environment variable set by cargo.
-
-### Existing Test Coverage
-
-Comprehensive tests already exist in `tests/test_version_display.rs`:
-
-1. **test_version_flag_output** - Verifies version output format
-2. **test_version_matches_cargo_toml** - Ensures CLI version matches Cargo.toml
-3. **test_version_short_flag** - Tests `-V` short flag
-4. **test_version_exit_code** - Verifies exit code is 0
-5. **is_valid_semver** - Helper function to validate semantic versioning format
-
-All acceptance criteria are met by the existing implementation.
+No code changes required — the clap `version` attribute already renders the version derived from `CARGO_PKG_VERSION`.

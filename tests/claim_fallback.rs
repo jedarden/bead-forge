@@ -392,13 +392,20 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
                 String::from_utf8_lossy(&output.stderr)
             );
 
-            // Parse JSON output
+            // Parse JSON output (may be wrapped in envelope)
             let stdout = String::from_utf8(output.stdout).unwrap();
             let json: serde_json::Value =
                 serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
+            // Handle envelope format: {version, kind, data}
+            let data = if json.get("version").is_some() && json.get("data").is_some() {
+                &json["data"]
+            } else {
+                &json
+            };
+
             // Verify a bead was claimed
-            let bead_id = json["bead_id"].as_str();
+            let bead_id = data["bead_id"].as_str();
             assert!(
                 bead_id.is_some(),
                 "Expected 'bead_id' in JSON output, got: {}",
@@ -414,7 +421,7 @@ fn test_cli_claim_fallback_any_exhausted_workspace() {
             );
 
             // Verify workspace is in output (should be workspace B's path)
-            let workspace_path = json["workspace"].as_str();
+            let workspace_path = data["workspace"].as_str();
             assert!(
                 workspace_path.is_some(),
                 "Expected 'workspace' in JSON output when claiming via fallback"
@@ -490,4 +497,241 @@ fn test_claim_fallback_to_1800s_when_velocity_stats_empty() {
         count, 0,
         "velocity_stats should still be empty - fallback used 1800s default"
     );
+}
+
+#[test]
+fn test_cli_claim_includes_metadata_flags_in_subprocess() {
+    // NEEDLE integration test: verifies that `bf claim` subprocess invocation
+    // includes --model/--harness/--harness-version flags when metadata is available.
+    //
+    // This test simulates how NEEDLE's run_bf_claim() invokes the bf claim CLI
+    // and verifies that the metadata flags are properly handled and stored.
+
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    let workspace = common::TempWorkspace::new().unwrap();
+
+    // Create test beads
+    workspace.create_bead("bf-1", "First bead").unwrap();
+    workspace.create_bead("bf-2", "Second bead").unwrap();
+    workspace.create_bead("bf-3", "Third bead").unwrap();
+
+    // Build the bf binary path
+    let project_root = std::env::current_dir().unwrap();
+    let bf_binary: PathBuf = if cfg!(debug_assertions) {
+        project_root.join("target/debug/bf")
+    } else {
+        project_root.join("target/release/bf")
+    };
+
+    // If binary doesn't exist, skip this test (requires cargo build)
+    if !bf_binary.exists() {
+        println!(
+            "CLI binary not found at {:?}, skipping CLI test. Run 'cargo build' first.",
+            bf_binary
+        );
+        return;
+    }
+
+    // Run: bf claim --model claude-sonnet-4-6 --harness needle --harness-version 0.5.2 --assignee test-worker-1 --format json
+    // This simulates the exact command that NEEDLE's run_bf_claim() would execute
+    let output = Command::new(&bf_binary)
+        .arg("--workspace")
+        .arg(workspace.workspace_path())
+        .arg("claim")
+        .arg("--model")
+        .arg("claude-sonnet-4-6")
+        .arg("--harness")
+        .arg("needle")
+        .arg("--harness-version")
+        .arg("0.5.2")
+        .arg("--assignee")
+        .arg("test-worker-1")
+        .arg("--format")
+        .arg("json")
+        .current_dir(workspace.workspace_path())
+        .output();
+
+    match output {
+        Ok(output) => {
+            // Check that command succeeded
+            assert!(
+                output.status.success(),
+                "bf claim command failed: stderr={}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+
+            // Parse JSON output (may be wrapped in envelope)
+            let stdout = String::from_utf8(output.stdout).unwrap();
+            let json: serde_json::Value =
+                serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
+            // Handle envelope format: {version, kind, data}
+            let data = if json.get("version").is_some() && json.get("data").is_some() {
+                &json["data"]
+            } else {
+                &json
+            };
+
+            // Verify a bead was claimed
+            let bead_id = data["bead_id"].as_str();
+            assert!(
+                bead_id.is_some(),
+                "Expected 'bead_id' in JSON output, got: {}",
+                stdout
+            );
+
+            let claimed_bead_id = bead_id.unwrap();
+
+            // Verify the bead was actually claimed
+            let bead = workspace.get_bead(claimed_bead_id).unwrap().unwrap();
+            assert_eq!(bead.status.to_string(), "in_progress");
+            assert_eq!(bead.assignee.as_ref().unwrap(), "test-worker-1");
+
+            // Verify metadata was stored in worker_sessions table
+            let storage = workspace.storage().unwrap();
+            let session_count = storage
+                .with_immediate_transaction(|tx| {
+                    Ok(tx.query_row(
+                        "SELECT COUNT(*) FROM worker_sessions
+                         WHERE worker_id = ?1
+                         AND model = ?2
+                         AND harness = ?3
+                         AND harness_version = ?4
+                         AND bead_id = ?5",
+                        [
+                            &"test-worker-1",
+                            &"claude-sonnet-4-6",
+                            &"needle",
+                            &"0.5.2",
+                            &claimed_bead_id,
+                        ],
+                        |row| row.get::<_, i64>(0),
+                    )?)
+                })
+                .unwrap();
+
+            assert_eq!(
+                session_count, 1,
+                "worker_sessions should contain exactly one entry with the provided metadata"
+            );
+        }
+        Err(e) => {
+            panic!("Failed to execute bf binary: {}", e);
+        }
+    }
+}
+
+#[test]
+fn test_cli_claim_partial_metadata_flags() {
+    // NEEDLE integration test: verifies that `bf claim` subprocess invocation
+    // handles partial metadata correctly (only some flags provided).
+    //
+    // This tests the fallback behavior when not all metadata fields are available,
+    // which can happen in some NEEDLE deployment scenarios.
+
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    let workspace = common::TempWorkspace::new().unwrap();
+
+    // Create test beads
+    workspace.create_bead("bf-1", "First bead").unwrap();
+    workspace.create_bead("bf-2", "Second bead").unwrap();
+
+    // Build the bf binary path
+    let project_root = std::env::current_dir().unwrap();
+    let bf_binary: PathBuf = if cfg!(debug_assertions) {
+        project_root.join("target/debug/bf")
+    } else {
+        project_root.join("target/release/bf")
+    };
+
+    // If binary doesn't exist, skip this test (requires cargo build)
+    if !bf_binary.exists() {
+        println!(
+            "CLI binary not found at {:?}, skipping CLI test. Run 'cargo build' first.",
+            bf_binary
+        );
+        return;
+    }
+
+    // Run: bf claim --model claude-opus-4-8 --assignee test-worker-2 --format json
+    // Only model is provided, no harness or harness_version
+    let output = Command::new(&bf_binary)
+        .arg("--workspace")
+        .arg(workspace.workspace_path())
+        .arg("claim")
+        .arg("--model")
+        .arg("claude-opus-4-8")
+        .arg("--assignee")
+        .arg("test-worker-2")
+        .arg("--format")
+        .arg("json")
+        .current_dir(workspace.workspace_path())
+        .output();
+
+    match output {
+        Ok(output) => {
+            // Check that command succeeded
+            assert!(
+                output.status.success(),
+                "bf claim command failed: stderr={}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+
+            // Parse JSON output
+            let stdout = String::from_utf8(output.stdout).unwrap();
+            let json: serde_json::Value =
+                serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
+            // Handle envelope format
+            let data = if json.get("version").is_some() && json.get("data").is_some() {
+                &json["data"]
+            } else {
+                &json
+            };
+
+            // Verify a bead was claimed
+            let bead_id = data["bead_id"].as_str();
+            assert!(
+                bead_id.is_some(),
+                "Expected 'bead_id' in JSON output, got: {}",
+                stdout
+            );
+
+            let claimed_bead_id = bead_id.unwrap();
+
+            // Verify the bead was claimed
+            let bead = workspace.get_bead(claimed_bead_id).unwrap().unwrap();
+            assert_eq!(bead.status.to_string(), "in_progress");
+            assert_eq!(bead.assignee.as_ref().unwrap(), "test-worker-2");
+
+            // Verify metadata was stored with partial fields (model only, harness/harness_version are NULL)
+            let storage = workspace.storage().unwrap();
+            let session_count = storage
+                .with_immediate_transaction(|tx| {
+                    Ok(tx.query_row(
+                        "SELECT COUNT(*) FROM worker_sessions
+                         WHERE worker_id = ?1
+                         AND model = ?2
+                         AND harness IS NULL
+                         AND harness_version IS NULL
+                         AND bead_id = ?3",
+                        [&"test-worker-2", &"claude-opus-4-8", &claimed_bead_id],
+                        |row| row.get::<_, i64>(0),
+                    )?)
+                })
+                .unwrap();
+
+            assert_eq!(
+                session_count, 1,
+                "worker_sessions should contain entry with model but NULL harness/harness_version"
+            );
+        }
+        Err(e) => {
+            panic!("Failed to execute bf binary: {}", e);
+        }
+    }
 }

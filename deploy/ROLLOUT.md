@@ -27,6 +27,27 @@ else
 fi
 ```
 
+## bf-checkpoint.timer — deploys identically (inert by default)
+
+The `bf-checkpoint` units ship alongside `bf-update` and deploy the **same way**: same host-variant split (`deploy/` for Debian/Ubuntu, `systemd/` for NixOS), same `~/.config/systemd/user/` install target, same `OnCalendar=hourly` cadence. Per-host, after the `bf-update` copy block above, also copy:
+
+```bash
+# Debian/Portable host
+cp deploy/bf-checkpoint.sh ~/.local/bin/bf-checkpoint.sh
+chmod +x ~/.local/bin/bf-checkpoint.sh
+cp deploy/bf-checkpoint.{service,timer} ~/.config/systemd/user/
+
+# NixOS host (script comes from scripts/, units from systemd/)
+cp scripts/bf-checkpoint.sh ~/.local/bin/bf-checkpoint.sh
+chmod +x ~/.local/bin/bf-checkpoint.sh
+cp systemd/bf-checkpoint.{service,timer} ~/.config/systemd/user/
+
+systemctl --user daemon-reload
+systemctl --user enable --now bf-checkpoint.timer
+```
+
+**Safe to roll out everywhere immediately** — unlike `bf-update`, the checkpoint timer is **inert by default**: `bf-checkpoint.sh` exits 0 unless `checkpoint.enabled: true` is set in a workspace's `.beads/config.yaml`. Deploying the timer does not commit or push anything until a maintainer opts in per workspace. Push is off by default too (`checkpoint.push: true` to enable). See [`README.md`](README.md#bf-checkpoint--periodic-beads-git-checkpoint-adr-1).
+
 ## Per-Host Deployment
 
 ### 1. Hetzner (this host) ✅ COMPLETE

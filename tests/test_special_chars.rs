@@ -209,6 +209,49 @@ mod tests {
         );
     }
 
+    /// Regression test for Latin-extended (café) and CJK (日本語) round-tripping
+    /// through every storage path: create → show (text), show --json, and the
+    /// JSONL checkpoint. Confirms unicode is stored as raw UTF-8, never
+    /// `\uXXXX`-escaped, so the bytes survive a SQLite→JSONL round-trip.
+    #[test]
+    fn test_unicode_latin_and_cjk_roundtrip() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+        let title = "Test with unicode: café and 日本語";
+
+        let (stdout, stderr, success) =
+            run_create(&beads_dir, &["--title", title, "--type", "task", "--priority", "2"]);
+        assert!(success, "Create command should succeed. stderr: {}", stderr);
+
+        let bead_id = stdout.trim();
+
+        // Text output preserves both scripts verbatim.
+        let show_output = run_show(&beads_dir, bead_id);
+        assert!(show_output.contains("café"), "Latin-extended should survive");
+        assert!(show_output.contains("日本語"), "CJK should survive");
+
+        // JSON output keeps raw UTF-8 rather than escaping to \uXXXX.
+        let json_output = Command::new(bf_binary())
+            .arg("--workspace")
+            .arg(&beads_dir)
+            .arg("show")
+            .arg(bead_id)
+            .arg("--json")
+            .output()
+            .expect("Failed to execute bf show --json");
+        let json = String::from_utf8_lossy(&json_output.stdout);
+        assert!(
+            json.contains("café") && json.contains("日本語"),
+            "JSON output must preserve raw UTF-8, not \\uXXXX escape — got: {json}"
+        );
+
+        // The JSONL checkpoint (the git-tracked artifact) holds the raw bytes.
+        let jsonl = fs::read_to_string(beads_dir.join("issues.jsonl")).unwrap();
+        assert!(
+            jsonl.contains("café") && jsonl.contains("日本語"),
+            "JSONL checkpoint must preserve raw UTF-8 — got: {jsonl}"
+        );
+    }
+
     #[test]
     fn test_quotes_and_backslashes() {
         let (_temp_dir, beads_dir) = setup_test_workspace();

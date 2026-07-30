@@ -264,6 +264,17 @@ pub const SCHEMA_SQL: &str = r"
     CREATE INDEX IF NOT EXISTS idx_bead_annotations_key_value
         ON bead_annotations (key, value);
 
+    -- Bead Labels (bf-only table for persistent label storage)
+    -- Stores labels per bead for filtering and categorization.
+    -- Separate from the br-compatible 'labels' table to avoid conflicts.
+    CREATE TABLE IF NOT EXISTS bead_labels (
+        bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+        label    TEXT NOT NULL,
+        PRIMARY KEY (bead_id, label)
+    );
+    CREATE INDEX IF NOT EXISTS idx_bead_labels_label ON bead_labels(label);
+    CREATE INDEX IF NOT EXISTS idx_bead_labels_issue ON bead_labels(bead_id);
+
     -- Worker Sessions (bf-only table for multi-workspace claiming)
     -- Tracks worker metadata (model, harness, version) for each claim operation.
     -- Used by velocity-aware scoring and audit trails.

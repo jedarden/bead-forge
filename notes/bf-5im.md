@@ -1,35 +1,20 @@
-# Bead Creation and Listing Test Results
+# bf-5im — Test bead creation and listing
 
-**Date:** 2026-07-28  
-**Bead:** bf-5im
+Verified the core `bf` create/list/show lifecycle end-to-end against the built
+`bf` 0.3.0 binary (`target/debug/bf`).
 
-## Tests Performed
+## Steps
 
-### 1. Bead Creation
-✅ Successfully created bead with `bf create --title 'Test bead' --type task`
-- Generated ID: `bf-1x19a`
-- Default status: `open`
-- Default priority: `P2`
+1. **Create** — `bf create --title 'Test bead'` → created bead `bf-264e2`.
+2. **List** — `bf list` output includes the line
+   `[bf-264e2] Test bead - open (P2)`. ✅ appears.
+3. **Show** — `bf show bf-264e2` prints id/title/status/priority/type. ✅ works.
+4. **Cleanup** — closed the test bead:
+   `bf close bf-264e2 --reason "..."` → status now `closed`.
 
-### 2. Bead Listing
-✅ Verified bead appears in `bf list` output
-- Bead `bf-1x19a` appeared at top of list
-- Format: `[bf-1x19a] Test bead - open (P2)`
+## Result
 
-### 3. Bead Display
-✅ Verified bead can be shown with `bf show <id>`
-```
-ID: bf-1x19a
-Title: Test bead
-Status: open
-Priority: P2
-Type: task
-Description:
-```
-
-### 4. Cleanup
-✅ Closed test bead with `bf close bf-1x19a --reason "Test verification completed..."`
-
-## Conclusion
-
-All acceptance criteria met. Bead creation, listing, and showing functionality working correctly.
+All acceptance criteria pass. No source changes — `bf` already handles
+create/list/show correctly. Mutations are db-only (no flush), so `.beads/beads.db`
+carries the ephemeral test bead; it is untracked by git, and `.beads/issues.jsonl`
+was not touched by this bead.

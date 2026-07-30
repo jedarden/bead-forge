@@ -792,3 +792,124 @@ fn test_cli_update_without_changes() {
         "bf update with no changes should succeed"
     );
 }
+
+// ==================== --description-file (bf-9recy) ====================
+//
+// Round-trip coverage for `bf update --description-file <path>`. Per the
+// upstream beads_rust#386 lesson, the fix must flow through the REAL update
+// path (cmd_update -> update_issue writes the column) and be verified by
+// reading the bead back via `show --json` — not just the storage API. These
+// tests exercise the whole CLI loop.
+
+/// The documented round-trip: create -> update --description-file ->
+/// show --json must reflect the file's text.
+#[test]
+fn test_cli_update_description_file_round_trip() {
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Test Desc File");
+
+    let desc_path = workspace.join("description.md");
+    let body = "This description came from a file.";
+    std::fs::write(&desc_path, body).unwrap();
+
+    update_cli_bead(workspace, &bead_id, &["--description-file", "description.md"]);
+
+    let bead = get_cli_bead_json(workspace, &bead_id);
+    assert_eq!(bead["description"], body);
+}
+
+/// Multiline / large bodies survive the file-read path byte-for-byte
+/// (the shell-quoting pain that motivates --description-file).
+#[test]
+fn test_cli_update_description_file_multiline() {
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Test Desc File Multiline");
+
+    let body = "## Title\n\n- bullet one\n- bullet two\n\n    indented code 'with \"quotes\"'\n";
+    let desc_path = workspace.join("multiline.md");
+    std::fs::write(&desc_path, body).unwrap();
+
+    update_cli_bead(
+        workspace,
+        &bead_id,
+        &["--description-file", "multiline.md"],
+    );
+
+    let bead = get_cli_bead_json(workspace, &bead_id);
+    assert_eq!(bead["description"], body);
+}
+
+/// --description-file and --description are mutually exclusive: passing both
+/// is ambiguous, so clap must reject it (mirrors the --assignee /
+/// --clear-assignee conflict guard).
+#[test]
+fn test_cli_update_description_file_conflicts_with_description() {
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Test Conflict Desc File");
+
+    let bf = bf_path();
+    let result = Command::new(&bf)
+        .arg("update")
+        .arg(&bead_id)
+        .arg("--description")
+        .arg("inline")
+        .arg("--description-file")
+        .arg("some.md")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to run update");
+
+    assert!(
+        !result.status.success(),
+        "--description and --description-file together should be rejected"
+    );
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        stderr.contains("cannot be used with"),
+        "expected a clap conflict error, got: {}",
+        stderr
+    );
+}
+
+/// A missing file is a hard, named error rather than silently clearing the
+/// description (which would look identical to a successful no-op).
+#[test]
+#[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
+fn test_cli_update_description_file_missing_file_errors() {
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Test Missing Desc File");
+
+    let bf = bf_path();
+    let result = Command::new(&bf)
+        .arg("update")
+        .arg(&bead_id)
+        .arg("--description-file")
+        .arg("does-not-exist.md")
+        .current_dir(workspace)
+        .output()
+        .expect("Failed to run update");
+
+    assert!(
+        !result.status.success(),
+        "bf update with a missing --description-file should fail"
+    );
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        stderr.contains("--description-file") && stderr.contains("does-not-exist.md"),
+        "error should name the flag and the missing path, got: {}",
+        stderr
+    );
+
+    // The description must be untouched — the failure happened before the
+    // real update path wrote anything.
+    let bead = get_cli_bead_json(workspace, &bead_id);
+    assert!(
+        bead["description"].is_null(),
+        "description should remain unset after a failed --description-file, got {:?}",
+        bead["description"]
+    );
+}

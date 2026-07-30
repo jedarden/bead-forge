@@ -27,6 +27,29 @@ pub struct Config {
     pub sync: SyncConfig,
 }
 
+/// Automatic SQLite → JSONL flush behavior (Phase 7.1).
+///
+/// When `auto_flush` is enabled, mutating commands flush the dirty beads to
+/// `issues.jsonl` right after the mutation so the on-disk artifact never lags
+/// the database. It is the master switch resolved against the per-invocation
+/// `--no-auto-flush` CLI override (see `crate::autoflush::enabled`). Enabled by
+/// default so a fresh workspace keeps JSONL current without extra flags.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncConfig {
+    /// Master switch. `true` (default) flushes dirty beads to JSONL after each
+    /// mutation; set `false` to leave flushing to explicit `bf sync`/checkpoint.
+    #[serde(default = "default_auto_flush")]
+    pub auto_flush: bool,
+}
+
+impl Default for SyncConfig {
+    fn default() -> Self {
+        SyncConfig {
+            auto_flush: default_auto_flush(),
+        }
+    }
+}
+
 /// Pre-export JSONL history backups (Phase 7.9).
 ///
 /// Before every full flush overwrites `issues.jsonl`, the previous version is
@@ -50,29 +73,6 @@ impl Default for HistoryConfig {
         HistoryConfig {
             enabled: default_history_enabled(),
             max_backups: default_history_max_backups(),
-        }
-    }
-}
-
-/// Incremental auto-flush configuration (Phase 7.1).
-///
-/// Controls automatic incremental export of dirty issues to JSONL after each
-/// successful mutation. When enabled (default), the workspace state in `issues.jsonl`
-/// tracks the live SQLite store in near-real-time, eliminating the flush-before-repair
-/// ritual and protecting against data loss.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncConfig {
-    /// Master switch for auto-flush. `true` (default) means every successful mutation
-    /// (create/update/close/batch) incrementally exports dirty issues to JSONL.
-    /// Set `false` to disable automatic flushing and rely on explicit `bf sync --flush-only`.
-    #[serde(default = "default_sync_auto_flush")]
-    pub auto_flush: bool,
-}
-
-impl Default for SyncConfig {
-    fn default() -> Self {
-        SyncConfig {
-            auto_flush: default_sync_auto_flush(),
         }
     }
 }
@@ -224,7 +224,7 @@ fn default_history_max_backups() -> usize {
     20
 }
 
-fn default_sync_auto_flush() -> bool {
+fn default_auto_flush() -> bool {
     true
 }
 
@@ -385,6 +385,36 @@ checkpoint:
         assert!(!cfg.checkpoint.enabled);
         assert_eq!(cfg.checkpoint.interval_minutes, 60);
         assert!(!cfg.checkpoint.push);
+    }
+
+    #[test]
+    fn test_sync_config_default_auto_flush_true() {
+        assert!(
+            SyncConfig::default().auto_flush,
+            "auto_flush must default to true"
+        );
+        assert!(
+            Config::default().sync.auto_flush,
+            "Config::default() must carry auto_flush=true"
+        );
+    }
+
+    #[test]
+    fn test_sync_config_omitted_block_uses_defaults() {
+        // A config.yaml with no `sync:` block must still deserialize and report
+        // auto_flush=true, matching the compiled default.
+        let yaml = "issue_prefixes:\n- bf\n";
+        let cfg: Config =
+            serde_yaml::from_str(yaml).expect("config without sync block must parse");
+        assert!(cfg.sync.auto_flush);
+    }
+
+    #[test]
+    fn test_sync_config_parses_auto_flush_false() {
+        let yaml = "sync:\n  auto_flush: false\n";
+        let cfg: Config =
+            serde_yaml::from_str(yaml).expect("populated sync block must parse");
+        assert!(!cfg.sync.auto_flush, "auto_flush: false must disable");
     }
 
     #[test]

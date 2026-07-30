@@ -4,10 +4,11 @@ use crate::claim::{
 };
 use crate::close::close_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
-use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata};
+use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
-use crate::format::{get_formatter, OutputFormat};
+use crate::format::{get_formatter, ClaimResultOutput, OutputFormat, StatsOutput};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
+use serde_json::Value;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
 use crate::validation::normalize_assignee;
@@ -23,15 +24,23 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Parser)]
 #[command(name = "bf")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(disable_version_flag = true)]
 #[command(about = "bead-forge - Drop-in replacement for beads_rust (br)", long_about = None)]
 pub struct Cli {
     /// Workspace directory (defaults to current directory's .beads/)
     #[arg(short, long, global = true)]
     pub workspace: Option<PathBuf>,
 
-    /// Disable automatic flushing to JSONL after mutations
+    /// Disable the automatic SQLite→JSONL flush after mutating commands for
+    /// this invocation. Overrides `sync.auto_flush: true` in config; a no-op
+    /// when auto-flush is already off. See `crate::autoflush::enabled`.
     #[arg(long, global = true)]
-    no_auto_flush: bool,
+    pub no_auto_flush: bool,
+
+    /// Wrap --json output in a standard envelope: {version, kind, data, warning?}.
+    /// This provides stable structure for programmatic consumers. See `bf robot-docs`.
+    #[arg(long, global = true)]
+    pub envelope: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -68,6 +77,10 @@ pub enum Commands {
         /// Labels
         #[arg(long)]
         label: Vec<String>,
+
+        /// Output JSON ({"id": "..."} plus a "warning" key if auto-flush fails)
+        #[arg(long)]
+        json: bool,
     },
 
     /// List beads
@@ -134,8 +147,11 @@ pub enum Commands {
 
     /// Update a bead
     ///
-    /// Changes only the fields you pass. Note that description and
-    /// acceptance_criteria cannot be edited here — add a comment instead.
+    /// Changes only the fields you pass. `--description` and
+    /// `--acceptance-criteria` edit those fields directly (closing the old
+    /// "add a comment instead" gap). For long/multiline descriptions pass
+    /// `--description-file <path>` instead — it reads the file's contents and
+    /// sets the description, and conflicts with `--description`.
     /// --due-at expects an RFC3339 timestamp (e.g. 2025-01-01T00:00:00Z).
     Update {
         /// Bead ID
@@ -167,6 +183,12 @@ pub enum Commands {
         /// New description
         #[arg(long)]
         description: Option<String>,
+
+        /// Read the new description from a file. Useful for long or multiline
+        /// bodies that are awkward to pass on the shell. Conflicts with
+        /// --description (which wins for short inline text).
+        #[arg(long, conflicts_with = "description")]
+        description_file: Option<PathBuf>,
 
         /// New acceptance criteria
         #[arg(long)]
@@ -341,6 +363,19 @@ pub enum Commands {
         /// not rebuild from JSONL). Fixes the NULL-datetime crash class.
         #[arg(long)]
         fix_schema: bool,
+
+        /// Proceed with --repair even if a prior rebuild failed post-verification
+        /// (clears the repeat-failure gate; see the doctor safety stack).
+        #[arg(long)]
+        allow_repeated_repair: bool,
+
+        /// List verified pre-rebuild recovery runs (hash-checked DB backups).
+        #[arg(long)]
+        runs: bool,
+
+        /// Restore the DB family from a recovery run: a run id or "latest".
+        #[arg(long, value_name = "RUN_ID")]
+        restore: Option<String>,
     },
 
     /// Three-way merge of JSONL bead files (usable as a git merge driver)
@@ -436,6 +471,10 @@ pub enum Commands {
         /// Read from stdin
         #[arg(long, default_value = "false")]
         stdin: bool,
+
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        format: String,
     },
 
     /// Mitosis: split a bead into children atomically
@@ -475,17 +514,23 @@ pub enum Commands {
     #[command(subcommand)]
     Label(LabelCommands),
 
-    /// List labels for a specific issue (direct SELECT, efficient)
+    /// List labels for beads
     ///
-    /// A lightweight single-SELECT variant of `bf label list` for one bead.
-    /// Prints one label per line, or JSON with --format json.
+    /// With a bead ID, lists that bead's labels (one per line). Without an ID,
+    /// lists all beads with their labels in a formatted table showing ID, title,
+    /// and comma-separated labels.
     Labels {
-        /// Bead ID
-        id: String,
+        /// Bead ID (optional - if omitted, shows all beads with their labels)
+        #[arg(required = false)]
+        id: Option<String>,
 
         /// Output format (text, json)
         #[arg(short, long, default_value = "text")]
         format: String,
+
+        /// Output JSON (alias for --format json)
+        #[arg(long)]
+        json: bool,
     },
 
     /// Manage comments
@@ -561,6 +606,10 @@ pub enum Commands {
         /// Output format (text, json, toon)
         #[arg(long, default_value = "text")]
         format: String,
+
+        /// Wrap output in a JSON envelope (requires --format json)
+        #[arg(long)]
+        envelope: bool,
     },
 
     /// Emit JSON Schema
@@ -763,6 +812,17 @@ pub enum Commands {
         /// Output JSON (alias for --format json)
         #[arg(long)]
         json: bool,
+    },
+
+    /// Robot docs - machine-readable command contract documentation
+    ///
+    /// Outputs a JSON schema describing every command's --json output contract,
+    /// enabling agent consumers to parse responses programmatically without
+    /// hardcoding shapes.
+    RobotDocs {
+        /// Output format (text, json)
+        #[arg(long, default_value = "json")]
+        format: String,
     },
 }
 
@@ -983,12 +1043,37 @@ pub enum AnnotateCommands {
     },
 }
 
+/// Wrap data in a JSON envelope for --json output.
+///
+/// This helper creates the standard envelope shape that all bf commands emit:
+/// { version: 1, kind: "<command>", data: <data>, warning?: "<msg>" }
+fn wrap_envelope(kind: &str, data: serde_json::Value, warning: Option<&str>) -> String {
+    let envelope = crate::format::JsonEnvelope::new(kind, data);
+    let envelope = if let Some(w) = warning {
+        envelope.with_warning(w)
+    } else {
+        envelope
+    };
+    envelope.to_json().unwrap_or_else(|_| "{}".to_string())
+}
+
 pub fn run_cli() -> Result<Cli> {
     Ok(Cli::parse())
 }
 
 pub fn run(cli: Cli) -> Result<()> {
+    // Captured before `cli.command` is moved out below. This is the
+    // per-invocation half of the effective auto-flush switch; combined with
+    // `config.sync.auto_flush` inside each handler via
+    // `autoflush::after_mutation_with_config` (see child 1, bf-37xjd).
+    let no_auto_flush = cli.no_auto_flush;
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
+
+    // Enable envelope wrapping for this process if --envelope flag is set.
+    // This is a process-wide setting that affects all JSON formatting.
+    if cli.envelope {
+        crate::format::json::JsonFormatter::with_envelope_enabled();
+    }
 
     // Handle case where no subcommand is provided
     let command = match cli.command {
@@ -1032,20 +1117,18 @@ pub fn run(cli: Cli) -> Result<()> {
             description,
             assignee,
             label,
-        } => {
-            let config = load_config(&beads_dir).unwrap_or_default();
-            cmd_create(
-                &beads_dir,
-                title,
-                type_,
-                priority,
-                description,
-                assignee,
-                label,
-                cli.no_auto_flush,
-                config.sync.auto_flush,
-            )
-        },
+            json,
+        } => cmd_create(
+            &beads_dir,
+            title,
+            type_,
+            priority,
+            description,
+            assignee,
+            label,
+            json,
+            no_auto_flush,
+        ),
         Commands::List {
             status,
             type_,
@@ -1059,12 +1142,12 @@ pub fn run(cli: Cli) -> Result<()> {
         } => {
             let format = if json { "json".to_string() } else { format };
             cmd_list(
-                &beads_dir, status, type_, assignee, priority, annotation, limit, all, &format,
+                &beads_dir, status, type_, assignee, priority, annotation, limit, all, &format, cli.envelope,
             )
         }
         Commands::Show { id, format, json } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_show(&beads_dir, &id, &format)
+            cmd_show(&beads_dir, &id, &format, cli.envelope)
         }
         Commands::Update {
             id,
@@ -1074,12 +1157,12 @@ pub fn run(cli: Cli) -> Result<()> {
             assignee,
             clear_assignee,
             description,
+            description_file,
             acceptance_criteria,
             notes,
             design,
             due_at,
         } => {
-            let config = load_config(&beads_dir).unwrap_or_default();
             // --clear-assignee is sugar for --assignee "": both flow the
             // empty-string "clear to NULL" signal into update_issue. clap
             // guarantees the two flags are mutually exclusive.
@@ -1087,6 +1170,16 @@ pub fn run(cli: Cli) -> Result<()> {
                 Some(String::new())
             } else {
                 assignee
+            };
+            // --description-file resolves into `description` here (the REAL
+            // update path — cmd_update -> update_issue writes the column).
+            // clap's conflicts_with("description") guarantees only one is set.
+            let description = match description_file {
+                Some(path) => Some(
+                    std::fs::read_to_string(&path)
+                        .map_err(|e| anyhow!("Failed to read --description-file {}: {}", path.display(), e))?,
+                ),
+                None => description,
             };
             cmd_update(
                 &beads_dir,
@@ -1100,35 +1193,19 @@ pub fn run(cli: Cli) -> Result<()> {
                 notes,
                 design,
                 due_at,
-                cli.no_auto_flush,
-                config.sync.auto_flush,
+                no_auto_flush,
             )
         }
-        Commands::Close { id, reason } => {
-            let config = load_config(&beads_dir).unwrap_or_default();
-            cmd_close(
-                &beads_dir,
-                &id,
-                &reason,
-                cli.no_auto_flush,
-                config.sync.auto_flush,
-            )
-        },
-        Commands::Reopen { id } => {
-            let config = load_config(&beads_dir).unwrap_or_default();
-            cmd_reopen(&beads_dir, &id, cli.no_auto_flush, config.sync.auto_flush)
-        }
-        Commands::Delete { id } => {
-            let config = load_config(&beads_dir).unwrap_or_default();
-            cmd_delete(&beads_dir, &id, cli.no_auto_flush, config.sync.auto_flush)
-        },
+        Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason, no_auto_flush),
+        Commands::Reopen { id } => cmd_reopen(&beads_dir, &id, no_auto_flush),
+        Commands::Delete { id } => cmd_delete(&beads_dir, &id, no_auto_flush),
         Commands::Ready {
             limit,
             format,
             json,
         } => {
             let format = if json { "json".to_string() } else { format };
-            cmd_ready(&beads_dir, limit, &format)
+            cmd_ready(&beads_dir, limit, &format, cli.envelope)
         }
         Commands::Claim {
             assignee,
@@ -1154,6 +1231,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 &workspace_paths,
                 dry_run,
                 &format,
+                no_auto_flush,
             )
         }
         Commands::Sync {
@@ -1169,6 +1247,9 @@ pub fn run(cli: Cli) -> Result<()> {
             reclaim_stale,
             ttl,
             fix_schema,
+            allow_repeated_repair,
+            runs,
+            restore,
         } => cmd_doctor(
             &beads_dir,
             repair,
@@ -1177,25 +1258,24 @@ pub fn run(cli: Cli) -> Result<()> {
             reclaim_stale,
             ttl,
             fix_schema,
+            allow_repeated_repair,
+            runs,
+            restore,
         ),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
-        Commands::Batch { file, json, stdin } => {
-            let config = load_config(&beads_dir).unwrap_or_default();
-            cmd_batch(&beads_dir, file, json, stdin, cli.no_auto_flush, config.sync.auto_flush)
-        },
+        Commands::Batch { file, json, stdin, format } => {
+            cmd_batch(&beads_dir, file, json, stdin, &format, no_auto_flush)
+        }
         Commands::Mitosis {
             id,
             children,
             reason,
             format,
-        } => {
-            let config = load_config(&beads_dir).unwrap_or_default();
-            cmd_mitosis(&beads_dir, &id, &children, &reason, &format, cli.no_auto_flush, config.sync.auto_flush)
-        },
-        Commands::Dep(dep) => cmd_dep(&beads_dir, dep),
-        Commands::Label(label) => cmd_label(&beads_dir, label),
-        Commands::Comments(comments) => cmd_comments(&beads_dir, comments),
+        } => cmd_mitosis(&beads_dir, &id, &children, &reason, &format, no_auto_flush),
+        Commands::Dep(dep) => cmd_dep(&beads_dir, dep, no_auto_flush),
+        Commands::Label(label) => cmd_label(&beads_dir, label, no_auto_flush),
+        Commands::Comments(comments) => cmd_comments(&beads_dir, comments, no_auto_flush),
         Commands::Search {
             query,
             status,
@@ -1217,6 +1297,7 @@ pub fn run(cli: Cli) -> Result<()> {
             priority_max,
             limit,
             &format,
+            cli.envelope,
         ),
         Commands::Stats {
             by_type,
@@ -1224,6 +1305,7 @@ pub fn run(cli: Cli) -> Result<()> {
             by_assignee,
             by_label,
             format,
+            envelope,
         } => cmd_stats(
             &beads_dir,
             by_type,
@@ -1231,6 +1313,7 @@ pub fn run(cli: Cli) -> Result<()> {
             by_assignee,
             by_label,
             &format,
+            envelope,
         ),
         Commands::Schema { target, format } => cmd_schema(&target, &format),
         Commands::Config(config) => cmd_config(&beads_dir, config),
@@ -1239,8 +1322,11 @@ pub fn run(cli: Cli) -> Result<()> {
             harness,
             format,
         } => cmd_velocity(&beads_dir, model, harness, &format),
-        Commands::Labels { id, format } => cmd_labels(&beads_dir, &id, &format),
-        Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate),
+        Commands::Labels { id, format, json } => {
+            let format = if json { "json".to_string() } else { format };
+            cmd_labels(&beads_dir, id.as_deref(), &format)
+        }
+        Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate, no_auto_flush),
         Commands::Log {
             id,
             limit,
@@ -1311,6 +1397,10 @@ pub fn run(cli: Cli) -> Result<()> {
                 &format,
             )
         }
+        Commands::RobotDocs { .. } => {
+            eprintln!("Error: robot-docs command is not yet implemented");
+            std::process::exit(1);
+        }
         Commands::Init { .. } => unreachable!("Init command handled earlier"),
     }
 }
@@ -1349,6 +1439,59 @@ claim_ttl_minutes: 30
     Ok(())
 }
 
+/// Best-effort SQLite→JSONL flush after a SUCCESSFUL single-issue mutation.
+///
+/// This is the shared wiring for Phase 7.1 child 2/5 (bf-3iosi): every
+/// single-issue mutation handler calls this once its storage write has
+/// committed. It honors the effective auto-flush switch
+/// (`config.sync.auto_flush && !--no-auto-flush`) via child 1's
+/// [`crate::autoflush::after_mutation_with_config`].
+///
+/// A flush failure NEVER fails the mutation — the write already succeeded and
+/// the flush layer retains the `dirty_issues` marks so the next flush (or
+/// `bf sync --flush-only`) recovers. On failure we emit a stderr warning and
+/// return the warning text so a `--json` caller can also fold it into its
+/// output envelope via [`crate::format::with_warning`]. Returns `None` when
+/// auto-flush is disabled or the flush succeeded.
+fn autoflush_after_mutation(
+    beads_dir: &Path,
+    config: &Config,
+    no_auto_flush: bool,
+) -> Option<String> {
+    let outcome = crate::autoflush::after_mutation_with_config(beads_dir, config, no_auto_flush);
+    surface_flush_outcome(&outcome)
+}
+
+/// Like [`autoflush_after_mutation`] but for a hard delete: prunes the deleted
+/// beads' now-stale lines from JSONL via [`crate::autoflush::after_delete`]
+/// (the FK cascade drops their `dirty_issues` rows, so an ordinary dirty flush
+/// could never remove them). Best-effort — a flush failure never fails the
+/// delete; it degrades to a stderr warning and the returned text.
+fn autoflush_after_delete(
+    beads_dir: &Path,
+    config: &Config,
+    no_auto_flush: bool,
+    removed_ids: &[String],
+) -> Option<String> {
+    let enabled = crate::autoflush::enabled(config, no_auto_flush);
+    let outcome = crate::autoflush::after_delete(beads_dir, enabled, removed_ids);
+    surface_flush_outcome(&outcome)
+}
+
+/// Bridge a [`crate::autoflush::FlushOutcome`] into the user-facing warning
+/// channel: emit a stderr `warning:` line on failure and return the text so a
+/// `--json` caller can fold it into its envelope. `None` when silent
+/// (disabled/succeeded).
+fn surface_flush_outcome(outcome: &crate::autoflush::FlushOutcome) -> Option<String> {
+    match outcome.warning() {
+        Some(w) => {
+            crate::format::warn_stderr(w);
+            Some(w.to_string())
+        }
+        None => None,
+    }
+}
+
 fn cmd_create(
     beads_dir: &PathBuf,
     title: String,
@@ -1357,8 +1500,8 @@ fn cmd_create(
     description: Option<String>,
     assignee: Option<String>,
     labels: Vec<String>,
+    json: bool,
     no_auto_flush: bool,
-    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -1404,13 +1547,17 @@ fn cmd_create(
         return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted")));
     }
 
-    println!("{}", id);
+    // Incremental flush of the just-created bead (best effort; never fatal).
+    let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
 
-    // Auto-flush after successful mutation
-    let default_workspace = PathBuf::from(".");
-    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
-    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
-
+    if json {
+        let formatter = get_formatter(OutputFormat::Json);
+        let data = serde_json::json!({ "id": id });
+        let json_str = serde_json::to_string(&data)?;
+        println!("{}", formatter.format_with_envelope_and_warning("create", &json_str, warning.as_deref()));
+    } else {
+        println!("{}", id);
+    }
     Ok(())
 }
 
@@ -1424,6 +1571,7 @@ fn cmd_list(
     limit: Option<usize>,
     all: bool,
     format: &str,
+    envelope: bool,
 ) -> Result<()> {
     // Parse annotation filter (key=value format)
     let annotation_filter = match annotation {
@@ -1491,12 +1639,40 @@ fn cmd_list(
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_issues(&issues));
+
+    match output_format {
+        OutputFormat::Json => {
+            let jsonl = formatter.format_issues(&issues);
+            if envelope {
+                // Wrap in envelope with kind="list"
+                // Convert JSONL to JSON array for envelope wrapping
+                let data = if jsonl.is_empty() {
+                    "[]".to_string()
+                } else {
+                    // Convert JSONL (one object per line) to JSON array
+                    let objects: Vec<serde_json::Value> = jsonl
+                        .lines()
+                        .filter_map(|line| serde_json::from_str(line).ok())
+                        .collect();
+                    serde_json::to_string(&objects).unwrap_or_else(|_| "[]".to_string())
+                };
+                println!("{}", formatter.format_with_envelope("list", &data));
+            } else {
+                // Raw JSONL output; empty list prints nothing (unlike ready, which prints [])
+                if !jsonl.is_empty() {
+                    println!("{}", jsonl);
+                }
+            }
+        }
+        _ => {
+            print!("{}", formatter.format_issues(&issues));
+        }
+    }
 
     Ok(())
 }
 
-fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
+fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1519,8 +1695,16 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
             let mut out = issue;
             out.dependencies = vec![];
             out.comments = vec![];
-            // Wrap in array so NEEDLE's parse_single_bead (Vec<Bead> → first) works.
-            println!("{}", serde_json::to_string(&vec![out])?);
+            // Serialize to JSON
+            let formatter = get_formatter(OutputFormat::Json);
+            let json_str = formatter.format_issue(&out);
+            if envelope {
+                // Wrap in envelope with kind="show"
+                println!("{}", formatter.format_with_envelope("show", &json_str));
+            } else {
+                // Raw JSON array output (NEEDLE contract: single-element array)
+                println!("[{}]", json_str);
+            }
         }
         "toon" => {
             println!("ID: {}", issue.id);
@@ -1590,7 +1774,6 @@ fn cmd_update(
     design: Option<String>,
     due_at: Option<String>,
     no_auto_flush: bool,
-    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -1626,43 +1809,26 @@ fn cmd_update(
     };
 
     storage.update_issue(id, &changes)?;
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
     println!("Updated bead {}", id);
-
-    // Auto-flush after successful mutation
-    let default_workspace = PathBuf::from(".");
-    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
-    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
 
     Ok(())
 }
 
-fn cmd_close(
-    beads_dir: &PathBuf,
-    id: &str,
-    reason: &str,
-    no_auto_flush: bool,
-    config_auto_flush: bool,
-) -> Result<()> {
+fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
     close_bead(&db_path, id, reason, "cli")?;
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
     println!("Closed bead {}", id);
-
-    // Auto-flush after successful mutation
-    let default_workspace = PathBuf::from(".");
-    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
-    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
 
     Ok(())
 }
 
-fn cmd_reopen(
-    beads_dir: &PathBuf,
-    id: &str,
-    no_auto_flush: bool,
-    config_auto_flush: bool,
-) -> Result<()> {
+fn cmd_reopen(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1681,22 +1847,14 @@ fn cmd_reopen(
     };
 
     storage.update_issue(id, &changes)?;
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
     println!("Reopened bead {}", id);
-
-    // Auto-flush after successful mutation
-    let default_workspace = PathBuf::from(".");
-    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
-    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
 
     Ok(())
 }
 
-fn cmd_delete(
-    beads_dir: &PathBuf,
-    id: &str,
-    no_auto_flush: bool,
-    config_auto_flush: bool,
-) -> Result<()> {
+fn cmd_delete(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1706,17 +1864,17 @@ fn cmd_delete(
         Ok(())
     })?;
 
-    println!("Deleted bead {}", id);
+    // The hard DELETE cascades away the bead's dirty_issues row, so a normal
+    // dirty flush can never remove its stale JSONL line. Prune it explicitly
+    // (best effort; a flush failure never fails the delete).
+    autoflush_after_delete(beads_dir, &config, no_auto_flush, &[id.to_string()]);
 
-    // Auto-flush after successful mutation
-    let default_workspace = PathBuf::from(".");
-    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
-    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+    println!("Deleted bead {}", id);
 
     Ok(())
 }
 
-fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
+fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -1727,18 +1885,36 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str) -> Result<()> {
 
     match format {
         "json" => {
-            // Use the shared formatter (JSONL, one Issue per line) for consistency with
-            // `list`/`search`. Resolve each scored candidate to its full Issue record so
+            // Use the shared formatter for consistency with `list`/`search`.
+            // Resolve each scored candidate to its full Issue record so
             // the formatter has every field; empty result prints `[]`.
             let formatter = get_formatter(OutputFormat::Json);
             let issues: Vec<Issue> = candidates
                 .iter()
                 .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
                 .collect();
-            if issues.is_empty() {
-                println!("[]");
+
+            let jsonl = formatter.format_issues(&issues);
+            if envelope {
+                // Wrap in envelope with kind="ready"
+                // Convert JSONL to JSON array for the envelope data field
+                let data = if jsonl.is_empty() {
+                    "[]".to_string()
+                } else {
+                    let objects: Vec<Value> = jsonl
+                        .lines()
+                        .filter_map(|line| serde_json::from_str(line).ok())
+                        .collect();
+                    serde_json::to_string(&objects).unwrap_or_else(|_| "[]".to_string())
+                };
+                println!("{}", formatter.format_with_envelope("ready", &data));
             } else {
-                print!("{}", formatter.format_issues(&issues));
+                // Raw JSONL output; empty ready prints `[]` as a special case
+                if jsonl.is_empty() {
+                    println!("[]");
+                } else {
+                    println!("{}", jsonl);
+                }
             }
         }
         "toon" => {
@@ -1783,9 +1959,23 @@ fn cmd_claim(
     workspace_paths: &[PathBuf],
     dry_run: bool,
     format: &str,
+    no_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let claim_ttl = config.claim_ttl_minutes;
+
+    // Pre-resolved auto-flush switch; each successful (non-dry-run) claim flushes
+    // the workspace whose bead it mutated. `flush_claim` targets that workspace
+    // (which may differ from `beads_dir` under `--any`/fallback) and surfaces a
+    // flush failure as a warning without failing the claim.
+    let flush_enabled = crate::autoflush::enabled(&config, no_auto_flush);
+    let flush_claim = |ws: &Path| {
+        let outcome = crate::autoflush::after_mutation(ws, flush_enabled);
+        surface_flush_outcome(&outcome);
+    };
+
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
 
     // Build worker metadata
     let worker_metadata = WorkerMetadata {
@@ -1851,33 +2041,15 @@ fn cmd_claim(
         };
 
         if let Some((path, candidate)) = candidates.first() {
-            match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": candidate.id,
-                        "title": candidate.title,
-                        "priority": candidate.priority,
-                        "downstream_impact": candidate.downstream_impact,
-                        "assignee": assignee,
-                        "workspace": path.display().to_string(),
-                        "dry_run": true
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    println!(
-                        "{} (priority={}, impact={}, workspace={})",
-                        candidate.id,
-                        candidate.priority,
-                        candidate.downstream_impact,
-                        path.display()
-                    );
-                }
-            }
-        } else if format == "json" {
-            println!("{{}}");
+            let mut out = ClaimResultOutput::new(&candidate.id, assignee);
+            out.title = Some(candidate.title.clone());
+            out.priority = Some(candidate.priority);
+            out.downstream_impact = Some(candidate.downstream_impact);
+            out.workspace = Some(path.display().to_string());
+            out.dry_run = Some(true);
+            println!("{}", formatter.format_claim_result(&out));
         } else {
-            println!("No beads available to claim");
+            println!("{}", formatter.format_no_claim());
         }
     } else if any {
         // Claim from any workspace
@@ -1895,30 +2067,17 @@ fn cmd_claim(
                 bead_id,
                 reclaimed,
                 workspace_path,
-            }) => match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": bead_id,
-                        "reclaimed": reclaimed,
-                        "assignee": assignee,
-                        "workspace": workspace_path.map(|p| p.display().to_string())
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    if let Some(path) = workspace_path {
-                        println!("{} (workspace: {})", bead_id, path.display());
-                    } else {
-                        println!("{}", bead_id);
-                    }
-                }
-            },
+            }) => {
+                // Flush the workspace that actually got claimed (may differ
+                // from the invoking `beads_dir` under --any).
+                flush_claim(workspace_path.as_deref().unwrap_or(beads_dir.as_path()));
+                let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                out.reclaimed = Some(reclaimed);
+                out.workspace = workspace_path.map(|p| p.display().to_string());
+                println!("{}", formatter.format_claim_result(&out));
+            }
             None => {
-                if format == "json" {
-                    println!("{{}}");
-                } else {
-                    println!("No beads available to claim");
-                }
+                println!("{}", formatter.format_no_claim());
             }
         }
     } else if fallback == Some("any") {
@@ -1934,19 +2093,13 @@ fn cmd_claim(
         match result {
             Some(ClaimResult {
                 bead_id, reclaimed, ..
-            }) => match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": bead_id,
-                        "reclaimed": reclaimed,
-                        "assignee": assignee
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    println!("{}", bead_id);
-                }
-            },
+            }) => {
+                // Claimed in the current workspace.
+                flush_claim(beads_dir);
+                let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                out.reclaimed = Some(reclaimed);
+                println!("{}", formatter.format_claim_result(&out));
+            }
             None => {
                 // Fallback to any workspace
                 let paths = if workspace_paths.is_empty() {
@@ -1962,30 +2115,15 @@ fn cmd_claim(
                         bead_id,
                         reclaimed,
                         workspace_path,
-                    }) => match format {
-                        "json" => {
-                            let output = serde_json::json!({
-                                "bead_id": bead_id,
-                                "reclaimed": reclaimed,
-                                "assignee": assignee,
-                                "workspace": workspace_path.map(|p| p.display().to_string())
-                            });
-                            println!("{}", output);
-                        }
-                        _ => {
-                            if let Some(path) = workspace_path {
-                                println!("{} (workspace: {})", bead_id, path.display());
-                            } else {
-                                println!("{}", bead_id);
-                            }
-                        }
-                    },
+                    }) => {
+                        flush_claim(workspace_path.as_deref().unwrap_or(beads_dir.as_path()));
+                        let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                        out.reclaimed = Some(reclaimed);
+                        out.workspace = workspace_path.map(|p| p.display().to_string());
+                        println!("{}", formatter.format_claim_result(&out));
+                    }
                     None => {
-                        if format == "json" {
-                            println!("{{}}");
-                        } else {
-                            println!("No beads available to claim");
-                        }
+                        println!("{}", formatter.format_no_claim());
                     }
                 }
             }
@@ -2003,25 +2141,14 @@ fn cmd_claim(
         match result {
             Some(ClaimResult {
                 bead_id, reclaimed, ..
-            }) => match format {
-                "json" => {
-                    let output = serde_json::json!({
-                        "bead_id": bead_id,
-                        "reclaimed": reclaimed,
-                        "assignee": assignee
-                    });
-                    println!("{}", output);
-                }
-                _ => {
-                    println!("{}", bead_id);
-                }
-            },
+            }) => {
+                flush_claim(beads_dir);
+                let mut out = ClaimResultOutput::new(&bead_id, assignee);
+                out.reclaimed = Some(reclaimed);
+                println!("{}", formatter.format_claim_result(&out));
+            }
             None => {
-                if format == "json" {
-                    println!("{{}}");
-                } else {
-                    println!("No beads available to claim");
-                }
+                println!("{}", formatter.format_no_claim());
             }
         }
     }
@@ -2107,11 +2234,49 @@ fn cmd_doctor(
     reclaim_stale: bool,
     ttl: Option<i64>,
     fix_schema: bool,
+    allow_repeated_repair: bool,
+    runs: bool,
+    restore: Option<String>,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
-    if fix_schema {
+    if runs {
+        // List verified pre-rebuild recovery runs (doctor safety stack, layer 3).
+        let all = crate::recovery::list_runs(beads_dir)?;
+        if all.is_empty() {
+            println!("No recovery runs found");
+        } else {
+            println!("Recovery runs (newest first):");
+            for m in &all {
+                let total: u64 = m.files.iter().map(|f| f.bytes).sum();
+                println!(
+                    "  {}  {}  {} file(s), {} bytes  [{}]",
+                    m.run_id,
+                    m.created_at,
+                    m.files.len(),
+                    total,
+                    m.reason
+                );
+                for f in &m.files {
+                    println!("      {}  sha256:{}…  {} bytes", f.name, &f.sha256[..12.min(f.sha256.len())], f.bytes);
+                }
+            }
+            println!();
+            println!("Restore one with: bf doctor --restore <run-id|latest>");
+        }
+    } else if let Some(run_ref) = restore {
+        // Restore the DB family from a hash-verified recovery run (layer 3).
+        let manifest = crate::recovery::restore_run(beads_dir, &run_ref)?;
+        println!(
+            "✓ Restored {} file(s) from recovery run {} (all hashes verified)",
+            manifest.files.len(),
+            manifest.run_id
+        );
+        for f in &manifest.files {
+            println!("    {}", f.name);
+        }
+    } else if fix_schema {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let fixed = crate::doctor::fix_null_not_null(workspace_dir)?;
         if fixed == 0 {
@@ -2124,8 +2289,29 @@ fn cmd_doctor(
         }
     } else if repair {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
-        let imported = crate::doctor::repair(workspace_dir, flush_first, force)?;
-        println!("Repaired database: imported {} beads from JSONL", imported);
+        let opts = crate::doctor::RepairOptions {
+            flush_first,
+            force,
+            allow_repeated_repair,
+        };
+        let report = crate::doctor::repair_stack(workspace_dir, &opts)?;
+        if report.rebuilt {
+            println!(
+                "Repaired database: rebuilt from JSONL ({} imported, {} unflushed bead(s) preserved)",
+                report.imported, report.preserved_dirty
+            );
+            if let Some(run_id) = &report.backup_run_id {
+                println!("  Verified pre-rebuild backup: recovery run {}", run_id);
+            }
+        } else {
+            println!("✓ Workspace healthy — no JSONL rebuild needed");
+            if !report.local_fixes.is_empty() {
+                println!("  Applied local fixers: {}", report.local_fixes.join(", "));
+            }
+        }
+        for msg in &report.messages {
+            println!("  {}", msg);
+        }
     } else if reclaim_stale {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
         let config = load_config(beads_dir)?;
@@ -2260,8 +2446,8 @@ fn cmd_batch(
     file: Option<PathBuf>,
     json: Option<String>,
     stdin: bool,
+    format: &str,
     no_auto_flush: bool,
-    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -2279,34 +2465,39 @@ fn cmd_batch(
         return Err(anyhow!("Must provide --file, --json, or --stdin"));
     };
 
-    let results = execute_batch(&storage, ops, beads_dir)?;
+    let results = execute_batch(&storage, ops, beads_dir, no_auto_flush)?;
 
-    // Auto-flush after successful batch operations (flushes once at transaction end)
-    let default_workspace = PathBuf::from(".");
-    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
-    let flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
-
-    // Print results
-    for result in results {
-        if result.status == "ok" {
-            if let Some(id) = result.id {
-                println!("[op {}] ok: {}", result.op, id);
-            } else {
-                println!("[op {}] ok", result.op);
-            }
-        } else {
-            eprintln!(
-                "[op {}] error: {}",
-                result.op,
-                result.error.unwrap_or_default()
-            );
+    // Check if we should output JSON
+    let output_format = crate::format::OutputFormat::from_str(format).unwrap_or(crate::format::OutputFormat::Text);
+    match output_format {
+        crate::format::OutputFormat::Json => {
+            let formatter = get_formatter(output_format);
+            // Convert Vec<BatchResult> to JSONL (newline-separated JSON objects)
+            let jsonl = results
+                .iter()
+                .map(|r| serde_json::to_string(r))
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap_or_default()
+                .join("\n");
+            println!("{}", formatter.format_with_envelope("batch", &jsonl));
         }
-    }
-
-    // Print auto-flush warning if any
-    if let Ok(flush_res) = flush_result {
-        if let Some(warning) = flush_res.warning {
-            eprintln!("WARNING: {}", warning);
+        _ => {
+            // Print results in human-readable format
+            for result in results {
+                if result.status == "ok" {
+                    if let Some(id) = result.id {
+                        println!("[op {}] ok: {}", result.op, id);
+                    } else {
+                        println!("[op {}] ok", result.op);
+                    }
+                } else {
+                    eprintln!(
+                        "[op {}] error: {}",
+                        result.op,
+                        result.error.unwrap_or_default()
+                    );
+                }
+            }
         }
     }
 
@@ -2320,7 +2511,6 @@ fn cmd_mitosis(
     reason: &str,
     format: &str,
     no_auto_flush: bool,
-    config_auto_flush: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -2334,12 +2524,11 @@ fn cmd_mitosis(
     let ops = mitosis_ex(id, children_defs, Some(reason.to_string()))?;
 
     // Execute atomically
-    let results = execute_batch(&storage, ops, beads_dir)?;
+    let results = execute_batch(&storage, ops, beads_dir, false /* enable auto-flush */)?;
 
-    // Auto-flush after successful batch operations (flushes once at transaction end)
-    let default_workspace = PathBuf::from(".");
-    let workspace = beads_dir.parent().unwrap_or(&default_workspace);
-    let _flush_result = crate::sync::auto_flush(workspace, config_auto_flush, no_auto_flush);
+    // One surgical flush after the whole mitosis transaction commits (parent
+    // close + all children + dep edges were marked dirty together).
+    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
 
     match format {
         "json" => {
@@ -2432,7 +2621,7 @@ fn print_dep_tree(nodes: &[crate::storage::DepTreeNode], _storage: &Storage) -> 
     Ok(())
 }
 
-fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
+fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands, no_auto_flush: bool) -> Result<()> {
     match dep {
         DepCommands::Add {
             blocks,
@@ -2443,6 +2632,7 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                 anyhow!("Missing --blocks argument. Usage: bf dep add <blocker> --blocks <blocked>")
             })?;
 
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
@@ -2461,16 +2651,19 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
                 storage.update_issue(&blocks, &changes)?;
             }
 
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!(
                 "Added dependency: {} depends on {} ({})",
                 blocks, blocker, type_
             );
         }
         DepCommands::Remove { issue, depends_on } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             storage.remove_dependency(&issue, &depends_on)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Removed dependency: {} -> {}", issue, depends_on);
         }
         DepCommands::List { id } => {
@@ -2566,9 +2759,10 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands) -> Result<()> {
     Ok(())
 }
 
-fn cmd_label(beads_dir: &PathBuf, label: LabelCommands) -> Result<()> {
+fn cmd_label(beads_dir: &PathBuf, label: LabelCommands, no_auto_flush: bool) -> Result<()> {
     match label {
         LabelCommands::Add { id, label } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
@@ -2576,8 +2770,11 @@ fn cmd_label(beads_dir: &PathBuf, label: LabelCommands) -> Result<()> {
                 storage.add_label(&id, &l)?;
                 println!("Added label '{}' to {}", l, id);
             }
+            // One flush after all labels are applied (all mark the same bead).
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
         }
         LabelCommands::Remove { id, label } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
@@ -2585,6 +2782,7 @@ fn cmd_label(beads_dir: &PathBuf, label: LabelCommands) -> Result<()> {
                 storage.remove_label(&id, &l)?;
                 println!("Removed label '{}' from {}", l, id);
             }
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
         }
         LabelCommands::List { id } => {
             let metadata = load_metadata(beads_dir)?;
@@ -2608,29 +2806,71 @@ fn cmd_label(beads_dir: &PathBuf, label: LabelCommands) -> Result<()> {
     Ok(())
 }
 
-fn cmd_labels(beads_dir: &PathBuf, id: &str, format: &str) -> Result<()> {
+fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
-    let labels = storage.get_labels(id)?;
-    if format == "json" {
-        println!("{}", serde_json::to_string_pretty(&labels)?);
+
+    if let Some(issue_id) = id {
+        // Single bead mode - show labels for one bead
+        let labels = storage.get_labels(issue_id)?;
+        if format == "json" {
+            // Output labels array as compact JSON
+            println!("{}", serde_json::to_string(&labels)?);
+        } else {
+            for label in &labels {
+                println!("{}", label);
+            }
+        }
     } else {
-        for label in &labels {
-            println!("{}", label);
+        // All beads mode - show all beads with their labels
+        let filter = IssueFilter::default();
+        let mut issues = storage.list_issues(&filter)?;
+
+        // Sort by bead ID
+        issues.sort_by(|a, b| a.id.cmp(&b.id));
+
+        if format == "json" {
+            // Output JSONL (one {id, title, labels} object per line)
+            // Empty bead set prints [] (matches list/ready convention)
+            if issues.is_empty() {
+                println!("[]");
+            } else {
+                for issue in &issues {
+                    let obj = serde_json::json!({
+                        "id": issue.id,
+                        "title": issue.title,
+                        "labels": issue.labels
+                    });
+                    println!("{}", serde_json::to_string(&obj)?);
+                }
+            }
+        } else {
+            // Text format - display in a clean table
+            for issue in &issues {
+                let labels_str = if issue.labels.is_empty() {
+                    "(no labels)".to_string()
+                } else {
+                    issue.labels.join(", ")
+                };
+                println!("{} {} | {}", issue.id, issue.title, labels_str);
+            }
         }
     }
+
     Ok(())
 }
 
-fn cmd_comments(beads_dir: &PathBuf, comments: CommentsCommands) -> Result<()> {
+fn cmd_comments(beads_dir: &PathBuf, comments: CommentsCommands, no_auto_flush: bool) -> Result<()> {
     match comments {
         CommentsCommands::Add { id, text } => {
+            let config = load_config(beads_dir)?;
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let comment_text = text.join(" ");
             let comment_id = storage.add_comment(&id, "cli", &comment_text)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Added comment {} to {}", comment_id, id);
         }
         CommentsCommands::List { id } => {
@@ -2661,6 +2901,7 @@ fn cmd_search(
     priority_max: Option<i32>,
     limit: usize,
     format: &str,
+    envelope: bool,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -2688,7 +2929,18 @@ fn cmd_search(
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_issues(&issues));
+    match output_format {
+        OutputFormat::Json => {
+            let jsonl = formatter.format_issues(&issues);
+            // Empty search results produce no output (JSONL: 0 lines)
+            if !jsonl.is_empty() {
+                println!("{}", jsonl);
+            }
+        }
+        _ => {
+            print!("{}", formatter.format_issues(&issues));
+        }
+    }
 
     Ok(())
 }
@@ -2700,54 +2952,58 @@ fn cmd_stats(
     by_assignee: bool,
     by_label: bool,
     format: &str,
+    envelope: bool,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
     let stats = storage.get_stats()?;
 
-    match format {
-        "json" => {
-            println!("{}", serde_json::to_string_pretty(&stats)?);
-        }
-        _ => {
-            println!("Total beads: {}", stats.total);
-            println!("  Open: {}", stats.open);
-            println!("  In Progress: {}", stats.in_progress);
-            println!("  Closed: {}", stats.closed);
-        }
-    }
-
+    // Build the serializable projection. Breakdowns are fetched only when
+    // requested and folded into the object so that `--format json --by-*`
+    // yields one valid JSON document (the prior impl appended plain text
+    // after the JSON object). Priority/assignee keys are stringified to
+    // satisfy JSON's string-key rule; unassigned buckets use "None" to match
+    // the text view.
+    let mut output = StatsOutput::new(stats.total, stats.open, stats.in_progress, stats.closed);
     if by_type {
-        let by_type_stats = storage.get_stats_by_type()?;
-        println!("\nBy type:");
-        for (issue_type, count) in by_type_stats {
-            println!("  {} ({})", issue_type, count);
-        }
+        output.by_type = Some(storage.get_stats_by_type()?.into_iter().collect());
     }
     if by_priority {
-        let by_priority_stats = storage.get_stats_by_priority()?;
-        println!("\nBy priority:");
-        for (priority, count) in by_priority_stats {
-            println!("  P{} ({})", priority, count);
-        }
+        output.by_priority = Some(
+            storage
+                .get_stats_by_priority()?
+                .into_iter()
+                .map(|(priority, count)| (priority.to_string(), count))
+                .collect(),
+        );
     }
     if by_assignee {
-        let by_assignee_stats = storage.get_stats_by_assignee()?;
-        println!("\nBy assignee:");
-        if by_assignee_stats.is_empty() {
-            println!("  (no assigned beads)");
-        } else {
-            for (assignee, count) in by_assignee_stats {
-                println!("  {} ({})", assignee.as_deref().unwrap_or("None"), count);
-            }
-        }
+        output.by_assignee = Some(
+            storage
+                .get_stats_by_assignee()?
+                .into_iter()
+                .map(|(assignee, count)| (assignee.unwrap_or_else(|| "None".to_string()), count))
+                .collect(),
+        );
     }
     if by_label {
-        let labels = storage.list_all_labels()?;
-        println!("\nBy label:");
-        for (label, count) in labels {
-            println!("  {} ({})", label, count);
+        output.by_label = Some(storage.list_all_labels()?.into_iter().collect());
+    }
+
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    match output_format {
+        OutputFormat::Json => {
+            let json_str = formatter.format_stats(&output);
+            if envelope {
+                println!("{}", formatter.format_with_envelope("stats", &json_str));
+            } else {
+                println!("{}", json_str);
+            }
+        }
+        _ => {
+            print!("{}", formatter.format_stats(&output));
         }
     }
 
@@ -2979,64 +3235,22 @@ fn cmd_velocity(
         crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())
     })?;
 
-    match format {
-        "json" => {
-            println!("{}", serde_json::to_string_pretty(&stats)?);
-        }
-        "toon" => {
-            for stat in stats {
-                println!("Model: {}", stat.model);
-                println!("Harness: {}", stat.harness);
-                println!("Type: {}", stat.issue_type);
-                println!("Samples: {}", stat.sample_count);
-                if let Some(p50) = stat.p50_seconds {
-                    println!("P50: {}s", p50);
-                }
-                if let Some(p90) = stat.p90_seconds {
-                    println!("P90: {}s", p90);
-                }
-                if let Some(avg) = stat.avg_seconds {
-                    println!("Avg: {:.1}s", avg);
-                }
-                println!();
-            }
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+    match output_format {
+        OutputFormat::Json => {
+            println!("{}", formatter.format_velocity(&stats));
         }
         _ => {
-            if stats.is_empty() {
-                println!("No velocity statistics available yet.");
-                println!("Velocity data accumulates as beads are claimed and closed.");
-            } else {
-                println!("Velocity Statistics:");
-                println!();
-                println!(
-                    "{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8}",
-                    "Model", "Harness", "Type", "Samples", "P50(s)", "P90(s)", "Avg(s)"
-                );
-                println!("{}", "-".repeat(85));
-                for stat in stats {
-                    println!(
-                        "{:<20} {:<15} {:<10} {:<8} {:<8} {:<8} {:<8.1}",
-                        stat.model,
-                        stat.harness,
-                        stat.issue_type,
-                        stat.sample_count,
-                        stat.p50_seconds
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| "-".to_string()),
-                        stat.p90_seconds
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| "-".to_string()),
-                        stat.avg_seconds.unwrap_or(0.0),
-                    );
-                }
-            }
+            print!("{}", formatter.format_velocity(&stats));
         }
     }
 
     Ok(())
 }
 
-fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
+fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands, no_auto_flush: bool) -> Result<()> {
+    let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
@@ -3044,6 +3258,7 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
     match annotate {
         AnnotateCommands::Set { id, key, value } => {
             storage.set_annotation(&id, &key, &value)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Set annotation '{}' on {}", key, id);
         }
         AnnotateCommands::Get { id, key } => {
@@ -3056,6 +3271,7 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
         }
         AnnotateCommands::Remove { id, key } => {
             storage.remove_annotation(&id, &key)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Removed annotation '{}' from {}", key, id);
         }
         AnnotateCommands::List { id } => {
@@ -3071,6 +3287,7 @@ fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands) -> Result<()> {
         }
         AnnotateCommands::Clear { id } => {
             storage.clear_annotations(&id)?;
+            autoflush_after_mutation(beads_dir, &config, no_auto_flush);
             println!("Cleared all annotations from {}", id);
         }
     }
@@ -3441,7 +3658,29 @@ fn cmd_recent(
     // Format output
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
-    print!("{}", formatter.format_issues(&issues));
+    match output_format {
+        OutputFormat::Json => {
+            let json_str = formatter.format_issues(&issues);
+            println!("{}", formatter.format_with_envelope("recent", &json_str));
+        }
+        _ => {
+            print!("{}", formatter.format_issues(&issues));
+        }
+    }
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    pub mod json_output;
+    pub mod list_ready_recent_json_tests;
+    pub mod show_json_tests;
+    pub mod search_json_tests;
+    pub mod edge_case_json_tests;
+    pub mod error_json_tests;
+    pub mod json_schema_validation;
+    pub use crate::config::init_workspace;
+    pub use crate::Storage;
+}
+

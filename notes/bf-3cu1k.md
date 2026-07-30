@@ -107,3 +107,118 @@ interval=1, push=false; both `issues.jsonl` + `beads.db` untracked `?? .beads/`)
 - Immediate second run → `last checkpoint < 1m ago ... skipping`, exit 0
   (self-throttle honored). PASS
 - Scratch repo removed after the test.
+
+## Re-verification #3 (2026-07-22, bf-3cu1k re-dispatch)
+
+Deliverable unchanged — no script edits needed or made. This run re-verified
+every acceptance criterion end-to-end with the real `bf` binary against isolated
+throwaway repos in `~/scratch/bf-3cu1k-verify*` (separate git repos + separate
+`beads.db`; the shared bead-forge tree was never mutated by the test runs).
+
+### Provenance (correcting an earlier over-claim in this file)
+
+The note above states the script is "already on `origin/main` (`fef0340`)".
+That is not accurate — verified now:
+
+- `git branch -r --contains 83882b4` → `origin/needle/bf-5wku` only (the
+  refined script is on the needle branch, NOT on `origin/main`).
+- `fef0340` (the original feat commit) lives in `refs/stash`, reachable from no
+  branch and no remote. The live script on disk is `83882b4` (refined by sibling
+  worker bf-5y3cj: collapsed variant comment + throttle/push parity).
+- `origin/main` tip = `531e415`; this notes file (`5e6754a`) IS on `origin/main`.
+- Current branch `needle/bf-5wku` is at `0 0` vs `origin/needle/bf-5wku` — fully
+  pushed.
+
+### Static (re-confirmed)
+
+- `bash -n` clean on both `deploy/` and `scripts/` variants. PASS
+- `shellcheck` not installed → "clean if available" clause N/A. PASS (conditional)
+- Shebangs: `deploy` `#!/bin/bash`, `scripts` `#!/usr/bin/env bash`; body
+  byte-identical modulo the one variant-description header comment. PASS
+- `git log -- deploy/bf-checkpoint.sh scripts/bf-checkpoint.sh` → only commits
+  `83882b4` (branch) + `fef0340` (stash); **`src/claim.rs` and the claim/close
+  hot path untouched** (out-of-band per ADR-1). PASS
+
+### Functional, isolated workspace `~/scratch/bf-3cu1k-verify` (enabled=true, interval=1, push=false; repo-local identity deliberately set to `real@user.com` to prove the script overrides it)
+
+- **Disabled gate**: fresh workspace with no `checkpoint:` block →
+  `bf config get checkpoint.enabled` = `false` → script prints
+  `checkpoint disabled ... (checkpoint.enabled != true) — nothing to do`, exit 0. PASS
+- **Flush + commit**: created a db-only bead, ran `deploy/bf-checkpoint.sh -w`;
+  `bf sync --flush-only` → `Flushed 1 beads to JSONL`; commit
+  `chore(beads): auto-checkpoint 2026-07-22T14:16:48Z` created. PASS
+- **Identity override**: `git log -1 --format='%an <%ae>'` →
+  `jedarden <github@jedarden.com>` (NOT the repo's `real@user.com`). PASS
+- **Scope**: `git show --stat HEAD` → `1 file changed, .beads/issues.jsonl`
+  only. PASS
+- **beads.db never staged**: `.beads/.gitignore` (written by `bf init`)
+  contains `beads.db` / `-shm` / `-wal`; `git check-ignore .beads/beads.db`
+  confirms it; the script also never adds it explicitly. Doubly protected. PASS
+- **Throttle**: immediate 2nd run → `last checkpoint < 1m ago ... skipping`,
+  exit 0. PASS
+- **scripts/ (NixOS) variant parity**: aged the state file, added a 2nd bead,
+  ran `scripts/bf-checkpoint.sh -w`; identical result — `chore(beads):
+  auto-checkpoint`, only `.beads/issues.jsonl`, identity `jedarden`. PASS
+
+### Push (new — exercised against a real bare remote this run)
+
+Repo `~/scratch/bf-3cu1k-verify-push` with a bare `*-remote.git` and
+`master` tracking `origin/master`:
+
+- **`--push` one-shot** (`checkpoint.push=false`): `Pushing (checkpoint.push=false,
+  --push=1)` → `master -> master`; remote commit count 1 → 3; remote HEAD msg =
+  the checkpoint commit. PASS
+- **persistent `checkpoint.push=true`** (no `--push`): `Pushing (checkpoint.push=true,
+  --push=0)`; remote count 3 → 4. PASS
+- **default off** (`push=false`, no flag): commit lands locally, remote count
+  unchanged (1 == 1); no `Pushing` line. PASS
+
+All scratch repos removed after the run. Acceptance criteria fully satisfied;
+closing.
+
+## Re-verification #4 (2026-07-22, bf-3cu1k re-dispatch — glm-5 worker)
+
+Deliverable unchanged — no script edits needed or made. Re-confirmed every
+acceptance criterion independently against isolated throwaway repos in
+`~/scratch/` (the shared bead-forge tree was never mutated by the test runs;
+all scratch repos removed afterward).
+
+Static: `bash -n` clean on both variants; `shellcheck` not installed (the
+"clean if available" clause is conditional). `diff deploy/bf-checkpoint.sh
+scripts/bf-checkpoint.sh` → differences are ONLY line 1 (shebang
+`#!/bin/bash` vs `#!/usr/bin/env bash`) and line 12 (the variant-description
+comment); body logic byte-identical, mirroring the `bf-update.sh` split exactly.
+`git log -- deploy/bf-checkpoint.sh scripts/bf-checkpoint.sh` → only commits
+`fef0340` (feat) + `83882b4` (refine); `src/claim.rs` and the claim/close hot
+path untouched (ADR-1 out-of-band only). Dependency bf-2hgh8 satisfied:
+`bf config get checkpoint.{enabled,interval_minutes,push} -w <ws>` returns
+`false` / `60` / `false` (dotted key + `-w` honored).
+
+Functional (isolated repo, `checkpoint.enabled=true`, repo-local identity set to
+a throwaway to prove the script overrides it):
+
+| Scenario | Result |
+|---|---|
+| `enabled=false` (no `checkpoint:` block) → no-op | prints `checkpoint disabled ...`, exit 0. PASS |
+| `enabled=true` + db-only bead → flush + commit | `Flushed 1 beads`, commit created, exit 0. PASS |
+| commit message prefix | `chore(beads): auto-checkpoint <iso-ts>`. PASS |
+| author identity (overrides repo-local) | `jedarden <github@jedarden.com>`. PASS |
+| commit scope | `git show --stat HEAD` → 1 file, `.beads/issues.jsonl` only. PASS |
+| `beads.db` never staged | 0 in index, 0 in HEAD; also gitignored by `bf init`. PASS |
+| `config.yaml` not swept in | 0 in HEAD (only the explicit `issues.jsonl` pathspec). PASS |
+| self-throttle (interval=60, immediate re-run) | `last checkpoint < 60m ago ... skipping`, exit 0. PASS |
+| no-changes no-op (interval=0, no new diff) | `nothing to commit`, exit 0; commit count unchanged. PASS |
+| `--push` with upstream set | `master -> master`, remote +1, exit 0. PASS |
+| persistent `push=true`, no flag | push fires, remote advances, exit 0. PASS |
+| `push=false`, no flag | local commit only, remote unchanged, no `Pushing` line. PASS |
+
+One environment nuance re-confirmed (not a script defect): `git push` with no
+upstream-tracking branch returns 128 — this only surfaces in a freshly
+`git init`'d probe repo; any real checked-out workspace (branch tracks a
+remote) pushes fine. The spec says `git push` and the script does exactly that.
+
+Shared-tree note: local tip diverged from `origin/needle/bf-5wku` by a
+sibling's duplicate `notes(bf-5wku)` commit (identical patch on both sides);
+rebased cleanly (duplicate dropped) before pushing this notes update. Only
+`notes/bf-3cu1k.md` was committed — the unrelated dirty `src/format/*.rs` /
+`src/cli/mod.rs` files belong to sibling workers and were left untouched.

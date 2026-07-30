@@ -98,32 +98,241 @@ claude-haiku-4-5       needle    task     23       35m    2h10m
 
 ### Atomic Batch Operations
 
-Replaces NEEDLE's crash-unsafe create+dep chains:
+Replaces NEEDLE's crash-unsafe create+dep chains. All operations execute in one `BEGIN IMMEDIATE` transaction. A crash mid-batch leaves zero partial state — SQLite rolls back automatically.
 
+#### Batch Operation JSON Schema
+
+Batch operations are specified as a JSON array of operation objects. Each operation must have an `op` field that specifies the operation type, followed by type-specific fields.
+
+**Operation types:**
+
+| Operation | `op` value | Description |
+|-----------|------------|-------------|
+| Create bead | `create` | Create a new bead with specified properties |
+| Update bead | `update` | Modify fields of an existing bead |
+| Close bead | `close` | Close a bead with optional reason |
+| Add dependency | `dep_add_blocker` | Create a blocking dependency (A blocks B) |
+| Remove dependency | `dep_remove` | Remove a dependency between beads |
+| Add labels | `label_add` | Add labels to a bead |
+| Remove labels | `label_remove` | Remove labels from a bead |
+| Add comment | `comment` | Add a comment to a bead |
+
+**Placeholder references**: `@0`, `@1`, etc. resolve to the IDs of beads created at that position in the batch. You don't need to know child IDs in advance — `bf` substitutes them automatically.
+
+#### Operation Schema Details
+
+##### 1. Create (`create`)
+
+Creates a new bead. Returns the generated bead ID in the batch result.
+
+**Required fields:**
+- `op`: `"create"`
+- `title`: `string` — Bead title
+
+**Optional fields:**
+- `type`: `string` — Issue type (default: `"task"`)
+- `priority`: `number` — Priority level 0-4 (default: `2`)
+- `description`: `string | null` — Bead description
+- `assignee`: `string | null` — Assignee username
+- `labels`: `string[]` — Labels to apply (default: `[]`)
+
+**Example:**
+```json
+{"op": "create", "title": "Implement auth", "type": "task", "priority": 1, "labels": ["urgent"]}
+```
+
+##### 2. Update (`update`)
+
+Updates fields of an existing bead. Only specified fields are modified.
+
+**Required fields:**
+- `op`: `"update"`
+- `id`: `string` — Bead ID (can use placeholder like `@0`)
+
+**Optional fields:**
+- `title`: `string | null` — New title
+- `description`: `string | null` — New description
+- `design`: `string | null` — Design document
+- `acceptance_criteria`: `string | null` — Acceptance criteria
+- `notes`: `string | null` — Notes
+- `status`: `string` — New status (`open|in_progress|blocked|closed|...`)
+- `priority`: `number` — New priority 0-4
+- `assignee`: `string | null` — New assignee (empty string clears)
+- `owner`: `string | null` — New owner
+- `issue_type`: `string` — New issue type
+
+**Example:**
+```json
+{"op": "update", "id": "bf-123", "status": "in_progress", "priority": 0}
+```
+
+##### 3. Close (`close`)
+
+Closes a bead. Idempotent — succeeds if already closed.
+
+**Required fields:**
+- `op`: `"close"`
+- `id`: `string` — Bead ID (can use placeholder like `@0`)
+
+**Optional fields:**
+- `reason`: `string` — Close reason (default: `"Completed"`)
+
+**Example:**
+```json
+{"op": "close", "id": "bf-123", "reason": "Fixed in PR #45"}
+```
+
+##### 4. Add Dependency (`dep_add_blocker`)
+
+Creates a blocking dependency: the blocker must close before the blocked bead can close. Validates against cycles and duplicates.
+
+**Required fields:**
+- `op`: `"dep_add_blocker"`
+- `id`: `string` — The bead being blocked (can use placeholder)
+- `blocker`: `string` — The bead that blocks (can use placeholder)
+
+**Legacy aliases (deprecated but supported):**
+- `parent` → `blocker` (the bead that blocks)
+- `child` → `id` (the bead being blocked)
+
+**Direction:** Creates dependency: `id depends_on blocker` (blocker blocks id)
+
+**Example:**
+```json
+{"op": "dep_add_blocker", "id": "bf-child", "blocker": "bf-parent"}
+```
+
+##### 5. Remove Dependency (`dep_remove`)
+
+Removes a dependency between two beads.
+
+**Required fields:**
+- `op`: `"dep_remove"`
+- `id`: `string` — The bead that has the dependency
+- `depends_on`: `string` — The bead to remove dependency from
+
+**Example:**
+```json
+{"op": "dep_remove", "id": "bf-child", "depends_on": "bf-parent"}
+```
+
+##### 6. Add Labels (`label_add`)
+
+Adds labels to a bead. Duplicate labels are ignored (idempotent).
+
+**Required fields:**
+- `op`: `"label_add"`
+- `id`: `string` — Bead ID (can use placeholder)
+- `labels`: `string[]` — Labels to add
+
+**Example:**
+```json
+{"op": "label_add", "id": "bf-123", "labels": ["urgent", "backend"]}
+```
+
+##### 7. Remove Labels (`label_remove`)
+
+Removes labels from a bead.
+
+**Required fields:**
+- `op`: `"label_remove"`
+- `id`: `string` — Bead ID (can use placeholder)
+- `labels`: `string[]` — Labels to remove
+
+**Example:**
+```json
+{"op": "label_remove", "id": "bf-123", "labels": ["deprecated"]}
+```
+
+##### 8. Add Comment (`comment`)
+
+Adds a comment to a bead.
+
+**Required fields:**
+- `op`: `"comment"`
+- `id`: `string` — Bead ID (can use placeholder)
+- `text`: `string` — Comment text
+
+**Optional fields:**
+- `author`: `string` — Comment author (default: `"batch"`)
+
+**Example:**
+```json
+{"op": "comment", "id": "bf-123", "text": "Found edge case in login flow", "author": "worker-7"}
+```
+
+#### Batch Execution Examples
+
+**NEEDLE mitosis: split 1 bead into N children atomically**
+
+Method 1: Dedicated mitosis command (recommended)
 ```bash
-# NEEDLE mitosis: split 1 bead into N children atomically
-# Method 1: Dedicated mitosis command (recommended)
 bf mitosis bf-a3f8 \
   --children '[
     {"title": "Implement login handler", "type": "task", "priority": 2},
     {"title": "Add session tests", "type": "task", "priority": 2}
   ]' \
   --reason "Split into children"
+```
 
-# Method 2: Direct batch with placeholder references
-# Use @0, @1, ... to reference beads created earlier in the batch
+Method 2: Direct batch with placeholder references
+```bash
 bf batch --json '[
   {"op": "create", "title": "Implement login handler", "type": "task"},
   {"op": "create", "title": "Add session tests", "type": "task"},
-  {"op": "dep_add_blocker", "parent": "@0", "child": "bf-a3f8"},
-  {"op": "dep_add_blocker", "parent": "@1", "child": "bf-a3f8"},
+  {"op": "dep_add_blocker", "id": "bf-a3f8", "blocker": "@0"},
+  {"op": "dep_add_blocker", "id": "bf-a3f8", "blocker": "@1"},
   {"op": "close", "id": "bf-a3f8", "reason": "Split into children"}
 ]'
 ```
 
-**Placeholder references**: `@0`, `@1`, etc. resolve to the IDs of beads created earlier in the batch. You don't need to know the child IDs in advance — `bf` substitutes them automatically.
+**Bulk status update:**
+```bash
+bf batch --json '[
+  {"op": "update", "id": "bf-123", "status": "in_progress"},
+  {"op": "update", "id": "bf-456", "status": "in_progress"},
+  {"op": "comment", "id": "bf-123", "text": "Started work"}
+]'
+```
 
-All operations execute in one `BEGIN IMMEDIATE` transaction. A crash mid-batch leaves zero partial state — SQLite rolls back automatically.
+**Label management:**
+```bash
+bf batch --json '[
+  {"op": "label_add", "id": "bf-123", "labels": ["urgent", "backend"]},
+  {"op": "label_remove", "id": "bf-456", "labels": ["deprecated"]}
+]'
+```
+
+#### Batch Response Format
+
+Returns a JSON array of results, one per operation:
+
+```json
+[
+  {"op": 0, "status": "ok", "id": "bf-new1", "message": "Created bead bf-new1"},
+  {"op": 1, "status": "ok", "id": "bf-new2", "message": "Created bead bf-new2"},
+  {"op": 2, "status": "ok", "message": "ok: bf-parent blocked by bf-new1"},
+  {"op": 3, "status": "ok", "message": "Closed bead bf-parent"}
+]
+```
+
+On error, the transaction rolls back and no partial state is committed:
+
+```json
+[
+  {"op": 0, "status": "ok", "id": "bf-new1", "message": "Created bead bf-new1"},
+  {"op": 1, "status": "error", "error": "Bead not found: bf-missing", "message": null}
+]
+```
+
+#### Field Validation
+
+Unknown fields in any operation are rejected with a clear error message listing allowed fields. This catches typos early:
+
+```bash
+bf batch --json '[{"op": "create", "titlle": " typo"}]'
+# Error: Unknown field 'titlle' in operation 'create'. Allowed fields: op, title, type, priority, description, assignee, labels
+```
 
 ### Extensible Annotations
 
@@ -200,7 +409,7 @@ secret_protection:
 
 ## Commands
 
-Most commands accept `--format json|text|toon` for output and a global `-w/--workspace <path>` to target a workspace other than the current directory.
+Most commands accept `--format json|text|toon` for output and a global `-w/--workspace <path>` to target a workspace other than the current directory. The global `--no-auto-flush` flag disables the post-mutation incremental JSONL export for that one invocation (mutations stay db-only and marked dirty until `bf sync --flush-only`); see [Auto-Flush](#auto-flush-phase-71--the-checkpoint-tracks-the-live-store) below.
 
 ```
 # ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -210,8 +419,8 @@ bf list          [--status <s>] [--type <t>] [--assignee <a>] [--priority <N>]
                  [--annotation k=v] [--limit <N>] [--all] [--format json|text|toon] [--json]
 bf show          <id> [--format json|text|toon] [--json]
 bf update        <id> [--title "..."] [--status <s>] [--priority <N>] [--assignee <a>]
-                 [--description "..."] [--acceptance-criteria "..."] [--notes "..."]
-                 [--design "..."] [--due-at <RFC3339>]
+                 [--description "..."] [--description-file <path>] [--acceptance-criteria "..."]
+                 [--notes "..."] [--design "..."] [--due-at <RFC3339>]
 bf close         <id> [--reason "..."]
 bf reopen        <id>
 bf delete        <id>
@@ -273,6 +482,98 @@ All `br` commands work identically. `bf` is a strict superset.
 
 ---
 
+## Output Formats
+
+Most read commands accept `--format text|json|toon` (or the `--json` alias for
+`--format json`). The JSON shape depends on **which command** you run, and it is
+not always a JSON array.
+
+### Listing commands emit JSONL — not a JSON array
+
+`bf list`, `bf ready`, `bf search`, and `bf recent` with `--format json` emit
+**JSONL**: one self-contained, compact JSON object per line, joined by newlines,
+with **no array wrapper** and no commas between objects.
+
+```bash
+$ bf list --format json
+{"id":"test-3qv","title":"alpha task","status":"open","priority":2,"issue_type":"task","assignee":null,"labels":[],"created_at":"2026-07-22T15:54:16Z",...}
+{"id":"test-2c4","title":"beta task","status":"open","priority":2,"issue_type":"task","assignee":null,"labels":[],"created_at":"2026-07-22T15:54:16Z",...}
+```
+
+The concatenated stdout is **not** valid JSON (`{"a":1}\n{"b":2}` is two values,
+not one), so you cannot `json.loads()` the whole buffer. Parse it **line by
+line**:
+
+```python
+import json, subprocess
+out = subprocess.check_output(["bf", "list", "--format", "json"], text=True)
+beads = [json.loads(line) for line in out.splitlines() if line.strip()]
+```
+
+```bash
+# jq: slurp the JSONL lines into one array, then operate on it
+bf list --format json | jq -s 'map(.id)'
+```
+
+Two keys are **always** present on every emitted object, even on a bare bead:
+
+- `assignee` — `null` when unassigned (never omitted)
+- `labels` — an array, `[]` when empty (never omitted)
+
+The on-disk `issues.jsonl` checkpoint (written by `bf sync`) omits these when
+unset to stay compact; the CLI `--format json` path normalizes them back so a
+downstream struct with non-optional `assignee`/`labels` fields deserializes
+cleanly.
+
+**Empty results differ by command:**
+
+| Command | Empty `--format json` output |
+|---------|------------------------------|
+| `bf list` | nothing (empty stdout) |
+| `bf search` / `bf recent` | nothing (empty stdout) |
+| `bf ready` | `[]` |
+
+`ready` is the one listing command that special-cases emptiness to `[]`; the
+others print nothing at all.
+
+### `bf show` emits a one-element array
+
+Unlike the listing commands, `bf show <id> --format json` wraps the single bead
+in a **JSON array of one element**:
+
+```bash
+$ bf show test-3qv --format json
+[{"id":"test-3qv","title":"alpha task","status":"open","priority":2,...}]
+```
+
+This is deliberate: NEEDLE's `parse_single_bead` expects `Vec<Bead>` and takes
+the first element, so `show` ships an array to stay parse-compatible with that
+code path.
+
+### `bf claim` emits a single object
+
+`bf claim --json` prints one JSON object describing the claim (or `{}` when
+nothing was claimed) — never an array, never an `Issue`:
+
+```bash
+$ bf claim --assignee worker-7 --json
+{"bead_id":"test-3qv","assignee":"worker-7","reclaimed":0}
+```
+
+`bf velocity --format json` emits a JSON array of stat objects (`[]` when empty).
+
+### `br` produces byte-identical output
+
+`br` delegates to the `bf` binary — either directly (a symlink, as installed by
+`ln -sf ~/.local/bin/bf ~/.local/bin/br`) or via a logging shim that writes a
+deprecation-telemetry line and then `exec bf "$@"`. Neither path touches stdout,
+so every `br` command emits **byte-identical** output to its `bf` equivalent —
+same JSONL, same array wrapping for `show`, same empty-case behavior. A parser
+written for `br list --format json` works unchanged for `bf list --format json`,
+and vice versa.
+
+---
+
 ## NEEDLE Integration
 
 Replace the five non-atomic `br` chains in `bead_store/mod.rs`:
@@ -318,25 +619,43 @@ ln -sf ~/.local/bin/bf ~/.local/bin/br
 | beads / br | JSONL (`issues.jsonl`) | SQLite is read-cache |
 | bead-forge | SQLite (`beads.db`) | JSONL is git-tracked checkpoint |
 
-This inversion is necessary for atomic multi-worker operations. All mutations (create/update/claim) go to SQLite; JSONL is a git checkpoint written only by `bf sync --flush-only`. **Beads created or modified since the last flush exist only in SQLite.**
+This inversion is necessary for atomic multi-worker operations. All mutations (create/update/claim) go to SQLite. With `sync.auto_flush` (default **on**), every successful mutation also incrementally exports the changed beads to `issues.jsonl`, so the checkpoint tracks the live store instead of trailing it — a separate flush is no longer needed in normal operation.
 
-### Flush-Before-Repair Rule
+### Auto-Flush (Phase 7.1) — the checkpoint tracks the live store
 
-`bf doctor --repair` rebuilds SQLite from JSONL. Without flushing first, **unflushed beads are silently destroyed**.
+With `sync.auto_flush` (default **on**), every successful mutation (`create`/`update`/`claim`/`close`/`batch`) incrementally exports just the changed beads to `issues.jsonl` (a surgical line replacement, not a full rewrite). The JSONL artifact therefore stays current with SQLite after every command — no separate flush step is required in normal operation. Read-only and diagnostic commands never write the JSONL.
 
-```bash
-# Always flush before repair
-bf sync --flush-only
-bf doctor --repair
-
-# Or use the combined command
-bf doctor --repair --flush-first
-
-# Force repair (with data loss warning)
-bf doctor --repair --force
+```yaml
+# .beads/config.yaml
+sync:
+  auto_flush: true     # default; set false to make mutations db-only until bf sync --flush-only
 ```
 
-**Historical context**: On 2026-06-10, seven independent agents across seven workspaces (ARMOR, NEEDLE, AgentScribe, kalshi-weather, jedarden.com, vibe-coding-discovery, face/pose/sun repos) each lost their entire first batch of freshly created beads by running `doctor --repair` after bulk creates. Four db-only beads in ARMOR (bf-4rm7/5zxa/tojg/tr44) were permanently lost. This fix implements the flush-before-repair protection.
+```bash
+bf create --title "..."               # auto-flushed by default → already in issues.jsonl
+bf create --title "..." --no-auto-flush   # per-invocation override: db-only, marked dirty
+```
+
+**Flush failure never fails the mutation.** Auto-flush is best-effort: if the incremental export fails, the mutation still commits, the dirty mark is retained, and the failure is surfaced loudly — a `warning:` line on stderr and a non-null `warning` field in the `--json` envelope naming the recovery command. The dirty bead stays recoverable.
+
+**Named recovery.** `bf sync --flush-only` is the explicit checkpoint and the recovery path: it clears the entire `dirty_issues` set and rewrites a **full** checkpoint (every bead, not just the dirty one). Run it after an auto-flush warning, or to produce a clean git-committable snapshot:
+
+```bash
+bf sync --flush-only
+```
+
+### Repair safety — protection is in the doctor, not a manual ritual
+
+`bf doctor --repair` rebuilds SQLite from `issues.jsonl`. Because auto-flush keeps the checkpoint current, the old "ALWAYS `bf sync --flush-only` before repair" ritual (added after the 2026-06-10 incident where seven agents across seven workspaces each lost their first batch of fresh beads to a post-create `doctor --repair`; four db-only beads in ARMOR — bf-4rm7/5zxa/tojg/tr44 — were permanently lost) is **obsolete**. The data-loss guard now lives in the doctor command itself: it **refuses** to repair when unflushed (db-only) beads exist, and tells you exactly what to do.
+
+```bash
+bf doctor                              # health check — reports "Unflushed beads: N" if any
+bf doctor --repair                     # REFUSES if unflushed beads exist (no data loss)
+bf doctor --repair --flush-first       # checkpoint unflushed beads first, then rebuild
+bf doctor --repair --force             # proceed anyway — unflushed beads WILL be lost
+```
+
+Killing a worker at any point between mutation and flush loses nothing that `git diff .beads/` can't show: with auto-flush on the bead is already in the artifact when the command returns; with auto-flush off the bead survives in SQLite (marked dirty) and is recovered by `bf sync --flush-only`. Pinned by `tests/recovery_and_exit_criteria.rs`.
 
 ### Multi-Box & Fleet Hardening (Phase 7.9)
 
@@ -372,6 +691,25 @@ See [`docs/plan/plan.md`](plan/plan.md) for the complete implementation plan inc
 ---
 
 ## Migration from br to bf
+
+### Output Format Compatibility (no parser changes)
+
+Migrating to `bf` requires **no changes to JSON consumers**. `bf` is a drop-in
+replacement: every command emits byte-identical output to `br`, because `br`
+delegates to the `bf` binary (via symlink, or a logging shim that `exec bf
+"$@"`) and never alters stdout.
+
+The format to keep in mind (full details in [§ Output Formats](#output-formats)):
+
+- `list` / `ready` / `search` / `recent --format json` → **JSONL** (one object
+  per line, not a JSON array). Parse line-by-line — do not `json.loads()` the
+  whole buffer.
+- `show <id> --format json` → a **one-element array** (for NEEDLE's
+  `parse_single_bead`).
+- Empty `list`/`search`/`recent` print nothing; empty `ready` prints `[]`.
+
+Any script that already parses `br list --format json` line-by-line keeps
+working unchanged against `bf`.
 
 ### Per-Machine Installation
 

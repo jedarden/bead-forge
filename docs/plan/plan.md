@@ -1242,11 +1242,25 @@ tempfile = "3"              # Ephemeral test workspaces — never touch live br 
 
 ### 6.3 CI via Argo Workflows
 
-Add a `bead-forge-build` WorkflowTemplate to `jedarden/declarative-config`. Builds the Rust binary in a container, pushes to `ronaldraygun/bead-forge`.
+`bead-forge-build` WorkflowTemplate lives in `jedarden/declarative-config` under
+`k8s/iad-ci/argo-workflows/`. It clones `main` from GitHub, runs `cargo test` then
+`cargo build --release`, and — if a GitHub Release for the `Cargo.toml` version doesn't
+already exist — publishes one with the `bf-linux-x86_64` binary and a `SHA256SUMS`
+manifest attached. There is no Docker image; this is a binary-only release pipeline (not
+a `ronaldraygun/bead-forge` registry push as an earlier draft of this plan assumed). The
+workflow is not wired to an auto-trigger (no Argo Events sensor) — it requires manual
+submission via `kubectl create -f -` with a `workflowTemplateRef`, or a bump-and-release
+step in whatever process ships a change. Because release creation is skipped once a
+matching version tag exists, `Cargo.toml`'s `version` must actually be bumped for each
+release-worthy change, or the workflow silently no-ops forever.
 
 ### 6.4 Deployment
 
-Deploy as a standalone binary to the Hetzner server at `~/.local/bin/bf`. Symlink `br` -> `bf` for backward compatibility. No daemon, no systemd unit — each `bf` invocation is self-contained.
+Deploy as a standalone binary to the Hetzner/lab servers at `~/.local/bin/bf`. No daemon
+runs `bf` itself — each invocation is self-contained — but a `bf-update.timer` systemd
+user timer checks GitHub Releases hourly and auto-installs a newer `bf-linux-x86_64`
+after verifying its `SHA256SUMS` entry, backing up the previous binary for rollback (see
+`deploy/bf-update.sh`, `deploy/bf-update.service`, `deploy/bf-update.timer`).
 
 ---
 
@@ -1695,6 +1709,35 @@ Phases 1-3 produce a fully functional standalone `bf` that replaces `br`. Phase 
 14. **Worker composition is first-class metadata**: `--model`, `--harness`, `--harness-version` on `bf claim` record what kind of agent did the work. This transforms the events table from a bare audit log into a performance dataset: which model+harness combinations close which task types fastest. The fleet becomes self-optimizing — velocity data informs which workers to dispatch to which workspace, without any external ML pipeline.
 
 15. **Upstream br is a tracked ideas source, ported one-way as behaviors, never merged as code** (2026-07-21): beads_rust keeps solving dual-store robustness problems bf also has — credit where due, Emanuel keeps finding improvements on top of what already exists. The codebases are architecturally divergent and upstream accepts no PRs (their agents integrate from filed issues), so the flow is: study upstream behavior → spec it against bf's architecture in this plan (Phase 7) → implement natively with attribution. Never vendor upstream code, never chase their product surface (see Phase 7 Non-goals), and periodically re-scan their tracker/source for new robustness work worth porting.
+
+---
+
+## Architecture Decision Records
+
+### ADR-1: Periodic `.beads/` git checkpoint timer (2026-07-20)
+
+**Status:** Accepted & implemented — `bf-checkpoint.{sh,service,timer}` ship in `deploy/` (Debian/Ubuntu) and `systemd/` (NixOS); `CheckpointConfig` parses the block in `src/config.rs`. Parent bead: `bf-48pw0`.
+
+**Context.** bead-forge is a dual-store system: SQLite (`beads.db`) is the live store and `issues.jsonl` is the git-tracked checkpoint (see Core Principle #2 and §2.7). Historically, mutations did not auto-flush, so a workspace under active NEEDLE work could accumulate **db-only** beads never captured in git — losing the box meant losing work, and shared workspaces (many agents in one tree) had no coherent, low-noise way to land periodic snapshots. Phase 7.1's `sync.auto_flush` (default on) closes the per-mutation gap, but a periodic out-of-band safety net is still wanted so that even a workspace whose agents exit ungracefully still gets its state committed to git.
+
+**Decision.** A dedicated systemd timer (`bf-checkpoint.timer` → `bf-checkpoint.service` → `bf-checkpoint.sh`) periodically flushes SQLite → JSONL via `bf sync --flush-only` and, if `.beads/issues.jsonl` changed, stages **only** that file and commits it as `chore(beads): auto-checkpoint <UTC>`. It runs strictly out-of-band — driven by the timer, never by any `bf` command. New rollouts default to **`checkpoint.enabled: false`**; a maintainer must opt each workspace in. `git push` is off by default.
+
+**Consequences.**
+
+- **Out-of-band only.** `src/claim.rs` and the claim/close hot path are never touched — no git or flush work on the latency-critical dequeue path. Checkpointing cannot regress claim latency or contend with `BEGIN IMMEDIATE` write transactions on the hot path.
+- **Exactly one committed path.** Only `.beads/issues.jsonl` is ever staged. `beads.db` is never staged — it is gitignored and rebuilt from JSONL via `bf sync --import`.
+- **Safe by default / opt-in.** A freshly deployed timer is inert: `bf-checkpoint.sh` prints `checkpoint disabled` and exits 0 until `checkpoint.enabled: true`. Cadence is governed by `checkpoint.interval_minutes` via a per-workspace self-throttle state file, not by how often the timer fires.
+- **Distinguishable commits.** A fixed identity (`jedarden <github@jedarden.com>`) and the `chore(beads): auto-checkpoint` prefix keep machine checkpoints separable from human commits.
+- **Push stays opt-in.** Enabled persistently by `checkpoint.push: true` or one-shot by the script's `--push` flag. The unit's `ExecStart` must never carry `--push`, which would force-push on every timer fire.
+
+**Config block** (`.beads/config.yaml`):
+
+```yaml
+checkpoint:
+  enabled: false           # master switch; NEW ROLLOUTS STAY DISABLED until a maintainer opts in
+  interval_minutes: 60     # min gap between commits (self-throttle), default 60
+  push: false              # git push after each commit, default false
+```
 
 ---
 

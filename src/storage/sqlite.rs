@@ -158,14 +158,18 @@ impl Storage {
     pub fn get_issue(&self, id: &str) -> Result<Option<Issue>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, content_hash, title, description, design, acceptance_criteria, notes,
-                    status, priority, issue_type, assignee, owner, estimated_minutes,
-                    created_at, created_by, updated_at, closed_at, close_reason,
-                    closed_by_session, due_at, defer_until, external_ref, source_system,
-                    source_repo, deleted_at, deleted_by, delete_reason, original_type,
-                    compaction_level, compacted_at, compacted_at_commit, original_size,
-                    sender, ephemeral, pinned, is_template
-             FROM issues WHERE id = ?1",
+            "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+                    i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
+                    i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
+                    i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
+                    i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
+                    i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
+                    i.sender, i.ephemeral, i.pinned, i.is_template,
+                    GROUP_CONCAT(bl.label) AS labels
+             FROM issues i
+             LEFT JOIN bead_labels bl ON i.id = bl.bead_id
+             WHERE i.id = ?1
+             GROUP BY i.id",
         )?;
         let mut rows = stmt.query(params![id])?;
         if let Some(row) = rows.next()? {
@@ -177,26 +181,28 @@ impl Storage {
 
     pub fn list_issues(&self, filter: &IssueFilter) -> Result<Vec<Issue>> {
         let mut query = String::from(
-            "SELECT DISTINCT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+            "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
                     i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
                     i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
                     i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
                     i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
                     i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
-                    i.sender, i.ephemeral, i.pinned, i.is_template
-             FROM issues i",
+                    i.sender, i.ephemeral, i.pinned, i.is_template,
+                    GROUP_CONCAT(bl.label) AS labels
+             FROM issues i
+             LEFT JOIN bead_labels bl ON i.id = bl.bead_id",
         );
         let mut params = Vec::new();
         let mut param_idx = 1;
-        let needs_join = filter.annotation.is_some();
+        let needs_annotation_join = filter.annotation.is_some();
 
-        if needs_join {
+        if needs_annotation_join {
             query.push_str(
-                " LEFT JOIN bead_annotations a ON i.id = a.bead_id WHERE i.deleted_at IS NULL",
+                " LEFT JOIN bead_annotations a ON i.id = a.bead_id",
             );
-        } else {
-            query.push_str(" WHERE i.deleted_at IS NULL");
         }
+
+        query.push_str(" WHERE i.deleted_at IS NULL");
 
         if let Some(ref status) = filter.status {
             query.push_str(&format!(" AND i.status = ?{}", param_idx));
@@ -241,6 +247,7 @@ impl Storage {
             params.push(updated_before.to_rfc3339());
             param_idx += 1;
         }
+        query.push_str(" GROUP BY i.id");
         query.push_str(" ORDER BY i.updated_at DESC, i.id ASC");
         if let Some(limit) = filter.limit {
             query.push_str(&format!(" LIMIT {}", limit));
@@ -263,14 +270,19 @@ impl Storage {
     pub fn list_all_issues(&self) -> Result<Vec<Issue>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, content_hash, title, description, design, acceptance_criteria, notes,
-                    status, priority, issue_type, assignee, owner, estimated_minutes,
-                    created_at, created_by, updated_at, closed_at, close_reason,
-                    closed_by_session, due_at, defer_until, external_ref, source_system,
-                    source_repo, deleted_at, deleted_by, delete_reason, original_type,
-                    compaction_level, compacted_at, compacted_at_commit, original_size,
-                    sender, ephemeral, pinned, is_template
-             FROM issues WHERE deleted_at IS NULL ORDER BY id",
+            "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+                    i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
+                    i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
+                    i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
+                    i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
+                    i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
+                    i.sender, i.ephemeral, i.pinned, i.is_template,
+                    GROUP_CONCAT(bl.label) AS labels
+             FROM issues i
+             LEFT JOIN bead_labels bl ON i.id = bl.bead_id
+             WHERE i.deleted_at IS NULL
+             GROUP BY i.id
+             ORDER BY i.id",
         )?;
         let mut rows = stmt.query([])?;
         let mut issues = Vec::new();
@@ -289,9 +301,12 @@ impl Storage {
                     i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
                     i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
                     i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
-                    i.sender, i.ephemeral, i.pinned, i.is_template
+                    i.sender, i.ephemeral, i.pinned, i.is_template,
+                    GROUP_CONCAT(bl.label) AS labels
              FROM issues i
              INNER JOIN dirty_issues d ON i.id = d.issue_id
+             LEFT JOIN bead_labels bl ON i.id = bl.bead_id
+             GROUP BY i.id
              ORDER BY i.id",
         )?;
         let mut rows = stmt.query([])?;
@@ -371,6 +386,9 @@ impl Storage {
             )?;
             for label in &issue.labels {
                 tx.execute("INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+            }
+            for label in &issue.labels {
+                tx.execute("INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
             }
             for dep in &issue.dependencies {
                 tx.execute(
@@ -620,6 +638,13 @@ impl Storage {
                         params![id, label],
                     )?;
                 }
+                tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![id])?;
+                for label in labels {
+                    tx.execute(
+                        "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
+                        params![id, label],
+                    )?;
+                }
             }
             // Handle annotation updates separately
             if let Some(ref annotations) = changes.annotations {
@@ -658,6 +683,7 @@ impl Storage {
         self.with_immediate_transaction(|tx| {
             // Delete existing related data
             tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
+            tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![&issue.id])?;
             tx.execute("DELETE FROM dependencies WHERE issue_id = ?1", params![&issue.id])?;
             tx.execute("DELETE FROM comments WHERE issue_id = ?1", params![&issue.id])?;
 
@@ -701,6 +727,9 @@ impl Storage {
             // Re-insert labels, dependencies, and comments
             for label in &issue.labels {
                 tx.execute("INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
+            }
+            for label in &issue.labels {
+                tx.execute("INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)", params![&issue.id, label])?;
             }
             for dep in &issue.dependencies {
                 tx.execute(
@@ -956,6 +985,13 @@ impl Storage {
             }
         };
         let id: String = row.get(0)?;
+
+        // Parse labels from GROUP_CONCAT result (comma-separated string)
+        let labels_str: Option<String> = row.get(36)?;
+        let labels: Vec<String> = labels_str
+            .map(|s| s.split(',').map(String::from).collect())
+            .unwrap_or_default();
+
         Ok(Issue {
             content_hash: row.get(1)?,
             title: row.get(2)?,
@@ -992,7 +1028,7 @@ impl Storage {
             ephemeral: row.get::<_, i32>(33)? != 0,
             pinned: row.get::<_, i32>(34)? != 0,
             is_template: row.get::<_, i32>(35)? != 0,
-            labels: Self::load_labels_conn(conn, &id)?,
+            labels,
             dependencies: Self::load_dependencies_conn(conn, &id)?,
             comments: Self::load_comments_conn(conn, &id)?,
             annotations: Self::load_annotations_conn(conn, &id)?,
@@ -1001,7 +1037,7 @@ impl Storage {
     }
 
     fn load_labels_conn(conn: &Connection, issue_id: &str) -> Result<Vec<String>> {
-        let mut stmt = conn.prepare("SELECT label FROM labels WHERE issue_id = ?1")?;
+        let mut stmt = conn.prepare("SELECT label FROM bead_labels WHERE bead_id = ?1")?;
         let mut rows = stmt.query(params![issue_id])?;
         let mut labels = Vec::new();
         while let Some(row) = rows.next()? {
@@ -1266,10 +1302,19 @@ impl Storage {
     }
 
     pub fn add_label(&self, issue_id: &str, label: &str) -> Result<()> {
+        let trimmed_label = label.trim();
+        if trimmed_label.is_empty() {
+            return Err(anyhow::anyhow!("Label cannot be empty or whitespace only"));
+        }
+
         self.with_immediate_transaction(|tx| {
             tx.execute(
                 "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
-                params![issue_id, label],
+                params![issue_id, trimmed_label],
+            )?;
+            tx.execute(
+                "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
+                params![issue_id, trimmed_label],
             )?;
             mark_dirty_tx(tx, issue_id)?;
             Ok(())
@@ -1277,10 +1322,19 @@ impl Storage {
     }
 
     pub fn remove_label(&self, issue_id: &str, label: &str) -> Result<()> {
+        let trimmed_label = label.trim();
+        if trimmed_label.is_empty() {
+            return Err(anyhow::anyhow!("Label cannot be empty or whitespace only"));
+        }
+
         self.with_immediate_transaction(|tx| {
             tx.execute(
                 "DELETE FROM labels WHERE issue_id = ?1 AND label = ?2",
-                params![issue_id, label],
+                params![issue_id, trimmed_label],
+            )?;
+            tx.execute(
+                "DELETE FROM bead_labels WHERE bead_id = ?1 AND label = ?2",
+                params![issue_id, trimmed_label],
             )?;
             mark_dirty_tx(tx, issue_id)?;
             Ok(())
@@ -1450,15 +1504,17 @@ impl Storage {
         limit: usize,
     ) -> Result<Vec<Issue>> {
         let mut sql = String::from(
-            "SELECT DISTINCT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+            "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
                     i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
                     i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
                     i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
                     i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
                     i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
-                    i.sender, i.ephemeral, i.pinned, i.is_template
+                    i.sender, i.ephemeral, i.pinned, i.is_template,
+                    GROUP_CONCAT(bl.label) AS labels
              FROM issues i
              LEFT JOIN labels l ON i.id = l.issue_id
+             LEFT JOIN bead_labels bl ON i.id = bl.bead_id
              WHERE i.deleted_at IS NULL",
         );
         let mut params = Vec::new();
@@ -1473,15 +1529,29 @@ impl Storage {
             params.push(format!("%{}%", q));
             param_idx += 2;
         }
-        for s in status {
-            sql.push_str(&format!(" AND i.status = ?{}", param_idx));
-            params.push(s.to_string());
-            param_idx += 1;
+        if !status.is_empty() {
+            let status_conditions: Vec<String> = status
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("i.status = ?{}", param_idx + i))
+                .collect();
+            sql.push_str(&format!(" AND ({}) ", status_conditions.join(" OR ")));
+            for s in status {
+                params.push(s.to_string());
+                param_idx += 1;
+            }
         }
-        for t in issue_type {
-            sql.push_str(&format!(" AND i.issue_type = ?{}", param_idx));
-            params.push(t.to_string());
-            param_idx += 1;
+        if !issue_type.is_empty() {
+            let type_conditions: Vec<String> = issue_type
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("i.issue_type = ?{}", param_idx + i))
+                .collect();
+            sql.push_str(&format!(" AND ({}) ", type_conditions.join(" OR ")));
+            for t in issue_type {
+                params.push(t.to_string());
+                param_idx += 1;
+            }
         }
         if let Some(a) = assignee {
             sql.push_str(&format!(" AND i.assignee = ?{}", param_idx));
@@ -1510,6 +1580,7 @@ impl Storage {
             params.push(max.to_string());
             param_idx += 1;
         }
+        sql.push_str(" GROUP BY i.id");
         sql.push_str(" ORDER BY i.priority ASC, i.created_at ASC");
         if limit > 0 {
             sql.push_str(&format!(" LIMIT {}", limit));
@@ -1754,14 +1825,18 @@ impl Storage {
     /// Get an issue within a transaction context.
     pub fn get_issue_tx(tx: &Connection, id: &str) -> Result<Option<Issue>> {
         let mut stmt = tx.prepare(
-            "SELECT id, content_hash, title, description, design, acceptance_criteria, notes,
-                    status, priority, issue_type, assignee, owner, estimated_minutes,
-                    created_at, created_by, updated_at, closed_at, close_reason,
-                    closed_by_session, due_at, defer_until, external_ref, source_system,
-                    source_repo, deleted_at, deleted_by, delete_reason, original_type,
-                    compaction_level, compacted_at, compacted_at_commit, original_size,
-                    sender, ephemeral, pinned, is_template
-             FROM issues WHERE id = ?1",
+            "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+                    i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
+                    i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
+                    i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
+                    i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
+                    i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
+                    i.sender, i.ephemeral, i.pinned, i.is_template,
+                    GROUP_CONCAT(bl.label) AS labels
+             FROM issues i
+             LEFT JOIN bead_labels bl ON i.id = bl.bead_id
+             WHERE i.id = ?1
+             GROUP BY i.id",
         )?;
         let mut rows = stmt.query(params![id])?;
         if let Some(row) = rows.next()? {
@@ -1837,6 +1912,12 @@ impl Storage {
                 params![&issue.id, label],
             )?;
         }
+        for label in &issue.labels {
+            tx.execute(
+                "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
+                params![&issue.id, label],
+            )?;
+        }
         for dep in &issue.dependencies {
             tx.execute(
                 "INSERT INTO dependencies (issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by)
@@ -1876,6 +1957,7 @@ impl Storage {
             .unwrap_or_else(|| issue.content_hash());
 
         tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
+        tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![&issue.id])?;
         tx.execute(
             "DELETE FROM dependencies WHERE issue_id = ?1",
             params![&issue.id],
@@ -1944,6 +2026,12 @@ impl Storage {
         for label in &issue.labels {
             tx.execute(
                 "INSERT OR IGNORE INTO labels (issue_id, label) VALUES (?1, ?2)",
+                params![&issue.id, label],
+            )?;
+        }
+        for label in &issue.labels {
+            tx.execute(
+                "INSERT OR IGNORE INTO bead_labels (bead_id, label) VALUES (?1, ?2)",
                 params![&issue.id, label],
             )?;
         }

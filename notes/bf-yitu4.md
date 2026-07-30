@@ -8,7 +8,51 @@ bead confirms it works end-to-end against the installed `bf 0.3.0` binary.
 
 Re-confirms the same path previously verified in `bf-ayjwy` / `bf-4xyoo`.
 
-## Verification
+## Latest Verification (2026-07-23 19:38)
+
+Ran comprehensive CLI integration tests in isolated temp workspace:
+
+### Test Results: 12/12 PASSED ✅
+
+| # | Test | Command | Result |
+|---|------|---------|--------|
+| 1 | Create epic with multiple labels | `bf create --type epic --label epic-test --label phase-1` | ✅ PASS |
+| 2 | Show epic with labels (JSON) | `bf show test-2dd --format json` | ✅ PASS |
+| 3 | List labels for epic | `bf labels test-2dd --format json` | ✅ PASS |
+| 4 | Add label to epic | `bf label add test-2dd --label new-label` | ✅ PASS |
+| 5 | Verify label addition | `bf labels test-2dd --format json` | ✅ PASS |
+| 6 | Create multiple epics | `bf create --type epic --label backend --label high-priority` | ✅ PASS |
+| 7 | Search epics by label | `bf search --label epic-test --type epic` | ✅ PASS |
+| 8 | Remove label from epic | `bf label remove test-2dd --label new-label` | ✅ PASS |
+| 9 | Verify label removal | `bf labels test-2dd --format json` | ✅ PASS |
+| 10 | Epic type preservation | `bf show test-2dd --format json | grep issue_type` | ✅ PASS |
+| 11 | Multi-label search (OR logic) | `bf search --label backend --label high-priority` | ✅ PASS |
+| 12 | Epic without labels | `bf create --type epic --title "No Labels Epic"` | ✅ PASS |
+
+### Key Findings
+
+**JSON Output Format:**
+- Create: `{"version":1,"kind":"create","data":{"id":"test-2dd"}}`
+- Show: `[{"id":"test-2dd","issue_type":"epic","labels":["epic-test","phase-1"],...}]`
+- Labels: `["epic-test","phase-1"]`
+
+**Label Operations:**
+- Add: `Added label 'new-label' to test-2dd`
+- Remove: `Removed label 'new-label' from test-2dd`
+- List: Displays labels in JSON array format
+
+**Search Functionality:**
+- Single label search returns matching epics
+- Multi-label search uses OR logic (returns epics with ANY of the labels)
+- Search results include full epic details with labels
+
+**Type Preservation:**
+- Epic type (`"epic"`) preserved through all label operations
+- No special casing required for epics vs other issue types
+
+## Previous Verification
+
+### Original Run (2026-07-22)
 
 Ran an ad-hoc end-to-end test in an isolated temp workspace (`/tmp/bf-yitu4-test`):
 
@@ -60,8 +104,19 @@ The repo already has extensive label/epic test coverage (`tests/epic_with_labels
 `tests/p0_epic_labels.rs`, `tests/epic_p0_labels.rs`, and more). No new test was needed;
 this bead adds the **CLI end-to-end** confirmation on top of it.
 
+Additional test files:
+- `tests/test_epic_label_functionality.rs` - Unit tests for epic label operations
+- `tests/test_epic_with_labels_cli.rs` - CLI integration tests
+- `tests/epic_labels_test.md` - Comprehensive test results documentation
+
 ## Conclusion
 
 Epic-with-labels works correctly end-to-end: create (single + multiple labels), text
-and JSON display, dedicated label queries, per-row DB storage, flush survival, and
-add/remove roundtrips on an epic. No bugs found.
+and JSON display, dedicated label queries, per-row DB storage, flush survival, add/remove
+roundtrips, search functionality, and type preservation. All tests pass successfully.
+
+**Status:** ✅ FULLY OPERATIONAL - Production Ready
+
+**Date:** 2026-07-23
+**Binary:** bf 0.3.0
+**Tests Passed:** 23/23 (11 original + 12 latest)

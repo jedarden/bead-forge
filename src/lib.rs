@@ -1,4 +1,6 @@
+pub mod autoflush;
 pub mod batch;
+pub mod bead_store;
 pub mod claim;
 pub mod cli;
 pub mod close;
@@ -15,10 +17,15 @@ pub mod log;
 pub mod merge;
 pub mod migrate;
 pub mod model;
+pub mod recovery;
+pub mod robot_docs;
 pub mod rotate;
 pub mod secrets;
 pub mod storage;
+pub mod subprocess;
 pub mod sync;
+pub mod timing;
+pub mod trace;
 pub mod validation;
 pub mod velocity;
 
@@ -26,6 +33,7 @@ pub use batch::{execute_batch, mitosis, mitosis_ex, BatchOp, BatchResult, Mitosi
 pub use claim::{claim, claim_any, get_ready_candidates, ClaimResult, ScoredBead};
 pub use config::{
     find_beads_dir, load_config, load_metadata, Config, HistoryConfig, Metadata, RotateConfig,
+    SyncConfig,
 };
 pub use merge::{merge_jsonl_files, merge_maps, MergeReport};
 pub use doctor::{check, rebuild_cache, reclaim_stale, repair, verify_schema, DoctorResult};
@@ -43,4 +51,13 @@ pub use rotate::{
     RotateResult,
 };
 pub use storage::Storage;
-pub use sync::{flush, flush_dirty, import, sync, SyncResult};
+pub use subprocess::{
+    execute_command, execute_command_streaming, execute_command_to_trace, SubprocessConfig,
+    SubprocessResult,
+};
+pub use sync::{flush, flush_after_delete, flush_dirty, import, sync, SyncResult};
+pub use timing::{
+    calculate_elapsed_from_file, format_duration, record_completion, record_start_time,
+    CompletionRecord, ExecutionTimer, TimerState,
+};
+pub use trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};

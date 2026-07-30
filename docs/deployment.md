@@ -124,6 +124,43 @@ journalctl --user -u bf-update.service -n 20
 systemctl --user start bf-update.service
 ```
 
+## Periodic `.beads/` Checkpoint (ADR-1)
+
+Alongside the binary auto-updater, the fleet ships an **opt-in** periodic checkpoint timer that keeps each workspace's `.beads/` state committed to git. Full rationale and consequences are recorded in [ADR-1: Periodic `.beads/` git checkpoint timer](plan/plan.md#adr-1-periodic-beads-git-checkpoint-timer-2026-07-20).
+
+### What it does
+
+Every hour (default), `bf-checkpoint.timer` runs `bf-checkpoint.sh`, which:
+
+1. **Flushes SQLite → JSONL** via `bf sync --flush-only` (the same explicit checkpoint the recovery path uses).
+2. **Detects** whether `.beads/issues.jsonl` changed in git.
+3. If it did, **stages only `.beads/issues.jsonl`** and commits it as `chore(beads): auto-checkpoint <UTC>` with a fixed identity.
+
+It **never** stages `beads.db` (gitignored, rebuilt from JSONL via `bf sync --import`) and **never** runs on the `bf` claim/close hot path — it is invoked solely by the systemd timer, so it cannot regress claim latency or contend with the `BEGIN IMMEDIATE` write lock (ADR-1: out-of-band only).
+
+### Disabled by default — opt in per workspace
+
+> **New rollouts default to `checkpoint.enabled: false`.** A freshly enabled timer has **no side effects** — `bf-checkpoint.sh` prints `checkpoint disabled` and exits 0 until a maintainer sets `checkpoint.enabled: true` for that workspace.
+
+```yaml
+# .beads/config.yaml
+checkpoint:
+  enabled: false           # master switch — DEFAULT FALSE; opt in per workspace
+  interval_minutes: 60     # min gap between commits (self-throttle), default 60
+  push: false              # git push after each commit, default false
+```
+
+`push` is off by default too — commits stay local unless `checkpoint.push: true` (persistent) or the script is run with `--push` (one-shot). Do **not** add `--push` to the unit's `ExecStart`, which would force-push on every timer fire.
+
+### Install / status
+
+The units ship in `deploy/` (Debian/Ubuntu) and `systemd/` (NixOS) alongside the `bf-update` units and install the same way — see [`../deploy/README.md`](../deploy/README.md#bf-checkpoint--periodic-beads-git-checkpoint-adr-1) and [`../systemd/README.md`](../systemd/README.md#bf-checkpoint--periodic-beads-git-checkpoint-adr-1).
+
+```bash
+systemctl --user list-timers bf-checkpoint.timer
+journalctl --user -u bf-checkpoint.service -n 50
+```
+
 ## Source Files
 
 - `~/.local/bin/bf-update.sh` - Update script (source in `scripts/bf-update.sh`)

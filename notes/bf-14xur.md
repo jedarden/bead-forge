@@ -101,7 +101,39 @@ pub fn remove_label(&self, issue_id: &str, label: &str) -> Result<()> {
 - Correctly scoped to both `issue_id` AND `label` (no cross-bead label deletion) ✅
 - Idempotent (no error when the label is absent) ✅
 
+## Re-test Verification (2026-07-23)
+
+Re-verified label removal functionality on 2026-07-23 to confirm continued correct behavior.
+
+**Starting state:** `phase-1`, `test3`, `urgent`
+
+```bash
+$ bf label remove bf-14xur --label test3
+Removed label 'test3' from bf-14xur
+
+$ bf labels bf-14xur
+phase-1
+urgent
+```
+
+**Multi-label removal:**
+
+```bash
+$ bf label add bf-14xur --label test3 --label extra
+$ bf label remove bf-14xur --label test3 --label extra
+Removed label 'test3' from bf-14xur
+Removed label 'extra' from bf-14xur
+
+$ sqlite3 .beads/beads.db "SELECT * FROM labels WHERE issue_id = 'bf-14xur';"
+bf-14xur|phase-1
+bf-14xur|urgent
+```
+
+**Result:** ✅ All functionality continues to work as documented in the original tests. Database state matches CLI output.
+
 ## Conclusion
 
 Label removal works correctly across single-label, multi-label, and no-op cases.
 The only finding is a cosmetic message in the no-op case (Test 2) — not a defect.
+
+**Re-verified:** 2026-07-23 ✅ All tests pass.

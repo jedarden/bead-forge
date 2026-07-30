@@ -93,3 +93,18 @@ user who changes it in config (or via `bf config set default_priority 4`) and th
 inconsistency noted in [[bf-3mvas]] / [[bf-32ygm]], re-confirmed here. It is a pre-existing
 issue, not a regression, and out of scope for this verification bead (no spec requires the
 config value to drive create) — flagging for awareness.
+
+## Re-verification (2026-07-23)
+
+Re-ran the full epic default priority test suite to confirm continued functionality:
+
+```bash
+cargo test --test epic_default_priority --test test_epic_default_priority
+```
+
+Results:
+- ✅ `epic_default_priority.rs`: 7/7 tests passed
+- ✅ `test_epic_default_priority.rs`: 6/6 tests passed
+- ✅ Total: 13/13 tests passing
+
+All epic default priority tests verified and passing. No code changes needed.

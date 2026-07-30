@@ -1,41 +1,33 @@
-# bf-5trp: Verify bf list executes without error
+# bf-5trp — Verify `bf list` executes without error
 
-## Date
-2026-07-28
+## Result: PASS (already complete)
 
-## Verification Results
+Ran `bf list` against the installed binary (`/home/coding/.local/bin/bf`, `bf 0.3.0`).
 
-Successfully verified that `bf list` executes without error:
+### Acceptance criteria
 
-### Command Execution
-- Command: `bf list`
-- Exit code: `0` (success)
-- Output: 938 beads listed
+| Criterion | Result |
+|-----------|--------|
+| Run `bf list` and verify it executes without error | ✅ — runs cleanly, no panic/error output |
+| Command should return exit code 0 | ✅ — `EXIT_CODE=0` |
+| Output should show bead list (empty or non-empty) | ✅ — non-empty, 968 beads listed |
 
-### Output Format
-Beads displayed in format: `[bf-ID] Title - status (priority)`
+### Captured output
 
-Sample output:
+```
+$ bf list > /dev/null 2>&1; echo "EXIT_CODE=$?"
+EXIT_CODE=0
+
+$ bf list | grep -c '^\['   # bead count
+968
+```
+
+Each line is a bead, e.g.:
+
 ```
 [bf-5trp] Verify bf list executes without error - in_progress (P2)
-[bf-1wg2v] 7.1 Incremental auto-flush + dirty_issues tracking - in_progress (P1)
-[bf-1qr] Investigate current --version flag behavior - in_progress (P2)
 [bf-iyjr] Verify bf --version outputs version - closed (P2)
+...
 ```
 
-### Statuses Observed
-- `in_progress`
-- `open`
-- `closed`
-
-### Priorities Observed
-- `P1` (highest)
-- `P2`
-- `P3`
-- `P4` (lowest)
-
-## Conclusion
-All acceptance criteria met:
-- ✅ Command executes without error
-- ✅ Exit code is 0
-- ✅ Output shows bead list (non-empty in this workspace)
+No code changes required — the `list` command path is already implemented and functional.

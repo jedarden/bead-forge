@@ -5,10 +5,12 @@
 
 use crate::config::{find_beads_dir, load_metadata};
 use crate::jsonl::{import_jsonl, stream_issues, UpsertResult};
+use crate::model::Issue;
+use crate::recovery;
 use crate::storage::Storage;
 use anyhow::{anyhow, Result};
 use rusqlite::Connection;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Doctor check results.
 #[derive(Debug, Clone, Default)]
@@ -717,6 +719,390 @@ pub fn repair(workspace_dir: &Path, flush_first: bool, force: bool) -> Result<us
     storage.clear_dirty()?;
 
     Ok(result.imported)
+}
+
+// ===========================================================================
+// Doctor safety stack (Phase 7.2 — layered repair + beads_rust#394 preservation)
+//
+// `repair_stack` is the user-facing `bf doctor --repair` path. Unlike the
+// low-level `repair` primitive above (which unconditionally rebuilds from JSONL),
+// it walks a layered safety architecture and only reaches the destructive JSONL
+// rebuild as a last resort, always behind a verified restorable backup:
+//
+//   1. Healthy early-return  — a workspace with no corruption/divergence never
+//      rebuilds; only trivial, non-destructive fixers run.
+//   2. Local repair first    — integrity triage + VACUUM/REINDEX/cache rebuild;
+//      if that resolves the problem, the JSONL rebuild is never reached.
+//   3. Verified backups      — SHA-256-hashed copies of the DB family + JSONL into
+//      `.beads/recovery/<run-id>/` before any rebuild; restore-on-failure.
+//   4. JSONL authority preflight — refuse rebuild if the JSONL carries merge
+//      conflict markers or unparseable records (never rebuild from a poisoned
+//      authority).
+//   5. Repeat-failure gate   — a rebuild that fails post-verification writes a
+//      marker; further rebuilds refuse without `--allow-repeated-repair`.
+//   6. Preservation across rebuild (beads_rust#394) — snapshot unflushed dirty
+//      issues (with labels/deps/comments) *and* tombstones before the rebuild,
+//      restore + re-mark them dirty after, and report the preserved count.
+// ===========================================================================
+
+/// Options controlling a layered `repair_stack` run.
+#[derive(Debug, Clone, Default)]
+pub struct RepairOptions {
+    /// Flush unflushed (dirty) beads to JSONL before rebuild.
+    pub flush_first: bool,
+    /// Discard unflushed dirty beads instead of preserving them across a rebuild.
+    /// Preservation is the default; `force` opts out (the legacy destructive path).
+    pub force: bool,
+    /// Proceed even if a prior rebuild left a repeat-failure marker (layer 5).
+    pub allow_repeated_repair: bool,
+}
+
+/// Structured outcome of a layered `repair_stack` run.
+#[derive(Debug, Clone, Default)]
+pub struct RepairReport {
+    /// True when the workspace was healthy (or locally repairable) and no JSONL
+    /// rebuild was performed.
+    pub healthy: bool,
+    /// True when a JSONL rebuild was performed.
+    pub rebuilt: bool,
+    /// Beads imported from JSONL during a rebuild (0 if no rebuild).
+    pub imported: usize,
+    /// Unflushed dirty beads snapshotted and restored across the rebuild (layer 6).
+    pub preserved_dirty: usize,
+    /// Non-destructive local fixers that were applied (layer 2).
+    pub local_fixes: Vec<String>,
+    /// Run id of the verified pre-rebuild backup (layer 3), if a rebuild ran.
+    pub backup_run_id: Option<String>,
+    /// Human-readable notes for the CLI summary.
+    pub messages: Vec<String>,
+}
+
+/// Resolve the `.beads` dir + db/jsonl paths for a workspace.
+fn resolve_paths(workspace_dir: &Path) -> Result<(PathBuf, PathBuf, PathBuf)> {
+    let beads_dir = find_beads_dir(workspace_dir)
+        .ok_or_else(|| anyhow!("No .beads directory found in {}", workspace_dir.display()))?;
+    let metadata = load_metadata(&beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+    let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+    Ok((beads_dir, db_path, jsonl_path))
+}
+
+/// The DB family + JSONL authority paths that a pre-rebuild backup captures.
+fn backup_targets(db_path: &Path, jsonl_path: &Path) -> Vec<PathBuf> {
+    let db_str = db_path.to_string_lossy().into_owned();
+    vec![
+        db_path.to_path_buf(),
+        PathBuf::from(format!("{}-wal", db_str)),
+        PathBuf::from(format!("{}-shm", db_str)),
+        jsonl_path.to_path_buf(),
+    ]
+}
+
+/// Layer 4 — JSONL authority preflight.
+///
+/// Refuse to treat the JSONL as authoritative for a rebuild if it contains git
+/// merge-conflict markers or any unparseable record. Rebuilding from a poisoned
+/// authority is exactly how a bad flush or a botched merge becomes permanent.
+pub fn preflight_jsonl(jsonl_path: &Path) -> Result<()> {
+    if !jsonl_path.exists() {
+        return Ok(()); // A fresh/empty workspace has nothing to poison.
+    }
+
+    // Scan raw lines for conflict markers first — these produce the clearest error.
+    let content = std::fs::read_to_string(jsonl_path)
+        .map_err(|e| anyhow!("Cannot read JSONL for preflight: {}", e))?;
+    for (idx, line) in content.lines().enumerate() {
+        if line.starts_with("<<<<<<<")
+            || line.starts_with(">>>>>>>")
+            || line == "======="
+            || line.starts_with("======= ")
+            || line.starts_with("|||||||")
+        {
+            return Err(anyhow!(
+                "Refusing to rebuild: JSONL contains a git merge-conflict marker at line {} \
+                 (\"{}\"). Resolve the conflict in {} before repairing — rebuilding from a \
+                 conflicted authority would make the corruption permanent.",
+                idx + 1,
+                line.chars().take(20).collect::<String>(),
+                jsonl_path.display()
+            ));
+        }
+    }
+
+    // Then confirm every record parses. A single invalid record means the JSONL is
+    // not a trustworthy authority for a full rebuild.
+    let mut invalid = Vec::new();
+    for (idx, result) in stream_issues(jsonl_path)?.enumerate() {
+        if let Err(e) = result {
+            invalid.push(format!("line {}: {}", idx + 1, e));
+            if invalid.len() >= 5 {
+                break;
+            }
+        }
+    }
+    if !invalid.is_empty() {
+        return Err(anyhow!(
+            "Refusing to rebuild: JSONL contains {} invalid record(s) [{}]. \
+             Fix or remove the bad lines in {} before repairing.",
+            invalid.len(),
+            invalid.join("; "),
+            jsonl_path.display()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Layer 2 — non-destructive local repair.
+///
+/// Runs integrity triage and cheap local recovery (VACUUM, REINDEX, blocked-cache
+/// rebuild). Returns the list of fixers applied. Never touches JSONL and never
+/// drops data; safe to run on any openable database.
+fn local_repair(db_path: &Path) -> Result<Vec<String>> {
+    let mut applied = Vec::new();
+    if !db_path.exists() {
+        return Ok(applied);
+    }
+
+    {
+        let conn = Connection::open(db_path)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        // VACUUM compacts and can clear certain free-list inconsistencies.
+        conn.execute_batch("VACUUM")?;
+        applied.push("VACUUM".to_string());
+        // REINDEX rebuilds every index from the (authoritative) table rows.
+        conn.execute_batch("REINDEX")?;
+        applied.push("REINDEX".to_string());
+    }
+
+    // Rebuild the derived blocked-issues cache from the live graph.
+    let storage = Storage::open(db_path)?;
+    storage.rebuild_blocked_cache()?;
+    applied.push("rebuild-blocked-cache".to_string());
+
+    Ok(applied)
+}
+
+/// Core rebuild used by the safety stack: replace the DB by importing from JSONL.
+///
+/// Unlike the `repair` primitive, this performs no dirty-bead guard and writes no
+/// ad-hoc `.db.backup.*` file — the layered caller has already taken a verified
+/// recovery backup and captured any dirty state to restore afterwards.
+fn rebuild_db_from_jsonl(db_path: &Path, jsonl_path: &Path) -> Result<usize> {
+    if db_path.exists() {
+        std::fs::remove_file(db_path)?;
+    }
+    // Remove stale SQLite sidecars so the fresh DB starts clean.
+    for sidecar in ["-wal", "-shm"] {
+        let p = PathBuf::from(format!("{}{}", db_path.to_string_lossy(), sidecar));
+        if p.exists() {
+            let _ = std::fs::remove_file(&p);
+        }
+    }
+
+    let storage = Storage::open(db_path)?;
+    let result = storage.with_immediate_transaction(|tx| {
+        import_jsonl(jsonl_path, |issue| {
+            Storage::create_issue_tx(tx, &issue)?;
+            Ok(UpsertResult::New)
+        })
+    })?;
+    storage.rebuild_blocked_cache()?;
+    storage.clear_dirty()?;
+    Ok(result.imported)
+}
+
+/// Layer 6 (restore half) — re-insert snapshotted dirty beads after a rebuild and
+/// re-mark them dirty. Beads already reconstituted from JSONL are replaced with the
+/// (newer, unflushed) snapshot version so their in-flight edits survive.
+///
+/// Returns the number of beads restored.
+fn restore_dirty_snapshot(db_path: &Path, snapshot: &[Issue]) -> Result<usize> {
+    if snapshot.is_empty() {
+        return Ok(0);
+    }
+    let storage = Storage::open(db_path)?;
+    let now = chrono::Utc::now().to_rfc3339();
+    storage.with_immediate_transaction(|tx| {
+        for issue in snapshot {
+            if Storage::get_issue_tx(tx, &issue.id)?.is_some() {
+                // JSONL carried an older copy — overwrite with the unflushed snapshot.
+                Storage::update_issue_from_json_tx(tx, issue)?;
+            } else {
+                Storage::create_issue_tx(tx, issue)?;
+            }
+            // Re-mark dirty: these beads are still unflushed relative to JSONL.
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                rusqlite::params![issue.id, now],
+            )?;
+        }
+        Ok::<_, anyhow::Error>(())
+    })?;
+    Ok(snapshot.len())
+}
+
+/// Layered, safe `bf doctor --repair` (Phase 7.2).
+///
+/// Walks the six-layer safety stack described above. See [`RepairOptions`] /
+/// [`RepairReport`].
+pub fn repair_stack(workspace_dir: &Path, opts: &RepairOptions) -> Result<RepairReport> {
+    let (beads_dir, db_path, jsonl_path) = resolve_paths(workspace_dir)?;
+    let mut report = RepairReport::default();
+
+    if !jsonl_path.exists() {
+        return Err(anyhow!(
+            "Cannot repair: JSONL file not found at {}",
+            jsonl_path.display()
+        ));
+    }
+
+    // ---- Layer 5: repeat-failure gate (checked before doing any work) ----
+    if recovery::repair_failed_marker_exists(&beads_dir) && !opts.allow_repeated_repair {
+        return Err(anyhow!(
+            "Refusing to repair: a previous rebuild failed post-verification and its backup was \
+             restored (see {}/{}). Investigate before retrying, then pass \
+             --allow-repeated-repair to override.",
+            recovery::RECOVERY_DIR,
+            "repair-failed.marker"
+        ));
+    }
+
+    // ---- Layer 1: health assessment ----
+    let health = check(workspace_dir)?;
+
+    // A rebuild is only justified by genuine corruption or JSONL↔DB divergence.
+    // Unflushed (db-only) beads are NOT a rebuild trigger — that is a flush concern,
+    // and rebuilding for them would risk exactly the data we must preserve. Invalid
+    // JSONL counts as unhealthy so the flow reaches the layer-4 preflight, which then
+    // refuses (never rebuild from a poisoned authority) rather than silently passing.
+    let needs_rebuild = !health.db_ok
+        || !health.jsonl_ok
+        || !health.missing_in_sqlite.is_empty()
+        || !health.hash_mismatch.is_empty();
+
+    // ---- Layer 2: local repair first (always safe, never drops data) ----
+    if db_path.exists() {
+        match local_repair(&db_path) {
+            Ok(fixes) => report.local_fixes = fixes,
+            Err(e) => report
+                .messages
+                .push(format!("Local repair partially failed: {}", e)),
+        }
+    }
+
+    // Re-assess after local repair: it may have resolved integrity issues, making a
+    // rebuild unnecessary.
+    let post_local = check(workspace_dir)?;
+    let still_needs_rebuild = !post_local.db_ok
+        || !post_local.jsonl_ok
+        || !post_local.missing_in_sqlite.is_empty()
+        || !post_local.hash_mismatch.is_empty();
+
+    if !needs_rebuild || !still_needs_rebuild {
+        // Healthy (or locally repaired) — the JSONL rebuild is unreachable from here.
+        // A repair that repairs nothing must not write: honor the read-only contract.
+        // `--flush-first` is scoped to the rebuild ("flush unflushed beads *before*
+        // repair"); with no rebuild pending there is nothing to protect, so this branch
+        // never flushes regardless of the flag. If unflushed beads are present, point
+        // the user at the canonical checkpoint command (`bf sync --flush-only`) rather
+        // than silently writing the JSONL checkpoint (bf-ku8hv).
+        report.healthy = true;
+        // A clean state clears any prior repeat-failure marker.
+        let _ = recovery::clear_repair_failed_marker(&beads_dir);
+        if post_local.unflushed_count > 0 {
+            report.messages.push(format!(
+                "{} unflushed bead(s) present; run `bf sync --flush-only` to checkpoint them",
+                post_local.unflushed_count
+            ));
+        }
+        return Ok(report);
+    }
+
+    // ---- Layer 4: JSONL authority preflight ----
+    preflight_jsonl(&jsonl_path)?;
+
+    // ---- Optional pre-flush, then Layer 6 snapshot ----
+    if opts.flush_first && db_path.exists() {
+        // Only possible if the DB is readable; skip silently on a corrupt DB.
+        if let Ok(storage) = Storage::open(&db_path) {
+            if let Ok(flushed) = storage.sync_to_jsonl(&jsonl_path, false) {
+                report
+                    .messages
+                    .push(format!("Flushed {} bead(s) to JSONL before rebuild", flushed));
+            }
+        }
+    }
+
+    // Snapshot unflushed dirty beads (with labels/deps/comments and any dirty
+    // tombstones) unless the caller explicitly opted into the destructive path.
+    let dirty_snapshot: Vec<Issue> = if opts.force {
+        Vec::new()
+    } else if db_path.exists() {
+        Storage::open(&db_path)
+            .and_then(|s| s.list_dirty_issues())
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    // ---- Layer 3: verified pre-rebuild backup ----
+    let manifest = recovery::create_backup(
+        &beads_dir,
+        &backup_targets(&db_path, &jsonl_path),
+        "pre-rebuild",
+    )?;
+    report.backup_run_id = Some(manifest.run_id.clone());
+
+    // ---- Rebuild from JSONL ----
+    let imported = rebuild_db_from_jsonl(&db_path, &jsonl_path)?;
+    report.rebuilt = true;
+    report.imported = imported;
+
+    // ---- Layer 6: restore preserved dirty beads ----
+    report.preserved_dirty = restore_dirty_snapshot(&db_path, &dirty_snapshot)?;
+
+    // ---- Post-verification: did the rebuild produce a sound workspace? ----
+    let verify = check(workspace_dir)?;
+    // Preserved dirty beads legitimately show up as db-only (missing_in_jsonl); that
+    // is the expected unflushed state and must not count as a verification failure.
+    let verify_ok = verify.db_ok
+        && verify.jsonl_ok
+        && verify.missing_in_sqlite.is_empty()
+        && verify.hash_mismatch.is_empty();
+
+    if !verify_ok {
+        // Roll back to the verified backup and raise the repeat-failure gate.
+        let detail = format!(
+            "post-verify failed (db_ok={}, jsonl_ok={}, missing_in_sqlite={}, hash_mismatch={}); \
+             restored backup run {}",
+            verify.db_ok,
+            verify.jsonl_ok,
+            verify.missing_in_sqlite.len(),
+            verify.hash_mismatch.len(),
+            manifest.run_id
+        );
+        recovery::restore_run(&beads_dir, &manifest.run_id)?;
+        recovery::write_repair_failed_marker(&beads_dir, &detail)?;
+        return Err(anyhow!(
+            "Rebuild failed post-verification; restored the pre-rebuild backup (run {}). {}. \
+             Further rebuilds will refuse without --allow-repeated-repair.",
+            manifest.run_id,
+            detail
+        ));
+    }
+
+    // Success — clear any prior failure marker.
+    recovery::clear_repair_failed_marker(&beads_dir)?;
+    report.messages.push(format!(
+        "Rebuilt from JSONL: {} imported, {} unflushed bead(s) preserved; verified backup at {}/{}",
+        report.imported,
+        report.preserved_dirty,
+        recovery::RECOVERY_DIR,
+        manifest.run_id
+    ));
+
+    Ok(report)
 }
 
 /// Rebuild the blocked issues cache.
