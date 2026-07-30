@@ -469,7 +469,7 @@ bf velocity      [--model <m>] [--harness <h>] [--format json|text|toon]
 # ── Maintenance & config ─────────────────────────────────────────────────────
 bf sync          [--flush-only] [--import-only]
 bf merge-jsonl   --ours <A> --theirs <B> [--base <O>] [--output <path>]  # 3-way JSONL merge / git driver
-bf doctor        [--repair [--flush-first] [--force]] [--reclaim-stale [--ttl <minutes>]]  # no flags = health check
+bf doctor        [--repair [--flush-first] [--force]] [--reclaim-stale [--ttl <minutes>]] [--fix-schema] [--reconcile]  # no flags = health check
 bf rotate        [--days <N>] [--dry-run]
 bf migrate       [--workspace <p>] [--from-jsonl] [--seed-velocity] [--dry-run] [--skip-verify]
 bf init          [--prefix <p>]

@@ -337,7 +337,8 @@ pub enum Commands {
     /// Checks database integrity, JSONL validity, and drift between the two.
     /// --repair rebuilds SQLite from JSONL (flush unflushed beads first with
     /// --flush-first to avoid losing them). --reclaim-stale resets beads stuck
-    /// in_progress past the claim TTL back to open.
+    /// in_progress past the claim TTL back to open. --reconcile backfills rows
+    /// that predate a forward-only fix (stale blocked status, empty assignees).
     Doctor {
         /// Repair database
         #[arg(long)]
@@ -363,6 +364,12 @@ pub enum Commands {
         /// not rebuild from JSONL). Fixes the NULL-datetime crash class.
         #[arg(long)]
         fix_schema: bool,
+
+        /// Backfill rows that predate a forward-only fix (non-destructive, in place):
+        /// flips beads stuck at 'blocked' whose blockers are all closed back to 'open',
+        /// and rewrites empty-string assignees to NULL.
+        #[arg(long)]
+        reconcile: bool,
 
         /// Proceed with --repair even if a prior rebuild failed post-verification
         /// (clears the repeat-failure gate; see the doctor safety stack).
@@ -1247,6 +1254,7 @@ pub fn run(cli: Cli) -> Result<()> {
             reclaim_stale,
             ttl,
             fix_schema,
+            reconcile,
             allow_repeated_repair,
             runs,
             restore,
@@ -1258,6 +1266,7 @@ pub fn run(cli: Cli) -> Result<()> {
             reclaim_stale,
             ttl,
             fix_schema,
+            reconcile,
             allow_repeated_repair,
             runs,
             restore,
@@ -2234,6 +2243,7 @@ fn cmd_doctor(
     reclaim_stale: bool,
     ttl: Option<i64>,
     fix_schema: bool,
+    reconcile: bool,
     allow_repeated_repair: bool,
     runs: bool,
     restore: Option<String>,
@@ -2286,6 +2296,46 @@ fn cmd_doctor(
                 "Repaired {} NULL value(s) in NOT NULL column(s) in place",
                 fixed
             );
+        }
+    } else if reconcile {
+        // Backfill rows left behind by forward-only fixes (bf-29wxxl).
+        let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
+        let report = crate::doctor::reconcile(workspace_dir)?;
+        if report.is_clean() {
+            println!("✓ Nothing to reconcile — no stale blocked beads, no empty assignees");
+        } else {
+            if report.unblocked.is_empty() {
+                println!("✓ No beads stuck at 'blocked' with all blockers closed");
+            } else {
+                println!(
+                    "Reopened {} bead(s) stuck at 'blocked' with all blockers closed:",
+                    report.unblocked.len()
+                );
+                for id in &report.unblocked {
+                    println!("    - {}", id);
+                }
+            }
+            if report.normalized_assignees.is_empty() {
+                println!("✓ No empty-string assignees");
+            } else {
+                println!(
+                    "Normalized {} empty-string assignee(s) to NULL:",
+                    report.normalized_assignees.len()
+                );
+                for id in &report.normalized_assignees {
+                    println!("    - {}", id);
+                }
+            }
+        }
+        if !report.blocked_without_dependencies.is_empty() {
+            println!(
+                "⚠ {} bead(s) are 'blocked' with no blocking dependency — set by hand, \
+                 so they were left alone. Review and `bf update <id> --status open` if stale:",
+                report.blocked_without_dependencies.len()
+            );
+            for id in &report.blocked_without_dependencies {
+                println!("    - {}", id);
+            }
         }
     } else if repair {
         let workspace_dir = beads_dir.parent().unwrap_or(beads_dir);
@@ -2403,6 +2453,38 @@ fn cmd_doctor(
                 );
             }
             println!("  Run 'bf doctor --fix-schema' to repair these rows in place");
+        }
+
+        // Report rows left behind by forward-only fixes (bf-29wxxl). Like the NULL
+        // check above these are independent of db_ok/jsonl_ok, and both starve
+        // `bf ready`: a stale blocked bead is never claimable, and an empty-string
+        // assignee reads back as already-claimed.
+        if !result.stale_blocked_ids.is_empty() || !result.empty_assignee_ids.is_empty() {
+            if !result.stale_blocked_ids.is_empty() {
+                println!(
+                    "⚠ Stale 'blocked' beads (all blockers closed): {}",
+                    result.stale_blocked_ids.len()
+                );
+                for id in result.stale_blocked_ids.iter().take(10) {
+                    println!("    - {}", id);
+                }
+                if result.stale_blocked_ids.len() > 10 {
+                    println!("    ... and {} more", result.stale_blocked_ids.len() - 10);
+                }
+            }
+            if !result.empty_assignee_ids.is_empty() {
+                println!(
+                    "⚠ Empty-string assignees (should be NULL): {}",
+                    result.empty_assignee_ids.len()
+                );
+                for id in result.empty_assignee_ids.iter().take(10) {
+                    println!("    - {}", id);
+                }
+                if result.empty_assignee_ids.len() > 10 {
+                    println!("    ... and {} more", result.empty_assignee_ids.len() - 10);
+                }
+            }
+            println!("  Run 'bf doctor --reconcile' to backfill these rows in place");
         }
     }
 

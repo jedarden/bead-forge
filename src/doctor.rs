@@ -33,8 +33,13 @@ pub struct DoctorResult {
     pub pseudo_terminal_status_ids: Vec<String>,
     // Beads stuck in 'blocked' status despite having no active blockers -- see bf-5id.
     // These beads should be 'open' but were never transitioned when their last blocker
-    // closed, so this check surfaces them for manual `bf update <id> --status open`.
+    // closed, so this check surfaces them for `bf doctor --reconcile` (bf-29wxxl).
     pub stale_blocked_ids: Vec<String>,
+    // Beads whose assignee is the literal empty string instead of NULL -- see bf-29wxxl.
+    // `bf create`/`bf update` normalize this to NULL now (bf-4mj7l/bf-2uhsk), but rows
+    // written before that fix still carry "", and any consumer testing `assignee is not
+    // None` reads them as already-claimed. Repaired by `bf doctor --reconcile`.
+    pub empty_assignee_ids: Vec<String>,
     // Rows that violate a NOT NULL column constraint (NULL stored in a column the
     // schema declares NOT NULL) -- see bf-3hm5h. The historical case is a NULL
     // created_at/updated_at that used to crash the entire list/flush with
@@ -147,12 +152,27 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
     if !stale_blocked_ids.is_empty() {
         issues.push(format!(
             "{} bead(s) stuck in 'blocked' status despite having no active blockers \
-             -- run `bf update <id> --status open` on each to unblock them: {}",
+             -- run `bf doctor --reconcile` to flip them back to open: {}",
             stale_blocked_ids.len(),
             stale_blocked_ids.join(", ")
         ));
     }
     result.stale_blocked_ids = stale_blocked_ids;
+
+    // Check for legacy empty-string assignees (bf-29wxxl). The CLI normalizes these to
+    // NULL on write now, but rows that predate that fix were never backfilled and read
+    // back as "assigned" to consumers that test for presence rather than emptiness.
+    let empty_assignee_ids = check_empty_assignees(&db_path)?;
+    if !empty_assignee_ids.is_empty() {
+        issues.push(format!(
+            "{} bead(s) have an empty-string assignee instead of NULL (reads back as \
+             assigned and can hide the bead from claiming) -- run `bf doctor --reconcile` \
+             to normalize them: {}",
+            empty_assignee_ids.len(),
+            empty_assignee_ids.join(", ")
+        ));
+    }
+    result.empty_assignee_ids = empty_assignee_ids;
 
     // Check for NULL values stored in NOT NULL columns (bf-3hm5h). Independent of
     // db_ok/jsonl_ok since it only needs the sqlite db to be openable, and it is
@@ -210,6 +230,23 @@ fn check_stale_blocked_statuses(db_path: &Path) -> Result<Vec<String>> {
         "#
     )?;
 
+    let ids = stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(ids)
+}
+
+/// Find beads whose `assignee` is the literal empty string rather than NULL (bf-29wxxl).
+///
+/// `bf create`/`bf update` normalize an empty assignee to NULL (bf-4mj7l/bf-2uhsk), but
+/// that fix was forward-only: rows written before it still store `""`, which any consumer
+/// checking `assignee is not None` reads as "already claimed" (docs/plan/plan.md §3.4).
+fn check_empty_assignees(db_path: &Path) -> Result<Vec<String>> {
+    let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
+    let mut stmt = conn.prepare(
+        "SELECT id FROM issues WHERE assignee = '' AND deleted_at IS NULL ORDER BY id",
+    )?;
     let ids = stmt
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -393,6 +430,158 @@ pub fn fix_null_not_null(workspace_dir: &Path) -> Result<usize> {
     }
 
     Ok(fixed)
+}
+
+/// Structured outcome of a `reconcile` run (bf-29wxxl).
+#[derive(Debug, Clone, Default)]
+pub struct ReconcileReport {
+    /// Beads flipped from `blocked` back to `open` because every blocking dependency
+    /// they carry is already terminal.
+    pub unblocked: Vec<String>,
+    /// Beads whose empty-string assignee was rewritten to NULL.
+    pub normalized_assignees: Vec<String>,
+    /// Beads at status `blocked` that carry no blocking dependency edge at all. These
+    /// were set blocked by hand, so there is nothing to reconcile them against and
+    /// `reconcile` deliberately leaves them alone -- they are reported for review.
+    pub blocked_without_dependencies: Vec<String>,
+}
+
+impl ReconcileReport {
+    /// True when nothing needed fixing (beads left for manual review don't count).
+    pub fn is_clean(&self) -> bool {
+        self.unblocked.is_empty() && self.normalized_assignees.is_empty()
+    }
+}
+
+/// Backfill data that predates a forward-only fix (bf-29wxxl).
+///
+/// Two code fixes shipped without ever reconciling the rows that predated them, and both
+/// starve `bf ready`:
+///
+/// 1. The blocked->open cascade (bf-5id) only fires on future `close` events. A bead whose
+///    last blocker closed *before* that fix landed stayed at `status='blocked'` forever,
+///    transitively pinning everything downstream of it.
+/// 2. Empty-assignee normalization (bf-4mj7l/bf-2uhsk) only applies on write. Rows already
+///    holding `assignee = ''` read back as assigned (docs/plan/plan.md §3.4).
+///
+/// This is a non-destructive, in-place fixer -- like `fix_null_not_null` it never rebuilds
+/// from JSONL and never touches rows that are already correct. Repaired rows are marked
+/// dirty so the next flush carries them into JSONL, and the blocked cache is rebuilt.
+///
+/// Only beads that actually carry a blocking dependency edge are unblocked: a bead set to
+/// `blocked` by hand with no dependencies has no blocker state to derive `open` from, so it
+/// is reported in `blocked_without_dependencies` instead of being silently reopened.
+///
+/// Returns the ids touched in each pass.
+pub fn reconcile(workspace_dir: &Path) -> Result<ReconcileReport> {
+    let beads_dir = find_beads_dir(workspace_dir)
+        .ok_or_else(|| anyhow!("No .beads directory found in {}", workspace_dir.display()))?;
+    let metadata = load_metadata(&beads_dir)?;
+    let db_path = beads_dir.join(&metadata.database);
+
+    let storage = Storage::open(&db_path)?;
+
+    let report = storage.with_immediate_transaction(|tx| {
+        let now = chrono::Utc::now().to_rfc3339();
+        let mut report = ReconcileReport::default();
+
+        // Pass 1 -- stale blocked rows whose every blocking dependency is terminal.
+        // Mirrors the cascade condition in Storage::close_issue so a reconciled row is
+        // indistinguishable from one the cascade would have produced at close time.
+        let stale: Vec<String> = tx
+            .prepare(
+                r#"
+                SELECT i.id
+                FROM issues i
+                WHERE i.status = 'blocked'
+                AND i.deleted_at IS NULL
+                AND EXISTS (
+                    SELECT 1 FROM dependencies d
+                    WHERE d.issue_id = i.id
+                    AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM dependencies d
+                    INNER JOIN issues blocker ON blocker.id = d.depends_on_id
+                    WHERE d.issue_id = i.id
+                    AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                    AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                )
+                ORDER BY i.id
+                "#,
+            )?
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        for id in &stale {
+            tx.execute(
+                "UPDATE issues SET status = 'open', updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![&now, id],
+            )?;
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) \
+                 VALUES (?1, 'status_changed', 'doctor-reconcile', 'blocked', 'open', ?2)",
+                rusqlite::params![id, &now],
+            )?;
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                rusqlite::params![id, &now],
+            )?;
+        }
+        report.unblocked = stale;
+
+        // Blocked beads with no blocking edge at all -- reported, never rewritten.
+        report.blocked_without_dependencies = tx
+            .prepare(
+                r#"
+                SELECT i.id
+                FROM issues i
+                WHERE i.status = 'blocked'
+                AND i.deleted_at IS NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM dependencies d
+                    WHERE d.issue_id = i.id
+                    AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                )
+                ORDER BY i.id
+                "#,
+            )?
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        // Pass 2 -- legacy empty-string assignees.
+        let empty: Vec<String> = tx
+            .prepare("SELECT id FROM issues WHERE assignee = '' AND deleted_at IS NULL ORDER BY id")?
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        for id in &empty {
+            tx.execute(
+                "UPDATE issues SET assignee = NULL, updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![&now, id],
+            )?;
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) \
+                 VALUES (?1, 'assignee_changed', 'doctor-reconcile', '', NULL, ?2)",
+                rusqlite::params![id, &now],
+            )?;
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                rusqlite::params![id, &now],
+            )?;
+        }
+        report.normalized_assignees = empty;
+
+        Ok::<_, anyhow::Error>(report)
+    })?;
+
+    // Reopened beads no longer belong in the display-facing blocked cache. Cheap and
+    // idempotent, so run it whenever anything moved.
+    if !report.unblocked.is_empty() {
+        storage.rebuild_blocked_cache()?;
+    }
+
+    Ok(report)
 }
 
 /// Check database integrity.
