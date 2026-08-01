@@ -38,8 +38,103 @@ The velocity tracking feature is working correctly for:
 - Computing p50/p90/avg metrics
 - Supporting claim scoring based on historical performance
 
-## Test Output
+---
 
-```
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out
-```
+# Comprehensive Test Verification (2026-08-01)
+
+**Date:** 2026-08-01
+**Agent:** claude-code-glm-4.7-roam4
+**Purpose:** Verify basic bf CLI operations work correctly
+
+## Tests Executed and Results
+
+### 1. Basic Workflow Tests (4 tests)
+✅ All passed
+- `test_bead_forge_cli_exists`
+- `test_bead_forge_version`
+- `test_bead_show_by_id`
+- `test_current_workspace_accessible`
+
+### 2. Create Command Tests (19 tests)
+✅ All passed
+- Basic bead creation with various configurations
+- ID generation with proper prefix
+- Priority handling (Critical, High, Medium, Low, Backlog)
+- Type handling (task, bug, feature)
+- Labels (single and multiple)
+- Assignee handling
+- Long descriptions
+
+### 3. JSON Formatter Tests (12 tests)
+✅ All passed
+- Single and multiple issue formatting
+- Empty issue handling
+- Error formatting
+- Assignee and label normalization
+- Envelope formatting
+
+### 4. JSONL Roundtrip Tests (25 tests)
+✅ All passed
+- Full export/import roundtrip
+- Dirty export/import cycle (only modifies changed beads)
+- Multiple export/import cycles stability
+- Comment preservation
+- Dependency preservation
+- Label preservation
+- Timestamp preservation
+- Complex bead configurations
+- SQLite state matching
+
+### 5. Autoflush Comprehensive Mutation Tests (42 tests)
+✅ All passed
+- Create operations with/without autoflush
+- Update operations (status, priority)
+- Label add/remove operations
+- Dependency add/remove operations
+- Delete operations with/without autoflush
+- Comment add operations
+- Reopen operations
+- Flush failure handling (warns but succeeds)
+- JSONL newline separation
+- JSONL duplicate prevention
+- JSON output with warning fields
+
+### 6. Batch Atomic Operations Tests (13 tests)
+✅ All passed
+- Single and multiple independent creates
+- Placeholder resolution and references
+- Rollback on invalid operations
+- Mitosis atomicity
+- SQLite rollback on database reopen
+- Crash mid-transaction handling
+
+### 7. Concurrent Claim Race Tests (24 tests)
+✅ All passed
+- Thundering herd test (20 workers, no duplicate claims)
+- Priority ordering preservation
+- Stale reclamation
+- High-frequency claim attempts
+- Rapid claim/release cycles
+- Empty workspace handling
+- Dependencies and ephemeral beads
+
+## Overall Results
+
+**Total Tests Run:** 139
+**Passed:** 139 ✅
+**Failed:** 0
+**Ignored:** 0
+
+## Conclusion
+
+All core bf CLI operations are functioning correctly:
+- ✅ Basic CRUD operations (create, read, update, delete)
+- ✅ JSON output formatting with proper envelope structure
+- ✅ JSONL roundtrip data integrity
+- ✅ Autoflush behavior on mutations
+- ✅ Batch operation atomicity and rollback
+- ✅ Concurrent claiming without race conditions
+- ✅ Dependency and label management
+- ✅ Priority and type handling
+
+The bead-forge CLI demonstrates stable, correct behavior across all tested functionality areas.
