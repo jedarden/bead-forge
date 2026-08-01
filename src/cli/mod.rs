@@ -42,6 +42,15 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub envelope: bool,
 
+    /// Print version information ("bf <version>") and exit 0.
+    ///
+    /// Declared by hand rather than via clap's built-in version flag (see
+    /// `disable_version_flag` above) so the version is written to stdout by
+    /// `run` instead of clap's own writer, and so it is accepted anywhere on
+    /// the command line, including after a subcommand.
+    #[arg(short = 'V', long = "version", global = true)]
+    pub version: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -1069,6 +1078,15 @@ pub fn run_cli() -> Result<Cli> {
 }
 
 pub fn run(cli: Cli) -> Result<()> {
+    // --version wins over everything else, including a subcommand: print the
+    // version to stdout and return Ok so the process exits 0 with no "Error:"
+    // prefix. Checked first so it never falls through to the "No command
+    // provided" error below.
+    if cli.version {
+        println!("bf {}", VERSION);
+        return Ok(());
+    }
+
     // Captured before `cli.command` is moved out below. This is the
     // per-invocation half of the effective auto-flush switch; combined with
     // `config.sync.auto_flush` inside each handler via
