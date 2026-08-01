@@ -615,4 +615,310 @@ mod tests {
                                                             // and succeed since SQLite format accepts this
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_update_session_on_close_with_empty_claimed_at() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create a test issue
+        conn.execute(
+            "INSERT INTO issues (id, title, status, issue_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "bf-test-empty",
+                "Test Empty",
+                "in_progress",
+                "task",
+                Utc::now().to_rfc3339(),
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Create a worker session with empty claimed_at string
+        conn.execute(
+            "INSERT INTO worker_sessions (worker_id, model, harness, bead_id, claimed_at, workspace_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params!["worker1", "claude-4.7", "cli", "bf-test-empty", "", "."],
+        )
+        .unwrap();
+
+        // Close the bead
+        let closed_at = Utc::now();
+        let updated = update_session_on_close(&conn, "bf-test-empty", closed_at).unwrap();
+
+        // Should return false since empty claimed_at is filtered out
+        assert!(!updated);
+
+        // Verify the session was NOT updated
+        let (session_closed_at, duration): (Option<String>, Option<i64>) = conn
+            .query_row(
+                "SELECT closed_at, duration_seconds FROM worker_sessions WHERE bead_id = ?1",
+                params!["bf-test-empty"],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+
+        assert!(session_closed_at.is_none());
+        assert!(duration.is_none());
+    }
+
+    #[test]
+    fn test_update_session_on_close_sqlite_default_format() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create a test issue
+        conn.execute(
+            "INSERT INTO issues (id, title, status, issue_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "bf-test-sqlite-default",
+                "Test SQLite Default",
+                "in_progress",
+                "task",
+                Utc::now().to_rfc3339(),
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Create a worker session using SQLite's CURRENT_TIMESTAMP default
+        // This produces SQLite native format: "YYYY-MM-DD HH:MM:SS" without timezone
+        conn.execute(
+            "INSERT INTO worker_sessions (worker_id, model, harness, bead_id, workspace_path)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params!["worker1", "claude-4.7", "cli", "bf-test-sqlite-default", "."],
+        )
+        .unwrap();
+
+        // Verify the claimed_at was set to CURRENT_TIMESTAMP (not NULL)
+        let claimed_at_from_db: String = conn
+            .query_row(
+                "SELECT claimed_at FROM worker_sessions WHERE bead_id = ?1",
+                params!["bf-test-sqlite-default"],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        // SQLite's CURRENT_TIMESTAMP format is "YYYY-MM-DD HH:MM:SS" (space separator)
+        assert!(!claimed_at_from_db.is_empty());
+        assert!(claimed_at_from_db.contains(' ') || claimed_at_from_db.contains('T'));
+
+        // Close the bead - should successfully parse SQLite native format
+        let closed_at = Utc::now();
+        let updated = update_session_on_close(&conn, "bf-test-sqlite-default", closed_at).unwrap();
+
+        // Should successfully update since SQLite default format is parseable
+        assert!(updated);
+
+        // Verify the session was updated
+        let (session_closed_at, duration): (Option<String>, Option<i64>) = conn
+            .query_row(
+                "SELECT closed_at, duration_seconds FROM worker_sessions WHERE bead_id = ?1",
+                params!["bf-test-sqlite-default"],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+
+        assert!(session_closed_at.is_some());
+        assert!(duration.is_some());
+        // Duration should be reasonable (within a few seconds of now to now minus insertion time)
+        let duration_val = duration.unwrap();
+        assert!(duration_val >= 0, "Duration should be non-negative");
+        // Allow up to 60 seconds (test execution time)
+        assert!(duration_val <= 60, "Duration should be reasonable for test execution");
+    }
+
+    #[test]
+    fn test_update_session_on_close_triggers_velocity_recompute() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create a test issue
+        conn.execute(
+            "INSERT INTO issues (id, title, status, issue_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "bf-test-recompute",
+                "Test Recompute",
+                "in_progress",
+                "task",
+                Utc::now().to_rfc3339(),
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Create a worker session with model, harness, and issue_type
+        let claimed_at = Utc::now() - chrono::Duration::minutes(5);
+        conn.execute(
+            "INSERT INTO worker_sessions (worker_id, model, harness, bead_id, claimed_at, workspace_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "worker1",
+                "claude-4.7",
+                "cli",
+                "bf-test-recompute",
+                claimed_at.to_rfc3339(),
+                ".",
+            ],
+        )
+        .unwrap();
+
+        // Verify no velocity stats exist yet
+        let count_before: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM velocity_stats WHERE model = ?1 AND harness = ?2 AND issue_type = ?3",
+                params!["claude-4.7", "cli", "task"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_before, 0);
+
+        // Close the bead
+        let closed_at = Utc::now();
+        let updated = update_session_on_close(&conn, "bf-test-recompute", closed_at).unwrap();
+
+        // Should successfully update
+        assert!(updated);
+
+        // Verify velocity stats were recomputed and created
+        let (sample_count, p50, p90, avg): (i64, Option<i64>, Option<i64>, Option<f64>) = conn
+            .query_row(
+                "SELECT sample_count, p50_seconds, p90_seconds, avg_seconds
+                 FROM velocity_stats
+                 WHERE model = ?1 AND harness = ?2 AND issue_type = ?3",
+                params!["claude-4.7", "cli", "task"],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+
+        assert_eq!(sample_count, 1);
+        assert!(p50.is_some());
+        assert!(p90.is_some());
+        assert!(avg.is_some());
+
+        // Verify the stats are reasonable (around 5 minutes = 300 seconds)
+        let p50_val = p50.unwrap();
+        assert!(p50_val >= 290 && p50_val <= 310, "p50 should be around 300 seconds, got {}", p50_val);
+
+        let avg_val = avg.unwrap();
+        assert!(avg_val >= 290.0 && avg_val <= 310.0, "avg should be around 300 seconds, got {}", avg_val);
+    }
+
+    #[test]
+    fn test_update_session_on_close_multiple_sessions_same_bead() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create a test issue
+        conn.execute(
+            "INSERT INTO issues (id, title, status, issue_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "bf-test-multi",
+                "Test Multiple",
+                "in_progress",
+                "bug",
+                Utc::now().to_rfc3339(),
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Create multiple worker sessions for the same bead (e.g., after retry)
+        let claimed_at_1 = Utc::now() - chrono::Duration::minutes(20);
+        let claimed_at_2 = Utc::now() - chrono::Duration::minutes(10);
+
+        conn.execute(
+            "INSERT INTO worker_sessions (worker_id, model, harness, bead_id, claimed_at, workspace_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "worker1",
+                "claude-4.7",
+                "cli",
+                "bf-test-multi",
+                claimed_at_1.to_rfc3339(),
+                ".",
+            ],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO worker_sessions (worker_id, model, harness, bead_id, claimed_at, workspace_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "worker1",
+                "claude-4.7",
+                "cli",
+                "bf-test-multi",
+                claimed_at_2.to_rfc3339(),
+                ".",
+            ],
+        )
+        .unwrap();
+
+        // Close the bead
+        let closed_at = Utc::now();
+        let updated = update_session_on_close(&conn, "bf-test-multi", closed_at).unwrap();
+
+        // Should successfully update
+        assert!(updated);
+
+        // Verify only the most recent session was updated (not both)
+        let count_updated: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM worker_sessions WHERE bead_id = ?1 AND closed_at IS NOT NULL",
+                params!["bf-test-multi"],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(count_updated, 1, "Only one session should be updated");
+
+        // Verify the most recent session was updated (claimed_at_2)
+        let (session_closed_at, duration): (Option<String>, Option<i64>) = conn
+            .query_row(
+                "SELECT closed_at, duration_seconds FROM worker_sessions
+                 WHERE bead_id = ?1 AND claimed_at = ?2",
+                params!["bf-test-multi", claimed_at_2.to_rfc3339()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+
+        assert!(session_closed_at.is_some());
+        assert!(duration.is_some());
+        // 10 minutes = 600 seconds (allow some tolerance)
+        assert!(duration.unwrap() >= 590 && duration.unwrap() <= 610);
+    }
+
+    #[test]
+    fn test_update_session_on_close_no_matching_session() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create a test issue
+        conn.execute(
+            "INSERT INTO issues (id, title, status, issue_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "bf-test-nosession",
+                "Test No Session",
+                "in_progress",
+                "task",
+                Utc::now().to_rfc3339(),
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Close the bead without creating a worker session
+        let closed_at = Utc::now();
+        let updated = update_session_on_close(&conn, "bf-test-nosession", closed_at).unwrap();
+
+        // Should return false since no session exists
+        assert!(!updated);
+    }
 }
