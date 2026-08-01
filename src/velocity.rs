@@ -1152,4 +1152,299 @@ mod tests {
 
         assert!(result.is_none(), "Should return None when no velocity data available");
     }
+
+    #[test]
+    fn test_get_velocity_stats_no_filter() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Insert multiple velocity stats with different sample counts
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "cli", "bug", 10, 180, 300, 200.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "gui", "task", 5, 120, 200, 150.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-5.0", "cli", "bug", 15, 150, 250, 175.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        // Query with no filter should return all stats
+        let stats = get_velocity_stats(&conn, None, None).unwrap();
+
+        assert_eq!(stats.len(), 3, "Should return all 3 stats");
+
+        // Verify ordering by sample_count DESC
+        assert_eq!(stats[0].sample_count, 15, "First should have highest sample_count");
+        assert_eq!(stats[1].sample_count, 10, "Second should have middle sample_count");
+        assert_eq!(stats[2].sample_count, 5, "Third should have lowest sample_count");
+    }
+
+    #[test]
+    fn test_get_velocity_stats_model_filter_only() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Insert stats for different models
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "cli", "bug", 10, 180, 300, 200.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "gui", "task", 5, 120, 200, 150.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-5.0", "cli", "bug", 15, 150, 250, 175.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        // Query with model filter should return only matching stats
+        let stats = get_velocity_stats(&conn, Some("claude-4.7"), None).unwrap();
+
+        assert_eq!(stats.len(), 2, "Should return only claude-4.7 stats");
+        assert!(stats.iter().all(|s| s.model == "claude-4.7"), "All results should have model=claude-4.7");
+
+        // Verify ordering by sample_count DESC within filtered results
+        assert_eq!(stats[0].sample_count, 10, "First should have higher sample_count");
+        assert_eq!(stats[1].sample_count, 5, "Second should have lower sample_count");
+    }
+
+    #[test]
+    fn test_get_velocity_stats_harness_filter_only() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Insert stats for different harnesses
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "cli", "bug", 10, 180, 300, 200.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-5.0", "cli", "task", 15, 150, 250, 175.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "gui", "bug", 5, 120, 200, 150.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        // Query with harness filter should return only matching stats
+        let stats = get_velocity_stats(&conn, None, Some("cli")).unwrap();
+
+        assert_eq!(stats.len(), 2, "Should return only cli harness stats");
+        assert!(stats.iter().all(|s| s.harness == "cli"), "All results should have harness=cli");
+
+        // Verify ordering by sample_count DESC within filtered results
+        assert_eq!(stats[0].sample_count, 15, "First should have higher sample_count");
+        assert_eq!(stats[1].sample_count, 10, "Second should have lower sample_count");
+    }
+
+    #[test]
+    fn test_get_velocity_stats_combined_model_and_harness_filter() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Insert stats for different (model, harness) combinations
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "cli", "bug", 10, 180, 300, 200.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "gui", "bug", 5, 120, 200, 150.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-5.0", "cli", "task", 15, 150, 250, 175.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-5.0", "gui", "task", 8, 140, 220, 160.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        // Query with both model and harness filters should return only exact matches
+        let stats = get_velocity_stats(&conn, Some("claude-4.7"), Some("cli")).unwrap();
+
+        assert_eq!(stats.len(), 1, "Should return only claude-4.7 + cli stats");
+        assert_eq!(stats[0].model, "claude-4.7", "Should match model");
+        assert_eq!(stats[0].harness, "cli", "Should match harness");
+        assert_eq!(stats[0].sample_count, 10, "Should have correct sample_count");
+    }
+
+    #[test]
+    fn test_get_velocity_stats_no_matching_results() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Insert some stats
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "cli", "bug", 10, 180, 300, 200.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        // Query with non-matching filters should return empty results
+        let stats = get_velocity_stats(&conn, Some("non-existent-model"), Some("cli")).unwrap();
+        assert_eq!(stats.len(), 0, "Should return empty vec for non-matching model");
+
+        let stats = get_velocity_stats(&conn, Some("claude-4.7"), Some("non-existent-harness")).unwrap();
+        assert_eq!(stats.len(), 0, "Should return empty vec for non-matching harness");
+
+        let stats = get_velocity_stats(&conn, None, Some("non-existent-harness")).unwrap();
+        assert_eq!(stats.len(), 0, "Should return empty vec for non-matching harness (no model filter)");
+    }
+
+    #[test]
+    fn test_get_velocity_stats_ordering_by_sample_count_desc() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Insert multiple stats with varying sample counts
+        let sample_counts = vec![3, 15, 7, 20, 1, 10];
+
+        for (i, sample_count) in sample_counts.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    format!("model-{}", i),
+                    format!("harness-{}", i),
+                    "bug",
+                    sample_count,
+                    100 + i as i64,
+                    200 + i as i64,
+                    150.0 + i as f64,
+                    Utc::now().to_rfc3339()
+                ],
+            ).unwrap();
+        }
+
+        // Query without filter should return results ordered by sample_count DESC
+        let stats = get_velocity_stats(&conn, None, None).unwrap();
+
+        assert_eq!(stats.len(), 6, "Should return all 6 stats");
+
+        // Verify descending order
+        let mut last_count = i64::MAX;
+        for stat in &stats {
+            assert!(stat.sample_count <= last_count, "Should be sorted by sample_count DESC");
+            last_count = stat.sample_count;
+        }
+
+        // Verify exact ordering
+        assert_eq!(stats[0].sample_count, 20, "First should be 20");
+        assert_eq!(stats[1].sample_count, 15, "Second should be 15");
+        assert_eq!(stats[2].sample_count, 10, "Third should be 10");
+        assert_eq!(stats[3].sample_count, 7, "Fourth should be 7");
+        assert_eq!(stats[4].sample_count, 3, "Fifth should be 3");
+        assert_eq!(stats[5].sample_count, 1, "Sixth should be 1");
+    }
+
+    #[test]
+    fn test_get_velocity_stats_filtered_results_maintain_ordering() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Insert stats with same model but different sample counts
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "cli", "bug", 10, 180, 300, 200.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "gui", "bug", 25, 200, 350, 220.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7", "tui", "task", 5, 100, 150, 120.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-5.0", "cli", "bug", 30, 150, 250, 175.0, Utc::now().to_rfc3339()
+            ],
+        ).unwrap();
+
+        // Query with model filter should maintain ordering by sample_count DESC
+        let stats = get_velocity_stats(&conn, Some("claude-4.7"), None).unwrap();
+
+        assert_eq!(stats.len(), 3, "Should return 3 claude-4.7 stats");
+
+        // Verify ordering within filtered results
+        assert_eq!(stats[0].sample_count, 25, "First should have highest sample_count (gui)");
+        assert_eq!(stats[1].sample_count, 10, "Second should have middle sample_count (cli)");
+        assert_eq!(stats[2].sample_count, 5, "Third should have lowest sample_count (tui)");
+
+        // Verify harness matches ordering
+        assert_eq!(stats[0].harness, "gui");
+        assert_eq!(stats[1].harness, "cli");
+        assert_eq!(stats[2].harness, "tui");
+    }
 }
