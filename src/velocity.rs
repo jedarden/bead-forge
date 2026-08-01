@@ -256,42 +256,51 @@ pub fn get_expected_seconds(
     issue_type: &str,
 ) -> Result<Option<i64>> {
     // Try exact match first
-    let result: Option<i64> = tx.query_row(
-        "SELECT p50_seconds
-         FROM velocity_stats
-         WHERE model = ?1 AND harness = ?2 AND issue_type = ?3
-           AND sample_count >= 3",
-        params![model, harness, issue_type],
-        |row| row.get(0),
-    )?;
+    let result: Option<i64> = tx
+        .query_row(
+            "SELECT p50_seconds
+             FROM velocity_stats
+             WHERE model = ?1 AND harness = ?2 AND issue_type = ?3
+               AND sample_count >= 3",
+            params![model, harness, issue_type],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten();
 
     if let Some(seconds) = result {
         return Ok(Some(seconds));
     }
 
     // Fallback: try with just model and issue_type (any harness)
-    let result: Option<i64> = tx.query_row(
-        "SELECT p50_seconds
-         FROM velocity_stats
-         WHERE model = ?1 AND harness = '' AND issue_type = ?3
-           AND sample_count >= 3",
-        params![model, "", issue_type],
-        |row| row.get(0),
-    )?;
+    let result: Option<i64> = tx
+        .query_row(
+            "SELECT p50_seconds
+             FROM velocity_stats
+             WHERE model = ?1 AND harness = '' AND issue_type = ?3
+               AND sample_count >= 3",
+            params![model, "", issue_type],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten();
 
     if let Some(seconds) = result {
         return Ok(Some(seconds));
     }
 
     // Fallback: try with just issue_type (any model/harness)
-    let result: Option<i64> = tx.query_row(
-        "SELECT p50_seconds
-         FROM velocity_stats
-         WHERE model = '' AND harness = '' AND issue_type = ?1
-           AND sample_count >= 10",
-        params![issue_type],
-        |row| row.get(0),
-    )?;
+    let result: Option<i64> = tx
+        .query_row(
+            "SELECT p50_seconds
+             FROM velocity_stats
+             WHERE model = '' AND harness = '' AND issue_type = ?1
+               AND sample_count >= 10",
+            params![issue_type],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten();
 
     Ok(result)
 }
@@ -920,5 +929,227 @@ mod tests {
 
         // Should return false since no session exists
         assert!(!updated);
+    }
+
+    #[test]
+    fn test_recompute_velocity_stats_empty_sessions() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create test issue but no completed sessions
+        conn.execute(
+            "INSERT INTO issues (id, title, status, issue_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                "bf-test-empty",
+                "Test Empty",
+                "in_progress",
+                "task",
+                Utc::now().to_rfc3339(),
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Recompute stats with no completed sessions
+        recompute_velocity_stats(&conn, "claude-4.7", "cli", "task").unwrap();
+
+        // Verify stats were created with empty values
+        let (count, p50, p90, avg): (i64, Option<i64>, Option<i64>, Option<f64>) = conn
+            .query_row(
+                "SELECT sample_count, p50_seconds, p90_seconds, avg_seconds FROM velocity_stats
+                 WHERE model = ?1 AND harness = ?2 AND issue_type = ?3",
+                params!["claude-4.7", "cli", "task"],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+
+        assert_eq!(count, 0);
+        assert!(p50.is_none(), "p50 should be None for empty session list");
+        assert!(p90.is_none(), "p90 should be None for empty session list");
+        assert!(avg.is_none(), "avg should be None for empty session list");
+    }
+
+    #[test]
+    fn test_recompute_velocity_stats_single_session() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create a single test issue and session
+        let bead_id = "bf-test-single";
+        let created_at = Utc::now();
+        let closed_at = created_at + chrono::Duration::seconds(300);
+        conn.execute(
+            "INSERT INTO issues (id, title, status, issue_type, created_at, updated_at, closed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                bead_id,
+                "Test Single",
+                "closed",
+                "bug",
+                created_at.to_rfc3339(),
+                created_at.to_rfc3339(),
+                closed_at.to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        let claimed_at = created_at;
+        conn.execute(
+            "INSERT INTO worker_sessions (worker_id, model, harness, bead_id, claimed_at, closed_at, duration_seconds, workspace_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "worker1",
+                "claude-4.7",
+                "cli",
+                bead_id,
+                claimed_at.to_rfc3339(),
+                closed_at.to_rfc3339(),
+                300,
+                ".",
+            ],
+        )
+        .unwrap();
+
+        // Recompute stats with single session
+        recompute_velocity_stats(&conn, "claude-4.7", "cli", "bug").unwrap();
+
+        // Verify stats with single session
+        let (count, p50, p90, avg): (i64, Option<i64>, Option<i64>, Option<f64>) = conn
+            .query_row(
+                "SELECT sample_count, p50_seconds, p90_seconds, avg_seconds FROM velocity_stats
+                 WHERE model = ?1 AND harness = ?2 AND issue_type = ?3",
+                params!["claude-4.7", "cli", "bug"],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+
+        assert_eq!(count, 1);
+        assert!(p50.is_some(), "p50 should be Some for single session");
+        assert_eq!(p50.unwrap(), 300, "p50 should equal the single duration");
+
+        // For single session, p90 should equal p50 (index 0 for both)
+        assert!(p90.is_some(), "p90 should be Some for single session");
+        assert_eq!(p90.unwrap(), 300, "p90 should equal p50 for single session");
+
+        assert!(avg.is_some(), "avg should be Some for single session");
+        assert!((avg.unwrap() - 300.0).abs() < 0.01, "avg should equal the single duration");
+    }
+
+    #[test]
+    fn test_get_expected_seconds_fallback_to_model_and_issue_type() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create stats with empty harness (model + issue_type only)
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7",
+                "",  // Empty harness for model+issue_type fallback
+                "bug",
+                5,   // sample_count >= 3 required
+                180, // p50
+                300, // p90
+                200.0, // avg
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Query with unknown harness should fallback to model+issue_type
+        let result = get_expected_seconds(&conn, "claude-4.7", "unknown-harness", "bug").unwrap();
+
+        assert!(result.is_some(), "Should find fallback to model+issue_type");
+        assert_eq!(result.unwrap(), 180, "Should return p50 from model+issue_type stats");
+    }
+
+    #[test]
+    fn test_get_expected_seconds_fallback_to_issue_type_only() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create stats with empty model and harness (issue_type only)
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "",  // Empty model for issue_type-only fallback
+                "",  // Empty harness for issue_type-only fallback
+                "bug",
+                15,  // sample_count >= 10 required for issue_type-only fallback
+                150, // p50
+                250, // p90
+                175.0, // avg
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Query with unknown model and harness should fallback to issue_type only
+        let result = get_expected_seconds(&conn, "unknown-model", "unknown-harness", "bug").unwrap();
+
+        assert!(result.is_some(), "Should find fallback to issue_type only");
+        assert_eq!(result.unwrap(), 150, "Should return p50 from issue_type-only stats");
+    }
+
+    #[test]
+    fn test_get_expected_seconds_insufficient_sample_count_fallback() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create stats with insufficient sample_count for exact match
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7",
+                "cli",
+                "bug",
+                2,   // sample_count < 3, should not match exact query
+                100, // p50
+                150, // p90
+                110.0, // avg
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Create stats with sufficient sample_count for model+issue_type fallback
+        conn.execute(
+            "INSERT INTO velocity_stats (model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds, last_updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "claude-4.7",
+                "",  // Empty harness
+                "bug",
+                5,   // sample_count >= 3
+                180, // p50
+                300, // p90
+                200.0, // avg
+                Utc::now().to_rfc3339(),
+            ],
+        )
+        .unwrap();
+
+        // Should skip exact match (insufficient sample_count) and use model+issue_type fallback
+        let result = get_expected_seconds(&conn, "claude-4.7", "cli", "bug").unwrap();
+
+        assert!(result.is_some(), "Should find fallback to model+issue_type");
+        assert_eq!(result.unwrap(), 180, "Should return p50 from model+issue_type stats (not exact match with insufficient samples)");
+    }
+
+    #[test]
+    fn test_get_expected_seconds_no_data_available() {
+        let temp_file = setup_test_db();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // No stats in database
+
+        // Query should return None when no data available
+        let result = get_expected_seconds(&conn, "unknown-model", "unknown-harness", "unknown-type").unwrap();
+
+        assert!(result.is_none(), "Should return None when no velocity data available");
     }
 }
