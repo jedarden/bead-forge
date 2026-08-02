@@ -793,6 +793,23 @@ impl Issue {
         let expiration_time = deleted_at + chrono::Duration::days(days_i64);
         Utc::now() > expiration_time
     }
+
+    /// Create the changes needed to close this issue.
+    ///
+    /// Returns an `IssueChanges` struct with the status set to `Closed`.
+    /// This can be passed to `Storage::update_issue` to close the issue.
+    ///
+    /// For full close semantics with event recording and cascade handling
+    /// (unblocking dependents, updating caches), use `Storage::close_issue`
+    /// directly instead.
+    #[must_use]
+    pub fn close(&self, actor: String) -> IssueChanges {
+        IssueChanges {
+            status: Some(Status::Closed),
+            actor: Some(actor),
+            ..Default::default()
+        }
+    }
 }
 
 /// Epic completion status with child counts.
