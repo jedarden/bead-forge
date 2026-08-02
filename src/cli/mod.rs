@@ -3,6 +3,7 @@ use crate::claim::{
     claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
 };
 use crate::close::close_bead;
+use crate::reopen::reopen_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
@@ -1858,22 +1859,10 @@ fn cmd_reopen(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> 
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
 
-    // Reopening a bead logically makes it unclaimed again, so clear any stale
-    // assignee left over from before it was closed/tombstoned. An empty
-    // `assignee` is the three-valued "clear to NULL" signal: update_issue's
-    // storage layer maps it to `assignee = NULL` (it never persists a literal
-    // empty string, which would read back as "assigned" and hide the bead from
-    // claiming). Defaulting `assignee` to None here would mean "leave
-    // unchanged", leaving a foreign assignee on a now-open bead.
-    let changes = IssueChanges {
-        status: Some(Status::Open),
-        assignee: Some(String::new()),
-        ..Default::default()
-    };
+    // Call the reopen function which handles status validation
+    reopen_bead(&db_path, id)?;
 
-    storage.update_issue(id, &changes)?;
     autoflush_after_mutation(beads_dir, &config, no_auto_flush);
     println!("Reopened bead {}", id);
 

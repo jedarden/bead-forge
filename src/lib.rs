@@ -19,6 +19,7 @@ pub mod migrate;
 pub mod model;
 pub mod recovery;
 pub mod robot_docs;
+pub mod reopen;
 pub mod rotate;
 pub mod secrets;
 pub mod storage;

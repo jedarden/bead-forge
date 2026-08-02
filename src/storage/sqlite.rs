@@ -880,6 +880,52 @@ impl Storage {
         })
     }
 
+    pub fn reopen_issue(&self, id: &str) -> Result<()> {
+        self.with_immediate_transaction(|tx| {
+            // Check if bead exists and get current status
+            let current_status: Option<String> = tx
+                .query_row(
+                    "SELECT status FROM issues WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if current_status.is_none() {
+                return Err(anyhow!("Bead not found: {}", id));
+            }
+
+            // Check if bead is currently closed
+            if current_status.as_deref() != Some("closed") {
+                return Err(anyhow!(
+                    "Cannot reopen bead {}: status is '{}', must be 'closed'",
+                    id,
+                    current_status.unwrap()
+                ));
+            }
+
+            // Reopen the bead
+            let now = Utc::now();
+            tx.execute(
+                "UPDATE issues SET status = 'open', assignee = NULL, closed_at = NULL, close_reason = NULL, closed_by_session = NULL, updated_at = ?1 WHERE id = ?2",
+                params![now.to_rfc3339(), id],
+            )?;
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'reopened', 'system', 'closed', 'open', ?2)",
+                params![id, now.to_rfc3339()],
+            )?;
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                params![id, now.to_rfc3339()],
+            )?;
+
+            // Invalidate critical path cache: reopening a bead can change dependencies
+            invalidate_cache(tx)?;
+            compute_all_critical_paths(tx)?;
+            Ok(())
+        })
+    }
+
     pub fn mark_dirty(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = Utc::now().to_rfc3339();
