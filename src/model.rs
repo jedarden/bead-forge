@@ -810,6 +810,22 @@ impl Issue {
             ..Default::default()
         }
     }
+
+    /// Create the changes needed to reopen this issue.
+    ///
+    /// Returns an `IssueChanges` struct with the status set to `Open`.
+    /// This can be passed to `Storage::update_issue` to reopen the issue.
+    ///
+    /// For full reopen semantics with event recording and cache handling,
+    /// use `Storage::reopen_issue` directly instead.
+    #[must_use]
+    pub fn reopen(&self, actor: String) -> IssueChanges {
+        IssueChanges {
+            status: Some(Status::Open),
+            actor: Some(actor),
+            ..Default::default()
+        }
+    }
 }
 
 /// Epic completion status with child counts.
