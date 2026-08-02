@@ -1,80 +1,79 @@
-# Task bf-qv05y: Assignee Display in Show Command - Already Complete
+# Bead bf-qv05y: Assignee Display Verification
 
-## Task Description
-Implement assignee display in show command with support for text and JSON output formats.
+## Task
+Implement assignee display in show command.
 
-## Investigation Results
-**Status: ALREADY IMPLEMENTED** - The assignee field is fully functional in the show command.
+## Implementation Status: ALREADY COMPLETE
 
-### Implementation Location
-- File: `src/cli/mod.rs` (not `src/commands/show.rs` as mentioned in task description)
-- Function: `cmd_show` (lines 1703-1790)
+The assignee field is already properly displayed in the `cmd_show` function in `src/cli/mod.rs`:
 
-### Current Implementation
-
-#### Text Format (lines 1771-1773)
+### Text Format (Default)
+**Location:** `src/cli/mod.rs:1771-1773`
 ```rust
 if let Some(assignee) = &issue.assignee {
     println!("Assignee: {}", assignee);
 }
 ```
 
-#### Toon Format (lines 1746-1748)
+### Toon Format
+**Location:** `src/cli/mod.rs:1746-1748`
 ```rust
 if let Some(assignee) = &issue.assignee {
     println!("Assignee: {}", assignee);
 }
 ```
 
-#### JSON Format (line 1728)
-Full issue serialization includes assignee field automatically via Serde.
+### JSON Format
+**Location:** `src/cli/mod.rs:1718-1735`
+The issue is serialized using the formatter, which includes the assignee field from the `Issue` struct. The assignee field has `#[serde(default, skip_serializing_if = "Option::is_none")]`, so it's included when present and omitted when None.
 
-### Verification Tests Passed
+## Acceptance Criteria - All Met ✓
 
-#### Manual Testing
+1. **Assignee appears in text output format** ✓
+   - Line 1771-1773 in src/cli/mod.rs
+
+2. **Assignee appears in JSON output format** ✓
+   - JSON serialization includes the field when present
+
+3. **Handle cases where assignee is None/empty** ✓
+   - Uses `if let Some(assignee)` pattern, skips when None
+   - Serde's `skip_serializing_if = "Option::is_none"` handles JSON case
+
+4. **Add tests for show command with assignee** ✓
+   - Created `tests/test_show_assignee_display.rs` with 5 comprehensive tests:
+     - test_show_assignee_text_format
+     - test_show_assignee_toon_format
+     - test_show_assignee_json_format
+     - test_show_assignee_none_case
+     - test_show_assignee_cleared_via_update
+   - All tests pass successfully
+
+## Changes Made
+
+### Added Test File
+- **File:** `tests/test_show_assignee_display.rs`
+- **Purpose:** Comprehensive test coverage for assignee display in all formats
+- **Test Count:** 5 tests
+- **Status:** All passing
+
+### No Code Changes Required
+The implementation was already complete. The `cmd_show` function in `src/cli/mod.rs` already properly displays the assignee field in all output formats and handles the None case correctly.
+
+## Verification
+
 ```bash
-# Created bead with assignee
-./target/debug/bf create --title "Test assignee display" --assignee "test-assignee-123"
-./target/debug/bf show bf-2sv6o4
-# Output shows: "Assignee: test-assignee-123"
+# All tests pass
+cargo test test_show_assignee
+running 5 tests
+test test_show_assignee_json_format ... ok
+test test_show_assignee_cleared_via_update ... ok
+test test_show_assignee_none_case ... ok
+test test_show_assignee_text_format ... ok
+test test_show_assignee_toon_format ... ok
 
-# Created bead without assignee
-./target/debug/bf create --title "Test without assignee"
-./target/debug/bf show bf-4hq0la
-# Output does NOT show "Assignee:" line (correct behavior)
-
-# JSON format verification
-./target/debug/bf show bf-2sv6o4 --format json | jq '.[0].assignee'
-# Output: "test-assignee-123"
-
-./target/debug/bf show bf-4hq0la --format json | jq '.[0].assignee'
-# Output: null
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
-
-#### Automated Tests
-All 12 tests in `tests/test_show_command.rs` passed:
-- ✅ test_show_basic_text_format
-- ✅ test_show_json_format (verifies assignee in JSON at line 197)
-- ✅ test_show_json_flag
-- ✅ test_show_toon_format
-- ✅ test_show_missing_bead
-- ✅ test_show_with_all_fields (verifies assignee at line 397)
-- ✅ test_show_with_dependencies
-- ✅ test_show_with_labels_only
-- ✅ test_show_closed_bead
-- ✅ test_show_in_progress_bead
-- ✅ test_show_basic_fields_display
-- ✅ test_show_closed_bead_timestamps
-
-### Acceptance Criteria Status
-
-| Criterion | Status | Notes |
-|-----------|--------|-------|
-| Modify src/commands/show.rs | ✅ Complete | File doesn't exist; implementation in src/cli/mod.rs |
-| Assignee in text output | ✅ Complete | Lines 1771-1773 (text), 1746-1748 (toon) |
-| Assignee in JSON output | ✅ Complete | Full issue serialization (line 1728) |
-| Handle None/empty cases | ✅ Complete | Not printed when None; null in JSON |
-| Add tests for show with assignee | ✅ Complete | Tests already exist |
 
 ## Conclusion
-The task is **already complete**. No code changes were needed. The assignee field is properly displayed in all output formats and edge cases are handled correctly.
+
+The assignee display feature was already fully implemented in the show command. This bead verified the implementation and added comprehensive test coverage to ensure the functionality works correctly in all output formats and edge cases.
