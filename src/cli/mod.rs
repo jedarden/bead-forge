@@ -1761,6 +1761,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
             }
+            if !issue.annotations.is_empty() {
+                println!("Annotations:");
+                for (key, value) in &issue.annotations {
+                    println!("  {}: {}", key, value);
+                }
+            }
             if !issue.dependencies.is_empty() {
                 println!("Dependencies:");
                 for dep in &issue.dependencies {
@@ -1785,6 +1791,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             }
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
+            }
+            if !issue.annotations.is_empty() {
+                println!("Annotations:");
+                for (key, value) in &issue.annotations {
+                    println!("  {}: {}", key, value);
+                }
             }
             if !issue.dependencies.is_empty() {
                 println!("Dependencies:");
