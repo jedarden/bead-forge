@@ -948,6 +948,79 @@ pub struct IssueFilter {
     pub updated_before: Option<DateTime<Utc>>,
 }
 
+/// ReadyCandidate - a simplified projection of an Issue for ready/claim operations.
+///
+/// This struct represents a bead that is ready to be claimed, with only the
+/// essential fields needed for candidate display and selection. It is used by
+/// the formatter to convert to a full Issue for output.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReadyCandidate {
+    pub id: String,
+    pub title: String,
+    pub priority: Priority,
+    pub status: Status,
+    pub created_at: DateTime<Utc>,
+    pub labels: Vec<String>,
+}
+
+impl ReadyCandidate {
+    /// Convert a ReadyCandidate to a full Issue with sensible defaults for missing fields.
+    pub fn to_issue(&self) -> Issue {
+        let now = Utc::now();
+        Issue {
+            id: self.id.clone(),
+            title: self.title.clone(),
+            status: self.status.clone(),
+            priority: self.priority,
+            labels: self.labels.clone(),
+            created_at: self.created_at,
+            updated_at: now,
+            // Default values for missing fields
+            content_hash: None,
+            description: None,
+            design: None,
+            acceptance_criteria: None,
+            notes: None,
+            issue_type: IssueType::default(),
+            assignee: None,
+            owner: None,
+            estimated_minutes: None,
+            created_by: None,
+            closed_at: None,
+            close_reason: None,
+            closed_by_session: None,
+            due_at: None,
+            defer_until: None,
+            external_ref: None,
+            source_system: None,
+            source_repo: None,
+            deleted_at: None,
+            deleted_by: None,
+            delete_reason: None,
+            original_type: None,
+            compaction_level: None,
+            compacted_at: None,
+            compacted_at_commit: None,
+            original_size: None,
+            sender: None,
+            ephemeral: false,
+            pinned: false,
+            is_template: false,
+            dependencies: Vec::new(),
+            comments: Vec::new(),
+            annotations: BTreeMap::new(),
+        }
+    }
+}
+
+/// Convert a ReadyCandidate to an Issue.
+///
+/// This is a convenience function that creates a full Issue from a ReadyCandidate
+/// with sensible defaults for all missing fields.
+pub fn ready_candidate_to_issue(candidate: &ReadyCandidate) -> Issue {
+    candidate.to_issue()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1662,5 +1735,174 @@ mod tests {
         let default: Priority = Default::default();
         assert_eq!(default, Priority::MEDIUM);
         assert_ne!(default, Priority::CRITICAL);
+    }
+
+    // ReadyCandidate conversion tests
+
+    #[test]
+    fn test_ready_candidate_to_issue_basic_conversion() {
+        // Test basic conversion from ReadyCandidate to Issue
+        let candidate = ReadyCandidate {
+            id: "bf-test".to_string(),
+            title: "Test bead".to_string(),
+            priority: Priority::HIGH,
+            status: Status::Open,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec!["urgent".to_string(), "backend".to_string()],
+        };
+
+        let issue = candidate.to_issue();
+
+        assert_eq!(issue.id, "bf-test");
+        assert_eq!(issue.title, "Test bead");
+        assert_eq!(issue.priority, Priority::HIGH);
+        assert_eq!(issue.status, Status::Open);
+        assert_eq!(issue.created_at, Utc.timestamp_opt(1_700_000_000, 0).unwrap());
+        assert_eq!(issue.labels, vec!["urgent".to_string(), "backend".to_string()]);
+    }
+
+    #[test]
+    fn test_ready_candidate_to_issue_defaults() {
+        // Test that missing Issue fields get sensible defaults
+        let candidate = ReadyCandidate {
+            id: "bf-defaults".to_string(),
+            title: "Defaults test".to_string(),
+            priority: Priority::MEDIUM,
+            status: Status::InProgress,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec![],
+        };
+
+        let issue = candidate.to_issue();
+
+        // Verify defaults for missing fields
+        assert_eq!(issue.description, None);
+        assert_eq!(issue.design, None);
+        assert_eq!(issue.acceptance_criteria, None);
+        assert_eq!(issue.notes, None);
+        assert_eq!(issue.issue_type, IssueType::Task); // Default
+        assert_eq!(issue.assignee, None);
+        assert_eq!(issue.owner, None);
+        assert_eq!(issue.estimated_minutes, None);
+        assert_eq!(issue.created_by, None);
+        assert_eq!(issue.closed_at, None);
+        assert_eq!(issue.close_reason, None);
+        assert_eq!(issue.due_at, None);
+        assert_eq!(issue.defer_until, None);
+        assert_eq!(issue.external_ref, None);
+        assert_eq!(issue.source_system, None);
+        assert_eq!(issue.source_repo, None);
+        assert_eq!(issue.deleted_at, None);
+        assert_eq!(issue.deleted_by, None);
+        assert_eq!(issue.delete_reason, None);
+        assert_eq!(issue.compaction_level, None);
+        assert_eq!(issue.compacted_at, None);
+        assert_eq!(issue.compacted_at_commit, None);
+        assert_eq!(issue.original_size, None);
+        assert_eq!(issue.sender, None);
+        assert_eq!(issue.ephemeral, false);
+        assert_eq!(issue.pinned, false);
+        assert_eq!(issue.is_template, false);
+        assert!(issue.dependencies.is_empty());
+        assert!(issue.comments.is_empty());
+        assert!(issue.annotations.is_empty());
+    }
+
+    #[test]
+    fn test_ready_candidate_to_issue_updated_at_set() {
+        // Test that updated_at is set to current time
+        let before_conversion = Utc::now();
+        let candidate = ReadyCandidate {
+            id: "bf-updated".to_string(),
+            title: "Updated test".to_string(),
+            priority: Priority::CRITICAL,
+            status: Status::Open,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec![],
+        };
+
+        let issue = candidate.to_issue();
+        let after_conversion = Utc::now();
+
+        // Verify updated_at is set to approximately current time
+        assert!(issue.updated_at >= before_conversion);
+        assert!(issue.updated_at <= after_conversion);
+    }
+
+    #[test]
+    fn test_ready_candidate_to_issue_function() {
+        // Test the standalone ready_candidate_to_issue function
+        let candidate = ReadyCandidate {
+            id: "bf-fn".to_string(),
+            title: "Function test".to_string(),
+            priority: Priority::LOW,
+            status: Status::Blocked,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec!["blocked".to_string()],
+        };
+
+        let issue = ready_candidate_to_issue(&candidate);
+
+        assert_eq!(issue.id, "bf-fn");
+        assert_eq!(issue.title, "Function test");
+        assert_eq!(issue.priority, Priority::LOW);
+        assert_eq!(issue.status, Status::Blocked);
+        assert_eq!(issue.labels, vec!["blocked".to_string()]);
+    }
+
+    #[test]
+    fn test_ready_candidate_serialization() {
+        // Test that ReadyCandidate serializes correctly
+        let candidate = ReadyCandidate {
+            id: "bf-serialize".to_string(),
+            title: "Serialization test".to_string(),
+            priority: Priority::MEDIUM,
+            status: Status::Open,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec!["test".to_string()],
+        };
+
+        let json = serde_json::to_string(&candidate).unwrap();
+        assert!(json.contains(r#""id":"bf-serialize""#));
+        assert!(json.contains(r#""title":"Serialization test""#));
+        assert!(json.contains(r#""priority":2"#)); // MEDIUM = 2
+        assert!(json.contains(r#""status":"open""#));
+        assert!(json.contains(r#""labels":["test"]"#));
+
+        // Test roundtrip
+        let deserialized: ReadyCandidate = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, candidate);
+    }
+
+    #[test]
+    fn test_ready_candidate_with_custom_status() {
+        // Test conversion with custom status
+        let candidate = ReadyCandidate {
+            id: "bf-custom".to_string(),
+            title: "Custom status test".to_string(),
+            priority: Priority::BACKLOG,
+            status: Status::Custom("in-review".to_string()),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec![],
+        };
+
+        let issue = candidate.to_issue();
+        assert_eq!(issue.status, Status::Custom("in-review".to_string()));
+    }
+
+    #[test]
+    fn test_ready_candidate_empty_labels() {
+        // Test conversion with empty labels
+        let candidate = ReadyCandidate {
+            id: "bf-empty".to_string(),
+            title: "Empty labels test".to_string(),
+            priority: Priority::MEDIUM,
+            status: Status::Open,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            labels: vec![],
+        };
+
+        let issue = candidate.to_issue();
+        assert!(issue.labels.is_empty());
     }
 }
