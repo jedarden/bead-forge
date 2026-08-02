@@ -1580,7 +1580,16 @@ fn cmd_create(
 
     if json {
         let formatter = get_formatter(OutputFormat::Json);
-        let data = serde_json::json!({ "id": id });
+        let data = serde_json::json!({
+            "id": id,
+            "title": issue.title,
+            "type": issue.issue_type.to_string(),
+            "priority": issue.priority.0,
+            "status": issue.status.to_string(),
+            "description": issue.description,
+            "assignee": issue.assignee,
+            "labels": issue.labels
+        });
         let json_str = serde_json::to_string(&data)?;
         println!("{}", formatter.format_with_envelope_and_warning("create", &json_str, warning.as_deref()));
     } else {
