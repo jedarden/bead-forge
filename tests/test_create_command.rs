@@ -1153,7 +1153,7 @@ claim_ttl_minutes: 30
         let temp_dir = setup_test_workspace();
         let workspace = temp_dir.path();
 
-        // Test with very high priority value
+        // Test with priority value > 4 (should fail due to CHECK constraint)
         let create_output = Command::new(bf_binary())
             .arg("create")
             .arg("--title")
@@ -1164,11 +1164,19 @@ claim_ttl_minutes: 30
             .output()
             .expect("Failed to run bf create");
 
-        // The command should succeed (priority range is not enforced)
-        // This documents current behavior - any i32 is accepted
+        // The command should fail due to CHECK constraint: priority >= 0 AND priority <= 4
         assert!(
-            create_output.status.success(),
-            "bf create should accept any numeric priority value (current behavior)"
+            !create_output.status.success(),
+            "bf create should fail with priority > 4 (CHECK constraint)"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message mentions constraint or priority
+        assert!(
+            stderr.contains("constraint") || stderr.contains("priority") || stderr.contains("CHECK"),
+            "Error message should mention priority constraint, got: {}",
+            stderr
         );
     }
 }
