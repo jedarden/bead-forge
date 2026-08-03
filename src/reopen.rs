@@ -415,4 +415,55 @@ mod tests {
         assert_eq!(reopened_event.new_value.as_deref(), Some("open"), "Event should show new status as 'open'");
         assert_eq!(reopened_event.old_value.as_deref(), Some("closed"), "Event should show old status as 'closed'");
     }
+
+    #[test]
+    fn test_reopen_rolls_back_on_transaction_error() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let db_path = temp_dir.path().join("test.db");
+
+        let storage = Storage::open(&db_path).expect("Failed to open storage");
+
+        // Create a closed bead with an assignee
+        let bead_id = "bf-test-rollback-1".to_string();
+        let now = Utc::now();
+        let bead = Issue {
+            id: bead_id.clone(),
+            title: "Test bead for rollback".to_string(),
+            status: Status::Closed,
+            assignee: Some("test-worker".to_string()),
+            created_at: now,
+            updated_at: now,
+            closed_at: Some(now),
+            close_reason: Some("Test close".to_string()),
+            ..Default::default()
+        };
+
+        storage.create_issue(&bead).expect("Failed to create test bead");
+
+        // Manually corrupt the database to force a transaction error
+        // by deleting the events table (which reopen_issue needs)
+        let conn = storage.conn.lock().unwrap();
+        conn.execute("DROP TABLE events", []).expect("Failed to drop events table");
+        drop(conn);
+
+        // Attempt to reopen - this should fail partway through the transaction
+        let result = reopen_bead(&db_path, &bead_id);
+
+        // Should fail due to missing events table
+        assert!(result.is_err(), "Reopen should fail when events table is missing");
+
+        // Verify rollback occurred - bead should still be closed with original values
+        let storage = Storage::open(&db_path).expect("Failed to open storage");
+        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+
+        // All original fields should be intact (no partial update)
+        assert_eq!(bead.status, Status::Closed, "Status should remain closed after rollback");
+        assert_eq!(bead.assignee, Some("test-worker".to_string()), "Assignee should remain after rollback");
+        assert!(bead.closed_at.is_some(), "closed_at should still be set after rollback");
+        assert_eq!(bead.close_reason, Some("Test close".to_string()), "close_reason should remain after rollback");
+
+        // Verify bead is NOT marked as dirty (transaction was rolled back)
+        let dirty_issues = storage.list_dirty_issues().expect("Failed to list dirty issues");
+        assert!(!dirty_issues.iter().any(|b| b.id == bead_id), "Bead should not be marked as dirty after rollback");
+    }
 }
