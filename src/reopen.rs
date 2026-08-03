@@ -440,30 +440,53 @@ mod tests {
 
         storage.create_issue(&bead).expect("Failed to create test bead");
 
-        // Manually corrupt the database to force a transaction error
-        // by deleting the events table (which reopen_issue needs)
+        // Clear any dirty marks from create_issue (clears all dirty issues)
+        storage.clear_dirty().expect("Failed to clear dirty");
+
+        // Add a trigger that will cause the events INSERT to fail
         let conn = storage.conn.lock().unwrap();
-        conn.execute("DROP TABLE events", []).expect("Failed to drop events table");
+        conn.execute(
+            "CREATE TRIGGER prevent_event_insert
+             BEFORE INSERT ON events
+             WHEN NEW.event_type = 'reopened'
+             BEGIN SELECT RAISE(ABORT, 'Test trigger for rollback'); END",
+            [],
+        ).expect("Failed to create trigger");
         drop(conn);
 
-        // Attempt to reopen - this should fail partway through the transaction
-        let result = reopen_bead(&db_path, &bead_id);
+        // Store the original state for later comparison
+        let bead_before = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let closed_at_before = bead_before.closed_at;
+        let close_reason_before = bead_before.close_reason.clone();
 
-        // Should fail due to missing events table
-        assert!(result.is_err(), "Reopen should fail when events table is missing");
+        // Verify bead is NOT dirty before the reopen attempt
+        let dirty_before = storage.list_dirty_issues().expect("Failed to list dirty issues");
+        let was_dirty_before = dirty_before.iter().any(|b| b.id == bead_id);
+        assert!(!was_dirty_before, "Bead should not be dirty before reopen attempt");
+
+        // Attempt to reopen - this should fail partway through the transaction
+        let result = storage.reopen_issue(&bead_id);
+
+        // Should fail due to trigger
+        assert!(result.is_err(), "Reopen should fail when trigger aborts");
 
         // Verify rollback occurred - bead should still be closed with original values
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead_after = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
 
         // All original fields should be intact (no partial update)
-        assert_eq!(bead.status, Status::Closed, "Status should remain closed after rollback");
-        assert_eq!(bead.assignee, Some("test-worker".to_string()), "Assignee should remain after rollback");
-        assert!(bead.closed_at.is_some(), "closed_at should still be set after rollback");
-        assert_eq!(bead.close_reason, Some("Test close".to_string()), "close_reason should remain after rollback");
+        assert_eq!(bead_after.status, Status::Closed, "Status should remain closed after rollback");
+        assert_eq!(bead_after.assignee, Some("test-worker".to_string()), "Assignee should remain after rollback");
+        assert_eq!(bead_after.closed_at, closed_at_before, "closed_at should remain unchanged after rollback");
+        assert_eq!(bead_after.close_reason, close_reason_before, "close_reason should remain unchanged after rollback");
 
-        // Verify bead is NOT marked as dirty (transaction was rolled back)
-        let dirty_issues = storage.list_dirty_issues().expect("Failed to list dirty issues");
-        assert!(!dirty_issues.iter().any(|b| b.id == bead_id), "Bead should not be marked as dirty after rollback");
+        // Verify no reopened event was created (transaction rolled back)
+        let events = storage.list_events(&bead_id).expect("Failed to list events");
+        assert!(!events.iter().any(|e| e.event_type == crate::model::EventType::Reopened), "Should not have reopened event after rollback");
+
+        // Verify bead is still NOT marked as dirty (transaction was rolled back)
+        let dirty_after = storage.list_dirty_issues().expect("Failed to list dirty issues");
+        let is_dirty_after = dirty_after.iter().any(|b| b.id == bead_id);
+        assert!(!is_dirty_after, "Bead should not be marked as dirty after failed reopen (transaction rolled back)");
     }
 }
