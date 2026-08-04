@@ -350,6 +350,10 @@ pub enum Commands {
     /// in_progress past the claim TTL back to open. --reconcile backfills rows
     /// that predate a forward-only fix (stale blocked status, empty assignees).
     Doctor {
+        /// Validate JSONL line integrity, check SQLite <-> JSONL consistency (default behavior)
+        #[arg(long)]
+        check: bool,
+
         /// Repair database
         #[arg(long)]
         repair: bool,
@@ -1267,6 +1271,7 @@ pub fn run(cli: Cli) -> Result<()> {
         // Handled specially before the .beads-directory requirement above.
         Commands::MergeJsonl { .. } => unreachable!("MergeJsonl handled earlier"),
         Commands::Doctor {
+            check,
             repair,
             flush_first,
             force,
@@ -1279,6 +1284,7 @@ pub fn run(cli: Cli) -> Result<()> {
             restore,
         } => cmd_doctor(
             &beads_dir,
+            check,
             repair,
             flush_first,
             force,
@@ -2277,6 +2283,7 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
 #[allow(clippy::too_many_arguments)]
 fn cmd_doctor(
     beads_dir: &PathBuf,
+    check: bool,
     repair: bool,
     flush_first: bool,
     force: bool,
