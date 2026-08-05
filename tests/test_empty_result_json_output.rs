@@ -10,10 +10,10 @@
 //! - Verify empty result arrays are properly formatted
 //! - All tests pass
 
+use serde_json::{from_str, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-use serde_json::{Value, from_str};
 
 fn bf() -> Command {
     Command::new(env!("CARGO_BIN_EXE_bf"))
@@ -43,9 +43,7 @@ fn setup() -> (TempDir, PathBuf) {
 
 /// Parse a JSON string and panic if invalid
 fn parse_json(json: &str) -> Value {
-    from_str(json).unwrap_or_else(|e| {
-        panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-    })
+    from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
 }
 
 /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -68,14 +66,27 @@ fn test_search_json_no_results_returns_valid_json() {
     // Create a bead (so workspace isn't completely empty)
     let (_out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "test bead", "--type", "task", "--priority", "2"],
+        &[
+            "create",
+            "--title",
+            "test bead",
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
     );
     assert!(ok, "bf create failed: {err}");
 
     // Search with text that won't match anything
     let (out, err, ok) = run_bf(
         &workspace,
-        &["search", "NONEXISTENT_SEARCH_TERM_xyz123", "--format", "json"],
+        &[
+            "search",
+            "NONEXISTENT_SEARCH_TERM_xyz123",
+            "--format",
+            "json",
+        ],
     );
     assert!(ok, "Search with no matches failed: {err}");
 
@@ -90,7 +101,10 @@ fn test_search_json_no_results_returns_valid_json() {
             assert_eq!(arr.len(), 0, "Empty search should return empty array");
         } else {
             // Could be wrapped in envelope or other structure
-            assert!(parsed.is_object() || parsed.is_array(), "Should return valid JSON");
+            assert!(
+                parsed.is_object() || parsed.is_array(),
+                "Should return valid JSON"
+            );
         }
     }
 }
@@ -102,7 +116,15 @@ fn test_search_json_with_status_filter_no_results() {
     // Create an open bead
     let (_out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "open bead", "--type", "task", "--priority", "2"],
+        &[
+            "create",
+            "--title",
+            "open bead",
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
     );
     assert!(ok, "bf create failed: {err}");
 
@@ -131,7 +153,15 @@ fn test_search_json_with_type_filter_no_results() {
     // Create a task
     let (_out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "task bead", "--type", "task", "--priority", "2"],
+        &[
+            "create",
+            "--title",
+            "task bead",
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
     );
     assert!(ok, "bf create failed: {err}");
 
@@ -161,7 +191,15 @@ fn test_search_json_with_label_filter_no_results() {
     let bead_id = {
         let (out, err, ok) = run_bf(
             &workspace,
-            &["create", "--title", "plain bead", "--type", "task", "--priority", "2"],
+            &[
+                "create",
+                "--title",
+                "plain bead",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
         );
         assert!(ok, "bf create failed: {err}");
         out.trim().to_string()
@@ -195,14 +233,30 @@ fn test_search_json_with_priority_filter_no_results() {
     // Create a normal priority bead
     let (_out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "normal bead", "--type", "task", "--priority", "2"],
+        &[
+            "create",
+            "--title",
+            "normal bead",
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
     );
     assert!(ok, "bf create failed: {err}");
 
     // Search for critical priority beads (should return empty)
     let (out, err, ok) = run_bf(
         &workspace,
-        &["search", "--priority-min", "0", "--priority-max", "0", "--format", "json"],
+        &[
+            "search",
+            "--priority-min",
+            "0",
+            "--priority-max",
+            "0",
+            "--format",
+            "json",
+        ],
     );
     assert!(ok, "Search with no matches failed: {err}");
 
@@ -226,10 +280,7 @@ fn test_list_json_no_beads_returns_valid_json() {
     let (_temp, workspace) = setup();
 
     // Don't create any beads - list from completely empty workspace
-    let (out, err, ok) = run_bf(
-        &workspace,
-        &["list", "--format", "json"],
-    );
+    let (out, err, ok) = run_bf(&workspace, &["list", "--format", "json"]);
     assert!(ok, "List from empty workspace failed: {err}");
 
     let trimmed = out.trim();
@@ -257,7 +308,15 @@ fn test_list_json_with_status_filter_no_results() {
     // Create an open bead
     let (_out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "open bead", "--type", "task", "--priority", "2"],
+        &[
+            "create",
+            "--title",
+            "open bead",
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
     );
     assert!(ok, "bf create failed: {err}");
 
@@ -277,7 +336,10 @@ fn test_list_json_with_status_filter_no_results() {
             assert_eq!(arr.len(), 0, "Should return empty array");
         } else {
             // Could be wrapped in envelope
-            assert!(parsed.is_object() || parsed.is_array(), "Should return valid JSON");
+            assert!(
+                parsed.is_object() || parsed.is_array(),
+                "Should return valid JSON"
+            );
         }
     }
 }
@@ -289,15 +351,20 @@ fn test_list_json_with_type_filter_no_results() {
     // Create a task
     let (_out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "task bead", "--type", "task", "--priority", "2"],
+        &[
+            "create",
+            "--title",
+            "task bead",
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
     );
     assert!(ok, "bf create failed: {err}");
 
     // List epics (should return empty)
-    let (out, err, ok) = run_bf(
-        &workspace,
-        &["list", "--type", "epic", "--format", "json"],
-    );
+    let (out, err, ok) = run_bf(&workspace, &["list", "--type", "epic", "--format", "json"]);
     assert!(ok, "List with no matches failed: {err}");
 
     let trimmed = out.trim();
@@ -323,7 +390,15 @@ fn test_ready_json_no_ready_beads_returns_valid_json() {
     let blocker_id = {
         let (out, err, ok) = run_bf(
             &workspace,
-            &["create", "--title", "blocker bead", "--type", "task", "--priority", "2"],
+            &[
+                "create",
+                "--title",
+                "blocker bead",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
         );
         assert!(ok, "bf create failed: {err}");
         out.trim().to_string()
@@ -332,7 +407,15 @@ fn test_ready_json_no_ready_beads_returns_valid_json() {
     let blocked_id = {
         let (out, err, ok) = run_bf(
             &workspace,
-            &["create", "--title", "blocked bead", "--type", "task", "--priority", "2"],
+            &[
+                "create",
+                "--title",
+                "blocked bead",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
         );
         assert!(ok, "bf create failed: {err}");
         out.trim().to_string()
@@ -346,10 +429,7 @@ fn test_ready_json_no_ready_beads_returns_valid_json() {
     assert!(ok, "Failed to add blocker: {err}");
 
     // Get ready beads (should be empty since all are blocked)
-    let (out, err, ok) = run_bf(
-        &workspace,
-        &["ready", "--format", "json"],
-    );
+    let (out, err, ok) = run_bf(&workspace, &["ready", "--format", "json"]);
     assert!(ok, "Ready command failed: {err}");
 
     let trimmed = out.trim();
@@ -358,17 +438,29 @@ fn test_ready_json_no_ready_beads_returns_valid_json() {
     if !trimmed.is_empty() {
         let parsed = parse_json(trimmed);
         if let Some(arr) = parsed.as_array() {
-            assert_eq!(arr.len(), 0, "Should return empty array when no ready beads");
+            assert_eq!(
+                arr.len(),
+                0,
+                "Should return empty array when no ready beads"
+            );
         } else {
             // Could be "[]" string or wrapped in envelope
-            assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                    "Should return valid JSON for empty ready");
+            assert!(
+                parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                "Should return valid JSON for empty ready"
+            );
         }
     }
 
     // Cleanup
-    run_bf(&workspace, &["close", &blocker_id, "--reason", "test cleanup"]);
-    run_bf(&workspace, &["close", &blocked_id, "--reason", "test cleanup"]);
+    run_bf(
+        &workspace,
+        &["close", &blocker_id, "--reason", "test cleanup"],
+    );
+    run_bf(
+        &workspace,
+        &["close", &blocked_id, "--reason", "test cleanup"],
+    );
 }
 
 #[test]
@@ -379,23 +471,25 @@ fn test_ready_json_all_closed_beads_returns_valid_json() {
     let bead_id = {
         let (out, err, ok) = run_bf(
             &workspace,
-            &["create", "--title", "closed bead", "--type", "task", "--priority", "2"],
+            &[
+                "create",
+                "--title",
+                "closed bead",
+                "--type",
+                "task",
+                "--priority",
+                "2",
+            ],
         );
         assert!(ok, "bf create failed: {err}");
         out.trim().to_string()
     };
 
-    let (_out, err, ok) = run_bf(
-        &workspace,
-        &["close", &bead_id, "--reason", "test close"],
-    );
+    let (_out, err, ok) = run_bf(&workspace, &["close", &bead_id, "--reason", "test close"]);
     assert!(ok, "Failed to close bead: {err}");
 
     // Get ready beads (should be empty since all are closed)
-    let (out, err, ok) = run_bf(
-        &workspace,
-        &["ready", "--format", "json"],
-    );
+    let (out, err, ok) = run_bf(&workspace, &["ready", "--format", "json"]);
     assert!(ok, "Ready command failed: {err}");
 
     let trimmed = out.trim();
@@ -404,10 +498,16 @@ fn test_ready_json_all_closed_beads_returns_valid_json() {
     if !trimmed.is_empty() {
         let parsed = parse_json(trimmed);
         if let Some(arr) = parsed.as_array() {
-            assert_eq!(arr.len(), 0, "Should return empty array when no ready beads");
+            assert_eq!(
+                arr.len(),
+                0,
+                "Should return empty array when no ready beads"
+            );
         } else {
-            assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                    "Should return valid JSON for empty ready");
+            assert!(
+                parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                "Should return valid JSON for empty ready"
+            );
         }
     }
 }
@@ -417,10 +517,7 @@ fn test_ready_json_empty_workspace_returns_valid_json() {
     let (_temp, workspace) = setup();
 
     // Don't create any beads - ready from completely empty workspace
-    let (out, err, ok) = run_bf(
-        &workspace,
-        &["ready", "--format", "json"],
-    );
+    let (out, err, ok) = run_bf(&workspace, &["ready", "--format", "json"]);
     assert!(ok, "Ready from empty workspace failed: {err}");
 
     let trimmed = out.trim();
@@ -464,17 +561,30 @@ fn test_recent_json_very_short_time_period_returns_valid_json() {
 
     // Should be wrapped in envelope: {version: 1, kind: "recent", data: ...}
     assert!(parsed.is_object(), "Recent should return envelope object");
-    assert!(parsed.get("version").is_some(), "Envelope should have version");
+    assert!(
+        parsed.get("version").is_some(),
+        "Envelope should have version"
+    );
     assert!(parsed.get("kind").is_some(), "Envelope should have kind");
-    assert!(parsed.get("data").is_some(), "Envelope should have data field");
+    assert!(
+        parsed.get("data").is_some(),
+        "Envelope should have data field"
+    );
 
     let data = parsed.get("data").unwrap();
 
     // Data should be empty array or empty string for no results
     if let Some(arr) = data.as_array() {
-        assert_eq!(arr.len(), 0, "Empty recent should return empty array in data");
+        assert_eq!(
+            arr.len(),
+            0,
+            "Empty recent should return empty array in data"
+        );
     } else if let Some(s) = data.as_str() {
-        assert!(s.is_empty() || s == "[]", "Empty recent data should be empty");
+        assert!(
+            s.is_empty() || s == "[]",
+            "Empty recent data should be empty"
+        );
     }
 }
 
@@ -483,10 +593,7 @@ fn test_recent_json_empty_workspace_returns_valid_json() {
     let (_temp, workspace) = setup();
 
     // Recent from completely empty workspace
-    let (out, err, ok) = run_bf(
-        &workspace,
-        &["recent", "--format", "json"],
-    );
+    let (out, err, ok) = run_bf(&workspace, &["recent", "--format", "json"]);
     assert!(ok, "Recent from empty workspace failed: {err}");
 
     let trimmed = out.trim();
@@ -498,7 +605,10 @@ fn test_recent_json_empty_workspace_returns_valid_json() {
 
     // Should be wrapped in envelope
     assert!(parsed.is_object(), "Recent should return envelope object");
-    assert!(parsed.get("data").is_some(), "Envelope should have data field");
+    assert!(
+        parsed.get("data").is_some(),
+        "Envelope should have data field"
+    );
 }
 
 // ============================================================================
@@ -512,31 +622,19 @@ fn test_all_commands_consistent_empty_format() {
     // Test that all commands handle empty results consistently
 
     // Search with no results
-    let (search_out, err, ok) = run_bf(
-        &workspace,
-        &["search", "nonexistent", "--format", "json"],
-    );
+    let (search_out, err, ok) = run_bf(&workspace, &["search", "nonexistent", "--format", "json"]);
     assert!(ok, "Search failed: {err}");
 
     // List with no results (empty workspace)
-    let (list_out, err, ok) = run_bf(
-        &workspace,
-        &["list", "--format", "json"],
-    );
+    let (list_out, err, ok) = run_bf(&workspace, &["list", "--format", "json"]);
     assert!(ok, "List failed: {err}");
 
     // Ready with no results (empty workspace)
-    let (ready_out, err, ok) = run_bf(
-        &workspace,
-        &["ready", "--format", "json"],
-    );
+    let (ready_out, err, ok) = run_bf(&workspace, &["ready", "--format", "json"]);
     assert!(ok, "Ready failed: {err}");
 
     // Recent (always returns envelope)
-    let (recent_out, err, ok) = run_bf(
-        &workspace,
-        &["recent", "--format", "json"],
-    );
+    let (recent_out, err, ok) = run_bf(&workspace, &["recent", "--format", "json"]);
     assert!(ok, "Recent failed: {err}");
 
     // All should return valid JSON
@@ -559,8 +657,11 @@ fn test_all_commands_consistent_empty_format() {
         let parsed = parse_json(trimmed);
 
         // Verify it's valid JSON structure
-        assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                "{} should return valid JSON structure", cmd);
+        assert!(
+            parsed.is_object() || parsed.is_array() || parsed.is_string(),
+            "{} should return valid JSON structure",
+            cmd
+        );
     }
 }
 
@@ -573,7 +674,15 @@ fn test_empty_result_arrays_properly_formatted() {
     // Create a bead to make workspace non-empty
     let (_out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "test bead", "--type", "task", "--priority", "2"],
+        &[
+            "create",
+            "--title",
+            "test bead",
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
     );
     assert!(ok, "bf create failed: {err}");
 

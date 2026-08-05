@@ -251,8 +251,9 @@ pub fn restore_run(beads_dir: &Path, run_ref: &str) -> Result<BackupManifest> {
     for f in &manifest.files {
         let src = run_dir.join(&f.name);
         let dest = beads_dir.join(&f.name);
-        std::fs::copy(&src, &dest)
-            .with_context(|| format!("Failed to restore {} from run {}", f.name, manifest.run_id))?;
+        std::fs::copy(&src, &dest).with_context(|| {
+            format!("Failed to restore {} from run {}", f.name, manifest.run_id)
+        })?;
     }
 
     Ok(manifest)
@@ -311,12 +312,15 @@ mod tests {
         write(&db, b"database-bytes");
         write(&jsonl, b"{\"id\":\"bf-1\"}\n");
 
-        let manifest =
-            create_backup(&beads, &[db.clone(), jsonl.clone()], "pre-rebuild").unwrap();
+        let manifest = create_backup(&beads, &[db.clone(), jsonl.clone()], "pre-rebuild").unwrap();
         assert_eq!(manifest.files.len(), 2);
         assert_eq!(manifest.reason, "pre-rebuild");
         // Hash matches an independent computation of the source bytes.
-        let db_entry = manifest.files.iter().find(|f| f.name == "beads.db").unwrap();
+        let db_entry = manifest
+            .files
+            .iter()
+            .find(|f| f.name == "beads.db")
+            .unwrap();
         assert_eq!(db_entry.sha256, hash_file(&db).unwrap());
 
         // A fresh backup verifies cleanly.
@@ -348,9 +352,7 @@ mod tests {
         let manifest = create_backup(&beads, &[db], "pre-rebuild").unwrap();
 
         // Tamper with the backed-up copy.
-        let backed = recovery_dir(&beads)
-            .join(&manifest.run_id)
-            .join("beads.db");
+        let backed = recovery_dir(&beads).join(&manifest.run_id).join("beads.db");
         write(&backed, b"tampered-different-length");
 
         let err = verify_run(&beads, &manifest.run_id).unwrap_err();

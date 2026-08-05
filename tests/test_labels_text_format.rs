@@ -315,7 +315,9 @@ fn test_label_list_all_unique_text_format() {
 
     // Should have header "All labels:"
     assert!(
-        lines.iter().any(|line| line.contains("All labels") || line.contains("All")),
+        lines
+            .iter()
+            .any(|line| line.contains("All labels") || line.contains("All")),
         "Output should contain 'All labels' header: {}",
         stdout
     );
@@ -325,9 +327,7 @@ fn test_label_list_all_unique_text_format() {
         .iter()
         .filter(|line| {
             let trimmed = line.trim();
-            !trimmed.is_empty()
-                && !trimmed.contains("All labels")
-                && !trimmed.contains("All")
+            !trimmed.is_empty() && !trimmed.contains("All labels") && !trimmed.contains("All")
         })
         .cloned()
         .collect();

@@ -11,8 +11,8 @@
 //! - Test multiple items output
 //! - Tests pass with cargo test
 
-use std::process::Command;
 use serde_json::Value;
+use std::process::Command;
 
 /// Resolve the freshly-built bf binary — never the system-installed one.
 fn bf_binary() -> String {
@@ -120,14 +120,19 @@ fn test_list_command_json_flag() {
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
     // Should find our bead in output
-    assert!(stdout.contains(&bead_id), "list --json should include our bead");
+    assert!(
+        stdout.contains(&bead_id),
+        "list --json should include our bead"
+    );
 
     // Verify output is valid JSONL
     let parsed = parse_jsonl(&stdout);
     assert!(parsed.len() >= 1, "Should have at least one bead");
 
     // Verify required fields
-    let bead = parsed.iter().find(|b| b["id"].as_str() == Some(&bead_id))
+    let bead = parsed
+        .iter()
+        .find(|b| b["id"].as_str() == Some(&bead_id))
         .expect("Should find our bead");
 
     assert!(bead.get("id").is_some(), "Should have id field");
@@ -162,8 +167,7 @@ fn test_list_json_empty_results() {
     assert_eq!(trimmed, "[]", "Empty list should return '[]'");
 
     // Verify it's valid JSON
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Empty result should be valid JSON");
+    let parsed: Value = serde_json::from_str(trimmed).expect("Empty result should be valid JSON");
     assert!(parsed.is_array(), "Empty result should be an array");
     assert_eq!(parsed.as_array().unwrap().len(), 0, "Array should be empty");
 }
@@ -190,7 +194,11 @@ fn test_list_json_multiple_items() {
     let parsed = parse_jsonl(&stdout);
 
     // Should have at least our 5 beads
-    assert!(parsed.len() >= 5, "Should have at least 5 beads, got {}", parsed.len());
+    assert!(
+        parsed.len() >= 5,
+        "Should have at least 5 beads, got {}",
+        parsed.len()
+    );
 
     // Verify all our beads are present
     let bead_ids = vec![&bead1, &bead2, &bead3, &bead4, &bead5];
@@ -207,9 +215,18 @@ fn test_list_json_multiple_items() {
         assert!(bead.get("id").is_some(), "Each item should have id");
         assert!(bead.get("title").is_some(), "Each item should have title");
         assert!(bead.get("status").is_some(), "Each item should have status");
-        assert!(bead.get("priority").is_some(), "Each item should have priority");
-        assert!(bead.get("issue_type").is_some(), "Each item should have issue_type");
-        assert!(bead.get("labels").is_some(), "Each item should have labels array");
+        assert!(
+            bead.get("priority").is_some(),
+            "Each item should have priority"
+        );
+        assert!(
+            bead.get("issue_type").is_some(),
+            "Each item should have issue_type"
+        );
+        assert!(
+            bead.get("labels").is_some(),
+            "Each item should have labels array"
+        );
     }
 
     // Cleanup
@@ -281,14 +298,19 @@ fn test_ready_command_json_flag() {
     // Ready returns "[]" for empty or JSONL for results
     if trimmed != "[]" {
         // Should contain our bead
-        assert!(stdout.contains(&bead_id), "ready --json should include our bead");
+        assert!(
+            stdout.contains(&bead_id),
+            "ready --json should include our bead"
+        );
 
         // Verify output is valid JSONL
         let parsed = parse_jsonl(&stdout);
         assert!(parsed.len() >= 1, "Should have at least one bead");
 
         // Verify required fields
-        let bead = parsed.iter().find(|b| b["id"].as_str() == Some(&bead_id))
+        let bead = parsed
+            .iter()
+            .find(|b| b["id"].as_str() == Some(&bead_id))
             .expect("Should find our bead");
 
         assert!(bead.get("id").is_some(), "Should have id field");
@@ -322,8 +344,7 @@ fn test_ready_json_empty_results() {
     assert_eq!(trimmed, "[]", "Empty ready should return '[]'");
 
     // Verify it's valid JSON
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Empty result should be valid JSON");
+    let parsed: Value = serde_json::from_str(trimmed).expect("Empty result should be valid JSON");
     assert!(parsed.is_array(), "Empty result should be an array");
     assert_eq!(parsed.as_array().unwrap().len(), 0, "Array should be empty");
 }
@@ -360,9 +381,18 @@ fn test_ready_json_multiple_items() {
             assert!(bead.get("id").is_some(), "Each item should have id");
             assert!(bead.get("title").is_some(), "Each item should have title");
             assert!(bead.get("status").is_some(), "Each item should have status");
-            assert!(bead.get("priority").is_some(), "Each item should have priority");
-            assert!(bead.get("issue_type").is_some(), "Each item should have issue_type");
-            assert!(bead.get("labels").is_some(), "Each item should have labels array");
+            assert!(
+                bead.get("priority").is_some(),
+                "Each item should have priority"
+            );
+            assert!(
+                bead.get("issue_type").is_some(),
+                "Each item should have issue_type"
+            );
+            assert!(
+                bead.get("labels").is_some(),
+                "Each item should have labels array"
+            );
         }
     }
 
@@ -441,15 +471,24 @@ fn test_list_ready_json_flag_consistency() {
     let format_json_stdout = String::from_utf8(format_json_output.stdout).expect("Invalid UTF-8");
 
     // Both should contain our bead
-    assert!(json_flag_stdout.contains(&bead_id), "--json should contain bead");
-    assert!(format_json_stdout.contains(&bead_id), "--format json should contain bead");
+    assert!(
+        json_flag_stdout.contains(&bead_id),
+        "--json should contain bead"
+    );
+    assert!(
+        format_json_stdout.contains(&bead_id),
+        "--format json should contain bead"
+    );
 
     // Parse both and verify they have the same number of items
     let json_flag_parsed = parse_jsonl(&json_flag_stdout);
     let format_json_parsed = parse_jsonl(&format_json_stdout);
 
-    assert_eq!(json_flag_parsed.len(), format_json_parsed.len(),
-               "Both flags should produce same number of items");
+    assert_eq!(
+        json_flag_parsed.len(),
+        format_json_parsed.len(),
+        "Both flags should produce same number of items"
+    );
 
     close_test_bead(&bead_id);
 }
@@ -476,17 +515,24 @@ fn test_list_json_with_filters() {
     let parsed = parse_jsonl(&stdout);
 
     // Should find the open bead
-    assert!(parsed.iter().any(|b| b["id"].as_str() == Some(&open_bead2)),
-            "Should find open bead");
+    assert!(
+        parsed.iter().any(|b| b["id"].as_str() == Some(&open_bead2)),
+        "Should find open bead"
+    );
 
     // Should not find the closed bead
-    assert!(!parsed.iter().any(|b| b["id"].as_str() == Some(&open_bead)),
-            "Should not find closed bead when filtering for open");
+    assert!(
+        !parsed.iter().any(|b| b["id"].as_str() == Some(&open_bead)),
+        "Should not find closed bead when filtering for open"
+    );
 
     // Verify all results have status=open
     for bead in &parsed {
-        assert_eq!(bead["status"].as_str().unwrap(), "open",
-                   "All filtered results should have status=open");
+        assert_eq!(
+            bead["status"].as_str().unwrap(),
+            "open",
+            "All filtered results should have status=open"
+        );
     }
 
     close_test_bead(&open_bead2);
@@ -515,7 +561,10 @@ fn test_ready_json_limit_parameter() {
 
     if trimmed != "[]" {
         let lines: Vec<&str> = trimmed.lines().collect();
-        assert!(lines.len() <= 2, "ready with --limit 2 should return at most 2 beads");
+        assert!(
+            lines.len() <= 2,
+            "ready with --limit 2 should return at most 2 beads"
+        );
     }
 }
 
@@ -534,8 +583,14 @@ fn test_list_ready_json_unicode() {
         .expect("Failed to execute list command");
 
     let list_stdout = String::from_utf8(list_output.stdout).expect("Invalid UTF-8");
-    assert!(list_stdout.contains("🎉"), "list --json should preserve emoji");
-    assert!(list_stdout.contains("Ñ"), "list --json should preserve unicode");
+    assert!(
+        list_stdout.contains("🎉"),
+        "list --json should preserve emoji"
+    );
+    assert!(
+        list_stdout.contains("Ñ"),
+        "list --json should preserve unicode"
+    );
 
     // Test ready preserves unicode
     let ready_output = bf()
@@ -550,8 +605,14 @@ fn test_list_ready_json_unicode() {
     let trimmed = ready_stdout.trim();
 
     if trimmed != "[]" {
-        assert!(ready_stdout.contains("🎉"), "ready --json should preserve emoji");
-        assert!(ready_stdout.contains("Ñ"), "ready --json should preserve unicode");
+        assert!(
+            ready_stdout.contains("🎉"),
+            "ready --json should preserve emoji"
+        );
+        assert!(
+            ready_stdout.contains("Ñ"),
+            "ready --json should preserve unicode"
+        );
     }
 
     close_test_bead(&bead_id);

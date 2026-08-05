@@ -12,9 +12,9 @@
 //! - Test all label fields (names, colors, descriptions) survive
 //! - Test should pass with cargo test
 
-use bead_forge::sync;
-use bead_forge::model::{Issue, Priority, Status, IssueType};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
+use bead_forge::sync;
 use chrono::Utc;
 use std::fs;
 use tempfile::TempDir;
@@ -74,10 +74,23 @@ fn test_label_export_import_roundtrip_basic() {
 
     // Verify labels survived the roundtrip
     let imported = storage2.get_issue("bf-roundtrip-basic").unwrap().unwrap();
-    assert_eq!(imported.labels.len(), 3, "Should have 3 labels after roundtrip");
-    assert!(imported.labels.contains(&"phase-1".to_string()), "Should contain phase-1 label");
-    assert!(imported.labels.contains(&"storage".to_string()), "Should contain storage label");
-    assert!(imported.labels.contains(&"critical".to_string()), "Should contain critical label");
+    assert_eq!(
+        imported.labels.len(),
+        3,
+        "Should have 3 labels after roundtrip"
+    );
+    assert!(
+        imported.labels.contains(&"phase-1".to_string()),
+        "Should contain phase-1 label"
+    );
+    assert!(
+        imported.labels.contains(&"storage".to_string()),
+        "Should contain storage label"
+    );
+    assert!(
+        imported.labels.contains(&"critical".to_string()),
+        "Should contain critical label"
+    );
 }
 
 #[test]
@@ -115,7 +128,10 @@ fn test_label_roundtrip_with_empty_labels_field() {
 
     // Verify empty labels array is skipped in JSON (due to skip_serializing_if)
     let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
-    assert!(!jsonl_content.contains("\"labels\""), "Empty labels should not appear in JSON");
+    assert!(
+        !jsonl_content.contains("\"labels\""),
+        "Empty labels should not appear in JSON"
+    );
 
     // Clear and re-import
     drop(storage);
@@ -125,7 +141,11 @@ fn test_label_roundtrip_with_empty_labels_field() {
 
     // Verify issue imported with no labels
     let imported = storage2.get_issue("bf-roundtrip-empty").unwrap().unwrap();
-    assert_eq!(imported.labels.len(), 0, "Should have no labels after roundtrip");
+    assert_eq!(
+        imported.labels.len(),
+        0,
+        "Should have no labels after roundtrip"
+    );
     assert!(imported.labels.is_empty(), "Labels vector should be empty");
 }
 
@@ -187,10 +207,18 @@ fn test_complex_labels_roundtrip_special_chars() {
 
     // Verify all special character labels survived
     let imported = storage2.get_issue("bf-complex-chars").unwrap().unwrap();
-    assert_eq!(imported.labels.len(), complex_labels.len(), "All labels should survive roundtrip");
+    assert_eq!(
+        imported.labels.len(),
+        complex_labels.len(),
+        "All labels should survive roundtrip"
+    );
 
     for label in &complex_labels {
-        assert!(imported.labels.contains(label), "Label '{}' should survive roundtrip", label);
+        assert!(
+            imported.labels.contains(label),
+            "Label '{}' should survive roundtrip",
+            label
+        );
     }
 }
 
@@ -206,19 +234,19 @@ fn test_unicode_labels_roundtrip() {
 
     // Create an issue with Unicode labels from various scripts
     let unicode_labels = vec![
-        "日本語".to_string(),              // Japanese
-        "中文标签".to_string(),            // Chinese
-        "한국어".to_string(),              // Korean
-        "لغة-عربية".to_string(),          // Arabic
-        "עברית".to_string(),               // Hebrew
-        "метка".to_string(),              // Russian/Cyrillic
-        "ετικέτα".to_string(),            // Greek
-        "émoji-😀-test".to_string(),       // Emoji
-        "café".to_string(),               // Latin with accents
-        "naïve".to_string(),              // Diaeresis
-        "über".to_string(),               // Umlaut
-        "ñoño".to_string(),               // Tilde
-        "🚀-rocket".to_string(),          // More emoji
+        "日本語".to_string(),        // Japanese
+        "中文标签".to_string(),      // Chinese
+        "한국어".to_string(),        // Korean
+        "لغة-عربية".to_string(),     // Arabic
+        "עברית".to_string(),         // Hebrew
+        "метка".to_string(),         // Russian/Cyrillic
+        "ετικέτα".to_string(),       // Greek
+        "émoji-😀-test".to_string(), // Emoji
+        "café".to_string(),          // Latin with accents
+        "naïve".to_string(),         // Diaeresis
+        "über".to_string(),          // Umlaut
+        "ñoño".to_string(),          // Tilde
+        "🚀-rocket".to_string(),     // More emoji
     ];
 
     let issue = Issue {
@@ -246,10 +274,18 @@ fn test_unicode_labels_roundtrip() {
 
     // Verify all Unicode labels survived
     let imported = storage2.get_issue("bf-unicode-labels").unwrap().unwrap();
-    assert_eq!(imported.labels.len(), unicode_labels.len(), "All Unicode labels should survive");
+    assert_eq!(
+        imported.labels.len(),
+        unicode_labels.len(),
+        "All Unicode labels should survive"
+    );
 
     for label in &unicode_labels {
-        assert!(imported.labels.contains(label), "Unicode label '{}' should survive roundtrip", label);
+        assert!(
+            imported.labels.contains(label),
+            "Unicode label '{}' should survive roundtrip",
+            label
+        );
     }
 }
 
@@ -293,8 +329,14 @@ fn test_very_long_label_roundtrip() {
     // Verify long labels survived
     let imported = storage2.get_issue("bf-long-labels").unwrap().unwrap();
     assert_eq!(imported.labels.len(), 2, "Both long labels should survive");
-    assert!(imported.labels.contains(&long_label), "Long label should survive roundtrip");
-    assert!(imported.labels.contains(&long_label2), "Long label 2 should survive roundtrip");
+    assert!(
+        imported.labels.contains(&long_label),
+        "Long label should survive roundtrip"
+    );
+    assert!(
+        imported.labels.contains(&long_label2),
+        "Long label 2 should survive roundtrip"
+    );
 }
 
 #[test]
@@ -309,11 +351,11 @@ fn test_json_edge_case_labels_roundtrip() {
 
     // Labels that might cause JSON parsing issues
     let edge_case_labels = vec![
-        "\"quoted\"".to_string(),        // Quotes
-        "back\\slash".to_string(),       // Backslash
-        "line\nbreak".to_string(),       // Newline (should be escaped)
-        "tab\there".to_string(),        // Tab (should be escaped)
-        "mixed\"quo\\tes".to_string(),   // Mixed special chars
+        "\"quoted\"".to_string(),      // Quotes
+        "back\\slash".to_string(),     // Backslash
+        "line\nbreak".to_string(),     // Newline (should be escaped)
+        "tab\there".to_string(),       // Tab (should be escaped)
+        "mixed\"quo\\tes".to_string(), // Mixed special chars
     ];
 
     let issue = Issue {
@@ -341,10 +383,18 @@ fn test_json_edge_case_labels_roundtrip() {
 
     // Verify edge case labels survived
     let imported = storage2.get_issue("bf-json-edge-cases").unwrap().unwrap();
-    assert_eq!(imported.labels.len(), edge_case_labels.len(), "All edge case labels should survive");
+    assert_eq!(
+        imported.labels.len(),
+        edge_case_labels.len(),
+        "All edge case labels should survive"
+    );
 
     for label in &edge_case_labels {
-        assert!(imported.labels.contains(label), "Edge case label '{}' should survive roundtrip", label);
+        assert!(
+            imported.labels.contains(label),
+            "Edge case label '{}' should survive roundtrip",
+            label
+        );
     }
 }
 
@@ -406,12 +456,21 @@ fn test_multiple_beads_with_different_label_sets_roundtrip() {
     // Verify all beads with their labels survived
     for original_issue in &issues {
         let imported = storage2.get_issue(&original_issue.id).unwrap().unwrap();
-        assert_eq!(imported.labels.len(), original_issue.labels.len(),
-            "Bead {} should have {} labels after roundtrip", original_issue.id, original_issue.labels.len());
+        assert_eq!(
+            imported.labels.len(),
+            original_issue.labels.len(),
+            "Bead {} should have {} labels after roundtrip",
+            original_issue.id,
+            original_issue.labels.len()
+        );
 
         for label in &original_issue.labels {
-            assert!(imported.labels.contains(label),
-                "Bead {} should contain label '{}' after roundtrip", original_issue.id, label);
+            assert!(
+                imported.labels.contains(label),
+                "Bead {} should contain label '{}' after roundtrip",
+                original_issue.id,
+                label
+            );
         }
     }
 }
@@ -461,5 +520,8 @@ fn test_label_roundtrip_preserves_label_order() {
 
     // Verify labels preserved order
     let imported = storage2.get_issue("bf-ordered-labels").unwrap().unwrap();
-    assert_eq!(imported.labels, ordered_labels, "Label order should be preserved through roundtrip");
+    assert_eq!(
+        imported.labels, ordered_labels,
+        "Label order should be preserved through roundtrip"
+    );
 }

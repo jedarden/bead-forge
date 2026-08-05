@@ -375,7 +375,8 @@ claim_ttl_minutes: 30
             "CLI show output should have updated description"
         );
         assert_eq!(
-            db_issue.description, Some(desc_content.to_string()),
+            db_issue.description,
+            Some(desc_content.to_string()),
             "Database should have updated description"
         );
 
@@ -421,11 +422,13 @@ claim_ttl_minutes: 30
             "Acceptance criteria should be updated"
         );
         assert_eq!(
-            db_issue2.description, Some(desc_content.to_string()),
+            db_issue2.description,
+            Some(desc_content.to_string()),
             "Database description should persist"
         );
         assert_eq!(
-            db_issue2.acceptance_criteria, Some(ac_content.to_string()),
+            db_issue2.acceptance_criteria,
+            Some(ac_content.to_string()),
             "Database acceptance criteria should be updated"
         );
     }
@@ -512,10 +515,15 @@ claim_ttl_minutes: 30
             .expect("Failed to run command");
 
         // Should fail due to argument conflict
-        assert!(!result.status.success(), "Should fail when both --description and --description-file are provided");
+        assert!(
+            !result.status.success(),
+            "Should fail when both --description and --description-file are provided"
+        );
         let stderr = String::from_utf8_lossy(&result.stderr);
         assert!(
-            stderr.contains("conflict") || stderr.contains("cannot be used with") || stderr.contains("one of"),
+            stderr.contains("conflict")
+                || stderr.contains("cannot be used with")
+                || stderr.contains("one of"),
             "Error should mention argument conflict"
         );
     }

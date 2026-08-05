@@ -237,7 +237,10 @@ fn claim_with_no_auto_flush_leaves_jsonl_untouched() {
     fs::remove_file(jsonl_path(&ws)).unwrap();
 
     // Claim with --no-auto-flush - should not write issues.jsonl
-    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "claim", "--assignee", "worker-no-flush"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &["--no-auto-flush", "claim", "--assignee", "worker-no-flush"],
+    );
     assert!(ok, "claim with --no-auto-flush failed: {e}");
     assert!(
         !jsonl_path(&ws).exists(),
@@ -286,12 +289,28 @@ fn reclaim_flushes_reclaimed_status() {
 
     // Both beads should be flushed to issues.jsonl
     let first_bead = find_bead(&ws, &id);
-    assert_eq!(field(&first_bead, "status"), "in_progress", "first bead should be in_progress");
-    assert_eq!(field(&first_bead, "assignee"), "original-worker", "first bead should have original assignee");
+    assert_eq!(
+        field(&first_bead, "status"),
+        "in_progress",
+        "first bead should be in_progress"
+    );
+    assert_eq!(
+        field(&first_bead, "assignee"),
+        "original-worker",
+        "first bead should have original assignee"
+    );
 
     let second_bead = find_bead(&ws, &open_id);
-    assert_eq!(field(&second_bead, "status"), "in_progress", "second bead should be in_progress");
-    assert_eq!(field(&second_bead, "assignee"), "new-worker", "second bead should have assignee");
+    assert_eq!(
+        field(&second_bead, "status"),
+        "in_progress",
+        "second bead should be in_progress"
+    );
+    assert_eq!(
+        field(&second_bead, "assignee"),
+        "new-worker",
+        "second bead should have assignee"
+    );
 }
 
 #[test]
@@ -337,7 +356,10 @@ fn no_auto_flush_flag_leaves_jsonl_untouched() {
         "--no-auto-flush create must not write issues.jsonl"
     );
     // A subsequent flagged mutation must likewise leave it absent.
-    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "update", &id, "--status", "in_progress"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &["--no-auto-flush", "update", &id, "--status", "in_progress"],
+    );
     assert!(ok, "update failed: {e}");
     assert!(
         !jsonl_path(&ws).exists(),
@@ -384,7 +406,8 @@ fn flush_failure_nonfatal_json_warning_and_dirty_retained() {
     // top-level "warning" alongside the "data" envelope.
     let (out, _e, ok) = run_bf(&ws, &["create", "--json", "--title", "Wedged"]);
     assert!(ok, "create must not fail on a flush error");
-    let parsed: Value = serde_json::from_str(out.trim()).expect("create --json emitted invalid JSON");
+    let parsed: Value =
+        serde_json::from_str(out.trim()).expect("create --json emitted invalid JSON");
     let id = parsed
         .get("data")
         .and_then(|d| d.get("id"))

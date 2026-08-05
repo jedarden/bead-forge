@@ -25,8 +25,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     let src_dir = temp_dir.path().join("src");
     fs::create_dir(&src_dir).unwrap();
@@ -43,8 +44,9 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 }
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Create metadata for the trace
     let metadata = TraceMetadata {
@@ -91,8 +93,7 @@ mod tests {
     // ACCEPTANCE CRITERIA 2: execution_time field is recorded with duration
     let metadata_path = result.bead_trace_dir.join("metadata.json");
     let metadata_content = fs::read_to_string(&metadata_path).unwrap();
-    let trace_metadata: TraceMetadata =
-        serde_json::from_str(&metadata_content).unwrap();
+    let trace_metadata: TraceMetadata = serde_json::from_str(&metadata_content).unwrap();
 
     assert!(
         trace_metadata.duration_ms.is_some(),
@@ -148,10 +149,7 @@ mod tests {
     let end_time = chrono::DateTime::parse_from_rfc3339(end_time_str)
         .expect("end_time should be valid RFC3339");
 
-    assert!(
-        end_time > start_time,
-        "end_time should be after start_time"
-    );
+    assert!(end_time > start_time, "end_time should be after start_time");
 
     // Verify duration_ms matches the time difference
     let actual_duration_ms = (end_time - start_time).num_milliseconds() as u64;
@@ -183,9 +181,15 @@ mod tests {
 
     // Verify BeadTestResult structure
     assert_eq!(result.exit_code, 0, "test should succeed");
-    assert!(result.start_time.is_some(), "start_time should be in result");
+    assert!(
+        result.start_time.is_some(),
+        "start_time should be in result"
+    );
     assert!(result.end_time.is_some(), "end_time should be in result");
-    assert_eq!(result.duration_ms, duration_ms, "duration should match metadata");
+    assert_eq!(
+        result.duration_ms, duration_ms,
+        "duration should match metadata"
+    );
 }
 
 #[test]
@@ -203,8 +207,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     let src_dir = temp_dir.path().join("src");
     fs::create_dir(&src_dir).unwrap();
@@ -220,8 +225,9 @@ mod tests {
         assert_eq!(1 + 1, 3, "Intentional failure");
     }
 }
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     let metadata = TraceMetadata {
         bead_id: Some("bf-failing-test".to_string()),
@@ -247,8 +253,7 @@ mod tests {
     // Verify timing was still recorded despite failure
     let metadata_path = result.bead_trace_dir.join("metadata.json");
     let metadata_content = fs::read_to_string(&metadata_path).unwrap();
-    let trace_metadata: TraceMetadata =
-        serde_json::from_str(&metadata_content).unwrap();
+    let trace_metadata: TraceMetadata = serde_json::from_str(&metadata_content).unwrap();
 
     assert!(
         trace_metadata.duration_ms.is_some(),

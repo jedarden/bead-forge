@@ -86,8 +86,7 @@ impl TraceManager {
 
     /// Create a new TraceManager for the current workspace
     pub fn for_current_workspace() -> Result<Self> {
-        let current_dir = std::env::current_dir()
-            .context("Failed to get current directory")?;
+        let current_dir = std::env::current_dir().context("Failed to get current directory")?;
         Ok(Self::new(&current_dir))
     }
 
@@ -132,7 +131,7 @@ impl TraceManager {
             data.get(0..16)
                 .unwrap_or(&[0u8; 16])
                 .try_into()
-                .unwrap_or([0u8; 16])
+                .unwrap_or([0u8; 16]),
         );
 
         if num == 0 {
@@ -169,13 +168,9 @@ impl TraceManager {
         // Create parent directory if needed
         if let Some(parent) = self.traces_dir.parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent)
-                    .with_context(|| {
-                        format!(
-                            "Failed to create parent directory: {}",
-                            parent.display()
-                        )
-                    })?;
+                fs::create_dir_all(parent).with_context(|| {
+                    format!("Failed to create parent directory: {}", parent.display())
+                })?;
             }
         }
 
@@ -337,12 +332,8 @@ impl TraceManager {
         let metadata_json = serde_json::to_string_pretty(metadata)
             .context("Failed to serialize metadata to JSON")?;
 
-        fs::write(&metadata_path, metadata_json).with_context(|| {
-            format!(
-                "Failed to write metadata file: {}",
-                metadata_path.display()
-            )
-        })
+        fs::write(&metadata_path, metadata_json)
+            .with_context(|| format!("Failed to write metadata file: {}", metadata_path.display()))
     }
 
     /// Write stdout.txt for a bead trace
@@ -350,12 +341,8 @@ impl TraceManager {
         let bead_dir = self.bead_trace_dir(bead_id)?;
         let stdout_path = bead_dir.join("stdout.txt");
 
-        fs::write(&stdout_path, stdout).with_context(|| {
-            format!(
-                "Failed to write stdout file: {}",
-                stdout_path.display()
-            )
-        })
+        fs::write(&stdout_path, stdout)
+            .with_context(|| format!("Failed to write stdout file: {}", stdout_path.display()))
     }
 
     /// Write stderr.txt for a bead trace
@@ -363,12 +350,8 @@ impl TraceManager {
         let bead_dir = self.bead_trace_dir(bead_id)?;
         let stderr_path = bead_dir.join("stderr.txt");
 
-        fs::write(&stderr_path, stderr).with_context(|| {
-            format!(
-                "Failed to write stderr file: {}",
-                stderr_path.display()
-            )
-        })
+        fs::write(&stderr_path, stderr)
+            .with_context(|| format!("Failed to write stderr file: {}", stderr_path.display()))
     }
 
     /// Write a complete bead trace (metadata, stdout, stderr)
@@ -405,10 +388,7 @@ impl TraceManager {
         // Ensure the directory exists
         if !trace_dir.exists() {
             fs::create_dir_all(trace_dir).with_context(|| {
-                format!(
-                    "Failed to create trace directory: {}",
-                    trace_dir.display()
-                )
+                format!("Failed to create trace directory: {}", trace_dir.display())
             })?;
         }
 
@@ -417,29 +397,18 @@ impl TraceManager {
         let metadata_json = serde_json::to_string_pretty(metadata)
             .context("Failed to serialize metadata to JSON")?;
         fs::write(&metadata_path, metadata_json).with_context(|| {
-            format!(
-                "Failed to write metadata file: {}",
-                metadata_path.display()
-            )
+            format!("Failed to write metadata file: {}", metadata_path.display())
         })?;
 
         // Write stdout.txt
         let stdout_path = trace_dir.join("stdout.txt");
-        fs::write(&stdout_path, stdout).with_context(|| {
-            format!(
-                "Failed to write stdout file: {}",
-                stdout_path.display()
-            )
-        })?;
+        fs::write(&stdout_path, stdout)
+            .with_context(|| format!("Failed to write stdout file: {}", stdout_path.display()))?;
 
         // Write stderr.txt
         let stderr_path = trace_dir.join("stderr.txt");
-        fs::write(&stderr_path, stderr).with_context(|| {
-            format!(
-                "Failed to write stderr file: {}",
-                stderr_path.display()
-            )
-        })?;
+        fs::write(&stderr_path, stderr)
+            .with_context(|| format!("Failed to write stderr file: {}", stderr_path.display()))?;
 
         Ok(())
     }
@@ -449,10 +418,7 @@ impl TraceManager {
         let trace_path = self.cargo_test_path()?;
 
         fs::write(&trace_path, output).with_context(|| {
-            format!(
-                "Failed to write cargo test trace: {}",
-                trace_path.display()
-            )
+            format!("Failed to write cargo test trace: {}", trace_path.display())
         })?;
 
         // Update the "latest" symlink
@@ -471,15 +437,13 @@ impl TraceManager {
         // Remove existing symlink if it exists
         if latest_path.exists() || latest_path.is_symlink() {
             fs::remove_file(&latest_path).with_context(|| {
-                format!(
-                    "Failed to remove old symlink: {}",
-                    latest_path.display()
-                )
+                format!("Failed to remove old symlink: {}", latest_path.display())
             })?;
         }
 
         // Create new symlink
-        let target_name = target.file_name()
+        let target_name = target
+            .file_name()
             .context("Failed to get target filename")?;
 
         symlink(target_name, &latest_path).with_context(|| {
@@ -504,14 +468,12 @@ impl TraceManager {
 
         let mut bead_ids = Vec::new();
 
-        for entry in fs::read_dir(&self.traces_dir)
-            .with_context(|| {
-                format!(
-                    "Failed to read traces directory: {}",
-                    self.traces_dir.display()
-                )
-            })?
-        {
+        for entry in fs::read_dir(&self.traces_dir).with_context(|| {
+            format!(
+                "Failed to read traces directory: {}",
+                self.traces_dir.display()
+            )
+        })? {
             let entry = entry.context("Failed to read directory entry")?;
             let path = entry.path();
 
@@ -601,14 +563,19 @@ impl TraceManager {
         combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
         combined_output.push_str("\n=== STDERR ===\n");
         combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
-        combined_output.push_str(&format!("\n=== EXIT CODE: {} ===\n",
-            output.status.code().unwrap_or(-1)));
+        combined_output.push_str(&format!(
+            "\n=== EXIT CODE: {} ===\n",
+            output.status.code().unwrap_or(-1)
+        ));
 
         // Add execution timing information
         combined_output.push_str(&format!("=== START TIME: {} ===\n", start_time));
         combined_output.push_str(&format!("=== END TIME: {} ===\n", end_time));
-        combined_output.push_str(&format!("=== DURATION: {}ms ({:.2}s) ===\n",
-            duration_ms, duration_ms as f64 / 1000.0));
+        combined_output.push_str(&format!(
+            "=== DURATION: {}ms ({:.2}s) ===\n",
+            duration_ms,
+            duration_ms as f64 / 1000.0
+        ));
 
         // Write to trace file
         let trace_path = self.write_cargo_test_trace(&combined_output)?;
@@ -633,7 +600,11 @@ impl TraceManager {
     ///
     /// # Returns
     /// * `Result<CargoTestResult>` containing exit code, duration, and trace path
-    pub fn run_cargo_test_with_args(&self, workspace_dir: &Path, args: &[&str]) -> Result<CargoTestResult> {
+    pub fn run_cargo_test_with_args(
+        &self,
+        workspace_dir: &Path,
+        args: &[&str],
+    ) -> Result<CargoTestResult> {
         // Ensure the traces directory exists
         self.ensure_traces_dir()?;
 
@@ -663,14 +634,19 @@ impl TraceManager {
         combined_output.push_str(&String::from_utf8_lossy(&output.stdout));
         combined_output.push_str("\n=== STDERR ===\n");
         combined_output.push_str(&String::from_utf8_lossy(&output.stderr));
-        combined_output.push_str(&format!("\n=== EXIT CODE: {} ===\n",
-            output.status.code().unwrap_or(-1)));
+        combined_output.push_str(&format!(
+            "\n=== EXIT CODE: {} ===\n",
+            output.status.code().unwrap_or(-1)
+        ));
 
         // Add execution timing information
         combined_output.push_str(&format!("=== START TIME: {} ===\n", start_time));
         combined_output.push_str(&format!("=== END TIME: {} ===\n", end_time));
-        combined_output.push_str(&format!("=== DURATION: {}ms ({:.2}s) ===\n",
-            duration_ms, duration_ms as f64 / 1000.0));
+        combined_output.push_str(&format!(
+            "=== DURATION: {}ms ({:.2}s) ===\n",
+            duration_ms,
+            duration_ms as f64 / 1000.0
+        ));
 
         // Write to trace file
         let trace_path = self.write_cargo_test_trace(&combined_output)?;
@@ -954,15 +930,24 @@ mod tests {
             let trace_name = TraceManager::generate_trace_name();
 
             // Verify prefix
-            assert!(trace_name.starts_with("bf-"), "Trace name must start with 'bf-'");
+            assert!(
+                trace_name.starts_with("bf-"),
+                "Trace name must start with 'bf-'"
+            );
 
             // Verify length: "bf-" + 8 characters = 11 total
-            assert_eq!(trace_name.len(), 11, "Trace name must be exactly 11 characters (bf- + 8 chars)");
+            assert_eq!(
+                trace_name.len(),
+                11,
+                "Trace name must be exactly 11 characters (bf- + 8 chars)"
+            );
 
             // Verify characters after prefix are alphanumeric
             let suffix = &trace_name[3..];
-            assert!(suffix.chars().all(|c| c.is_ascii_alphanumeric()),
-                    "Trace suffix must contain only alphanumeric characters");
+            assert!(
+                suffix.chars().all(|c| c.is_ascii_alphanumeric()),
+                "Trace suffix must contain only alphanumeric characters"
+            );
         }
     }
 
@@ -977,7 +962,11 @@ mod tests {
         }
 
         // With 8 characters (36^8 possible combinations), collisions should be extremely rare
-        assert_eq!(trace_names.len(), 1000, "All generated trace names should be unique");
+        assert_eq!(
+            trace_names.len(),
+            1000,
+            "All generated trace names should be unique"
+        );
     }
 
     #[test]
@@ -990,16 +979,28 @@ mod tests {
 
         // Verify file exists in correct location
         assert!(trace_path.exists(), "Trace file should exist");
-        assert!(trace_path.is_file(), "Trace should be a file, not directory");
+        assert!(
+            trace_path.is_file(),
+            "Trace should be a file, not directory"
+        );
 
         // Verify path is under .beads/traces/
-        assert!(trace_path.starts_with(&manager.traces_dir),
-                "Trace file should be under .beads/traces/ directory");
+        assert!(
+            trace_path.starts_with(&manager.traces_dir),
+            "Trace file should be under .beads/traces/ directory"
+        );
 
         // Verify filename follows bf-{8-char} format
         let file_name = trace_path.file_name().unwrap().to_str().unwrap();
-        assert!(file_name.starts_with("bf-"), "Trace file name should start with 'bf-'");
-        assert_eq!(file_name.len(), 11, "Trace file name should be 11 characters (bf- + 8 chars)");
+        assert!(
+            file_name.starts_with("bf-"),
+            "Trace file name should start with 'bf-'"
+        );
+        assert_eq!(
+            file_name.len(),
+            11,
+            "Trace file name should be 11 characters (bf- + 8 chars)"
+        );
     }
 
     #[test]
@@ -1053,8 +1054,14 @@ mod tests {
         let trace_path = manager.trace_path_for_name(trace_name);
 
         // Verify path construction
-        assert!(trace_path.ends_with(trace_name), "Path should end with trace name");
-        assert!(trace_path.starts_with(&manager.traces_dir), "Path should be under traces directory");
+        assert!(
+            trace_path.ends_with(trace_name),
+            "Path should end with trace name"
+        );
+        assert!(
+            trace_path.starts_with(&manager.traces_dir),
+            "Path should be under traces directory"
+        );
     }
 
     #[test]
@@ -1067,10 +1074,16 @@ mod tests {
         let trace_name = trace_path.file_name().unwrap().to_str().unwrap();
 
         // Check that it exists
-        assert!(manager.has_trace_file(trace_name), "Created trace file should exist");
+        assert!(
+            manager.has_trace_file(trace_name),
+            "Created trace file should exist"
+        );
 
         // Check that non-existent file doesn't exist
-        assert!(!manager.has_trace_file("bf-nonexistent"), "Non-existent trace file should not exist");
+        assert!(
+            !manager.has_trace_file("bf-nonexistent"),
+            "Non-existent trace file should not exist"
+        );
     }
 
     #[test]
@@ -1086,13 +1099,20 @@ mod tests {
         let trace_path2 = manager2.create_trace_file().unwrap();
 
         // Verify both are in their respective trace directories
-        assert!(trace_path1.starts_with(&manager1.traces_dir),
-                "Trace 1 should be under first manager's traces directory");
-        assert!(trace_path2.starts_with(&manager2.traces_dir),
-                "Trace 2 should be under second manager's traces directory");
+        assert!(
+            trace_path1.starts_with(&manager1.traces_dir),
+            "Trace 1 should be under first manager's traces directory"
+        );
+        assert!(
+            trace_path2.starts_with(&manager2.traces_dir),
+            "Trace 2 should be under second manager's traces directory"
+        );
 
         // Verify the paths are different (different base directories)
-        assert_ne!(trace_path1, trace_path2, "Paths should be different for different base directories");
+        assert_ne!(
+            trace_path1, trace_path2,
+            "Paths should be different for different base directories"
+        );
     }
 
     #[test]
@@ -1142,7 +1162,9 @@ mod tests {
         let stdout = "Test stdout output";
         let stderr = "Test stderr output";
 
-        manager.write_bead_trace("bf-test456", &metadata, stdout, stderr).unwrap();
+        manager
+            .write_bead_trace("bf-test456", &metadata, stdout, stderr)
+            .unwrap();
 
         // Verify all files exist
         assert!(manager.bead_metadata_path("bf-test456").exists());
@@ -1207,8 +1229,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1223,8 +1246,9 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Run cargo test
         let result = manager.run_cargo_test(temp_dir.path()).unwrap();
@@ -1236,9 +1260,18 @@ mod tests {
 
         // Verify trace file contains expected output
         let content = fs::read_to_string(&result.trace_path).unwrap();
-        assert!(content.contains("=== STDOUT ==="), "should have stdout section");
-        assert!(content.contains("=== STDERR ==="), "should have stderr section");
-        assert!(content.contains("=== EXIT CODE: 0 ==="), "should have exit code");
+        assert!(
+            content.contains("=== STDOUT ==="),
+            "should have stdout section"
+        );
+        assert!(
+            content.contains("=== STDERR ==="),
+            "should have stderr section"
+        );
+        assert!(
+            content.contains("=== EXIT CODE: 0 ==="),
+            "should have exit code"
+        );
     }
 
     #[test]
@@ -1256,8 +1289,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1272,8 +1306,9 @@ mod tests {
         assert_eq!(2 + 2, 5, "This test is designed to fail");
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Run cargo test - it should complete even though tests fail
         let result = manager.run_cargo_test(temp_dir.path()).unwrap();
@@ -1285,7 +1320,10 @@ mod tests {
 
         // Verify trace file contains error output
         let content = fs::read_to_string(&result.trace_path).unwrap();
-        assert!(content.contains("=== STDERR ==="), "should have stderr section");
+        assert!(
+            content.contains("=== STDERR ==="),
+            "should have stderr section"
+        );
         assert!(content.contains("=== EXIT CODE"), "should have exit code");
     }
 
@@ -1304,8 +1342,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1325,14 +1364,14 @@ mod tests {
         assert_eq!(1 + 1, 2);
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Run cargo test with specific test filter
-        let result = manager.run_cargo_test_with_args(
-            temp_dir.path(),
-            &["--", "first_test"]
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_with_args(temp_dir.path(), &["--", "first_test"])
+            .unwrap();
 
         // Verify the result
         assert_eq!(result.exit_code, 0, "cargo test should succeed");
@@ -1354,8 +1393,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1370,8 +1410,9 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -1384,18 +1425,22 @@ mod tests {
         };
 
         // Run cargo test and write to bead trace directory
-        let result = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-test-8ei6pa",
-            &metadata
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-test-8ei6pa", &metadata)
+            .unwrap();
 
         // Verify the result
         assert_eq!(result.exit_code, 0, "cargo test should succeed");
         assert!(result.duration_ms > 0, "duration should be positive");
-        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+        assert!(
+            result.bead_trace_dir.exists(),
+            "bead trace directory should exist"
+        );
         assert!(!result.stdout.is_empty(), "stdout should not be empty");
-        assert!(!result.stderr.is_empty() || result.exit_code == 0, "stderr may be empty on success");
+        assert!(
+            !result.stderr.is_empty() || result.exit_code == 0,
+            "stderr may be empty on success"
+        );
 
         // Verify all expected files exist in the bead trace directory
         let metadata_path = result.bead_trace_dir.join("metadata.json");
@@ -1416,8 +1461,10 @@ mod tests {
 
         // Verify stdout content
         let stdout_content = fs::read_to_string(&stdout_path).unwrap();
-        assert!(stdout_content.contains("running 1 test") || stdout_content.contains("test result: ok"),
-            "stdout should contain test output");
+        assert!(
+            stdout_content.contains("running 1 test") || stdout_content.contains("test result: ok"),
+            "stdout should contain test output"
+        );
     }
 
     #[test]
@@ -1435,8 +1482,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1451,8 +1499,9 @@ mod tests {
         assert_eq!(2 + 2, 5, "This test is designed to fail");
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -1463,16 +1512,17 @@ mod tests {
         };
 
         // Run cargo test - it should complete even though tests fail
-        let result = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-test-fail",
-            &metadata
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-test-fail", &metadata)
+            .unwrap();
 
         // Verify the result - should have non-zero exit code but still complete
         assert!(result.exit_code != 0, "cargo test should fail");
         assert!(result.duration_ms > 0, "duration should be positive");
-        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+        assert!(
+            result.bead_trace_dir.exists(),
+            "bead trace directory should exist"
+        );
 
         // Verify metadata shows failure
         let metadata_path = result.bead_trace_dir.join("metadata.json");
@@ -1497,8 +1547,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1518,8 +1569,9 @@ mod tests {
         assert_eq!(1 + 1, 2);
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -1530,22 +1582,28 @@ mod tests {
         };
 
         // Run cargo test with specific test filter
-        let result = manager.run_cargo_test_to_bead_trace_with_args(
-            temp_dir.path(),
-            "bf-test-args",
-            &metadata,
-            &["--", "first_test"]
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace_with_args(
+                temp_dir.path(),
+                "bf-test-args",
+                &metadata,
+                &["--", "first_test"],
+            )
+            .unwrap();
 
         // Verify the result
         assert_eq!(result.exit_code, 0, "cargo test should succeed");
-        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+        assert!(
+            result.bead_trace_dir.exists(),
+            "bead trace directory should exist"
+        );
 
         // Verify stdout contains the filtered test output
-        let stdout_content = fs::read_to_string(
-            &result.bead_trace_dir.join("stdout.txt")
-        ).unwrap();
-        assert!(stdout_content.contains("first_test"), "stdout should mention the filtered test");
+        let stdout_content = fs::read_to_string(&result.bead_trace_dir.join("stdout.txt")).unwrap();
+        assert!(
+            stdout_content.contains("first_test"),
+            "stdout should mention the filtered test"
+        );
     }
 
     #[test]
@@ -1572,9 +1630,18 @@ mod tests {
         let dir2_name = dir2.file_name().unwrap().to_str().unwrap();
         let dir3_name = dir3.file_name().unwrap().to_str().unwrap();
 
-        assert!(dir1_name.starts_with("bf-repeat-"), "first directory should have bf-repeat- prefix");
-        assert!(dir2_name.starts_with("bf-repeat-"), "second directory should have bf-repeat- prefix");
-        assert!(dir3_name.starts_with("bf-repeat-"), "third directory should have bf-repeat- prefix");
+        assert!(
+            dir1_name.starts_with("bf-repeat-"),
+            "first directory should have bf-repeat- prefix"
+        );
+        assert!(
+            dir2_name.starts_with("bf-repeat-"),
+            "second directory should have bf-repeat- prefix"
+        );
+        assert!(
+            dir3_name.starts_with("bf-repeat-"),
+            "third directory should have bf-repeat- prefix"
+        );
     }
 
     #[test]
@@ -1592,8 +1659,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1608,8 +1676,9 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -1620,42 +1689,78 @@ mod tests {
         };
 
         // Run the same test multiple times
-        let result1 = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-multi-run",
-            &metadata
-        ).unwrap();
+        let result1 = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-multi-run", &metadata)
+            .unwrap();
 
-        let result2 = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-multi-run",
-            &metadata
-        ).unwrap();
+        let result2 = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-multi-run", &metadata)
+            .unwrap();
 
-        let result3 = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-multi-run",
-            &metadata
-        ).unwrap();
+        let result3 = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-multi-run", &metadata)
+            .unwrap();
 
         // Verify all runs created distinct directories
-        assert_ne!(result1.bead_trace_dir, result2.bead_trace_dir, "runs should create distinct directories");
-        assert_ne!(result2.bead_trace_dir, result3.bead_trace_dir, "runs should create distinct directories");
-        assert_ne!(result1.bead_trace_dir, result3.bead_trace_dir, "runs should create distinct directories");
+        assert_ne!(
+            result1.bead_trace_dir, result2.bead_trace_dir,
+            "runs should create distinct directories"
+        );
+        assert_ne!(
+            result2.bead_trace_dir, result3.bead_trace_dir,
+            "runs should create distinct directories"
+        );
+        assert_ne!(
+            result1.bead_trace_dir, result3.bead_trace_dir,
+            "runs should create distinct directories"
+        );
 
         // Verify all directories exist
-        assert!(result1.bead_trace_dir.exists(), "first run directory should exist");
-        assert!(result2.bead_trace_dir.exists(), "second run directory should exist");
-        assert!(result3.bead_trace_dir.exists(), "third run directory should exist");
+        assert!(
+            result1.bead_trace_dir.exists(),
+            "first run directory should exist"
+        );
+        assert!(
+            result2.bead_trace_dir.exists(),
+            "second run directory should exist"
+        );
+        assert!(
+            result3.bead_trace_dir.exists(),
+            "third run directory should exist"
+        );
 
         // Verify naming convention: bf-multi-run-{timestamp}
-        let dir1_name = result1.bead_trace_dir.file_name().unwrap().to_str().unwrap();
-        let dir2_name = result2.bead_trace_dir.file_name().unwrap().to_str().unwrap();
-        let dir3_name = result3.bead_trace_dir.file_name().unwrap().to_str().unwrap();
+        let dir1_name = result1
+            .bead_trace_dir
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let dir2_name = result2
+            .bead_trace_dir
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let dir3_name = result3
+            .bead_trace_dir
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
 
-        assert!(dir1_name.starts_with("bf-multi-run-"), "first directory should have bf-multi-run- prefix");
-        assert!(dir2_name.starts_with("bf-multi-run-"), "second directory should have bf-multi-run- prefix");
-        assert!(dir3_name.starts_with("bf-multi-run-"), "third directory should have bf-multi-run- prefix");
+        assert!(
+            dir1_name.starts_with("bf-multi-run-"),
+            "first directory should have bf-multi-run- prefix"
+        );
+        assert!(
+            dir2_name.starts_with("bf-multi-run-"),
+            "second directory should have bf-multi-run- prefix"
+        );
+        assert!(
+            dir3_name.starts_with("bf-multi-run-"),
+            "third directory should have bf-multi-run- prefix"
+        );
 
         // Verify all directories contain the expected files
         for (i, result) in [result1, result2, result3].iter().enumerate() {
@@ -1663,9 +1768,21 @@ mod tests {
             let stdout_path = result.bead_trace_dir.join("stdout.txt");
             let stderr_path = result.bead_trace_dir.join("stderr.txt");
 
-            assert!(metadata_path.exists(), "run {} metadata.json should exist", i + 1);
-            assert!(stdout_path.exists(), "run {} stdout.txt should exist", i + 1);
-            assert!(stderr_path.exists(), "run {} stderr.txt should exist", i + 1);
+            assert!(
+                metadata_path.exists(),
+                "run {} metadata.json should exist",
+                i + 1
+            );
+            assert!(
+                stdout_path.exists(),
+                "run {} stdout.txt should exist",
+                i + 1
+            );
+            assert!(
+                stderr_path.exists(),
+                "run {} stderr.txt should exist",
+                i + 1
+            );
 
             // Verify metadata is valid JSON
             let content = fs::read_to_string(&metadata_path).unwrap();
@@ -1675,12 +1792,18 @@ mod tests {
 
         // Verify we can list all bead traces
         let all_beads = manager.list_bead_traces().unwrap();
-        assert!(all_beads.len() >= 3, "should have at least 3 bead trace directories");
+        assert!(
+            all_beads.len() >= 3,
+            "should have at least 3 bead trace directories"
+        );
 
         // Verify all listed beads follow the bf- prefix convention
         for bead in all_beads {
-            assert!(bead.starts_with("bf-") || bead.starts_with("needle-"),
-                "all bead IDs should start with bf- or needle- prefix, got: {}", bead);
+            assert!(
+                bead.starts_with("bf-") || bead.starts_with("needle-"),
+                "all bead IDs should start with bf- or needle- prefix, got: {}",
+                bead
+            );
         }
     }
 
@@ -1699,8 +1822,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1718,8 +1842,9 @@ mod tests {
         println!("TEST_OUTPUT_LINE_3");
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -1730,12 +1855,14 @@ mod tests {
         };
 
         // Run cargo test with --nocapture to actually capture test stdout output
-        let result = manager.run_cargo_test_to_bead_trace_with_args(
-            temp_dir.path(),
-            "bf-stdout-test",
-            &metadata,
-            &["--", "--nocapture"]
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace_with_args(
+                temp_dir.path(),
+                "bf-stdout-test",
+                &metadata,
+                &["--", "--nocapture"],
+            )
+            .unwrap();
 
         // Test assertions pass - test completed successfully
         assert_eq!(result.exit_code, 0, "cargo test should succeed");
@@ -1744,12 +1871,18 @@ mod tests {
         assert!(!result.stdout.is_empty(), "stdout should not be empty");
 
         // Verify capture mechanism works correctly by checking for known output patterns
-        assert!(result.stdout.contains("TEST_OUTPUT_LINE_1"),
-            "stdout should contain first test output line");
-        assert!(result.stdout.contains("TEST_OUTPUT_LINE_2"),
-            "stdout should contain second test output line");
-        assert!(result.stdout.contains("TEST_OUTPUT_LINE_3"),
-            "stdout should contain third test output line");
+        assert!(
+            result.stdout.contains("TEST_OUTPUT_LINE_1"),
+            "stdout should contain first test output line"
+        );
+        assert!(
+            result.stdout.contains("TEST_OUTPUT_LINE_2"),
+            "stdout should contain second test output line"
+        );
+        assert!(
+            result.stdout.contains("TEST_OUTPUT_LINE_3"),
+            "stdout should contain third test output line"
+        );
 
         // Verify the stdout was written to file
         let stdout_path = result.bead_trace_dir.join("stdout.txt");
@@ -1757,22 +1890,36 @@ mod tests {
 
         // Verify the file content matches the captured stdout
         let stdout_content = fs::read_to_string(&stdout_path).unwrap();
-        assert_eq!(stdout_content, result.stdout, "file content should match captured stdout");
+        assert_eq!(
+            stdout_content, result.stdout,
+            "file content should match captured stdout"
+        );
 
         // Verify the file contains all expected patterns
-        assert!(stdout_content.contains("TEST_OUTPUT_LINE_1"),
-            "stdout file should contain first test output line");
-        assert!(stdout_content.contains("TEST_OUTPUT_LINE_2"),
-            "stdout file should contain second test output line");
-        assert!(stdout_content.contains("TEST_OUTPUT_LINE_3"),
-            "stdout file should contain third test output line");
+        assert!(
+            stdout_content.contains("TEST_OUTPUT_LINE_1"),
+            "stdout file should contain first test output line"
+        );
+        assert!(
+            stdout_content.contains("TEST_OUTPUT_LINE_2"),
+            "stdout file should contain second test output line"
+        );
+        assert!(
+            stdout_content.contains("TEST_OUTPUT_LINE_3"),
+            "stdout file should contain third test output line"
+        );
 
         // Verify standard cargo test output markers are present
-        assert!(stdout_content.contains("running") || stdout_content.contains("test result:"),
-            "stdout should contain cargo test output markers");
+        assert!(
+            stdout_content.contains("running") || stdout_content.contains("test result:"),
+            "stdout should contain cargo test output markers"
+        );
 
         // Verify trace directory structure is complete
-        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+        assert!(
+            result.bead_trace_dir.exists(),
+            "bead trace directory should exist"
+        );
         let metadata_path = result.bead_trace_dir.join("metadata.json");
         assert!(metadata_path.exists(), "metadata.json should exist");
         let stderr_path = result.bead_trace_dir.join("stderr.txt");
@@ -1785,9 +1932,18 @@ mod tests {
         assert_eq!(read_metadata.agent, "test-stdout-agent");
         assert_eq!(read_metadata.exit_code, Some(0));
         assert_eq!(read_metadata.outcome, "success");
-        assert!(read_metadata.start_time.is_some(), "metadata should have start time");
-        assert!(read_metadata.end_time.is_some(), "metadata should have end time");
-        assert!(read_metadata.duration_ms.is_some(), "metadata should have duration");
+        assert!(
+            read_metadata.start_time.is_some(),
+            "metadata should have start time"
+        );
+        assert!(
+            read_metadata.end_time.is_some(),
+            "metadata should have end time"
+        );
+        assert!(
+            read_metadata.duration_ms.is_some(),
+            "metadata should have duration"
+        );
     }
 
     #[test]
@@ -1805,8 +1961,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1834,8 +1991,9 @@ mod tests {
         assert!(true);
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for comprehensive trace
         let metadata = TraceMetadata {
@@ -1846,38 +2004,54 @@ mod tests {
         };
 
         // Run cargo test with --nocapture to capture all stdout output
-        let result = manager.run_cargo_test_to_bead_trace_with_args(
-            temp_dir.path(),
-            "bf-stdout-comprehensive",
-            &metadata,
-            &["--", "--nocapture"]
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace_with_args(
+                temp_dir.path(),
+                "bf-stdout-comprehensive",
+                &metadata,
+                &["--", "--nocapture"],
+            )
+            .unwrap();
 
         // Comprehensive assertions
         assert_eq!(result.exit_code, 0, "all tests should pass");
 
         // Verify stdout capture from multiple tests
         assert!(!result.stdout.is_empty(), "stdout should not be empty");
-        assert!(result.stdout.len() > 100, "stdout should contain substantial output");
+        assert!(
+            result.stdout.len() > 100,
+            "stdout should contain substantial output"
+        );
 
         // Verify all test outputs are captured
-        assert!(result.stdout.contains("FIRST_TEST_OUTPUT"),
-            "should capture output from first test");
-        assert!(result.stdout.contains("SECOND_TEST_OUTPUT"),
-            "should capture output from second test");
-        assert!(result.stdout.contains("STRUCTURED_OUTPUT"),
-            "should capture structured JSON output");
+        assert!(
+            result.stdout.contains("FIRST_TEST_OUTPUT"),
+            "should capture output from first test"
+        );
+        assert!(
+            result.stdout.contains("SECOND_TEST_OUTPUT"),
+            "should capture output from second test"
+        );
+        assert!(
+            result.stdout.contains("STRUCTURED_OUTPUT"),
+            "should capture structured JSON output"
+        );
 
         // Verify stdout contains cargo test framework output
-        assert!(result.stdout.contains("running") || result.stdout.contains("test result:"),
-            "stdout should contain cargo test execution indicators");
+        assert!(
+            result.stdout.contains("running") || result.stdout.contains("test result:"),
+            "stdout should contain cargo test execution indicators"
+        );
 
         // Verify file persistence
         let stdout_path = result.bead_trace_dir.join("stdout.txt");
         assert!(stdout_path.exists(), "stdout.txt should exist");
 
         let file_content = fs::read_to_string(&stdout_path).unwrap();
-        assert_eq!(file_content, result.stdout, "file should exactly match captured stdout");
+        assert_eq!(
+            file_content, result.stdout,
+            "file should exactly match captured stdout"
+        );
 
         // Verify metadata integrity
         let metadata_path = result.bead_trace_dir.join("metadata.json");
@@ -1886,15 +2060,24 @@ mod tests {
 
         assert_eq!(trace_metadata.exit_code, Some(0));
         assert_eq!(trace_metadata.outcome, "success");
-        assert!(trace_metadata.duration_ms.unwrap() > 0, "duration should be positive");
+        assert!(
+            trace_metadata.duration_ms.unwrap() > 0,
+            "duration should be positive"
+        );
 
         // Verify trace directory completeness
         let stderr_path = result.bead_trace_dir.join("stderr.txt");
-        assert!(stderr_path.exists(), "stderr.txt should exist (even if empty)");
+        assert!(
+            stderr_path.exists(),
+            "stderr.txt should exist (even if empty)"
+        );
 
         // Verify capture mechanism reliability by counting lines
         let stdout_lines = result.stdout.lines().count();
-        assert!(stdout_lines > 5, "stdout should contain multiple lines of output");
+        assert!(
+            stdout_lines > 5,
+            "stdout should contain multiple lines of output"
+        );
     }
 
     #[test]
@@ -1912,8 +2095,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -1931,8 +2115,9 @@ mod tests {
         eprintln!("STDERR_TEST_LINE_3");
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -1943,12 +2128,14 @@ mod tests {
         };
 
         // Run cargo test with --nocapture to capture test stderr output
-        let result = manager.run_cargo_test_to_bead_trace_with_args(
-            temp_dir.path(),
-            "bf-stderr-test",
-            &metadata,
-            &["--", "--nocapture"]
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace_with_args(
+                temp_dir.path(),
+                "bf-stderr-test",
+                &metadata,
+                &["--", "--nocapture"],
+            )
+            .unwrap();
 
         // Test assertions pass - test completed successfully
         assert_eq!(result.exit_code, 0, "cargo test should succeed");
@@ -1970,7 +2157,10 @@ mod tests {
 
         // Verify the file content matches the captured stderr
         let stderr_content = fs::read_to_string(&stderr_path).unwrap();
-        assert_eq!(stderr_content, result.stderr, "file content should match captured stderr");
+        assert_eq!(
+            stderr_content, result.stderr,
+            "file content should match captured stderr"
+        );
 
         // For tests with --nocapture and eprintln!, the output may go to stdout
         // rather than stderr when tests pass successfully. This is a quirk of how
@@ -1990,7 +2180,10 @@ mod tests {
         // (which may be empty for clean tests)
 
         // Verify trace directory structure is complete
-        assert!(result.bead_trace_dir.exists(), "bead trace directory should exist");
+        assert!(
+            result.bead_trace_dir.exists(),
+            "bead trace directory should exist"
+        );
         let metadata_path = result.bead_trace_dir.join("metadata.json");
         assert!(metadata_path.exists(), "metadata.json should exist");
         let stdout_path = result.bead_trace_dir.join("stdout.txt");
@@ -2003,9 +2196,18 @@ mod tests {
         assert_eq!(read_metadata.agent, "test-stderr-agent");
         assert_eq!(read_metadata.exit_code, Some(0));
         assert_eq!(read_metadata.outcome, "success");
-        assert!(read_metadata.start_time.is_some(), "metadata should have start time");
-        assert!(read_metadata.end_time.is_some(), "metadata should have end time");
-        assert!(read_metadata.duration_ms.is_some(), "metadata should have duration");
+        assert!(
+            read_metadata.start_time.is_some(),
+            "metadata should have start time"
+        );
+        assert!(
+            read_metadata.end_time.is_some(),
+            "metadata should have end time"
+        );
+        assert!(
+            read_metadata.duration_ms.is_some(),
+            "metadata should have duration"
+        );
     }
 
     #[test]
@@ -2023,8 +2225,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -2040,8 +2243,9 @@ mod tests {
         assert_eq!(1 + 1, 3, "Intentional failure for stderr testing");
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -2052,33 +2256,42 @@ mod tests {
         };
 
         // Run cargo test - the failing test will generate stderr output
-        let result = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-stderr-warnings",
-            &metadata
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-stderr-warnings", &metadata)
+            .unwrap();
 
         // Verify test completed (even though it failed)
         assert!(result.exit_code != 0, "cargo test should fail as expected");
 
         // Verify stderr is captured with failure output
         // When tests fail, cargo outputs to stderr
-        assert!(!result.stderr.is_empty(), "stderr should not be empty for failing tests");
+        assert!(
+            !result.stderr.is_empty(),
+            "stderr should not be empty for failing tests"
+        );
 
         // Verify stderr contains failure indicators
         // When tests fail, cargo writes "error: test failed" to stderr
-        assert!(result.stderr.contains("error: test failed") || result.stderr.contains("FAILED"),
-            "stderr should contain failure indication");
+        assert!(
+            result.stderr.contains("error: test failed") || result.stderr.contains("FAILED"),
+            "stderr should contain failure indication"
+        );
 
         // Verify stderr file exists and contains content
         let stderr_path = result.bead_trace_dir.join("stderr.txt");
         assert!(stderr_path.exists(), "stderr.txt should exist");
 
         let stderr_content = fs::read_to_string(&stderr_path).unwrap();
-        assert_eq!(stderr_content, result.stderr, "file content should match captured stderr");
+        assert_eq!(
+            stderr_content, result.stderr,
+            "file content should match captured stderr"
+        );
 
         // Verify stderr has substantial content for failures
-        assert!(stderr_content.lines().count() > 2, "stderr should contain multiple lines for failures");
+        assert!(
+            stderr_content.lines().count() > 2,
+            "stderr should contain multiple lines for failures"
+        );
 
         // Verify metadata captures the failure correctly
         let metadata_path = result.bead_trace_dir.join("metadata.json");
@@ -2087,7 +2300,10 @@ mod tests {
 
         assert_eq!(trace_metadata.exit_code, Some(result.exit_code));
         assert_eq!(trace_metadata.outcome, "failure");
-        assert!(trace_metadata.duration_ms.unwrap() > 0, "duration should be positive");
+        assert!(
+            trace_metadata.duration_ms.unwrap() > 0,
+            "duration should be positive"
+        );
     }
 
     #[test]
@@ -2105,8 +2321,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -2121,8 +2338,9 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -2133,11 +2351,9 @@ mod tests {
         };
 
         // Run cargo test
-        let result = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-stderr-empty",
-            &metadata
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-stderr-empty", &metadata)
+            .unwrap();
 
         // Verify test completed successfully
         assert_eq!(result.exit_code, 0, "cargo test should succeed");
@@ -2151,7 +2367,10 @@ mod tests {
 
         // Verify the content matches
         let stderr_content = fs::read_to_string(&stderr_path).unwrap();
-        assert_eq!(stderr_content, result.stderr, "file content should match captured stderr");
+        assert_eq!(
+            stderr_content, result.stderr,
+            "file content should match captured stderr"
+        );
 
         // For clean tests, stderr might be empty or only contain cargo/rustc output
         // The important thing is that the capture mechanism worked correctly
@@ -2178,8 +2397,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         let src_dir = temp_dir.path().join("src");
         fs::create_dir(&src_dir).unwrap();
@@ -2202,8 +2422,9 @@ mod tests {
         assert_eq!(1 + 1, 3, "This test is designed to fail");
     }
 }
-"#
-        ).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create metadata for the trace
         let metadata = TraceMetadata {
@@ -2214,23 +2435,29 @@ mod tests {
         };
 
         // Run cargo test - some tests pass, some fail
-        let result = manager.run_cargo_test_to_bead_trace(
-            temp_dir.path(),
-            "bf-both-streams",
-            &metadata
-        ).unwrap();
+        let result = manager
+            .run_cargo_test_to_bead_trace(temp_dir.path(), "bf-both-streams", &metadata)
+            .unwrap();
 
         // Verify test completed with failures
-        assert!(result.exit_code != 0, "cargo test should fail due to failing test");
+        assert!(
+            result.exit_code != 0,
+            "cargo test should fail due to failing test"
+        );
 
         // Verify stdout is captured correctly
         assert!(!result.stdout.is_empty(), "stdout should not be empty");
-        assert!(result.stdout.contains("PASSING_TEST_OUTPUT") || result.stdout.contains("running"),
-            "stdout should contain test output");
+        assert!(
+            result.stdout.contains("PASSING_TEST_OUTPUT") || result.stdout.contains("running"),
+            "stdout should contain test output"
+        );
 
         // Verify stderr is captured correctly with failure information
         // When tests fail, cargo writes detailed failure information to stderr
-        assert!(!result.stderr.is_empty(), "stderr should not be empty for failing tests");
+        assert!(
+            !result.stderr.is_empty(),
+            "stderr should not be empty for failing tests"
+        );
 
         // Verify both files exist and are separate
         let stdout_path = result.bead_trace_dir.join("stdout.txt");
@@ -2242,13 +2469,21 @@ mod tests {
         let stdout_file_content = fs::read_to_string(&stdout_path).unwrap();
         let stderr_file_content = fs::read_to_string(&stderr_path).unwrap();
 
-        assert_eq!(stdout_file_content, result.stdout, "stdout file should match captured stdout");
-        assert_eq!(stderr_file_content, result.stderr, "stderr file should match captured stderr");
+        assert_eq!(
+            stdout_file_content, result.stdout,
+            "stdout file should match captured stdout"
+        );
+        assert_eq!(
+            stderr_file_content, result.stderr,
+            "stderr file should match captured stderr"
+        );
 
         // Verify stdout and stderr contain different information
         // They may have some overlap in cargo framework output, but should be distinct
-        assert_ne!(result.stdout, result.stderr,
-            "stdout and stderr should be distinct streams");
+        assert_ne!(
+            result.stdout, result.stderr,
+            "stdout and stderr should be distinct streams"
+        );
 
         // Verify metadata captures the failure correctly
         let metadata_path = result.bead_trace_dir.join("metadata.json");

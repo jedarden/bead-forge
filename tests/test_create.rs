@@ -11,11 +11,11 @@
 
 #[cfg(test)]
 mod tests {
+    use rusqlite::Connection;
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
     use tempfile::TempDir;
-    use rusqlite::Connection;
 
     /// Create a temporary test workspace with bf configuration
     /// Resolve the freshly-built bf binary — never the system-installed one.
@@ -89,8 +89,7 @@ mod tests {
     /// of a bead to ensure it was stored correctly.
     fn verify_bead_in_database(beads_dir: &PathBuf, bead_id: &str, expected_fields: &BeadFields) {
         let db_path = beads_dir.join("beads.db");
-        let conn = Connection::open(&db_path)
-            .expect("Failed to open database for verification");
+        let conn = Connection::open(&db_path).expect("Failed to open database for verification");
 
         // Query the main issue record
         let mut stmt = conn
@@ -100,9 +99,7 @@ mod tests {
             )
             .expect("Failed to prepare statement");
 
-        let mut rows = stmt
-            .query(&[bead_id])
-            .expect("Failed to execute query");
+        let mut rows = stmt.query(&[bead_id]).expect("Failed to execute query");
 
         let row = rows
             .next()
@@ -117,7 +114,10 @@ mod tests {
         assert_eq!(title, expected_fields.title, "Title should match");
 
         let description: String = row.get(2).expect("Failed to get description");
-        assert_eq!(description, expected_fields.description, "Description should match");
+        assert_eq!(
+            description, expected_fields.description,
+            "Description should match"
+        );
 
         let status: String = row.get(3).expect("Failed to get status");
         assert_eq!(status, expected_fields.status, "Status should match");
@@ -126,7 +126,10 @@ mod tests {
         assert_eq!(priority, expected_fields.priority, "Priority should match");
 
         let issue_type: String = row.get(5).expect("Failed to get issue_type");
-        assert_eq!(issue_type, expected_fields.issue_type, "Issue type should match");
+        assert_eq!(
+            issue_type, expected_fields.issue_type,
+            "Issue type should match"
+        );
 
         let assignee: Option<String> = row.get(6).expect("Failed to get assignee");
         assert_eq!(assignee, expected_fields.assignee, "Assignee should match");
@@ -143,8 +146,7 @@ mod tests {
             .expect("Failed to collect labels");
 
         assert_eq!(
-            labels,
-            expected_fields.labels,
+            labels, expected_fields.labels,
             "Labels should match (sorted for comparison)"
         );
     }
@@ -635,7 +637,11 @@ mod tests {
             ],
         );
 
-        assert!(success, "Create command with --json should succeed. stderr: {}", stderr);
+        assert!(
+            success,
+            "Create command with --json should succeed. stderr: {}",
+            stderr
+        );
         assert!(!stdout.is_empty(), "JSON output should not be empty");
 
         // Parse the JSON output (wrapped in envelope)

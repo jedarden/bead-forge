@@ -185,7 +185,12 @@ pub fn claim_bead(workspace: &Path, config: ClaimConfig) -> Result<Option<Claime
             config.workspace_paths
         };
 
-        let result = claim_any(&workspace_paths, &config.worker_id, claim_ttl, Some(&worker_metadata))?;
+        let result = claim_any(
+            &workspace_paths,
+            &config.worker_id,
+            claim_ttl,
+            Some(&worker_metadata),
+        )?;
 
         Ok(result.map(|r| ClaimedBead {
             bead_id: r.bead_id,
@@ -199,7 +204,13 @@ pub fn claim_bead(workspace: &Path, config: ClaimConfig) -> Result<Option<Claime
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, &config.worker_id, claim_ttl, Utc::now(), Some(&worker_metadata))
+            claim(
+                tx,
+                &config.worker_id,
+                claim_ttl,
+                Utc::now(),
+                Some(&worker_metadata),
+            )
         })?;
 
         Ok(result.map(|r| ClaimedBead {
@@ -231,7 +242,8 @@ pub fn get_ready(workspace: &Path, limit: usize) -> Result<Vec<crate::claim::Sco
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    storage.with_immediate_transaction(|tx| crate::claim::get_ready_candidates(tx, limit, None, None))
+    storage
+        .with_immediate_transaction(|tx| crate::claim::get_ready_candidates(tx, limit, None, None))
 }
 
 /// Check if a bead is ready to be claimed (not blocked).
@@ -270,7 +282,9 @@ pub fn is_bead_ready(workspace: &Path, bead_id: &str) -> Result<bool> {
                 if dep.dep_type.to_string() == "blocks" {
                     // Check if the blocking bead is still open/in_progress
                     if let Some(blocker) = storage.get_issue(&dep.depends_on_id)? {
-                        if blocker.status.to_string() == "open" || blocker.status.to_string() == "in_progress" {
+                        if blocker.status.to_string() == "open"
+                            || blocker.status.to_string() == "in_progress"
+                        {
                             return Ok(false);
                         }
                     }
@@ -320,7 +334,11 @@ claim_ttl_minutes: 30
         let storage = Storage::open(&db_path).unwrap();
 
         for i in 1..=3 {
-            let mut issue = Issue::new(format!("bf-{:0>4}", i), format!("Test bead {}", i), ".".to_string());
+            let mut issue = Issue::new(
+                format!("bf-{:0>4}", i),
+                format!("Test bead {}", i),
+                ".".to_string(),
+            );
             issue.priority = Priority(i);
             storage.create_issue(&issue).unwrap();
         }
@@ -351,7 +369,11 @@ claim_ttl_minutes: 30
         // Create beads with different priorities (0 = highest)
         let priorities = [2, 0, 1, 4, 3];
         for (i, &priority) in priorities.iter().enumerate() {
-            let mut issue = Issue::new(format!("bf-{:0>4}", i), format!("Test {}", i), ".".to_string());
+            let mut issue = Issue::new(
+                format!("bf-{:0>4}", i),
+                format!("Test {}", i),
+                ".".to_string(),
+            );
             issue.priority = Priority(priority);
             storage.create_issue(&issue).unwrap();
         }
@@ -387,7 +409,11 @@ claim_ttl_minutes: 30
 
         // Create test beads
         for i in 1..=3 {
-            let issue = Issue::new(format!("bf-{:0>4}", i), format!("Test {}", i), ".".to_string());
+            let issue = Issue::new(
+                format!("bf-{:0>4}", i),
+                format!("Test {}", i),
+                ".".to_string(),
+            );
             storage.create_issue(&issue).unwrap();
         }
 
@@ -420,14 +446,29 @@ claim_ttl_minutes: 30
         let db_path = beads_dir.join(&metadata.database);
         let storage = Storage::open(&db_path).unwrap();
 
-        let blocker = Issue::new("bf-blocker".to_string(), "Blocker".to_string(), ".".to_string());
+        let blocker = Issue::new(
+            "bf-blocker".to_string(),
+            "Blocker".to_string(),
+            ".".to_string(),
+        );
         storage.create_issue(&blocker).unwrap();
 
-        let blocked = Issue::new("bf-blocked".to_string(), "Blocked".to_string(), ".".to_string());
+        let blocked = Issue::new(
+            "bf-blocked".to_string(),
+            "Blocked".to_string(),
+            ".".to_string(),
+        );
         storage.create_issue(&blocked).unwrap();
 
         // Add blocking dependency
-        storage.add_dependency("bf-blocked", "bf-blocker", &crate::model::DependencyType::Blocks, "test").unwrap();
+        storage
+            .add_dependency(
+                "bf-blocked",
+                "bf-blocker",
+                &crate::model::DependencyType::Blocks,
+                "test",
+            )
+            .unwrap();
 
         // Blocked bead should not be ready
         assert!(!is_bead_ready(&workspace, "bf-blocked").unwrap());

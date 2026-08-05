@@ -100,9 +100,7 @@ fn comment_marks_dirty() {
     storage.create_issue(&make_issue("bf-comment1")).unwrap();
     reset_dirty(&storage);
 
-    storage
-        .add_comment("bf-comment1", "cli", "a note")
-        .unwrap();
+    storage.add_comment("bf-comment1", "cli", "a note").unwrap();
     assert!(dirty_ids(temp.path()).contains("bf-comment1"));
 }
 
@@ -151,9 +149,7 @@ fn dep_remove_marks_dirty() {
         .unwrap();
     reset_dirty(&storage);
 
-    storage
-        .remove_dependency("bf-dep-c", "bf-dep-d")
-        .unwrap();
+    storage.remove_dependency("bf-dep-c", "bf-dep-d").unwrap();
     assert!(dirty_ids(temp.path()).contains("bf-dep-c"));
 }
 
@@ -190,9 +186,7 @@ fn read_only_commands_do_not_mark_dirty() {
     let (temp, storage) = setup();
     storage.create_issue(&make_issue("bf-ro1")).unwrap();
     storage.add_label("bf-ro1", "x").unwrap();
-    storage
-        .add_comment("bf-ro1", "cli", "hi")
-        .unwrap();
+    storage.add_comment("bf-ro1", "cli", "hi").unwrap();
     reset_dirty(&storage);
 
     // A representative sweep of read paths.

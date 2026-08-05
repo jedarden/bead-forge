@@ -41,7 +41,7 @@ fn main() -> Result<()> {
         &workspace_dir,
         bead_id,
         &metadata,
-        &["--lib", "trace::tests::test_trace_metadata_default"]
+        &["--lib", "trace::tests::test_trace_metadata_default"],
     )?;
 
     println!("✓ Test 1 PASSED: stdout captured for passing test");
@@ -81,23 +81,29 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&temp_dir)?;
 
     let cargo_toml = temp_dir.join("Cargo.toml");
-    std::fs::write(&cargo_toml, r#"[package]
+    std::fs::write(
+        &cargo_toml,
+        r#"[package]
 name = "temp-test-fail"
 version = "0.1.0"
 edition = "2021"
-"#)?;
+"#,
+    )?;
 
     let src_dir = temp_dir.join("src");
     std::fs::create_dir(&src_dir)?;
     let lib_rs = src_dir.join("lib.rs");
-    std::fs::write(&lib_rs, r#"#[cfg(test)]
+    std::fs::write(
+        &lib_rs,
+        r#"#[cfg(test)]
 mod tests {
     #[test]
     fn test_fails() {
         assert_eq!(1 + 1, 3, "This test is designed to fail");
     }
 }
-"#)?;
+"#,
+    )?;
 
     let fail_metadata = TraceMetadata {
         bead_id: Some(format!("{}-fail", bead_id)),
@@ -109,14 +115,20 @@ mod tests {
     let fail_result = trace_manager.run_cargo_test_to_bead_trace(
         &temp_dir,
         &format!("{}-fail", bead_id),
-        &fail_metadata
+        &fail_metadata,
     )?;
 
     println!("✓ Test 2 PASSED: stdout/stderr captured for failing test");
-    println!("  Exit code: {} (non-zero as expected)", fail_result.exit_code);
+    println!(
+        "  Exit code: {} (non-zero as expected)",
+        fail_result.exit_code
+    );
     println!("  Stdout length: {} bytes", fail_result.stdout.len());
     println!("  Stderr length: {} bytes", fail_result.stderr.len());
-    println!("  Trace directory: {}", fail_result.bead_trace_dir.display());
+    println!(
+        "  Trace directory: {}",
+        fail_result.bead_trace_dir.display()
+    );
     println!();
 
     // Verify failing test also has proper trace structure
@@ -124,9 +136,18 @@ mod tests {
     let fail_stdout_path = fail_result.bead_trace_dir.join("stdout.txt");
     let fail_stderr_path = fail_result.bead_trace_dir.join("stderr.txt");
 
-    assert!(fail_metadata_path.exists(), "failing test metadata.json should exist");
-    assert!(fail_stdout_path.exists(), "failing test stdout.txt should exist");
-    assert!(fail_stderr_path.exists(), "failing test stderr.txt should exist");
+    assert!(
+        fail_metadata_path.exists(),
+        "failing test metadata.json should exist"
+    );
+    assert!(
+        fail_stdout_path.exists(),
+        "failing test stdout.txt should exist"
+    );
+    assert!(
+        fail_stderr_path.exists(),
+        "failing test stderr.txt should exist"
+    );
 
     println!("✓ Test 2 PASSED: Failing test trace file structure is correct");
     println!("  metadata.json exists: {}", fail_metadata_path.exists());
@@ -137,8 +158,10 @@ mod tests {
     // Verify stderr contains failure information
     if !fail_result.stderr.is_empty() {
         println!("✓ Test 2 PASSED: Stderr contains failure information");
-        println!("  Stderr contains failure indication: {}",
-            fail_result.stderr.contains("error") || fail_result.stderr.contains("FAILED"));
+        println!(
+            "  Stderr contains failure indication: {}",
+            fail_result.stderr.contains("error") || fail_result.stderr.contains("FAILED")
+        );
     }
 
     // Clean up temp directory

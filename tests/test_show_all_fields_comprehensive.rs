@@ -153,10 +153,19 @@ fn test_show_displays_all_fields_text_format() {
 
     // Verify ALL standard fields are displayed
     // Core fields
-    assert!(output.contains(&format!("ID: {}", bead_id)), "ID field must be displayed");
-    assert!(output.contains("Title: Test all fields display"), "Title field must be displayed");
+    assert!(
+        output.contains(&format!("ID: {}", bead_id)),
+        "ID field must be displayed"
+    );
+    assert!(
+        output.contains("Title: Test all fields display"),
+        "Title field must be displayed"
+    );
     assert!(output.contains("Status:"), "Status field must be displayed");
-    assert!(output.contains("Priority:"), "Priority field must be displayed");
+    assert!(
+        output.contains("Priority:"),
+        "Priority field must be displayed"
+    );
     assert!(output.contains("Type:"), "Type field must be displayed");
 
     // Optional fields
@@ -170,15 +179,33 @@ fn test_show_displays_all_fields_text_format() {
     );
 
     // Labels
-    assert!(output.contains("Labels:"), "Labels section must be displayed");
-    assert!(output.contains("test-label"), "Label 'test-label' must be shown");
-    assert!(output.contains("comprehensive"), "Label 'comprehensive' must be shown");
-    assert!(output.contains("all-fields"), "Label 'all-fields' must be shown");
+    assert!(
+        output.contains("Labels:"),
+        "Labels section must be displayed"
+    );
+    assert!(
+        output.contains("test-label"),
+        "Label 'test-label' must be shown"
+    );
+    assert!(
+        output.contains("comprehensive"),
+        "Label 'comprehensive' must be shown"
+    );
+    assert!(
+        output.contains("all-fields"),
+        "Label 'all-fields' must be shown"
+    );
 
     // Annotations
-    assert!(output.contains("Annotations:"), "Annotations section must be displayed");
+    assert!(
+        output.contains("Annotations:"),
+        "Annotations section must be displayed"
+    );
     assert!(output.contains("test-key"), "Annotation key must be shown");
-    assert!(output.contains("test-value"), "Annotation value must be shown");
+    assert!(
+        output.contains("test-value"),
+        "Annotation value must be shown"
+    );
 }
 
 #[test]
@@ -326,12 +353,18 @@ fn test_show_displays_all_fields_json_format() {
     // Status fields
     assert!(bead.get("status").is_some(), "status must be present");
     assert!(bead.get("priority").is_some(), "priority must be present");
-    assert!(bead.get("issue_type").is_some(), "issue_type must be present");
+    assert!(
+        bead.get("issue_type").is_some(),
+        "issue_type must be present"
+    );
 
     // Content fields
     assert_eq!(bead["description"], "JSON test description");
     assert_eq!(bead["assignee"], "json-test-user");
-    assert_eq!(bead["acceptance_criteria"], "AC: JSON must include all fields");
+    assert_eq!(
+        bead["acceptance_criteria"],
+        "AC: JSON must include all fields"
+    );
     assert_eq!(bead["notes"], "JSON notes");
     assert_eq!(bead["design"], "JSON design");
 
@@ -346,15 +379,27 @@ fn test_show_displays_all_fields_json_format() {
     assert!(labels.contains(&"json-label"), "label must be present");
 
     // Timestamps
-    assert!(bead.get("created_at").is_some(), "created_at must be present");
-    assert!(bead.get("updated_at").is_some(), "updated_at must be present");
+    assert!(
+        bead.get("created_at").is_some(),
+        "created_at must be present"
+    );
+    assert!(
+        bead.get("updated_at").is_some(),
+        "updated_at must be present"
+    );
 
     // Verify ISO 8601 format for timestamps
     let created_at = bead["created_at"].as_str().unwrap();
-    assert!(created_at.contains('T'), "created_at should be in ISO 8601 format");
+    assert!(
+        created_at.contains('T'),
+        "created_at should be in ISO 8601 format"
+    );
 
     let updated_at = bead["updated_at"].as_str().unwrap();
-    assert!(updated_at.contains('T'), "updated_at should be in ISO 8601 format");
+    assert!(
+        updated_at.contains('T'),
+        "updated_at should be in ISO 8601 format"
+    );
 }
 
 #[test]
@@ -411,7 +456,10 @@ fn test_show_displays_closed_bead_all_fields() {
     // Verify closed bead specific fields
     assert_eq!(bead["status"], "closed");
     assert_eq!(bead["close_reason"], "Test completed successfully");
-    assert!(bead.get("closed_at").is_some(), "closed_at must be present for closed beads");
+    assert!(
+        bead.get("closed_at").is_some(),
+        "closed_at must be present for closed beads"
+    );
 
     // Verify other fields are still present
     assert_eq!(bead["description"], "Closed bead description");
@@ -419,7 +467,10 @@ fn test_show_displays_closed_bead_all_fields() {
 
     // Verify closed_at timestamp format
     let closed_at = bead["closed_at"].as_str().unwrap();
-    assert!(closed_at.contains('T'), "closed_at should be in ISO 8601 format");
+    assert!(
+        closed_at.contains('T'),
+        "closed_at should be in ISO 8601 format"
+    );
 }
 
 #[test]

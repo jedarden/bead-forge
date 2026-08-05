@@ -379,8 +379,7 @@ mod tests {
     fn test_detects_azure_key() {
         let scanner = SecretScanner::new().unwrap();
         // A real Azure storage account key: 88 base64 chars ending in "==".
-        let azure_key =
-            "DefaultEndpointsProtocol=https;AccountName=demo;AccountKey=abcdefghij\
+        let azure_key = "DefaultEndpointsProtocol=https;AccountName=demo;AccountKey=abcdefghij\
              klmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab+/cdefghijklmno\
              pqrstuvwx==;EndpointSuffix=core.windows.net";
         let matches = scanner.scan_string(azure_key);

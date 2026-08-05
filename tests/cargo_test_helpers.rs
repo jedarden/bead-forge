@@ -22,10 +22,10 @@
 //! }
 //! ```
 
+use bead_forge::trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
-use bead_forge::trace::{TraceManager, CargoTestResult, BeadTestResult, TraceMetadata};
 
 /// A test Rust project that can be created on-the-fly for testing cargo test execution.
 ///
@@ -126,7 +126,8 @@ impl TestProject {
     ///     .build();
     /// ```
     pub fn with_dependency(mut self, name: &str, version: &str) -> Self {
-        self.dependencies.push((name.to_string(), version.to_string()));
+        self.dependencies
+            .push((name.to_string(), version.to_string()));
         self
     }
 
@@ -159,13 +160,15 @@ impl TestProject {
     pub fn build(self) -> anyhow::Result<Self> {
         // Create Cargo.toml
         let cargo_toml = self.workspace_dir.join("Cargo.toml");
-        let mut toml_content = String::from(r#"[package]
+        let mut toml_content = String::from(
+            r#"[package]
 name = "test-project"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#);
+"#,
+        );
 
         for (name, version) in &self.dependencies {
             toml_content.push_str(&format!("{} = \"{}\"\n", name, version));
@@ -261,7 +264,8 @@ edition = "2021"
         let mut entries: Vec<_> = fs::read_dir(&traces_dir)?
             .filter_map(|e| e.ok())
             .filter(|e| {
-                e.path().file_name()
+                e.path()
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .map(|n| n.starts_with("cargo-test-") && n.ends_with(".log"))
                     .unwrap_or(false)
@@ -355,7 +359,8 @@ macro_rules! assert_duration_gt {
         assert!(
             $result.duration_ms > $min_ms,
             "cargo test duration should be greater than {}ms, got {}ms",
-            $min_ms, $result.duration_ms
+            $min_ms,
+            $result.duration_ms
         );
     };
 }
@@ -379,7 +384,8 @@ macro_rules! assert_duration_lt {
         assert!(
             $result.duration_ms < $max_ms,
             "cargo test duration should be less than {}ms, got {}ms",
-            $max_ms, $result.duration_ms
+            $max_ms,
+            $result.duration_ms
         );
     };
 }
@@ -400,12 +406,13 @@ macro_rules! assert_duration_lt {
 #[macro_export]
 macro_rules! assert_trace_contains {
     ($result:expr, $expected_text:expr) => {
-        let content = std::fs::read_to_string(&$result.trace_path)
-            .expect("Failed to read trace file");
+        let content =
+            std::fs::read_to_string(&$result.trace_path).expect("Failed to read trace file");
         assert!(
             content.contains($expected_text),
             "Trace file should contain '{}', but it does not.\nTrace content:\n{}",
-            $expected_text, content
+            $expected_text,
+            content
         );
     };
 }
@@ -429,7 +436,8 @@ macro_rules! assert_stdout_contains {
         assert!(
             $result.stdout.contains($expected_text),
             "Stdout should contain '{}', but it does not.\nStdout:\n{}",
-            $expected_text, $result.stdout
+            $expected_text,
+            $result.stdout
         );
     };
 }
@@ -453,7 +461,8 @@ macro_rules! assert_stderr_contains {
         assert!(
             $result.stderr.contains($expected_text),
             "Stderr should contain '{}', but it does not.\nStderr:\n{}",
-            $expected_text, $result.stderr
+            $expected_text,
+            $result.stderr
         );
     };
 }
@@ -556,9 +565,8 @@ mod tests {
             .build()
             .unwrap();
 
-        let cargo_toml = std::fs::read_to_string(
-            project.workspace_dir().join("Cargo.toml")
-        ).unwrap();
+        let cargo_toml =
+            std::fs::read_to_string(project.workspace_dir().join("Cargo.toml")).unwrap();
 
         assert!(cargo_toml.contains("serde = \"1.0\""));
         assert!(cargo_toml.contains("tokio = \"1.0\""));
@@ -573,9 +581,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let lib_rs = std::fs::read_to_string(
-            project.workspace_dir().join("src/lib.rs")
-        ).unwrap();
+        let lib_rs = std::fs::read_to_string(project.workspace_dir().join("src/lib.rs")).unwrap();
 
         assert!(lib_rs.contains("pub fn helper() -> i32 { 42 }"));
         assert!(lib_rs.contains("test_helper"));
@@ -593,9 +599,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let lib_rs = std::fs::read_to_string(
-            project.workspace_dir().join("src/lib.rs")
-        ).unwrap();
+        let lib_rs = std::fs::read_to_string(project.workspace_dir().join("src/lib.rs")).unwrap();
 
         assert!(lib_rs.contains("test_one"));
         assert!(lib_rs.contains("test_two"));

@@ -1,4 +1,4 @@
-use crate::format::{ClaimResultOutput, Formatter, StatsOutput, JsonEnvelope};
+use crate::format::{ClaimResultOutput, Formatter, JsonEnvelope, StatsOutput};
 use crate::model::Issue;
 use crate::velocity::VelocityStats;
 use serde_json::{self, Map, Value};
@@ -38,10 +38,8 @@ fn issue_to_value(issue: &Issue) -> Value {
 
 /// Guarantee the `assignee` and `labels` keys exist on a serialized issue map.
 fn ensure_display_fields(map: &mut Map<String, Value>) {
-    map.entry("assignee")
-        .or_insert(Value::Null);
-    map.entry("labels")
-        .or_insert_with(|| Value::Array(vec![]));
+    map.entry("assignee").or_insert(Value::Null);
+    map.entry("labels").or_insert_with(|| Value::Array(vec![]));
 }
 
 impl Formatter for JsonFormatter {
@@ -80,8 +78,8 @@ impl Formatter for JsonFormatter {
 
     fn format_with_envelope(&self, kind: &str, data: &str) -> String {
         // Parse the data string as JSON
-        let json_value: Value = serde_json::from_str(data)
-            .unwrap_or_else(|_| Value::String(data.to_string()));
+        let json_value: Value =
+            serde_json::from_str(data).unwrap_or_else(|_| Value::String(data.to_string()));
 
         // Wrap in envelope and serialize
         JsonEnvelope::new(kind, json_value)
@@ -89,10 +87,15 @@ impl Formatter for JsonFormatter {
             .unwrap_or_else(|_| "{}".to_string())
     }
 
-    fn format_with_envelope_and_warning(&self, kind: &str, data: &str, warning: Option<&str>) -> String {
+    fn format_with_envelope_and_warning(
+        &self,
+        kind: &str,
+        data: &str,
+        warning: Option<&str>,
+    ) -> String {
         // Parse the data string as JSON
-        let json_value: Value = serde_json::from_str(data)
-            .unwrap_or_else(|_| Value::String(data.to_string()));
+        let json_value: Value =
+            serde_json::from_str(data).unwrap_or_else(|_| Value::String(data.to_string()));
 
         // Wrap in envelope with optional warning and serialize
         let envelope = JsonEnvelope::new(kind, json_value);
@@ -136,10 +139,15 @@ mod tests {
         issue.assignee = Some("claude-code-glm-4.7-alpha".to_string());
         issue.labels = vec!["split-child".to_string()];
         let v = parse(&JsonFormatter.format_issue(&issue));
-        assert_eq!(v.get("assignee").and_then(|a| a.as_str()), Some("claude-code-glm-4.7-alpha"));
+        assert_eq!(
+            v.get("assignee").and_then(|a| a.as_str()),
+            Some("claude-code-glm-4.7-alpha")
+        );
         assert_eq!(
             v.get("labels"),
-            Some(&Value::Array(vec![Value::String("split-child".to_string())]))
+            Some(&Value::Array(vec![Value::String(
+                "split-child".to_string()
+            )]))
         );
     }
 
@@ -154,7 +162,10 @@ mod tests {
             let v = parse(line);
             assert!(v.get("assignee").is_some(), "assignee key must be present");
             assert!(v.get("labels").is_some(), "labels key must be present");
-            assert!(v.get("labels").unwrap().is_array(), "labels must be an array");
+            assert!(
+                v.get("labels").unwrap().is_array(),
+                "labels must be an array"
+            );
         }
     }
 
@@ -164,7 +175,10 @@ mod tests {
     #[test]
     fn format_issues_empty_yields_empty_string() {
         let out = JsonFormatter.format_issues(&[]);
-        assert!(out.is_empty(), "empty input must produce empty output, got {out:?}");
+        assert!(
+            out.is_empty(),
+            "empty input must produce empty output, got {out:?}"
+        );
         assert_eq!(out.lines().count(), 0);
     }
 
@@ -174,7 +188,11 @@ mod tests {
     fn format_issues_single_yields_one_valid_json_line() {
         let issue = Issue::new("bf-solo".to_string(), "Solo".to_string(), ".".to_string());
         let out = JsonFormatter.format_issues(&[issue]);
-        assert_eq!(out.lines().count(), 1, "single issue must be exactly one line");
+        assert_eq!(
+            out.lines().count(),
+            1,
+            "single issue must be exactly one line"
+        );
 
         let v = parse(&out);
         assert_eq!(v.get("id").and_then(|i| i.as_str()), Some("bf-solo"));
@@ -194,7 +212,11 @@ mod tests {
         let out = JsonFormatter.format_issues(&[a, b, c]);
 
         let lines: Vec<&str> = out.lines().collect();
-        assert_eq!(lines.len(), 3, "three issues must produce three JSONL lines");
+        assert_eq!(
+            lines.len(),
+            3,
+            "three issues must produce three JSONL lines"
+        );
 
         // Each line is independently valid JSON; ids preserve input order.
         let ids: Vec<String> = lines

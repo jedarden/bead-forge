@@ -72,12 +72,7 @@ fn create_test_bead(workspace: impl AsRef<std::path::Path>, title: &str) -> Stri
 }
 
 /// Add an annotation to a bead via CLI
-fn add_annotation(
-    workspace: impl AsRef<std::path::Path>,
-    bead_id: &str,
-    key: &str,
-    value: &str,
-) {
+fn add_annotation(workspace: impl AsRef<std::path::Path>, bead_id: &str, key: &str, value: &str) {
     let bf_path = get_bf_binary();
     let result = std::process::Command::new(&bf_path)
         .arg("annotate")
@@ -128,10 +123,16 @@ fn test_show_displays_annotations_text_format() {
     println!("Show output with annotations:\n{}", output);
 
     // Verify annotations section is present
-    assert!(output.contains("Annotations:"), "Should show Annotations section");
+    assert!(
+        output.contains("Annotations:"),
+        "Should show Annotations section"
+    );
 
     // Verify all annotations are displayed
-    assert!(output.contains("severity: high"), "Should show severity annotation");
+    assert!(
+        output.contains("severity: high"),
+        "Should show severity annotation"
+    );
     assert!(
         output.contains("component: backend"),
         "Should show component annotation"
@@ -175,7 +176,10 @@ fn test_show_displays_annotations_toon_format() {
     println!("Toon format output with annotations:\n{}", output);
 
     // Verify annotations are shown in toon format
-    assert!(output.contains("Annotations:"), "Should show Annotations section");
+    assert!(
+        output.contains("Annotations:"),
+        "Should show Annotations section"
+    );
     assert!(
         output.contains("category: testing"),
         "Should show category annotation"
@@ -409,13 +413,13 @@ fn test_show_all_extended_fields_together() {
 
     // 2. Labels
     assert!(output.contains("Labels:"), "Should show labels section");
-    assert!(
-        output.contains("integration-test"),
-        "Should show label"
-    );
+    assert!(output.contains("integration-test"), "Should show label");
 
     // 3. Annotations
-    assert!(output.contains("Annotations:"), "Should show annotations section");
+    assert!(
+        output.contains("Annotations:"),
+        "Should show annotations section"
+    );
     assert!(
         output.contains("test_type: integration"),
         "Should show test_type annotation"
@@ -526,7 +530,12 @@ fn test_show_annotations_with_special_characters() {
 
     // Add annotations with special characters
     add_annotation(workspace, &bead_id, "key-with-dash", "value with spaces");
-    add_annotation(workspace, &bead_id, "key_with_underscore", "value:with:colons");
+    add_annotation(
+        workspace,
+        &bead_id,
+        "key_with_underscore",
+        "value:with:colons",
+    );
     add_annotation(workspace, &bead_id, "json_data", r#"{"complex": "data"}"#);
 
     // Show the bead in JSON format to verify proper escaping
@@ -554,9 +563,7 @@ fn test_show_annotations_with_special_characters() {
 
     // Verify special characters are preserved
     assert_eq!(
-        annotations
-            .get("key-with-dash")
-            .and_then(|v| v.as_str()),
+        annotations.get("key-with-dash").and_then(|v| v.as_str()),
         Some("value with spaces"),
         "Should preserve spaces in values"
     );

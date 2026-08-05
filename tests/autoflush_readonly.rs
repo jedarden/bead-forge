@@ -129,7 +129,10 @@ fn readonly_commands_never_write_jsonl() {
     ok(ws.path(), &["label", "add", &blocked, "--label", "urgent"]);
     // `dep add <blocker> --blocks <blocked>`: blocked depends on blocker.
     ok(ws.path(), &["dep", "add", &blocker, "--blocks", &blocked]);
-    ok(ws.path(), &["comments", "add", &blocked, "a", "seeded", "note"]);
+    ok(
+        ws.path(),
+        &["comments", "add", &blocked, "a", "seeded", "note"],
+    );
     ok(ws.path(), &["annotate", "set", &blocked, "env", "prod"]);
 
     // Canonical snapshot. Sleep past coarse (1s) filesystem mtime granularity so
@@ -141,29 +144,69 @@ fn readonly_commands_never_write_jsonl() {
     // Every read-only / diagnostic surface. Args interpolate the seeded ids.
     let cmds: Vec<(&str, Vec<String>)> = vec![
         ("list", vec!["list".into()]),
-        ("list --json", vec!["list".into(), "--format".into(), "json".into()]),
+        (
+            "list --json",
+            vec!["list".into(), "--format".into(), "json".into()],
+        ),
         ("show", vec!["show".into(), blocked.clone()]),
-        ("show --json", vec!["show".into(), blocked.clone(), "--format".into(), "json".into()]),
+        (
+            "show --json",
+            vec![
+                "show".into(),
+                blocked.clone(),
+                "--format".into(),
+                "json".into(),
+            ],
+        ),
         ("ready", vec!["ready".into()]),
-        ("critical-path", vec!["critical-path".into(), blocked.clone()]),
+        (
+            "critical-path",
+            vec!["critical-path".into(), blocked.clone()],
+        ),
         ("velocity", vec!["velocity".into()]),
         ("doctor", vec!["doctor".into()]),
         ("labels", vec!["labels".into(), blocked.clone()]),
-        ("label list", vec!["label".into(), "list".into(), blocked.clone()]),
-        ("dep list", vec!["dep".into(), "list".into(), blocked.clone()]),
-        ("dep tree", vec!["dep".into(), "tree".into(), blocked.clone()]),
+        (
+            "label list",
+            vec!["label".into(), "list".into(), blocked.clone()],
+        ),
+        (
+            "dep list",
+            vec!["dep".into(), "list".into(), blocked.clone()],
+        ),
+        (
+            "dep tree",
+            vec!["dep".into(), "tree".into(), blocked.clone()],
+        ),
         ("search", vec!["search".into(), "blocker".into()]),
         ("stats", vec!["stats".into()]),
         ("log", vec!["log".into(), blocked.clone()]),
         ("recent", vec!["recent".into()]),
         ("count", vec!["count".into()]),
         ("config list", vec!["config".into(), "list".into()]),
-        ("config get", vec!["config".into(), "get".into(), "claim_ttl_minutes".into()]),
+        (
+            "config get",
+            vec!["config".into(), "get".into(), "claim_ttl_minutes".into()],
+        ),
         ("config path", vec!["config".into(), "path".into()]),
         ("schema all", vec!["schema".into(), "all".into()]),
-        ("comments list", vec!["comments".into(), "list".into(), blocked.clone()]),
-        ("annotate get", vec!["annotate".into(), "get".into(), blocked.clone(), "env".into()]),
-        ("annotate list", vec!["annotate".into(), "list".into(), blocked.clone()]),
+        (
+            "comments list",
+            vec!["comments".into(), "list".into(), blocked.clone()],
+        ),
+        (
+            "annotate get",
+            vec![
+                "annotate".into(),
+                "get".into(),
+                blocked.clone(),
+                "env".into(),
+            ],
+        ),
+        (
+            "annotate list",
+            vec!["annotate".into(), "list".into(), blocked.clone()],
+        ),
     ];
 
     for (label, args) in &cmds {
@@ -190,9 +233,12 @@ fn doctor_does_not_flush_even_with_unflushed_beads() {
     // unflushed bead stays db-only until an explicit `bf sync --flush-only`.
     let ws = init_ws();
     let _flushed = create(ws.path(), "flushed"); // lands in issues.jsonl
-    let ghost = ok(ws.path(), &["--no-auto-flush", "create", "--title", "ghost"])
-        .trim()
-        .to_string();
+    let ghost = ok(
+        ws.path(),
+        &["--no-auto-flush", "create", "--title", "ghost"],
+    )
+    .trim()
+    .to_string();
     // ghost is db-only: it must be absent from issues.jsonl before AND after.
     assert!(find(&read_jsonl(ws.path()), &ghost).is_none());
 

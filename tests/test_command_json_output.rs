@@ -14,13 +14,12 @@
 
 mod common;
 
-use std::process::Command;
 use serde_json::Value;
+use std::process::Command;
 
 /// Get the path to the bf binary
 fn bf_binary() -> String {
-    std::env::var("CARGO_BIN_EXE_bf")
-        .unwrap_or_else(|_| "./target/debug/bf".to_string())
+    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
 }
 
 /// Create a Command builder for bf with workspace configured
@@ -37,9 +36,8 @@ mod json_validation {
 
     /// Parse a JSON string and panic if invalid
     pub fn parse_json(json: &str) -> Value {
-        serde_json::from_str(json).unwrap_or_else(|e| {
-            panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-        })
+        serde_json::from_str(json)
+            .unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
     }
 
     /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -82,13 +80,15 @@ mod envelope {
         let envelope = json_validation::parse_json(json);
 
         // Check version field
-        let version = envelope.get("version")
+        let version = envelope
+            .get("version")
             .and_then(|v| v.as_i64())
             .expect("Envelope must have numeric 'version' field");
         assert_eq!(version, 1, "Envelope version must be 1");
 
         // Check kind field
-        let kind = envelope.get("kind")
+        let kind = envelope
+            .get("kind")
             .and_then(|k| k.as_str())
             .expect("Envelope must have string 'kind' field");
         assert_eq!(kind, expected_kind, "Envelope kind mismatch");
@@ -104,7 +104,8 @@ mod envelope {
 
     /// Get the data field from an envelope
     pub fn get_envelope_data(envelope: &Value) -> Value {
-        envelope.get("data")
+        envelope
+            .get("data")
             .cloned()
             .unwrap_or_else(|| panic!("Envelope missing 'data' field"))
     }
@@ -112,21 +113,52 @@ mod envelope {
 
 /// Helper to check required issue fields in JSON
 fn assert_issue_fields_present(json: &Value, context: &str) {
-    assert!(json_validation::has_field(json, "id"), "{}: Missing 'id' field", context);
-    assert!(json_validation::has_field(json, "title"), "{}: Missing 'title' field", context);
-    assert!(json_validation::has_field(json, "status"), "{}: Missing 'status' field", context);
-    assert!(json_validation::has_field(json, "priority"), "{}: Missing 'priority' field", context);
-    assert!(json_validation::has_field(json, "issue_type"), "{}: Missing 'issue_type' field", context);
+    assert!(
+        json_validation::has_field(json, "id"),
+        "{}: Missing 'id' field",
+        context
+    );
+    assert!(
+        json_validation::has_field(json, "title"),
+        "{}: Missing 'title' field",
+        context
+    );
+    assert!(
+        json_validation::has_field(json, "status"),
+        "{}: Missing 'status' field",
+        context
+    );
+    assert!(
+        json_validation::has_field(json, "priority"),
+        "{}: Missing 'priority' field",
+        context
+    );
+    assert!(
+        json_validation::has_field(json, "issue_type"),
+        "{}: Missing 'issue_type' field",
+        context
+    );
     // These should always be present even if null/empty (display normalization)
-    assert!(json_validation::has_field(json, "assignee"), "{}: Missing 'assignee' field", context);
-    assert!(json_validation::has_field(json, "labels"), "{}: Missing 'labels' field", context);
+    assert!(
+        json_validation::has_field(json, "assignee"),
+        "{}: Missing 'assignee' field",
+        context
+    );
+    assert!(
+        json_validation::has_field(json, "labels"),
+        "{}: Missing 'labels' field",
+        context
+    );
 }
 
 /// Helper to check if binary exists
 fn require_binary() {
     let binary = bf_binary();
     if !std::path::Path::new(&binary).exists() {
-        eprintln!("Skipping test - binary not found at: {}. Run 'cargo build' first.", binary);
+        eprintln!(
+            "Skipping test - binary not found at: {}. Run 'cargo build' first.",
+            binary
+        );
         panic!("Binary not found");
     }
 }
@@ -143,9 +175,12 @@ fn test_list_command_json_structure() {
     let ws = common::TempWorkspace::new().unwrap();
 
     // Create multiple beads
-    ws.create_bead("bf-test-1", "First bead for list test").unwrap();
-    ws.create_bead("bf-test-2", "Second bead for list test").unwrap();
-    ws.create_bead("bf-test-3", "Third bead for list test").unwrap();
+    ws.create_bead("bf-test-1", "First bead for list test")
+        .unwrap();
+    ws.create_bead("bf-test-2", "Second bead for list test")
+        .unwrap();
+    ws.create_bead("bf-test-3", "Third bead for list test")
+        .unwrap();
 
     // Get JSON output
     let output = bf_command(&ws)
@@ -203,7 +238,8 @@ fn test_list_command_json_filters() {
     let ws = common::TempWorkspace::new().unwrap();
 
     // Create beads with different properties
-    ws.create_bead("bf-open", "Open bead for filter test").unwrap();
+    ws.create_bead("bf-open", "Open bead for filter test")
+        .unwrap();
     // Close one bead
     let closed = bead_forge::Issue {
         id: "bf-closed".to_string(),
@@ -215,7 +251,9 @@ fn test_list_command_json_filters() {
     };
     ws.create_issue(&closed).unwrap();
 
-    let _active = ws.create_bead("bf-active", "Active bead for filter test").unwrap();
+    let _active = ws
+        .create_bead("bf-active", "Active bead for filter test")
+        .unwrap();
 
     // Test status filter
     let output = bf_command(&ws)
@@ -246,7 +284,8 @@ fn test_list_command_json_ensure_fields_present() {
     let ws = common::TempWorkspace::new().unwrap();
 
     let bead_id = "bf-field-test";
-    ws.create_bead(bead_id, "Test bead for field presence").unwrap();
+    ws.create_bead(bead_id, "Test bead for field presence")
+        .unwrap();
 
     let output = bf_command(&ws)
         .arg("list")
@@ -267,8 +306,14 @@ fn test_list_command_json_ensure_fields_present() {
         .expect("Should find our bead in list output");
 
     // Verify display normalization: assignee and labels always present
-    assert!(json_validation::has_field(our_bead, "assignee"), "assignee must be present");
-    assert!(json_validation::has_field(our_bead, "labels"), "labels must be present");
+    assert!(
+        json_validation::has_field(our_bead, "assignee"),
+        "assignee must be present"
+    );
+    assert!(
+        json_validation::has_field(our_bead, "labels"),
+        "labels must be present"
+    );
     let _labels = json_validation::get_array(our_bead, "labels");
     // labels is already Vec<Value> from get_array, so it's verified to be an array
 }
@@ -280,7 +325,8 @@ fn test_list_command_json_with_envelope() {
 
     let ws = common::TempWorkspace::new().unwrap();
 
-    ws.create_bead("bf-envelope", "Test bead for envelope list").unwrap();
+    ws.create_bead("bf-envelope", "Test bead for envelope list")
+        .unwrap();
 
     let output = bf_command(&ws)
         .arg("list")
@@ -370,7 +416,10 @@ fn test_ready_command_json_empty_results() {
     let trimmed = stdout.trim();
 
     // Empty ready returns "[]" (special case in cmd_ready)
-    assert!(trimmed == "[]" || trimmed.is_empty(), "Empty ready should return '[]' or empty string");
+    assert!(
+        trimmed == "[]" || trimmed.is_empty(),
+        "Empty ready should return '[]' or empty string"
+    );
 }
 
 #[test]
@@ -404,7 +453,10 @@ fn test_ready_command_json_limit() {
 
     if trimmed != "[]" && !trimmed.is_empty() {
         let parsed = json_validation::parse_jsonl(trimmed);
-        assert!(parsed.len() <= 2, "ready with --limit 2 should return at most 2 beads");
+        assert!(
+            parsed.len() <= 2,
+            "ready with --limit 2 should return at most 2 beads"
+        );
     }
 }
 
@@ -415,7 +467,8 @@ fn test_ready_command_json_with_envelope() {
 
     let ws = common::TempWorkspace::new().unwrap();
 
-    ws.create_bead("bf-ready-envelope", "Test bead for envelope ready").unwrap();
+    ws.create_bead("bf-ready-envelope", "Test bead for envelope ready")
+        .unwrap();
 
     let output = bf_command(&ws)
         .arg("ready")
@@ -491,7 +544,8 @@ fn test_recent_command_json_time_period() {
     let ws = common::TempWorkspace::new().unwrap();
 
     let bead_id = "bf-recent-time";
-    ws.create_bead(bead_id, "Recent bead with time filter").unwrap();
+    ws.create_bead(bead_id, "Recent bead with time filter")
+        .unwrap();
 
     // Test with time period
     let output = bf_command(&ws)
@@ -512,7 +566,10 @@ fn test_recent_command_json_time_period() {
     let data = envelope::get_envelope_data(&envelope_obj);
 
     // Data should be present (even if empty array)
-    assert!(data.is_array() || data.is_string(), "recent data should be array or string");
+    assert!(
+        data.is_array() || data.is_string(),
+        "recent data should be array or string"
+    );
 }
 
 #[test]
@@ -578,7 +635,9 @@ fn test_json_output_handles_unicode() {
     let parsed = json_validation::parse_json(stdout.trim());
 
     // show command wraps output in array
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let issue_json = &array[0];
 
     let title = json_validation::get_string(issue_json, "title");
@@ -593,7 +652,8 @@ fn test_json_output_handles_newlines_in_description() {
     let ws = common::TempWorkspace::new().unwrap();
 
     let bead_id = "bf-newline";
-    ws.create_bead(bead_id, "Test bead with multiline description").unwrap();
+    ws.create_bead(bead_id, "Test bead with multiline description")
+        .unwrap();
 
     // Update with description containing newlines
     let storage = ws.storage().unwrap();
@@ -633,7 +693,8 @@ fn test_show_command_json_structure() {
 
     // Create a test bead
     let bead_id = "bf-show-test";
-    ws.create_bead(bead_id, "Test bead for show command").unwrap();
+    ws.create_bead(bead_id, "Test bead for show command")
+        .unwrap();
 
     // Get JSON output from show command
     let output = bf_command(&ws)
@@ -650,7 +711,9 @@ fn test_show_command_json_structure() {
 
     // show command wraps output in array (NEEDLE contract: single-element array)
     let parsed = json_validation::parse_json(stdout.trim());
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     assert_eq!(array.len(), 1, "show should return a single-element array");
 
     // The single element should be the issue object
@@ -666,12 +729,15 @@ fn test_show_command_json_required_fields() {
 
     // Create a bead with specific fields
     let bead_id = "bf-show-fields";
-    ws.create_bead(bead_id, "Test bead for field validation").unwrap();
+    ws.create_bead(bead_id, "Test bead for field validation")
+        .unwrap();
 
     // Add some additional fields to verify they're present
     let storage = ws.storage().unwrap();
     let changes = bead_forge::IssueChanges {
-        description: Some("Test description with multiple lines\nand special chars: <>&\"'".to_string()),
+        description: Some(
+            "Test description with multiple lines\nand special chars: <>&\"'".to_string(),
+        ),
         assignee: Some("test-assignee".to_string()),
         labels: Some(vec!["test-label".to_string(), "another-label".to_string()]),
         ..Default::default()
@@ -701,11 +767,17 @@ fn test_show_command_json_required_fields() {
 
     // Verify specific field values
     assert_eq!(json_validation::get_string(issue_json, "id"), bead_id);
-    assert_eq!(json_validation::get_string(issue_json, "title"), "Test bead for field validation");
+    assert_eq!(
+        json_validation::get_string(issue_json, "title"),
+        "Test bead for field validation"
+    );
 
     // Verify optional fields that we set
     let description = json_validation::get_string(issue_json, "description");
-    assert!(description.contains("Test description"), "description should be preserved");
+    assert!(
+        description.contains("Test description"),
+        "description should be preserved"
+    );
 
     let assignee = json_validation::get_string(issue_json, "assignee");
     assert_eq!(assignee, "test-assignee", "assignee should be preserved");
@@ -730,12 +802,17 @@ fn test_show_command_json_non_existent_bead() {
         .expect("Failed to execute bf show");
 
     // Should fail with non-zero exit code
-    assert!(!output.status.success(), "bf show should fail for non-existent bead");
+    assert!(
+        !output.status.success(),
+        "bf show should fail for non-existent bead"
+    );
 
     // stderr should contain error message
     let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
-    assert!(stderr.contains("not found") || stderr.contains("Bead not found"),
-            "Error message should mention bead not found");
+    assert!(
+        stderr.contains("not found") || stderr.contains("Bead not found"),
+        "Error message should mention bead not found"
+    );
 }
 
 #[test]
@@ -746,7 +823,8 @@ fn test_show_command_json_with_envelope() {
 
     // Create a test bead
     let bead_id = "bf-show-envelope";
-    ws.create_bead(bead_id, "Test bead for envelope show").unwrap();
+    ws.create_bead(bead_id, "Test bead for envelope show")
+        .unwrap();
 
     // Get JSON output with envelope
     let output = bf_command(&ws)
@@ -786,8 +864,22 @@ fn test_show_command_json_dependencies_stripped() {
 
     // Add dependencies using the correct API
     let storage = ws.storage().unwrap();
-    storage.add_dependency(bead_id, "bf-dep-1", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
-    storage.add_dependency(bead_id, "bf-dep-2", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
+    storage
+        .add_dependency(
+            bead_id,
+            "bf-dep-1",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
+    storage
+        .add_dependency(
+            bead_id,
+            "bf-dep-2",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // Get JSON output
     let output = bf_command(&ws)
@@ -812,8 +904,14 @@ fn test_show_command_json_dependencies_stripped() {
     let deps = issue_json.get("dependencies");
     match deps {
         Some(dep_value) => {
-            let dep_array = dep_value.as_array().expect("dependencies should be an array if present");
-            assert_eq!(dep_array.len(), 0, "dependencies should be empty in show JSON output");
+            let dep_array = dep_value
+                .as_array()
+                .expect("dependencies should be an array if present");
+            assert_eq!(
+                dep_array.len(),
+                0,
+                "dependencies should be empty in show JSON output"
+            );
         }
         None => {
             // Field is absent when empty, which is acceptable
@@ -823,8 +921,14 @@ fn test_show_command_json_dependencies_stripped() {
     let comments = issue_json.get("comments");
     match comments {
         Some(comment_value) => {
-            let comment_array = comment_value.as_array().expect("comments should be an array if present");
-            assert_eq!(comment_array.len(), 0, "comments should be empty in show JSON output");
+            let comment_array = comment_value
+                .as_array()
+                .expect("comments should be an array if present");
+            assert_eq!(
+                comment_array.len(),
+                0,
+                "comments should be empty in show JSON output"
+            );
         }
         None => {
             // Field is absent when empty, which is acceptable

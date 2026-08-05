@@ -89,19 +89,31 @@ fn test_batch_create_operations_single_transaction() {
     // Check labels directly from storage (get_issue doesn't load labels table)
     let bead1_labels = storage
         .with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT label FROM labels WHERE issue_id = ?1").unwrap();
-            let labels: Vec<String> = stmt.query_map([&bead1_id], |row| row.get(0)).unwrap()
-                .filter_map(|r| r.ok()).collect();
+            let mut stmt = tx
+                .prepare("SELECT label FROM labels WHERE issue_id = ?1")
+                .unwrap();
+            let labels: Vec<String> = stmt
+                .query_map([&bead1_id], |row| row.get(0))
+                .unwrap()
+                .filter_map(|r| r.ok())
+                .collect();
             Ok(labels)
-        }).unwrap();
+        })
+        .unwrap();
     assert_eq!(bead1_labels.len(), 1);
     assert!(bead1_labels.contains(&"tag1".to_string()));
 
-    let bead2 = storage.get_issue(&results[1].id.as_ref().unwrap()).unwrap().unwrap();
+    let bead2 = storage
+        .get_issue(&results[1].id.as_ref().unwrap())
+        .unwrap()
+        .unwrap();
     assert_eq!(bead2.title, "Second bead");
     assert_eq!(bead2.assignee.as_deref(), Some("user1"));
 
-    let bead3 = storage.get_issue(&results[2].id.as_ref().unwrap()).unwrap().unwrap();
+    let bead3 = storage
+        .get_issue(&results[2].id.as_ref().unwrap())
+        .unwrap()
+        .unwrap();
     assert_eq!(bead3.title, "Third bead");
 }
 
@@ -118,15 +130,15 @@ fn test_batch_dependency_operations_single_transaction() {
     // Create multiple dependency relationships in a single batch
     let ops = vec![
         BatchOp::DepAddBlocker {
-            id: "bf-b".to_string(),  // B is blocked by A
+            id: "bf-b".to_string(), // B is blocked by A
             blocker: "bf-a".to_string(),
         },
         BatchOp::DepAddBlocker {
-            id: "bf-c".to_string(),  // C is blocked by B
+            id: "bf-c".to_string(), // C is blocked by B
             blocker: "bf-b".to_string(),
         },
         BatchOp::DepAddBlocker {
-            id: "bf-c".to_string(),  // C is also blocked by A
+            id: "bf-c".to_string(), // C is also blocked by A
             blocker: "bf-a".to_string(),
         },
     ];
@@ -230,11 +242,17 @@ fn test_batch_mixed_operations_single_transaction() {
     // Verify labels (check directly from storage)
     let bead2_labels = storage
         .with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT label FROM labels WHERE issue_id = ?1").unwrap();
-            let labels: Vec<String> = stmt.query_map(["bf-2"], |row| row.get(0)).unwrap()
-                .filter_map(|r| r.ok()).collect();
+            let mut stmt = tx
+                .prepare("SELECT label FROM labels WHERE issue_id = ?1")
+                .unwrap();
+            let labels: Vec<String> = stmt
+                .query_map(["bf-2"], |row| row.get(0))
+                .unwrap()
+                .filter_map(|r| r.ok())
+                .collect();
             Ok(labels)
-        }).unwrap();
+        })
+        .unwrap();
     assert_eq!(bead2_labels.len(), 2);
     assert!(bead2_labels.contains(&"labeled-in-batch".to_string()));
     assert!(bead2_labels.contains(&"important".to_string()));
@@ -283,7 +301,9 @@ fn test_transaction_rollback_on_create_failure() {
     assert_eq!(final_count, initial_count);
 
     let all_issues = storage.list_all_issues().unwrap();
-    assert!(!all_issues.iter().any(|i| i.title.contains("Should be rolled back")));
+    assert!(!all_issues
+        .iter()
+        .any(|i| i.title.contains("Should be rolled back")));
 }
 
 #[test]
@@ -306,7 +326,7 @@ fn test_transaction_rollback_on_update_failure() {
             labels: vec![],
         },
         BatchOp::Update {
-            id: "bf-nonexistent".to_string(),  // This will fail
+            id: "bf-nonexistent".to_string(), // This will fail
             title: Some("This update should not happen".to_string()),
             description: None,
             design: None,
@@ -355,12 +375,12 @@ fn test_transaction_rollback_on_dependency_failure() {
         },
         // Create circular dependency (bf-a -> new bead -> bf-a)
         BatchOp::DepAddBlocker {
-            id: "@0".to_string(),     // new bead is blocked
+            id: "@0".to_string(),        // new bead is blocked
             blocker: "bf-a".to_string(), // by bf-a
         },
         BatchOp::DepAddBlocker {
             id: "bf-a".to_string(),    // bf-a is blocked
-            blocker: "@0".to_string(),  // by new bead (circular!)
+            blocker: "@0".to_string(), // by new bead (circular!)
         },
     ];
 
@@ -433,7 +453,9 @@ fn test_no_partial_state_on_early_failure() {
 
     assert_eq!(bead1_after.title, initial_bead1.title);
     assert_eq!(bead2_after.title, initial_bead2.title);
-    assert!(!bead2_after.labels.contains(&"should-not-be-added".to_string()));
+    assert!(!bead2_after
+        .labels
+        .contains(&"should-not-be-added".to_string()));
 }
 
 #[test]
@@ -489,8 +511,12 @@ fn test_no_partial_state_on_mid_batch_failure() {
     assert_eq!(final_count, initial_count);
 
     let all_issues = storage.list_all_issues().unwrap();
-    assert!(!all_issues.iter().any(|i| i.title.contains("Should be rolled back")));
-    assert!(!all_issues.iter().any(|i| i.title.contains("Also should be rolled back")));
+    assert!(!all_issues
+        .iter()
+        .any(|i| i.title.contains("Should be rolled back")));
+    assert!(!all_issues
+        .iter()
+        .any(|i| i.title.contains("Also should be rolled back")));
 }
 
 #[test]
@@ -521,15 +547,15 @@ fn test_placeholder_references_in_transaction() {
         // Use placeholder references to created beads
         BatchOp::DepAddBlocker {
             id: "bf-parent".to_string(),
-            blocker: "@0".to_string(),  // References Child 1
+            blocker: "@0".to_string(), // References Child 1
         },
         BatchOp::DepAddBlocker {
             id: "bf-parent".to_string(),
-            blocker: "@1".to_string(),  // References Child 2
+            blocker: "@1".to_string(), // References Child 2
         },
         BatchOp::DepAddBlocker {
-            id: "@1".to_string(),       // Child 2 is blocked
-            blocker: "@0".to_string(),  // by Child 1
+            id: "@1".to_string(),      // Child 2 is blocked
+            blocker: "@0".to_string(), // by Child 1
         },
     ];
 
@@ -547,7 +573,10 @@ fn test_placeholder_references_in_transaction() {
     // Verify dependencies were created with correct IDs
     let parent_deps = storage.get_dependencies("bf-parent").unwrap();
     assert_eq!(parent_deps.len(), 2);
-    let parent_dep_ids: Vec<&str> = parent_deps.iter().map(|d| d.depends_on_id.as_str()).collect();
+    let parent_dep_ids: Vec<&str> = parent_deps
+        .iter()
+        .map(|d| d.depends_on_id.as_str())
+        .collect();
     assert!(parent_dep_ids.contains(&child1_id.as_str()));
     assert!(parent_dep_ids.contains(&child2_id.as_str()));
 
@@ -601,11 +630,17 @@ fn test_single_operation_batch() {
     // Check labels directly from storage
     let bead_labels = storage
         .with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT label FROM labels WHERE issue_id = ?1").unwrap();
-            let labels: Vec<String> = stmt.query_map([&bead_id], |row| row.get(0)).unwrap()
-                .filter_map(|r| r.ok()).collect();
+            let mut stmt = tx
+                .prepare("SELECT label FROM labels WHERE issue_id = ?1")
+                .unwrap();
+            let labels: Vec<String> = stmt
+                .query_map([&bead_id], |row| row.get(0))
+                .unwrap()
+                .filter_map(|r| r.ok())
+                .collect();
             Ok(labels)
-        }).unwrap();
+        })
+        .unwrap();
     assert!(bead_labels.contains(&"single".to_string()));
 
     let final_count = storage.list_issues(&IssueFilter::default()).unwrap().len();
@@ -633,7 +668,7 @@ fn test_batch_close_operation_rollback() {
             labels: vec![],
         },
         BatchOp::Close {
-            id: "bf-nonexistent".to_string(),  // This will fail
+            id: "bf-nonexistent".to_string(), // This will fail
             reason: "Should not happen".to_string(),
         },
     ];
@@ -648,7 +683,9 @@ fn test_batch_close_operation_rollback() {
     assert_eq!(bead_after.status.to_string(), "open");
 
     let all_issues = storage.list_all_issues().unwrap();
-    assert!(!all_issues.iter().any(|i| i.title.contains("Should be rolled back")));
+    assert!(!all_issues
+        .iter()
+        .any(|i| i.title.contains("Should be rolled back")));
 }
 
 #[test]
@@ -658,7 +695,12 @@ fn test_batch_label_operation_rollback() {
 
     create_test_bead(&storage, "bf-label-test", "Bead for labels");
 
-    let initial_labels = storage.get_issue("bf-label-test").unwrap().unwrap().labels.clone();
+    let initial_labels = storage
+        .get_issue("bf-label-test")
+        .unwrap()
+        .unwrap()
+        .labels
+        .clone();
 
     // Create a batch where label op fails, rolling back the create
     let ops = vec![
@@ -671,7 +713,7 @@ fn test_batch_label_operation_rollback() {
             labels: vec![],
         },
         BatchOp::LabelAdd {
-            id: "bf-nonexistent".to_string(),  // This will fail
+            id: "bf-nonexistent".to_string(), // This will fail
             labels: vec!["should-not-be-added".to_string()],
         },
     ];
@@ -686,7 +728,9 @@ fn test_batch_label_operation_rollback() {
     assert_eq!(bead_after.labels, initial_labels);
 
     let all_issues = storage.list_all_issues().unwrap();
-    assert!(!all_issues.iter().any(|i| i.title.contains("Should be rolled back")));
+    assert!(!all_issues
+        .iter()
+        .any(|i| i.title.contains("Should be rolled back")));
 }
 
 #[test]

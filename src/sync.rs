@@ -5,7 +5,9 @@
 
 use crate::config::{find_beads_dir, load_config, load_metadata};
 use crate::history::backup_before_export;
-use crate::jsonl::{export_jsonl, export_jsonl_dirty, export_jsonl_merge, import_jsonl, UpsertResult};
+use crate::jsonl::{
+    export_jsonl, export_jsonl_dirty, export_jsonl_merge, import_jsonl, UpsertResult,
+};
 use crate::merge::update_base_anchor;
 use crate::model::{Issue, IssueChanges};
 use crate::storage::Storage;
@@ -351,7 +353,11 @@ pub struct AutoFlushResult {
 ///
 /// # Returns
 /// * `Ok(AutoFlushResult)` - Result with warning if flush failed
-pub fn auto_flush(workspace_dir: &Path, config_enabled: bool, cli_disabled: bool) -> Result<AutoFlushResult> {
+pub fn auto_flush(
+    workspace_dir: &Path,
+    config_enabled: bool,
+    cli_disabled: bool,
+) -> Result<AutoFlushResult> {
     // Check if auto-flush is disabled
     if cli_disabled {
         return Ok(AutoFlushResult {
@@ -683,7 +689,11 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             source_repo: Some(".".to_string()),
-            labels: vec!["phase-1".to_string(), "storage".to_string(), "critical".to_string()],
+            labels: vec![
+                "phase-1".to_string(),
+                "storage".to_string(),
+                "critical".to_string(),
+            ],
             ..Default::default()
         };
 
@@ -703,8 +713,18 @@ mod tests {
         {
             use std::io::Write;
             let mut file = std::fs::File::create(&jsonl_path).unwrap();
-            writeln!(file, "{}", serde_json::to_string(&issue_with_labels).unwrap()).unwrap();
-            writeln!(file, "{}", serde_json::to_string(&issue_without_labels).unwrap()).unwrap();
+            writeln!(
+                file,
+                "{}",
+                serde_json::to_string(&issue_with_labels).unwrap()
+            )
+            .unwrap();
+            writeln!(
+                file,
+                "{}",
+                serde_json::to_string(&issue_without_labels).unwrap()
+            )
+            .unwrap();
         }
 
         // Import from JSONL
@@ -724,21 +744,34 @@ mod tests {
         assert_eq!(imported2.labels.len(), 0);
 
         // Verify labels in bead_labels table
-        storage.with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label").unwrap();
-            let labels: Vec<String> = stmt.query_map(params!["bf-labels"], |row| row.get::<_, String>(0)).unwrap()
-                .filter_map(|r| r.ok()).collect();
-            assert_eq!(labels, vec!["critical", "phase-1", "storage"]);
-            Ok(())
-        }).unwrap();
+        storage
+            .with_immediate_transaction(|tx| {
+                let mut stmt = tx
+                    .prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label")
+                    .unwrap();
+                let labels: Vec<String> = stmt
+                    .query_map(params!["bf-labels"], |row| row.get::<_, String>(0))
+                    .unwrap()
+                    .filter_map(|r| r.ok())
+                    .collect();
+                assert_eq!(labels, vec!["critical", "phase-1", "storage"]);
+                Ok(())
+            })
+            .unwrap();
 
         // Verify no labels for the issue without labels
-        storage.with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1").unwrap();
-            let count: i64 = stmt.query_row(params!["bf-nolabels"], |row| row.get(0)).unwrap();
-            assert_eq!(count, 0);
-            Ok(())
-        }).unwrap();
+        storage
+            .with_immediate_transaction(|tx| {
+                let mut stmt = tx
+                    .prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1")
+                    .unwrap();
+                let count: i64 = stmt
+                    .query_row(params!["bf-nolabels"], |row| row.get(0))
+                    .unwrap();
+                assert_eq!(count, 0);
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -870,11 +903,26 @@ mod tests {
 
         // Verify labels are in JSONL
         assert_eq!(found_labels.get("bf-many-labels").unwrap().len(), 5);
-        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"phase-1".to_string()));
-        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"storage".to_string()));
-        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"critical".to_string()));
-        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"database".to_string()));
-        assert!(found_labels.get("bf-many-labels").unwrap().contains(&"priority-p0".to_string()));
+        assert!(found_labels
+            .get("bf-many-labels")
+            .unwrap()
+            .contains(&"phase-1".to_string()));
+        assert!(found_labels
+            .get("bf-many-labels")
+            .unwrap()
+            .contains(&"storage".to_string()));
+        assert!(found_labels
+            .get("bf-many-labels")
+            .unwrap()
+            .contains(&"critical".to_string()));
+        assert!(found_labels
+            .get("bf-many-labels")
+            .unwrap()
+            .contains(&"database".to_string()));
+        assert!(found_labels
+            .get("bf-many-labels")
+            .unwrap()
+            .contains(&"priority-p0".to_string()));
 
         assert_eq!(found_labels.get("bf-one-label").unwrap().len(), 1);
         assert_eq!(found_labels.get("bf-one-label").unwrap()[0], "phase-2");
@@ -887,7 +935,10 @@ mod tests {
 
         // Import from JSONL
         let import_result = import(workspace).unwrap();
-        assert_eq!(import_result.imported, 3, "All three issues should be imported");
+        assert_eq!(
+            import_result.imported, 3,
+            "All three issues should be imported"
+        );
 
         // Verify labels survived the roundtrip
         let imported_many = storage2.get_issue("bf-many-labels").unwrap().unwrap();
@@ -906,13 +957,23 @@ mod tests {
         assert_eq!(imported_none.labels.len(), 0);
 
         // Verify labels in bead_labels table
-        storage2.with_immediate_transaction(|tx| {
-            let mut stmt = tx.prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label").unwrap();
-            let labels: Vec<String> = stmt.query_map(params!["bf-many-labels"], |row| row.get::<_, String>(0)).unwrap()
-                .filter_map(|r| r.ok()).collect();
-            assert_eq!(labels, vec!["critical", "database", "phase-1", "priority-p0", "storage"]);
-            Ok(())
-        }).unwrap();
+        storage2
+            .with_immediate_transaction(|tx| {
+                let mut stmt = tx
+                    .prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label")
+                    .unwrap();
+                let labels: Vec<String> = stmt
+                    .query_map(params!["bf-many-labels"], |row| row.get::<_, String>(0))
+                    .unwrap()
+                    .filter_map(|r| r.ok())
+                    .collect();
+                assert_eq!(
+                    labels,
+                    vec!["critical", "database", "phase-1", "priority-p0", "storage"]
+                );
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
@@ -948,7 +1009,11 @@ mod tests {
 
         // Update the issue with new labels
         let changes = IssueChanges {
-            labels: Some(vec!["original".to_string(), "updated".to_string(), "dirty".to_string()]),
+            labels: Some(vec![
+                "original".to_string(),
+                "updated".to_string(),
+                "dirty".to_string(),
+            ]),
             ..Default::default()
         };
         storage.update_issue("bf-dirty-1", &changes).unwrap();
@@ -959,7 +1024,8 @@ mod tests {
 
         // Verify JSONL contains updated labels
         let jsonl_contents = std::fs::read_to_string(&jsonl_path).unwrap();
-        let imported: Issue = jsonl_contents.lines()
+        let imported: Issue = jsonl_contents
+            .lines()
             .find_map(|line| serde_json::from_str::<Issue>(line).ok())
             .unwrap();
 

@@ -102,7 +102,11 @@ fn batch_close_cascade_marked_dirty_and_exported_in_single_flush() {
         .unwrap();
     // Full flush: lands both beads in JSONL and clears dirty marks.
     sync::flush(ws.path()).unwrap();
-    assert_eq!(storage.list_dirty_issues().unwrap().len(), 0, "baseline must be clean");
+    assert_eq!(
+        storage.list_dirty_issues().unwrap().len(),
+        0,
+        "baseline must be clean"
+    );
 
     let baseline = std::fs::read(&jsonl_path).unwrap();
     assert_eq!(
@@ -117,7 +121,13 @@ fn batch_close_cascade_marked_dirty_and_exported_in_single_flush() {
         id: "bf-blk".into(),
         reason: "done".into(),
     }];
-    let results = execute_batch(&storage, ops, ws.path(), true /* no-auto-flush: test calls flush manually **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        ws.path(),
+        true, /* no-auto-flush: test calls flush manually **/
+    )
+    .unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].status, "ok");
 
@@ -143,7 +153,11 @@ fn batch_close_cascade_marked_dirty_and_exported_in_single_flush() {
     // Final landed state: blocker closed, dependent cascaded to open — both
     // present in JSONL after that one flush.
     let after = parse_all(&jsonl_path);
-    assert_eq!(status_of(&after, "bf-blk"), Some("closed"), "closed blocker exported");
+    assert_eq!(
+        status_of(&after, "bf-blk"),
+        Some("closed"),
+        "closed blocker exported"
+    );
     assert_eq!(
         status_of(&after, "bf-dep"),
         Some("open"),
@@ -245,7 +259,13 @@ fn incremental_flush_targets_only_active_jsonl_not_archive() {
         assignee: None,
         labels: vec![],
     }];
-    let results = execute_batch(&storage, ops, ws.path(), true /* no-auto-flush: test calls flush manually **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        ws.path(),
+        true, /* no-auto-flush: test calls flush manually **/
+    )
+    .unwrap();
     let new_id = results[0].id.clone().expect("create op yields an id");
     let n = autoflush::run(ws.path()).unwrap();
     assert_eq!(n, 1, "the batch flush exports exactly the one new bead");

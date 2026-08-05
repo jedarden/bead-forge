@@ -10,10 +10,10 @@
 //! - At least 3 invalid query scenarios tested
 //! - All tests pass
 
+use serde_json::{from_str, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-use serde_json::{Value, from_str};
 
 fn bf() -> Command {
     Command::new(env!("CARGO_BIN_EXE_bf"))
@@ -43,7 +43,18 @@ fn setup() -> (TempDir, PathBuf) {
 
 /// Create a test bead with the given title
 fn create_bead(workspace: &Path, title: &str) -> String {
-    let (out, err, ok) = run_bf(workspace, &["create", "--title", title, "--type", "task", "--priority", "2"]);
+    let (out, err, ok) = run_bf(
+        workspace,
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
+    );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
     assert!(!id.is_empty(), "create produced no id: {out}");
@@ -52,9 +63,7 @@ fn create_bead(workspace: &Path, title: &str) -> String {
 
 /// Parse a JSON string and panic if invalid
 fn parse_json(json: &str) -> Value {
-    from_str(json).unwrap_or_else(|e| {
-        panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-    })
+    from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
 }
 
 /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -89,8 +98,10 @@ fn test_show_json_with_nonexistent_bead_id() {
         // Some implementations might return error JSON
         let parsed = parse_json(trimmed);
         // Error JSON should be either an object with error info or empty
-        assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                "Error output should be valid JSON");
+        assert!(
+            parsed.is_object() || parsed.is_array() || parsed.is_string(),
+            "Error output should be valid JSON"
+        );
     }
 
     // stderr should contain error message
@@ -103,12 +114,12 @@ fn test_show_json_with_malformed_bead_id() {
 
     // Try various malformed bead IDs
     let malformed_ids = vec![
-        "",                // empty string
-        "not-a-bf-id",     // wrong format
-        "bf-",             // incomplete prefix
-        "12345",           // just numbers
-        "bf-abc$",         // invalid character
-        "bf-@#$%",         // special characters
+        "",            // empty string
+        "not-a-bf-id", // wrong format
+        "bf-",         // incomplete prefix
+        "12345",       // just numbers
+        "bf-abc$",     // invalid character
+        "bf-@#$%",     // special characters
     ];
 
     for malformed_id in malformed_ids {
@@ -116,10 +127,7 @@ fn test_show_json_with_malformed_bead_id() {
             continue; // Skip empty ID as it may be handled differently
         }
 
-        let (out, err, ok) = run_bf(
-            &workspace,
-            &["show", malformed_id, "--format", "json"],
-        );
+        let (out, err, ok) = run_bf(&workspace, &["show", malformed_id, "--format", "json"]);
 
         // Command should fail for malformed ID
         assert!(!ok, "show with malformed ID '{}' should fail", malformed_id);
@@ -128,12 +136,18 @@ fn test_show_json_with_malformed_bead_id() {
         let trimmed = out.trim();
         if !trimmed.is_empty() {
             let parsed = parse_json(trimmed);
-            assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                    "Error output should be valid JSON");
+            assert!(
+                parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                "Error output should be valid JSON"
+            );
         }
 
         // stderr should contain error information
-        assert!(!err.is_empty(), "stderr should contain error for malformed ID '{}'", malformed_id);
+        assert!(
+            !err.is_empty(),
+            "stderr should contain error for malformed ID '{}'",
+            malformed_id
+        );
     }
 }
 
@@ -165,17 +179,28 @@ fn test_list_json_with_invalid_status_value() {
     // Try to list with invalid status - bead-forge handles this gracefully
     let (out, _err, ok) = run_bf(
         &workspace,
-        &["list", "--status", "invalid_status_value", "--format", "json"],
+        &[
+            "list",
+            "--status",
+            "invalid_status_value",
+            "--format",
+            "json",
+        ],
     );
 
     // bead-forge is permissive: it doesn't fail on invalid status values
     // Instead, it returns valid JSON (likely empty since no beads match invalid status)
-    assert!(ok, "list should succeed even with invalid status (permissive design)");
+    assert!(
+        ok,
+        "list should succeed even with invalid status (permissive design)"
+    );
 
     // Output should be valid JSON (empty array or beads with valid status)
     let parsed = parse_jsonl(&out);
-    assert!(parsed.is_empty() || parsed.iter().all(|v| v.is_object()),
-            "Output should be valid JSONL (empty or array of bead objects)");
+    assert!(
+        parsed.is_empty() || parsed.iter().all(|v| v.is_object()),
+        "Output should be valid JSONL (empty or array of bead objects)"
+    );
 }
 
 #[test]
@@ -192,16 +217,20 @@ fn test_search_json_with_empty_query() {
         if !out.trim().is_empty() && out.trim() != "[]" {
             let parsed = parse_jsonl(&out);
             // Should be array of beads
-            assert!(parsed.is_empty() || parsed.iter().all(|v| v.is_object()),
-                    "Search output should be valid JSONL");
+            assert!(
+                parsed.is_empty() || parsed.iter().all(|v| v.is_object()),
+                "Search output should be valid JSONL"
+            );
         }
     } else {
         // If command fails, should still have valid JSON error if stdout exists
         let trimmed = out.trim();
         if !trimmed.is_empty() {
             let parsed = parse_json(trimmed);
-            assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                    "Error output should be valid JSON");
+            assert!(
+                parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                "Error output should be valid JSON"
+            );
         }
         assert!(!err.is_empty(), "stderr should contain error message");
     }
@@ -235,13 +264,17 @@ fn test_ready_json_with_invalid_limit_value() {
             if ok {
                 // If command succeeded, should be valid JSONL
                 let parsed = parse_jsonl(&out);
-                assert!(parsed.iter().all(|v| v.is_object()),
-                        "Output should be valid JSONL");
+                assert!(
+                    parsed.iter().all(|v| v.is_object()),
+                    "Output should be valid JSONL"
+                );
             } else {
                 // If command failed, should be valid JSON error
                 let parsed = parse_json(trimmed);
-                assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                        "Error output should be valid JSON");
+                assert!(
+                    parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                    "Error output should be valid JSON"
+                );
             }
         }
     }
@@ -260,16 +293,16 @@ fn test_search_json_with_very_long_query() {
 
     // Try with very long query string
     let long_query = "a".repeat(10000);
-    let (out, err, ok) = run_bf(
-        &workspace,
-        &["search", &long_query, "--format", "json"],
-    );
+    let (out, err, ok) = run_bf(&workspace, &["search", &long_query, "--format", "json"]);
 
     // Should either succeed with no matches or fail gracefully
     if ok {
         // Should return valid JSONL (empty in this case)
         let parsed = parse_jsonl(&out);
-        assert!(parsed.is_empty(), "Very long query should return no matches");
+        assert!(
+            parsed.is_empty(),
+            "Very long query should return no matches"
+        );
     } else {
         // If it fails, error should be in stderr
         assert!(!err.is_empty(), "stderr should contain error message");
@@ -279,8 +312,10 @@ fn test_search_json_with_very_long_query() {
     let trimmed = out.trim();
     if !trimmed.is_empty() && trimmed != "[]" {
         let parsed = parse_json(trimmed);
-        assert!(parsed.is_object() || parsed.is_array(),
-                "Output should be valid JSON");
+        assert!(
+            parsed.is_object() || parsed.is_array(),
+            "Output should be valid JSON"
+        );
     }
 }
 
@@ -306,12 +341,16 @@ fn test_list_json_with_invalid_priority_filter() {
         if !trimmed.is_empty() && trimmed != "[]" {
             if ok {
                 let parsed = parse_jsonl(&out);
-                assert!(parsed.iter().all(|v| v.is_object()),
-                        "Output should be valid JSONL");
+                assert!(
+                    parsed.iter().all(|v| v.is_object()),
+                    "Output should be valid JSONL"
+                );
             } else {
                 let parsed = parse_json(trimmed);
-                assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                        "Error output should be valid JSON");
+                assert!(
+                    parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                    "Error output should be valid JSON"
+                );
             }
         }
     }
@@ -330,7 +369,13 @@ fn test_recent_json_with_invalid_time_period() {
     for invalid_period in invalid_periods {
         let (out, _err, ok) = run_bf(
             &workspace,
-            &["recent", "--time-period", invalid_period, "--format", "json"],
+            &[
+                "recent",
+                "--time-period",
+                invalid_period,
+                "--format",
+                "json",
+            ],
         );
 
         // Should handle invalid time period gracefully
@@ -342,8 +387,10 @@ fn test_recent_json_with_invalid_time_period() {
                 assert!(parsed.is_object(), "Recent should return envelope object");
             } else {
                 let parsed = parse_json(trimmed);
-                assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                        "Error output should be valid JSON");
+                assert!(
+                    parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                    "Error output should be valid JSON"
+                );
             }
         }
     }
@@ -364,7 +411,9 @@ fn test_json_with_conflicting_filter_options() {
     // Try with potentially conflicting filters (status + type)
     let (out, _err, ok) = run_bf(
         &workspace,
-        &["list", "--status", "closed", "--type", "epic", "--format", "json"],
+        &[
+            "list", "--status", "closed", "--type", "epic", "--format", "json",
+        ],
     );
 
     // Command should succeed with intersection of filters (or empty result)
@@ -375,7 +424,10 @@ fn test_json_with_conflicting_filter_options() {
     // Results should satisfy both filters (intersection)
     for bead in &parsed {
         let _status = bead.get("status").and_then(|v| v.as_str()).unwrap_or("");
-        let _issue_type = bead.get("issue_type").and_then(|v| v.as_str()).unwrap_or("");
+        let _issue_type = bead
+            .get("issue_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         // If results exist, they should match both filters (or implementation should document behavior)
     }
 }
@@ -409,13 +461,19 @@ fn test_all_commands_handle_nonexistent_bead_id_gracefully() {
         if !trimmed.is_empty() {
             if args.iter().any(|&x| x == "--format") && args.iter().any(|&x| x == "json") {
                 let parsed = parse_json(trimmed);
-                assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                        "Error output should be valid JSON");
+                assert!(
+                    parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                    "Error output should be valid JSON"
+                );
             }
         }
 
         // stderr should contain error
-        assert!(!err.is_empty(), "stderr should contain error for {:?}", args);
+        assert!(
+            !err.is_empty(),
+            "stderr should contain error for {:?}",
+            args
+        );
     }
 }
 
@@ -431,7 +489,14 @@ fn test_all_commands_handle_invalid_enum_values() {
     let invalid_enum_tests = vec![
         vec!["list", "--status", "INVALID_STATUS", "--format", "json"],
         vec!["list", "--type", "INVALID_TYPE", "--format", "json"],
-        vec!["search", "test", "--status", "INVALID_STATUS", "--format", "json"],
+        vec![
+            "search",
+            "test",
+            "--status",
+            "INVALID_STATUS",
+            "--format",
+            "json",
+        ],
     ];
 
     for args in invalid_enum_tests {
@@ -439,7 +504,11 @@ fn test_all_commands_handle_invalid_enum_values() {
 
         // bead-forge is permissive: it doesn't fail on invalid enum values
         // Instead, it returns valid JSON (likely empty results)
-        assert!(ok, "Command {:?} should succeed with invalid enum (permissive design)", args);
+        assert!(
+            ok,
+            "Command {:?} should succeed with invalid enum (permissive design)",
+            args
+        );
 
         // Output should be valid JSON if --format json is specified
         if args.iter().any(|&x| x == "--format") && args.iter().any(|&x| x == "json") {
@@ -447,14 +516,20 @@ fn test_all_commands_handle_invalid_enum_values() {
             if !trimmed.is_empty() && trimmed != "[]" {
                 // Should be valid JSONL
                 let parsed = parse_jsonl(&out);
-                assert!(parsed.iter().all(|v| v.is_object()),
-                        "Output should be valid JSONL for {:?}", args);
+                assert!(
+                    parsed.iter().all(|v| v.is_object()),
+                    "Output should be valid JSONL for {:?}",
+                    args
+                );
             }
         }
     }
 
     // Test ready command separately as it may have stricter validation
-    let (out, _err, ok) = run_bf(&workspace, &["ready", "--status", "INVALID_STATUS", "--format", "json"]);
+    let (out, _err, ok) = run_bf(
+        &workspace,
+        &["ready", "--status", "INVALID_STATUS", "--format", "json"],
+    );
 
     // ready command might be stricter, handle both cases
     if ok {
@@ -462,8 +537,10 @@ fn test_all_commands_handle_invalid_enum_values() {
         let trimmed = out.trim();
         if !trimmed.is_empty() && trimmed != "[]" {
             let parsed = parse_jsonl(&out);
-            assert!(parsed.iter().all(|v| v.is_object()),
-                    "ready output should be valid JSONL");
+            assert!(
+                parsed.iter().all(|v| v.is_object()),
+                "ready output should be valid JSONL"
+            );
         }
     } else {
         // If it fails, that's acceptable too - ready may have stricter validation
@@ -483,7 +560,16 @@ fn test_boundary_numeric_values_for_filters() {
         // Priority boundaries
         vec!["list", "--priority-min", "-100", "--format", "json"],
         vec!["list", "--priority-max", "1000", "--format", "json"],
-        vec!["search", "test", "--priority-min", "999", "--priority-max", "0", "--format", "json"], // inverted range
+        vec![
+            "search",
+            "test",
+            "--priority-min",
+            "999",
+            "--priority-max",
+            "0",
+            "--format",
+            "json",
+        ], // inverted range
     ];
 
     for args in boundary_tests {
@@ -494,8 +580,10 @@ fn test_boundary_numeric_values_for_filters() {
         if ok && !out.trim().is_empty() && out.trim() != "[]" {
             if args[0] == "search" || args[0] == "list" {
                 let parsed = parse_jsonl(&out);
-                assert!(parsed.iter().all(|v| v.is_object()),
-                        "Output should be valid JSONL");
+                assert!(
+                    parsed.iter().all(|v| v.is_object()),
+                    "Output should be valid JSONL"
+                );
             } else if args[0] == "recent" {
                 let parsed = parse_json(&out);
                 assert!(parsed.is_object(), "Recent should return envelope");
@@ -519,16 +607,21 @@ fn test_commands_with_invalid_format_values() {
     let invalid_formats = vec!["xml", "csv", "yaml", "invalid", "txt"];
 
     for invalid_format in invalid_formats {
-        let (out, err, ok) = run_bf(
-            &workspace,
-            &["list", "--format", invalid_format],
-        );
+        let (out, err, ok) = run_bf(&workspace, &["list", "--format", invalid_format]);
 
         // bead-forge may either reject invalid formats or fall back to default text format
         if !ok {
             // If it fails, should have error message and no stdout
-            assert!(!err.is_empty(), "stderr should contain error for invalid format '{}'", invalid_format);
-            assert!(out.trim().is_empty(), "stdout should be empty for invalid format '{}'", invalid_format);
+            assert!(
+                !err.is_empty(),
+                "stderr should contain error for invalid format '{}'",
+                invalid_format
+            );
+            assert!(
+                out.trim().is_empty(),
+                "stdout should be empty for invalid format '{}'",
+                invalid_format
+            );
         } else {
             // If it succeeds, it's using default text format (not JSON)
             // The key requirement is that it doesn't crash and produces some output
@@ -566,8 +659,10 @@ fn test_json_flag_with_other_invalid_combinations() {
         if ok && !out.trim().is_empty() && out.trim() != "[]" {
             // If it succeeds, last flag usually wins
             let parsed = parse_jsonl(&out);
-            assert!(parsed.iter().all(|v| v.is_object()),
-                    "Output should be valid JSONL");
+            assert!(
+                parsed.iter().all(|v| v.is_object()),
+                "Output should be valid JSONL"
+            );
         }
     }
 }
@@ -590,7 +685,10 @@ fn test_commands_with_whitespace_only_inputs() {
     if ok {
         // Should return valid JSON (likely empty)
         let parsed = parse_jsonl(&out);
-        assert!(parsed.is_empty(), "Whitespace search should return no matches");
+        assert!(
+            parsed.is_empty(),
+            "Whitespace search should return no matches"
+        );
     } else {
         // If it fails, should have error message
         assert!(!err.is_empty(), "stderr should contain error");
@@ -600,8 +698,10 @@ fn test_commands_with_whitespace_only_inputs() {
     let trimmed = out.trim();
     if !trimmed.is_empty() && trimmed != "[]" {
         let parsed = parse_json(trimmed);
-        assert!(parsed.is_object() || parsed.is_array(),
-                "Output should be valid JSON");
+        assert!(
+            parsed.is_object() || parsed.is_array(),
+            "Output should be valid JSON"
+        );
     }
 }
 
@@ -613,15 +713,15 @@ fn test_update_with_empty_field_values() {
     let bead_id = create_bead(&workspace, "Test bead");
 
     // Try updating with empty values
-    let (_out, err, ok) = run_bf(
-        &workspace,
-        &["update", &bead_id, "--description", ""],
-    );
+    let (_out, err, ok) = run_bf(&workspace, &["update", &bead_id, "--description", ""]);
 
     // Behavior depends on implementation (might clear field or reject)
     // If it fails, should fail gracefully
     if !ok {
-        assert!(!err.is_empty(), "stderr should contain error for empty update");
+        assert!(
+            !err.is_empty(),
+            "stderr should contain error for empty update"
+        );
     }
 
     // stdout should be empty or text (update doesn't support JSON output)
@@ -642,24 +742,50 @@ fn test_comprehensive_invalid_query_scenarios() {
     // Comprehensive list of invalid query scenarios
     let scenarios = vec![
         // Invalid bead IDs
-        ("nonexistent bead ID", vec!["show", "bf-does-not-exist", "--format", "json"]),
-        ("malformed bead ID", vec!["show", "not-valid-id", "--format", "json"]),
-
+        (
+            "nonexistent bead ID",
+            vec!["show", "bf-does-not-exist", "--format", "json"],
+        ),
+        (
+            "malformed bead ID",
+            vec!["show", "not-valid-id", "--format", "json"],
+        ),
         // Invalid status values
-        ("invalid status filter", vec!["list", "--status", "not_a_status", "--format", "json"]),
-        ("invalid type filter", vec!["list", "--type", "not_a_type", "--format", "json"]),
-
+        (
+            "invalid status filter",
+            vec!["list", "--status", "not_a_status", "--format", "json"],
+        ),
+        (
+            "invalid type filter",
+            vec!["list", "--type", "not_a_type", "--format", "json"],
+        ),
         // Invalid numeric ranges
-        ("negative priority", vec!["list", "--priority", "-1", "--format", "json"]),
-        ("out of range priority", vec!["list", "--priority", "999", "--format", "json"]),
-
+        (
+            "negative priority",
+            vec!["list", "--priority", "-1", "--format", "json"],
+        ),
+        (
+            "out of range priority",
+            vec!["list", "--priority", "999", "--format", "json"],
+        ),
         // Invalid time periods
-        ("invalid time period", vec!["recent", "--time-period", "invalid", "--format", "json"]),
-        ("negative time", vec!["recent", "--time-period", "-1h", "--format", "json"]),
-
+        (
+            "invalid time period",
+            vec!["recent", "--time-period", "invalid", "--format", "json"],
+        ),
+        (
+            "negative time",
+            vec!["recent", "--time-period", "-1h", "--format", "json"],
+        ),
         // Invalid limits
-        ("negative limit", vec!["list", "--limit", "-1", "--format", "json"]),
-        ("non-numeric limit", vec!["list", "--limit", "abc", "--format", "json"]),
+        (
+            "negative limit",
+            vec!["list", "--limit", "-1", "--format", "json"],
+        ),
+        (
+            "non-numeric limit",
+            vec!["list", "--limit", "abc", "--format", "json"],
+        ),
     ];
 
     let mut passed_scenarios = 0;
@@ -678,27 +804,40 @@ fn test_comprehensive_invalid_query_scenarios() {
                 if args.iter().any(|&x| x == "--format") && args.iter().any(|&x| x == "json") {
                     if args[0] == "show" || args[0] == "recent" {
                         let parsed = parse_json(trimmed);
-                        assert!(parsed.is_object() || parsed.is_array(),
-                                "{}: output should be valid JSON", description);
+                        assert!(
+                            parsed.is_object() || parsed.is_array(),
+                            "{}: output should be valid JSON",
+                            description
+                        );
                     } else {
                         let parsed = parse_jsonl(&out);
-                        assert!(parsed.iter().all(|v| v.is_object()),
-                                "{}: output should be valid JSONL", description);
+                        assert!(
+                            parsed.iter().all(|v| v.is_object()),
+                            "{}: output should be valid JSONL",
+                            description
+                        );
                     }
                 }
             }
             passed_scenarios += 1;
         } else {
             // Command failed - verify graceful error handling
-            assert!(!err.is_empty(), "{}: stderr should contain error", description);
+            assert!(
+                !err.is_empty(),
+                "{}: stderr should contain error",
+                description
+            );
 
             // If --format json was specified, check stdout is valid JSON or empty
             if args.iter().any(|&x| x == "--format") && args.iter().any(|&x| x == "json") {
                 let trimmed = out.trim();
                 if !trimmed.is_empty() {
                     let parsed = parse_json(trimmed);
-                    assert!(parsed.is_object() || parsed.is_array() || parsed.is_string(),
-                            "{}: error output should be valid JSON", description);
+                    assert!(
+                        parsed.is_object() || parsed.is_array() || parsed.is_string(),
+                        "{}: error output should be valid JSON",
+                        description
+                    );
                 }
             }
             passed_scenarios += 1;
@@ -706,6 +845,12 @@ fn test_comprehensive_invalid_query_scenarios() {
     }
 
     // Verify we tested at least 3 scenarios as required
-    assert!(passed_scenarios >= 3, "Should test at least 3 invalid query scenarios");
-    println!("Tested {} invalid query scenarios successfully", passed_scenarios);
+    assert!(
+        passed_scenarios >= 3,
+        "Should test at least 3 invalid query scenarios"
+    );
+    println!(
+        "Tested {} invalid query scenarios successfully",
+        passed_scenarios
+    );
 }

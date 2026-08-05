@@ -157,7 +157,7 @@ impl Storage {
 
     pub fn get_issue(&self, id: &str) -> Result<Option<Issue>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
                     i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
                     i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
@@ -197,9 +197,7 @@ impl Storage {
         let needs_annotation_join = filter.annotation.is_some();
 
         if needs_annotation_join {
-            query.push_str(
-                " LEFT JOIN bead_annotations a ON i.id = a.bead_id",
-            );
+            query.push_str(" LEFT JOIN bead_annotations a ON i.id = a.bead_id");
         }
 
         query.push_str(" WHERE i.deleted_at IS NULL");
@@ -256,7 +254,7 @@ impl Storage {
             query.push_str(&format!(" OFFSET {}", offset));
         }
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&query)?;
+        let mut stmt = conn.prepare_cached(&query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> =
             params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
         let mut rows = stmt.query(param_refs.as_slice())?;
@@ -269,7 +267,7 @@ impl Storage {
 
     pub fn list_all_issues(&self) -> Result<Vec<Issue>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
                     i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
                     i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
@@ -551,6 +549,20 @@ impl Storage {
                     updates.push("close_reason = NULL");
                     updates.push("closed_by_session = NULL");
                 }
+                // Set closed fields when transitioning TO closed (satisfies CHECK constraint)
+                else if matches!(status, Status::Closed) {
+                    // Only set if not already closed (avoid overwriting existing close metadata)
+                    if !matches!(current_status, Some(Status::Closed)) {
+                        let now = Utc::now();
+                        updates.push("closed_at = ?");
+                        params.push(Box::new(now.to_rfc3339()));
+                        updates.push("close_reason = ?");
+                        params.push(Box::new(String::new())); // Empty reason when closed via update
+                        updates.push("closed_by_session = ?");
+                        let actor = changes.actor.as_deref().unwrap_or("cli");
+                        params.push(Box::new(actor.to_string()));
+                    }
+                }
             }
             if let Some(priority) = changes.priority {
                 updates.push("priority = ?");
@@ -670,6 +682,19 @@ impl Storage {
             if changes.status.is_some() {
                 invalidate_cache(tx)?;
                 compute_all_critical_paths(tx)?;
+                // Rebuild blocked_issues_cache when status changes to reflect new blocker states
+                let now = Utc::now();
+                tx.execute("DELETE FROM blocked_issues_cache", [])?;
+                tx.execute(
+                    "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                     SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                     FROM dependencies d
+                     INNER JOIN issues i ON i.id = d.depends_on_id
+                     WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                     AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                     GROUP BY d.issue_id",
+                    params![now.to_rfc3339()],
+                )?;
             }
             Ok(())
         })
@@ -960,9 +985,8 @@ impl Storage {
     /// a JSON array of blocker IDs.
     pub fn get_blocked_issues(&self) -> Result<Vec<(String, String)>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT issue_id, blocked_by FROM blocked_issues_cache ORDER BY issue_id"
-        )?;
+        let mut stmt = conn
+            .prepare("SELECT issue_id, blocked_by FROM blocked_issues_cache ORDER BY issue_id")?;
 
         let result = stmt
             .query_map([], |row| {
@@ -1111,6 +1135,7 @@ impl Storage {
                 thread_id: row.get(4)?,
                 created_at: parse_required_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
+                title: None,
             });
         }
         Ok(deps)
@@ -1188,6 +1213,18 @@ impl Storage {
             // Invalidate critical path cache after adding a dependency
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
+            // Rebuild blocked_issues_cache to reflect the new dependency
+            tx.execute("DELETE FROM blocked_issues_cache", [])?;
+            tx.execute(
+                "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                 SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                 FROM dependencies d
+                 INNER JOIN issues i ON i.id = d.depends_on_id
+                 WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                 GROUP BY d.issue_id",
+                params![now.to_rfc3339()],
+            )?;
             Ok(())
         })
     }
@@ -1202,6 +1239,19 @@ impl Storage {
             // Invalidate critical path cache after removing a dependency
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
+            // Rebuild blocked_issues_cache to reflect the removed dependency
+            let now = Utc::now();
+            tx.execute("DELETE FROM blocked_issues_cache", [])?;
+            tx.execute(
+                "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                 SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                 FROM dependencies d
+                 INNER JOIN issues i ON i.id = d.depends_on_id
+                 WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                 GROUP BY d.issue_id",
+                params![now.to_rfc3339()],
+            )?;
             Ok(())
         })
     }
@@ -1342,6 +1392,7 @@ impl Storage {
                 thread_id: row.get(4)?,
                 created_at: parse_required_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
+                title: None,
             });
         }
         Ok(deps)
@@ -1728,7 +1779,7 @@ impl Storage {
 
         if let (Some(m), Some(h)) = (model, harness) {
             // Velocity-aware scoring: join velocity_stats and compute combined_score
-            let mut stmt = conn.prepare(
+            let mut stmt = conn.prepare_cached(
                 "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
                         COALESCE(c.float, 999) as critical_float,
                         i.priority,
@@ -1748,13 +1799,7 @@ impl Storage {
                    AND i.pinned = 0
                    AND i.is_template = 0
                    AND i.deleted_at IS NULL
-                   AND NOT EXISTS (
-                       SELECT 1 FROM dependencies blocker_dep
-                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                       WHERE blocker_dep.issue_id = i.id
-                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-                   )
+                   AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
                  GROUP BY i.id
                  ORDER BY
                      combined_score / COALESCE(vs.p50_seconds, 1800) DESC,
@@ -1780,7 +1825,7 @@ impl Storage {
             }
         } else {
             // Standard scoring without velocity data
-            let mut stmt = conn.prepare(
+            let mut stmt = conn.prepare_cached(
                 "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
                         COALESCE(c.float, 999) as critical_float,
                         i.priority,
@@ -1793,13 +1838,7 @@ impl Storage {
                    AND i.pinned = 0
                    AND i.is_template = 0
                    AND i.deleted_at IS NULL
-                   AND NOT EXISTS (
-                       SELECT 1 FROM dependencies blocker_dep
-                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                       WHERE blocker_dep.issue_id = i.id
-                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-                   )
+                   AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
                  GROUP BY i.id
                  ORDER BY
                      downstream_impact DESC,
@@ -2003,7 +2042,10 @@ impl Storage {
             .unwrap_or_else(|| issue.content_hash());
 
         tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
-        tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![&issue.id])?;
+        tx.execute(
+            "DELETE FROM bead_labels WHERE bead_id = ?1",
+            params![&issue.id],
+        )?;
         tx.execute(
             "DELETE FROM dependencies WHERE issue_id = ?1",
             params![&issue.id],

@@ -10,8 +10,8 @@ use bead_forge::config::init_workspace;
 use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
-use rusqlite::params;
 use clap::Parser;
+use rusqlite::params;
 
 /// Setup test workspace with archive files for testing archive fallback
 fn setup_workspace_with_archive() -> tempfile::TempDir {
@@ -26,20 +26,30 @@ fn setup_workspace_with_archive() -> tempfile::TempDir {
     let storage = Storage::open(&db_path).unwrap();
 
     // Create some test beads in database
-    let mut bead1 = Issue::new("bf-db-1".to_string(), "Database bead 1".to_string(), ".".to_string());
+    let mut bead1 = Issue::new(
+        "bf-db-1".to_string(),
+        "Database bead 1".to_string(),
+        ".".to_string(),
+    );
     bead1.status = Status::Open;
     bead1.priority = Priority(2);
     storage.create_issue(&bead1).unwrap();
 
     // Add annotation for filtering tests
-    storage.set_annotation("bf-db-1", "test_key", "test_value").unwrap();
+    storage
+        .set_annotation("bf-db-1", "test_key", "test_value")
+        .unwrap();
     storage.add_label("bf-db-1", "test-label").unwrap();
 
     // Create an archive file with a bead that's NOT in the database
     let archive_dir = beads_dir.join("archive");
     fs::create_dir_all(&archive_dir).unwrap();
 
-    let mut archived_bead = Issue::new("bf-archived-1".to_string(), "Archived bead".to_string(), ".".to_string());
+    let mut archived_bead = Issue::new(
+        "bf-archived-1".to_string(),
+        "Archived bead".to_string(),
+        ".".to_string(),
+    );
     archived_bead.status = Status::Closed;
     archived_bead.closed_at = Some(Utc::now());
     archived_bead.priority = Priority(1);
@@ -75,21 +85,27 @@ fn setup_workspace_with_velocity() -> tempfile::TempDir {
 
     // Create test beads for velocity tracking
     for i in 0..5 {
-        let mut bead = Issue::new(format!("bf-velo-{}", i), format!("Velocity bead {}", i), ".".to_string());
+        let mut bead = Issue::new(
+            format!("bf-velo-{}", i),
+            format!("Velocity bead {}", i),
+            ".".to_string(),
+        );
         bead.status = Status::Closed;
         bead.issue_type = IssueType::Task;
         bead.closed_at = Some(Utc::now());
         storage.create_issue(&bead).unwrap();
 
         // Create worker sessions for velocity data
-        storage.record_worker_session(
-            "worker-1",
-            Some("claude-4.7"),
-            Some("cli"),
-            None,
-            &format!("bf-velo-{}", i),
-            workspace.to_str().unwrap(),
-        ).unwrap();
+        storage
+            .record_worker_session(
+                "worker-1",
+                Some("claude-4.7"),
+                Some("cli"),
+                None,
+                &format!("bf-velo-{}", i),
+                workspace.to_str().unwrap(),
+            )
+            .unwrap();
     }
 
     // Flush to JSONL
@@ -168,7 +184,10 @@ fn test_list_all_with_annotation_filter() {
     let workspace = temp_dir.path();
 
     // Test --all mode with annotation filter
-    let result = run_command(workspace, &["list", "--all", "--annotation", "test_key=test_value"]);
+    let result = run_command(
+        workspace,
+        &["list", "--all", "--annotation", "test_key=test_value"],
+    );
 
     assert!(result.is_ok());
 }
@@ -202,7 +221,7 @@ fn test_show_archive_fallback() {
 
     // Should succeed by finding it in archives
     match result {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             // Archive fallback might not be fully implemented yet
             // Let's check if it's just not finding the bead
@@ -227,7 +246,10 @@ fn test_show_envelope_output() {
     let workspace = temp_dir.path();
 
     // Test envelope output for show command
-    let result = run_command(workspace, &["show", "bf-db-1", "--format", "json", "--envelope"]);
+    let result = run_command(
+        workspace,
+        &["show", "bf-db-1", "--format", "json", "--envelope"],
+    );
 
     assert!(result.is_ok());
 }
@@ -247,12 +269,23 @@ fn test_show_toon_format_with_dependencies() {
     let storage = Storage::open(&db_path).unwrap();
 
     // Create a bead with dependencies
-    let mut bead_with_dep = Issue::new("bf-dep-test".to_string(), "Bead with deps".to_string(), ".".to_string());
+    let mut bead_with_dep = Issue::new(
+        "bf-dep-test".to_string(),
+        "Bead with deps".to_string(),
+        ".".to_string(),
+    );
     bead_with_dep.status = Status::Open;
     storage.create_issue(&bead_with_dep).unwrap();
 
     // Add a dependency
-    storage.add_dependency("bf-dep-test", "bf-db-1", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
+    storage
+        .add_dependency(
+            "bf-dep-test",
+            "bf-db-1",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // Test toon format which should show dependencies
     let result = run_command(workspace, &["show", "bf-dep-test", "--format", "toon"]);
@@ -322,10 +355,14 @@ fn test_labels_invalid_bead_id() {
     // Should handle gracefully - either error or empty result
     // The command should not panic
     match result {
-        Ok(_) => {}, // Empty result is ok
+        Ok(_) => {} // Empty result is ok
         Err(e) => {
             // Error is acceptable as long as it's not a panic
-            assert!(e.to_string().contains("not found") || e.to_string().contains("Bead not found") || e.to_string().contains("No bead"));
+            assert!(
+                e.to_string().contains("not found")
+                    || e.to_string().contains("Bead not found")
+                    || e.to_string().contains("No bead")
+            );
         }
     }
 }
@@ -351,9 +388,9 @@ fn test_labels_json_format() {
 
 #[test]
 fn test_velocity_session_not_found() {
+    use bead_forge::storage::schema::apply_schema;
     use bead_forge::velocity;
     use rusqlite::Connection;
-    use bead_forge::storage::schema::apply_schema;
 
     let temp_file = tempfile::NamedTempFile::new().unwrap();
     let conn = Connection::open(temp_file.path()).unwrap();
@@ -373,7 +410,8 @@ fn test_velocity_session_not_found() {
             Utc::now().to_rfc3339(),
             Utc::now().to_rfc3339(),
         ],
-    ).unwrap();
+    )
+    .unwrap();
 
     // Try to close a bead that has no worker session
     let result = velocity::update_session_on_close(&conn, "bf-test-1", Utc::now());
@@ -389,9 +427,9 @@ fn test_velocity_session_not_found() {
 
 #[test]
 fn test_velocity_parse_failure_fallback() {
+    use bead_forge::storage::schema::apply_schema;
     use bead_forge::velocity;
     use rusqlite::Connection;
-    use bead_forge::storage::schema::apply_schema;
 
     let temp_file = tempfile::NamedTempFile::new().unwrap();
     let conn = Connection::open(temp_file.path()).unwrap();
@@ -411,7 +449,8 @@ fn test_velocity_parse_failure_fallback() {
             Utc::now().to_rfc3339(),
             Utc::now().to_rfc3339(),
         ],
-    ).unwrap();
+    )
+    .unwrap();
 
     // Create a worker session with invalid claimed_at format
     conn.execute(
@@ -433,9 +472,9 @@ fn test_velocity_parse_failure_fallback() {
 
 #[test]
 fn test_velocity_get_expected_seconds_fallback_chain() {
+    use bead_forge::storage::schema::apply_schema;
     use bead_forge::velocity;
     use rusqlite::Connection;
-    use bead_forge::storage::schema::apply_schema;
 
     let temp_file = tempfile::NamedTempFile::new().unwrap();
     let conn = Connection::open(temp_file.path()).unwrap();
@@ -450,7 +489,11 @@ fn test_velocity_get_expected_seconds_fallback_chain() {
 
     let result = velocity::get_expected_seconds(&conn, "exact-model", "exact-harness", "feature");
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Some(2400), "Exact match should return 2400");
+    assert_eq!(
+        result.unwrap(),
+        Some(2400),
+        "Exact match should return 2400"
+    );
 
     // Test fallback 1: model + issue_type (empty harness) - requires sample_count >= 3
     conn.execute(
@@ -460,11 +503,16 @@ fn test_velocity_get_expected_seconds_fallback_chain() {
     ).unwrap();
 
     // This should match the second fallback query (model + issue_type with empty harness)
-    let result = velocity::get_expected_seconds(&conn, "claude-4.7", "non-matching-harness", "task");
+    let result =
+        velocity::get_expected_seconds(&conn, "claude-4.7", "non-matching-harness", "task");
     match result {
         Ok(seconds) => {
-            assert_eq!(seconds, Some(3600), "Fallback to model+issue_type should return 3600");
-        },
+            assert_eq!(
+                seconds,
+                Some(3600),
+                "Fallback to model+issue_type should return 3600"
+            );
+        }
         Err(e) => {
             eprintln!("Fallback to model+issue_type failed (this might be expected if fallback isn't fully working): {}", e);
         }
@@ -482,12 +530,19 @@ fn test_velocity_get_expected_seconds_fallback_chain() {
     match result {
         Ok(seconds) => {
             // Should get Some(1800) from the fallback row
-            assert_eq!(seconds, Some(1800), "Fallback to issue_type='bug' should return 1800");
-        },
+            assert_eq!(
+                seconds,
+                Some(1800),
+                "Fallback to issue_type='bug' should return 1800"
+            );
+        }
         Err(e) => {
             // The third fallback might not be implemented correctly
             // For now, just verify the error is handled gracefully
-            eprintln!("Fallback to issue_type only failed (this might be expected): {}", e);
+            eprintln!(
+                "Fallback to issue_type only failed (this might be expected): {}",
+                e
+            );
         }
     }
 
@@ -496,9 +551,9 @@ fn test_velocity_get_expected_seconds_fallback_chain() {
     // This is a known issue - the function should return Ok(None) instead
     let result = velocity::get_expected_seconds(&conn, "unknown", "unknown", "unknown");
     match result {
-        Ok(None) => {}, // Ideal behavior
+        Ok(None) => {} // Ideal behavior
         Ok(Some(seconds)) => panic!("Expected None but got Some({})", seconds),
-        Err(_) => {}, // Current behavior - returns error instead of Ok(None)
+        Err(_) => {} // Current behavior - returns error instead of Ok(None)
     }
 }
 
@@ -508,9 +563,9 @@ fn test_velocity_get_expected_seconds_fallback_chain() {
 
 #[test]
 fn test_velocity_dynamic_query_both_filters() {
+    use bead_forge::storage::schema::apply_schema;
     use bead_forge::velocity;
     use rusqlite::Connection;
-    use bead_forge::storage::schema::apply_schema;
 
     let temp_file = tempfile::NamedTempFile::new().unwrap();
     let conn = Connection::open(temp_file.path()).unwrap();
@@ -599,12 +654,30 @@ fn test_show_dependencies_default_format() {
     let storage = Storage::open(&db_path).unwrap();
 
     // Create a bead with multiple dependencies
-    let mut bead = Issue::new("bf-multi-deps".to_string(), "Bead with multiple deps".to_string(), ".".to_string());
+    let mut bead = Issue::new(
+        "bf-multi-deps".to_string(),
+        "Bead with multiple deps".to_string(),
+        ".".to_string(),
+    );
     bead.status = Status::Open;
     storage.create_issue(&bead).unwrap();
 
-    storage.add_dependency("bf-multi-deps", "bf-db-1", &bead_forge::model::DependencyType::Blocks, "test1").unwrap();
-    storage.add_dependency("bf-multi-deps", "bf-archived-1", &bead_forge::model::DependencyType::Related, "test2").unwrap();
+    storage
+        .add_dependency(
+            "bf-multi-deps",
+            "bf-db-1",
+            &bead_forge::model::DependencyType::Blocks,
+            "test1",
+        )
+        .unwrap();
+    storage
+        .add_dependency(
+            "bf-multi-deps",
+            "bf-archived-1",
+            &bead_forge::model::DependencyType::Related,
+            "test2",
+        )
+        .unwrap();
 
     // Test default text format which should show all dependencies
     let result = run_command(workspace, &["show", "bf-multi-deps"]);
@@ -629,7 +702,11 @@ fn test_ready_empty_candidates() {
     let storage = Storage::open(&db_path).unwrap();
 
     // Create only closed beads (no ready candidates)
-    let mut closed_bead = Issue::new("bf-closed".to_string(), "Closed bead".to_string(), ".".to_string());
+    let mut closed_bead = Issue::new(
+        "bf-closed".to_string(),
+        "Closed bead".to_string(),
+        ".".to_string(),
+    );
     closed_bead.status = Status::Closed;
     closed_bead.closed_at = Some(Utc::now());
     storage.create_issue(&closed_bead).unwrap();

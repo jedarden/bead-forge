@@ -23,7 +23,10 @@ fn main() -> Result<()> {
 
     // Verify workspace directory exists
     if !workspace_dir.exists() {
-        anyhow::bail!("Workspace directory does not exist: {}", workspace_dir.display());
+        anyhow::bail!(
+            "Workspace directory does not exist: {}",
+            workspace_dir.display()
+        );
     }
 
     // Create trace manager for workspace
@@ -53,7 +56,7 @@ fn main() -> Result<()> {
         &workspace_dir,
         bead_id,
         &metadata,
-        &["--lib", "trace::tests::test_trace_metadata_default"]
+        &["--lib", "trace::tests::test_trace_metadata_default"],
     )?;
 
     println!("=== Test Execution Complete ===\n");
@@ -62,7 +65,11 @@ fn main() -> Result<()> {
     println!();
 
     println!("Exit code: {}", result.exit_code);
-    println!("Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+    println!(
+        "Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
     println!("Trace directory: {}", result.bead_trace_dir.display());
     println!();
 

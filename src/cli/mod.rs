@@ -3,19 +3,19 @@ use crate::claim::{
     claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
 };
 use crate::close::close_bead;
-use crate::reopen::reopen_bead;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, ClaimResultOutput, OutputFormat, StatsOutput};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
-use serde_json::Value;
+use crate::reopen::reopen_bead;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
 use crate::validation::normalize_assignee;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -1172,7 +1172,16 @@ pub fn run(cli: Cli) -> Result<()> {
         } => {
             let format = if json { "json".to_string() } else { format };
             cmd_list(
-                &beads_dir, status, type_, assignee, priority, annotation, limit, all, &format, cli.envelope,
+                &beads_dir,
+                status,
+                type_,
+                assignee,
+                priority,
+                annotation,
+                limit,
+                all,
+                &format,
+                cli.envelope,
             )
         }
         Commands::Show { id, format, json } => {
@@ -1205,10 +1214,13 @@ pub fn run(cli: Cli) -> Result<()> {
             // update path — cmd_update -> update_issue writes the column).
             // clap's conflicts_with("description") guarantees only one is set.
             let description = match description_file {
-                Some(path) => Some(
-                    std::fs::read_to_string(&path)
-                        .map_err(|e| anyhow!("Failed to read --description-file {}: {}", path.display(), e))?,
-                ),
+                Some(path) => Some(std::fs::read_to_string(&path).map_err(|e| {
+                    anyhow!(
+                        "Failed to read --description-file {}: {}",
+                        path.display(),
+                        e
+                    )
+                })?),
                 None => description,
             };
             cmd_update(
@@ -1298,9 +1310,12 @@ pub fn run(cli: Cli) -> Result<()> {
         ),
         Commands::CommitCheck => cmd_commit_check(&beads_dir),
         Commands::Count { status } => cmd_count(&beads_dir, status),
-        Commands::Batch { file, json, stdin, format } => {
-            cmd_batch(&beads_dir, file, json, stdin, &format, no_auto_flush)
-        }
+        Commands::Batch {
+            file,
+            json,
+            stdin,
+            format,
+        } => cmd_batch(&beads_dir, file, json, stdin, &format, no_auto_flush),
         Commands::Mitosis {
             id,
             children,
@@ -1609,7 +1624,10 @@ fn cmd_create(
             "labels": issue.labels
         });
         let json_str = serde_json::to_string(&data)?;
-        println!("{}", formatter.format_with_envelope_and_warning("create", &json_str, warning.as_deref()));
+        println!(
+            "{}",
+            formatter.format_with_envelope_and_warning("create", &json_str, warning.as_deref())
+        );
     } else {
         println!("{}", id);
     }
@@ -1938,12 +1956,14 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
     let candidates =
         storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
 
-    match format {
-        "json" => {
-            // Use the shared formatter for consistency with `list`/`search`.
+    // Use the common formatter pattern for consistency with other commands
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+
+    match output_format {
+        OutputFormat::Json => {
             // Resolve each scored candidate to its full Issue record so
             // the formatter has every field; empty result prints `[]`.
-            let formatter = get_formatter(OutputFormat::Json);
             let issues: Vec<Issue> = candidates
                 .iter()
                 .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
@@ -1972,7 +1992,8 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
                 }
             }
         }
-        "toon" => {
+        OutputFormat::Toon => {
+            // Use the shared toon formatter for each candidate
             for candidate in candidates {
                 println!(
                     "{}",
@@ -1986,7 +2007,8 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
                 );
             }
         }
-        _ => {
+        OutputFormat::Text => {
+            // Use the shared text formatter pattern
             for candidate in candidates {
                 println!(
                     "[{}] {} (priority={}, impact={}, float={})",
@@ -2316,7 +2338,12 @@ fn cmd_doctor(
                     m.reason
                 );
                 for f in &m.files {
-                    println!("      {}  sha256:{}…  {} bytes", f.name, &f.sha256[..12.min(f.sha256.len())], f.bytes);
+                    println!(
+                        "      {}  sha256:{}…  {} bytes",
+                        f.name,
+                        &f.sha256[..12.min(f.sha256.len())],
+                        f.bytes
+                    );
                 }
             }
             println!();
@@ -2597,7 +2624,8 @@ fn cmd_batch(
     let results = execute_batch(&storage, ops, beads_dir, no_auto_flush)?;
 
     // Check if we should output JSON
-    let output_format = crate::format::OutputFormat::from_str(format).unwrap_or(crate::format::OutputFormat::Text);
+    let output_format =
+        crate::format::OutputFormat::from_str(format).unwrap_or(crate::format::OutputFormat::Text);
     match output_format {
         crate::format::OutputFormat::Json => {
             let formatter = get_formatter(output_format);
@@ -2990,7 +3018,11 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
     Ok(())
 }
 
-fn cmd_comments(beads_dir: &PathBuf, comments: CommentsCommands, no_auto_flush: bool) -> Result<()> {
+fn cmd_comments(
+    beads_dir: &PathBuf,
+    comments: CommentsCommands,
+    no_auto_flush: bool,
+) -> Result<()> {
     match comments {
         CommentsCommands::Add { id, text } => {
             let config = load_config(beads_dir)?;
@@ -3378,7 +3410,11 @@ fn cmd_velocity(
     Ok(())
 }
 
-fn cmd_annotate(beads_dir: &PathBuf, annotate: AnnotateCommands, no_auto_flush: bool) -> Result<()> {
+fn cmd_annotate(
+    beads_dir: &PathBuf,
+    annotate: AnnotateCommands,
+    no_auto_flush: bool,
+) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -3802,14 +3838,13 @@ fn cmd_recent(
 
 #[cfg(test)]
 mod tests {
-    pub mod json_output;
-    pub mod list_ready_recent_json_tests;
-    pub mod show_json_tests;
-    pub mod search_json_tests;
     pub mod edge_case_json_tests;
     pub mod error_json_tests;
+    pub mod json_output;
     pub mod json_schema_validation;
+    pub mod list_ready_recent_json_tests;
+    pub mod search_json_tests;
+    pub mod show_json_tests;
     pub use crate::config::init_workspace;
     pub use crate::Storage;
 }
-

@@ -3,12 +3,12 @@
 // Comprehensive tests for epic label edge cases and type preservation through all operations.
 // These tests ensure that epic type is preserved and labels work correctly across all scenarios.
 
-use std::process::Command;
-use std::fs;
-use tempfile::TempDir;
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
+use std::fs;
+use std::process::Command;
+use tempfile::TempDir;
 
 /// Get the path to the bf binary
 fn get_bf_binary() -> String {
@@ -31,13 +31,15 @@ default_priority: 2
 default_type: task
 claim_ttl_minutes: 30
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     let metadata_path = beads_dir.join("metadata.json");
     fs::write(
         &metadata_path,
         r#"{"database": "beads.db", "jsonl_export": "issues.jsonl"}"#,
-    ).unwrap();
+    )
+    .unwrap();
 
     let db_path = beads_dir.join("beads.db");
     bead_forge::storage::Storage::open(&db_path).unwrap();
@@ -397,13 +399,7 @@ fn test_epic_type_preserved_through_label_add() {
     // Add labels
     let add_out = Command::new(get_bf_binary())
         .args([
-            "label",
-            "add",
-            &bead_id,
-            "--label",
-            "label1",
-            "--label",
-            "label2",
+            "label", "add", &bead_id, "--label", "label1", "--label", "label2",
         ])
         .current_dir(workspace)
         .output()
@@ -801,15 +797,7 @@ fn test_comprehensive_epic_label_workflow() {
     // 3. Add multiple labels at once
     let add_out = Command::new(get_bf_binary())
         .args([
-            "label",
-            "add",
-            &bead_id,
-            "--label",
-            "label1",
-            "--label",
-            "label2",
-            "--label",
-            "label3",
+            "label", "add", &bead_id, "--label", "label1", "--label", "label2", "--label", "label3",
         ])
         .current_dir(workspace)
         .output()
@@ -899,13 +887,7 @@ fn test_epic_label_search_integration() {
     for (name, label) in &test_cases {
         let out = Command::new(get_bf_binary())
             .args([
-                "create",
-                "--title",
-                name,
-                "--type",
-                "epic",
-                "--label",
-                label,
+                "create", "--title", name, "--type", "epic", "--label", label,
             ])
             .current_dir(workspace)
             .output()
@@ -942,13 +924,7 @@ fn test_epic_label_list_command() {
     for (name, issue_type, label) in &test_cases {
         let out = Command::new(get_bf_binary())
             .args([
-                "create",
-                "--title",
-                name,
-                "--type",
-                issue_type,
-                "--label",
-                label,
+                "create", "--title", name, "--type", issue_type, "--label", label,
             ])
             .current_dir(workspace)
             .output()

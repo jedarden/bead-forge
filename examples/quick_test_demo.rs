@@ -44,12 +44,16 @@ fn main() -> Result<()> {
         &needle_dir,
         "bf-3ezlq4",
         &metadata,
-        &["--", "bead_store"]  // Run only bead_store tests
+        &["--", "bead_store"], // Run only bead_store tests
     )?;
 
     println!("=== Test Execution Complete ===\n");
     println!("Exit code: {}", result.exit_code);
-    println!("Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+    println!(
+        "Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
     println!("Trace directory: {}", result.bead_trace_dir.display());
     println!("Start time: {}", result.start_time.unwrap_or_default());
     println!("End time: {}", result.end_time.unwrap_or_default());

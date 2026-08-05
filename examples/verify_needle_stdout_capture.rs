@@ -30,7 +30,10 @@ fn main() -> Result<()> {
     // Verify NEEDLE has Cargo.toml
     let cargo_toml = needle_dir.join("Cargo.toml");
     if !cargo_toml.exists() {
-        anyhow::bail!("NEEDLE directory does not contain Cargo.toml: {}", needle_dir.display());
+        anyhow::bail!(
+            "NEEDLE directory does not contain Cargo.toml: {}",
+            needle_dir.display()
+        );
     }
 
     println!("✓ Acceptance Criteria 1: ~/NEEDLE directory exists with Cargo.toml");
@@ -58,7 +61,7 @@ fn main() -> Result<()> {
         &needle_dir,
         bead_id,
         &metadata,
-        &["--lib", "--", "--test-threads=1"] // Limit threads for predictable output
+        &["--lib", "--", "--test-threads=1"], // Limit threads for predictable output
     )?;
 
     println!("=== Test Execution Complete ===\n");
@@ -67,7 +70,11 @@ fn main() -> Result<()> {
     println!();
 
     println!("Exit code: {}", result.exit_code);
-    println!("Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+    println!(
+        "Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
     println!("Trace directory: {}", result.bead_trace_dir.display());
     println!();
 

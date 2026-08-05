@@ -9,7 +9,7 @@ use std::thread;
 use std::time::Duration;
 
 mod cargo_test_helpers;
-use cargo_test_helpers::{TestProject, default_bead_metadata};
+use cargo_test_helpers::{default_bead_metadata, TestProject};
 
 #[test]
 fn test_execution_time_is_measured() {
@@ -62,7 +62,10 @@ fn test_execution_time_is_reasonable() {
         result.duration_ms
     );
 
-    println!("✓ Execution time is reasonable: {}ms (between 100ms and 30s)", result.duration_ms);
+    println!(
+        "✓ Execution time is reasonable: {}ms (between 100ms and 30s)",
+        result.duration_ms
+    );
 }
 
 #[test]
@@ -102,10 +105,10 @@ fn test_execution_time_recorded_in_bead_trace_metadata() {
         "Metadata file should exist in bead trace directory"
     );
 
-    let metadata_content: String = std::fs::read_to_string(&metadata_path)
-        .expect("Failed to read metadata file");
-    let parsed_metadata: serde_json::Value = serde_json::from_str(&metadata_content)
-        .expect("Failed to parse metadata JSON");
+    let metadata_content: String =
+        std::fs::read_to_string(&metadata_path).expect("Failed to read metadata file");
+    let parsed_metadata: serde_json::Value =
+        serde_json::from_str(&metadata_content).expect("Failed to parse metadata JSON");
 
     // Verify duration_ms is present in metadata
     assert!(
@@ -123,7 +126,10 @@ fn test_execution_time_recorded_in_bead_trace_metadata() {
         duration_ms
     );
 
-    println!("✓ Execution time recorded in bead trace metadata: {}ms", duration_ms);
+    println!(
+        "✓ Execution time recorded in bead trace metadata: {}ms",
+        duration_ms
+    );
 }
 
 #[test]
@@ -141,7 +147,8 @@ fn test_execution_time_increases_with_test_complexity() {
     // Create a project with more complex tests
     let complex_project = TestProject::new()
         .unwrap()
-        .with_source_code(r#"
+        .with_source_code(
+            r#"
             fn fibonacci(n: u64) -> u64 {
                 match n {
                     0 => 0,
@@ -149,11 +156,21 @@ fn test_execution_time_increases_with_test_complexity() {
                     _ => fibonacci(n - 1) + fibonacci(n - 2),
                 }
             }
-        "#)
+        "#,
+        )
         .with_tests(vec![
-            ("test_fib_10".to_string(), "assert_eq!(fibonacci(10), 55);".to_string()),
-            ("test_fib_15".to_string(), "assert_eq!(fibonacci(15), 610);".to_string()),
-            ("test_fib_20".to_string(), "assert_eq!(fibonacci(20), 6765);".to_string()),
+            (
+                "test_fib_10".to_string(),
+                "assert_eq!(fibonacci(10), 55);".to_string(),
+            ),
+            (
+                "test_fib_15".to_string(),
+                "assert_eq!(fibonacci(15), 610);".to_string(),
+            ),
+            (
+                "test_fib_20".to_string(),
+                "assert_eq!(fibonacci(20), 6765);".to_string(),
+            ),
         ])
         .build()
         .unwrap();
@@ -265,20 +282,15 @@ fn test_execution_time_with_start_and_end_times() {
     let end_time_str = result.end_time.as_ref().unwrap();
 
     // Verify they're in RFC3339 format
-    assert!(
-        !start_time_str.is_empty(),
-        "start_time should not be empty"
-    );
+    assert!(!start_time_str.is_empty(), "start_time should not be empty");
 
-    assert!(
-        !end_time_str.is_empty(),
-        "end_time should not be empty"
-    );
+    assert!(!end_time_str.is_empty(), "end_time should not be empty");
 
     // Parse timestamps to verify format
     // RFC3339 format should be parseable
     assert!(
-        start_time_str.contains('T') && (start_time_str.ends_with('Z') || start_time_str.contains('+')),
+        start_time_str.contains('T')
+            && (start_time_str.ends_with('Z') || start_time_str.contains('+')),
         "start_time should be in RFC3339 format: {}",
         start_time_str
     );
@@ -332,7 +344,10 @@ fn test_execution_time_timing_variance_within_bounds() {
 
     // All measurements should be reasonable
     assert!(min_duration > 0, "Minimum duration should be positive");
-    assert!(max_duration < 60000, "Maximum duration should be under 60 seconds");
+    assert!(
+        max_duration < 60000,
+        "Maximum duration should be under 60 seconds"
+    );
 
     // Variance should be within reasonable bounds (max should be less than 10x min)
     // This allows for system load variations but catches timing anomalies
@@ -340,7 +355,9 @@ fn test_execution_time_timing_variance_within_bounds() {
     assert!(
         variance_ratio < 10.0,
         "Variance ratio should be less than 10x, got {:.2}x (min: {}ms, max: {}ms)",
-        variance_ratio, min_duration, max_duration
+        variance_ratio,
+        min_duration,
+        max_duration
     );
 }
 
@@ -376,10 +393,10 @@ fn test_execution_time_captured_in_all_output_formats() {
 
     // Verify bead trace has metadata file with duration
     let metadata_path = bead_result.bead_trace_dir.join("metadata.json");
-    let metadata_content: String = std::fs::read_to_string(&metadata_path)
-        .expect("Failed to read metadata");
-    let parsed: serde_json::Value = serde_json::from_str(&metadata_content)
-        .expect("Failed to parse metadata");
+    let metadata_content: String =
+        std::fs::read_to_string(&metadata_path).expect("Failed to read metadata");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&metadata_content).expect("Failed to parse metadata");
 
     let duration_in_metadata = parsed["duration_ms"]
         .as_u64()

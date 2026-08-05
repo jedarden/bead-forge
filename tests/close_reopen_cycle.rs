@@ -55,20 +55,28 @@ fn test_close_then_reopen_cycle() {
     let storage = Storage::open(&db_path).expect("Failed to open storage");
 
     // Verify initial state
-    let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+    let bead = storage
+        .get_issue(&bead_id)
+        .expect("Failed to get bead")
+        .unwrap();
     assert_eq!(bead.status, Status::Open, "Initial status should be Open");
     assert!(bead.closed_at.is_none(), "Initial closed_at should be None");
-    assert!(bead.close_reason.is_none(), "Initial close_reason should be None");
+    assert!(
+        bead.close_reason.is_none(),
+        "Initial close_reason should be None"
+    );
 
     // Close the bead
     let close_reason = "Implementation complete and verified";
     let actor = "test-actor";
-    close::close_bead(&db_path, &bead_id, close_reason, actor)
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, close_reason, actor).expect("Close should succeed");
 
     // Verify closed state
     let storage = Storage::open(&db_path).expect("Failed to open storage");
-    let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+    let bead = storage
+        .get_issue(&bead_id)
+        .expect("Failed to get bead")
+        .unwrap();
 
     assert_eq!(bead.status, Status::Closed, "Status should be Closed");
     assert!(bead.closed_at.is_some(), "closed_at should be set");
@@ -88,11 +96,21 @@ fn test_close_then_reopen_cycle() {
 
     // Verify reopened state
     let storage = Storage::open(&db_path).expect("Failed to open storage");
-    let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+    let bead = storage
+        .get_issue(&bead_id)
+        .expect("Failed to get bead")
+        .unwrap();
 
-    assert_eq!(bead.status, Status::Open, "Status should be Open after reopen");
+    assert_eq!(
+        bead.status,
+        Status::Open,
+        "Status should be Open after reopen"
+    );
     assert!(bead.closed_at.is_none(), "closed_at should be cleared");
-    assert!(bead.close_reason.is_none(), "close_reason should be cleared");
+    assert!(
+        bead.close_reason.is_none(),
+        "close_reason should be cleared"
+    );
     assert!(
         bead.closed_by_session.is_none(),
         "closed_by_session should be cleared"
@@ -107,18 +125,23 @@ fn test_close_reopen_creates_correct_events() {
     let close_reason = "Test close";
 
     // Close the bead
-    close::close_bead(&db_path, &bead_id, close_reason, actor)
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, close_reason, actor).expect("Close should succeed");
 
     // Reopen the bead
     reopen::reopen_bead(&db_path, &bead_id).expect("Reopen should succeed");
 
     // Verify events
     let storage = Storage::open(&db_path).expect("Failed to open storage");
-    let events = storage.list_events(&bead_id).expect("Failed to list events");
+    let events = storage
+        .list_events(&bead_id)
+        .expect("Failed to list events");
 
     // Should have 3 events: created, closed, and reopened
-    assert_eq!(events.len(), 3, "Should have exactly 3 events (created + closed + reopened)");
+    assert_eq!(
+        events.len(),
+        3,
+        "Should have exactly 3 events (created + closed + reopened)"
+    );
 
     let closed_event = events
         .iter()
@@ -131,8 +154,14 @@ fn test_close_reopen_creates_correct_events() {
         .expect("Should have a Reopened event");
 
     // Verify closed event
-    assert_eq!(closed_event.issue_id, bead_id, "Closed event should have correct issue_id");
-    assert_eq!(closed_event.actor, actor, "Closed event should have correct actor");
+    assert_eq!(
+        closed_event.issue_id, bead_id,
+        "Closed event should have correct issue_id"
+    );
+    assert_eq!(
+        closed_event.actor, actor,
+        "Closed event should have correct actor"
+    );
     assert_eq!(
         closed_event.new_value.as_deref(),
         Some(close_reason),
@@ -145,8 +174,7 @@ fn test_close_reopen_creates_correct_events() {
 
     // Verify reopened event
     assert_eq!(
-        reopened_event.issue_id,
-        bead_id,
+        reopened_event.issue_id, bead_id,
         "Reopened event should have correct issue_id"
     );
     assert_eq!(
@@ -175,15 +203,19 @@ fn test_multiple_close_reopen_cycles() {
     // Perform three close/reopen cycles
     for i in 0..3 {
         // Close
-        close::close_bead(&db_path, &bead_id, reasons[i], actors[i])
-            .expect("Close should succeed");
+        close::close_bead(&db_path, &bead_id, reasons[i], actors[i]).expect("Close should succeed");
 
         let storage = Storage::open(&db_path).expect("Failed to open storage");
         let bead = storage
             .get_issue(&bead_id)
             .expect("Failed to get bead")
             .unwrap();
-        assert_eq!(bead.status, Status::Closed, "Should be closed after close {}", i + 1);
+        assert_eq!(
+            bead.status,
+            Status::Closed,
+            "Should be closed after close {}",
+            i + 1
+        );
         assert_eq!(
             bead.close_reason.as_deref(),
             Some(reasons[i]),
@@ -200,7 +232,8 @@ fn test_multiple_close_reopen_cycles() {
             .expect("Failed to get bead")
             .unwrap();
         assert_eq!(
-            bead.status, Status::Open,
+            bead.status,
+            Status::Open,
             "Should be open after reopen {}",
             i + 1
         );
@@ -208,10 +241,16 @@ fn test_multiple_close_reopen_cycles() {
 
     // Verify final state is open
     let storage = Storage::open(&db_path).expect("Failed to open storage");
-    let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+    let bead = storage
+        .get_issue(&bead_id)
+        .expect("Failed to get bead")
+        .unwrap();
     assert_eq!(bead.status, Status::Open, "Final status should be Open");
     assert!(bead.closed_at.is_none(), "Final closed_at should be None");
-    assert!(bead.close_reason.is_none(), "Final close_reason should be None");
+    assert!(
+        bead.close_reason.is_none(),
+        "Final close_reason should be None"
+    );
 }
 
 #[test]
@@ -223,27 +262,42 @@ fn test_event_history_across_multiple_cycles() {
 
     // Perform two close/reopen cycles
     for i in 0..2 {
-        close::close_bead(&db_path, &bead_id, reasons[i], actors[i])
-            .expect("Close should succeed");
+        close::close_bead(&db_path, &bead_id, reasons[i], actors[i]).expect("Close should succeed");
         reopen::reopen_bead(&db_path, &bead_id).expect("Reopen should succeed");
     }
 
     // Verify event history
     let storage = Storage::open(&db_path).expect("Failed to open storage");
-    let events = storage.list_events(&bead_id).expect("Failed to list events");
+    let events = storage
+        .list_events(&bead_id)
+        .expect("Failed to list events");
 
     // Should have 5 events: created + 2 closed + 2 reopened
-    assert_eq!(events.len(), 5, "Should have 5 events (created + 2 cycles x 2 operations)");
+    assert_eq!(
+        events.len(),
+        5,
+        "Should have 5 events (created + 2 cycles x 2 operations)"
+    );
 
     // Verify order and types (skip the first "created" event)
-    assert_eq!(events[1].event_type, EventType::Closed, "Second event should be Closed");
     assert_eq!(
-        events[2].event_type, EventType::Reopened,
+        events[1].event_type,
+        EventType::Closed,
+        "Second event should be Closed"
+    );
+    assert_eq!(
+        events[2].event_type,
+        EventType::Reopened,
         "Third event should be Reopened"
     );
-    assert_eq!(events[3].event_type, EventType::Closed, "Fourth event should be Closed");
     assert_eq!(
-        events[4].event_type, EventType::Reopened,
+        events[3].event_type,
+        EventType::Closed,
+        "Fourth event should be Closed"
+    );
+    assert_eq!(
+        events[4].event_type,
+        EventType::Reopened,
         "Fifth event should be Reopened"
     );
 
@@ -293,8 +347,7 @@ fn test_close_reopen_preserves_non_close_fields() {
         .expect("Failed to create test bead");
 
     // Close and reopen
-    close::close_bead(&db_path, &bead_id, "Test", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
     reopen::reopen_bead(&db_path, &bead_id).expect("Reopen should succeed");
 
     // Verify non-close fields are preserved
@@ -309,12 +362,18 @@ fn test_close_reopen_preserves_non_close_fields() {
         bead_after.description, bead.description,
         "Description should be preserved"
     );
-    assert_eq!(bead_after.priority, bead.priority, "Priority should be preserved");
+    assert_eq!(
+        bead_after.priority, bead.priority,
+        "Priority should be preserved"
+    );
     assert_eq!(
         bead_after.issue_type, bead.issue_type,
         "Issue type should be preserved"
     );
-    assert_eq!(bead_after.created_at, bead.created_at, "Created_at should be preserved");
+    assert_eq!(
+        bead_after.created_at, bead.created_at,
+        "Created_at should be preserved"
+    );
 
     // Note: assignee should be cleared after reopen
     assert!(
@@ -336,13 +395,10 @@ fn test_close_reopen_marks_dirty_both_times() {
     );
 
     // Close should keep it marked as dirty
-    close::close_bead(&db_path, &bead_id, "Test", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
     let storage = Storage::open(&db_path).expect("Failed to open storage");
-    let dirty_after_close = storage
-        .list_dirty_issues()
-        .expect("Failed to list dirty");
+    let dirty_after_close = storage.list_dirty_issues().expect("Failed to list dirty");
     assert!(
         dirty_after_close.iter().any(|b| b.id == bead_id),
         "Bead should still be dirty after close"
@@ -352,9 +408,7 @@ fn test_close_reopen_marks_dirty_both_times() {
     reopen::reopen_bead(&db_path, &bead_id).expect("Reopen should succeed");
 
     let storage = Storage::open(&db_path).expect("Failed to open storage");
-    let dirty_after_reopen = storage
-        .list_dirty_issues()
-        .expect("Failed to list dirty");
+    let dirty_after_reopen = storage.list_dirty_issues().expect("Failed to list dirty");
     assert!(
         dirty_after_reopen.iter().any(|b| b.id == bead_id),
         "Bead should still be dirty after reopen"
@@ -376,8 +430,7 @@ fn test_close_reopen_updates_timestamps() {
     std::thread::sleep(std::time::Duration::from_millis(10));
 
     // Close
-    close::close_bead(&db_path, &bead_id, "Test", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
     let storage = Storage::open(&db_path).expect("Failed to open storage");
     let bead_after_close = storage
@@ -433,8 +486,7 @@ fn test_close_with_assignee_then_reopen_clears_assignee() {
         .expect("Failed to create test bead");
 
     // Close
-    close::close_bead(&db_path, &bead_id, "Test", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
     let storage = Storage::open(&db_path).expect("Failed to open storage");
     let bead_after_close = storage
@@ -474,8 +526,7 @@ fn test_reopen_fails_on_non_closed_status() {
     assert!(result.is_err(), "Reopening an open bead should fail");
 
     // Close the bead
-    close::close_bead(&db_path, &bead_id, "Test", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
     // Reopen should succeed
     let result = reopen::reopen_bead(&db_path, &bead_id);
@@ -483,7 +534,10 @@ fn test_reopen_fails_on_non_closed_status() {
 
     // Try to reopen again (should fail - it's now open)
     let result = reopen::reopen_bead(&db_path, &bead_id);
-    assert!(result.is_err(), "Reopening an already-open bead should fail");
+    assert!(
+        result.is_err(),
+        "Reopening an already-open bead should fail"
+    );
 }
 
 #[test]
@@ -491,18 +545,21 @@ fn test_close_reopen_database_persistence() {
     let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
     // Close
-    close::close_bead(&db_path, &bead_id, "Test", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
     // Reopen
     reopen::reopen_bead(&db_path, &bead_id).expect("Reopen should succeed");
 
     // Close and reopen the database connection to verify persistence
     let storage2 = Storage::open(&db_path).expect("Failed to reopen storage");
-    let bead = storage2.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+    let bead = storage2
+        .get_issue(&bead_id)
+        .expect("Failed to get bead")
+        .unwrap();
 
     assert_eq!(
-        bead.status, Status::Open,
+        bead.status,
+        Status::Open,
         "Status should persist as Open after database reopen"
     );
     assert!(
@@ -515,8 +572,14 @@ fn test_close_reopen_database_persistence() {
     );
 
     // Verify events also persist (created + closed + reopened)
-    let events = storage2.list_events(&bead_id).expect("Failed to list events");
-    assert_eq!(events.len(), 3, "All 3 events should persist (created + closed + reopened)");
+    let events = storage2
+        .list_events(&bead_id)
+        .expect("Failed to list events");
+    assert_eq!(
+        events.len(),
+        3,
+        "All 3 events should persist (created + closed + reopened)"
+    );
 }
 
 #[test]
@@ -524,8 +587,7 @@ fn test_close_reopen_cycle_empty_reason() {
     let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
     // Close with empty reason
-    close::close_bead(&db_path, &bead_id, "", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "", "test-actor").expect("Close should succeed");
 
     let storage = Storage::open(&db_path).expect("Failed to open storage");
     let bead_after_close = storage
@@ -534,7 +596,8 @@ fn test_close_reopen_cycle_empty_reason() {
         .unwrap();
 
     assert_eq!(
-        bead_after_close.status, Status::Closed,
+        bead_after_close.status,
+        Status::Closed,
         "Should be closed with empty reason"
     );
     assert_eq!(
@@ -553,7 +616,8 @@ fn test_close_reopen_cycle_empty_reason() {
         .unwrap();
 
     assert_eq!(
-        bead_after_reopen.status, Status::Open,
+        bead_after_reopen.status,
+        Status::Open,
         "Should be open after reopen"
     );
     assert!(
@@ -594,7 +658,8 @@ fn test_close_reopen_cycle_with_special_characters() {
         .unwrap();
 
     assert_eq!(
-        bead_after_reopen.status, Status::Open,
+        bead_after_reopen.status,
+        Status::Open,
         "Should be open after reopen"
     );
     assert!(
@@ -610,8 +675,7 @@ fn test_close_timestamp_accuracy_through_cycle() {
     let before_close = Utc::now();
 
     // Close
-    close::close_bead(&db_path, &bead_id, "Test", "test-actor")
-        .expect("Close should succeed");
+    close::close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
     let after_close = Utc::now();
 

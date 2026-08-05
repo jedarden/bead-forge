@@ -7,8 +7,8 @@
 // 4. Creating trace files with all output
 // 5. Verifying trace file contents
 
-use std::path::Path;
 use anyhow::Result;
+use std::path::Path;
 
 // Import trace module
 use bead_forge::trace::{TraceManager, TraceMetadata};
@@ -43,17 +43,23 @@ fn main() -> Result<()> {
     println!("This may take a while...\n");
 
     // Run cargo test with full trace capture
-    let result = trace_manager.run_cargo_test_to_bead_trace(
-        needle_dir,
-        "bf-2tup9b",
-        &metadata
-    )?;
+    let result = trace_manager.run_cargo_test_to_bead_trace(needle_dir, "bf-2tup9b", &metadata)?;
 
     println!("\n=== Test Execution Results ===");
     println!("Exit code: {}", result.exit_code);
-    println!("Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
-    println!("Start time: {}", result.start_time.as_ref().unwrap_or(&"unknown".to_string()));
-    println!("End time: {}", result.end_time.as_ref().unwrap_or(&"unknown".to_string()));
+    println!(
+        "Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
+    println!(
+        "Start time: {}",
+        result.start_time.as_ref().unwrap_or(&"unknown".to_string())
+    );
+    println!(
+        "End time: {}",
+        result.end_time.as_ref().unwrap_or(&"unknown".to_string())
+    );
     println!("Bead trace directory: {}", result.bead_trace_dir.display());
 
     // Verify stdout capture
@@ -61,8 +67,10 @@ fn main() -> Result<()> {
     if !result.stdout.is_empty() {
         let stdout_lines = result.stdout.lines().count();
         println!("✓ Stdout captured: {} lines", stdout_lines);
-        println!("  First 200 characters: {}...",
-            result.stdout.chars().take(200).collect::<String>());
+        println!(
+            "  First 200 characters: {}...",
+            result.stdout.chars().take(200).collect::<String>()
+        );
     } else {
         println!("✗ Stdout is empty");
     }
@@ -72,8 +80,10 @@ fn main() -> Result<()> {
     if !result.stderr.is_empty() {
         let stderr_lines = result.stderr.lines().count();
         println!("✓ Stderr captured: {} lines", stderr_lines);
-        println!("  First 200 characters: {}...",
-            result.stderr.chars().take(200).collect::<String>());
+        println!(
+            "  First 200 characters: {}...",
+            result.stderr.chars().take(200).collect::<String>()
+        );
     } else {
         println!("✓ Stderr is empty (no errors)");
     }
@@ -145,7 +155,10 @@ fn main() -> Result<()> {
     if result.exit_code == 0 {
         println!("✓ All tests passed (exit code 0)");
     } else {
-        println!("⚠ Some tests failed or had errors (exit code {})", result.exit_code);
+        println!(
+            "⚠ Some tests failed or had errors (exit code {})",
+            result.exit_code
+        );
     }
 
     println!("\n=== Verification Summary ===");
@@ -156,7 +169,10 @@ fn main() -> Result<()> {
     println!("✓ Trace file created with all output");
     println!("✓ Manual verification of trace file contents possible");
 
-    println!("\nTrace files available at: {}", result.bead_trace_dir.display());
+    println!(
+        "\nTrace files available at: {}",
+        result.bead_trace_dir.display()
+    );
     println!("Verification complete!");
 
     Ok(())

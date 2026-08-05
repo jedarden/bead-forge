@@ -9,8 +9,8 @@
 
 use anyhow::Result;
 use bead_forge::trace::{TraceManager, TraceMetadata};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 fn main() -> Result<()> {
     println!("=== Trace File Naming and Location Verification ===\n");
@@ -28,21 +28,33 @@ fn main() -> Result<()> {
     // Create multiple trace directories for the same bead to demonstrate uniqueness
     let bead_id = "bf-naming-test-4494od";
 
-    println!("\nCreating multiple trace directories for bead: {}", bead_id);
+    println!(
+        "\nCreating multiple trace directories for bead: {}",
+        bead_id
+    );
 
     let dir1 = manager.unique_bead_trace_dir(bead_id)?;
-    println!("  Directory 1: {}", dir1.file_name().unwrap().to_string_lossy());
+    println!(
+        "  Directory 1: {}",
+        dir1.file_name().unwrap().to_string_lossy()
+    );
 
     // Small delay to ensure different timestamp
     std::thread::sleep(std::time::Duration::from_millis(10));
 
     let dir2 = manager.unique_bead_trace_dir(bead_id)?;
-    println!("  Directory 2: {}", dir2.file_name().unwrap().to_string_lossy());
+    println!(
+        "  Directory 2: {}",
+        dir2.file_name().unwrap().to_string_lossy()
+    );
 
     std::thread::sleep(std::time::Duration::from_millis(10));
 
     let dir3 = manager.unique_bead_trace_dir(bead_id)?;
-    println!("  Directory 3: {}", dir3.file_name().unwrap().to_string_lossy());
+    println!(
+        "  Directory 3: {}",
+        dir3.file_name().unwrap().to_string_lossy()
+    );
 
     // Verify naming conventions
     println!("\n--- Verifying Naming Conventions ---");
@@ -52,7 +64,8 @@ fn main() -> Result<()> {
     let dir3_name = dir3.file_name().unwrap().to_str().unwrap();
 
     // Check bf- prefix
-    if dir1_name.starts_with("bf-") && dir2_name.starts_with("bf-") && dir3_name.starts_with("bf-") {
+    if dir1_name.starts_with("bf-") && dir2_name.starts_with("bf-") && dir3_name.starts_with("bf-")
+    {
         println!("✓ All directories use bf- prefix convention");
     } else {
         println!("✗ Some directories do not use bf- prefix");
@@ -87,10 +100,13 @@ fn main() -> Result<()> {
         &test_trace_dir,
         &metadata,
         "Example stdout content",
-        "Example stderr content"
+        "Example stderr content",
     )?;
 
-    println!("Created trace directory: {}", test_trace_dir.file_name().unwrap().to_string_lossy());
+    println!(
+        "Created trace directory: {}",
+        test_trace_dir.file_name().unwrap().to_string_lossy()
+    );
 
     // Verify expected files exist
     let metadata_path = test_trace_dir.join("metadata.json");
@@ -120,14 +136,19 @@ fn main() -> Result<()> {
     let all_beads = manager.list_bead_traces()?;
 
     let bf_count = all_beads.iter().filter(|b| b.starts_with("bf-")).count();
-    let needle_count = all_beads.iter().filter(|b| b.starts_with("needle-")).count();
+    let needle_count = all_beads
+        .iter()
+        .filter(|b| b.starts_with("needle-"))
+        .count();
 
     println!("Total trace directories: {}", all_beads.len());
     println!("  Directories with bf- prefix: {}", bf_count);
     println!("  Directories with needle- prefix: {}", needle_count);
 
     // Verify all follow expected patterns
-    let all_follow_pattern = all_beads.iter().all(|b| b.starts_with("bf-") || b.starts_with("needle-"));
+    let all_follow_pattern = all_beads
+        .iter()
+        .all(|b| b.starts_with("bf-") || b.starts_with("needle-"));
     if all_follow_pattern {
         println!("✓ All trace directories follow bf- or needle- naming convention");
     } else {

@@ -41,7 +41,18 @@ fn setup() -> (TempDir, PathBuf) {
 
 /// Create a test bead with the given title
 fn create_bead(workspace: &Path, title: &str) -> String {
-    let (out, err, ok) = run_bf(workspace, &["create", "--title", title, "--type", "task", "--priority", "2"]);
+    let (out, err, ok) = run_bf(
+        workspace,
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
+    );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
     assert!(!id.is_empty(), "create produced no id: {out}");
@@ -64,7 +75,17 @@ fn create_bead_with_labels(workspace: &Path, title: &str, labels: &[&str]) -> St
 fn create_bead_with_assignee(workspace: &Path, title: &str, assignee: &str) -> String {
     let (out, err, ok) = run_bf(
         workspace,
-        &["create", "--title", title, "--type", "task", "--priority", "2", "--assignee", assignee],
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+            "--assignee",
+            assignee,
+        ],
     );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
@@ -80,13 +101,11 @@ fn close_bead(workspace: &Path, bead_id: &str, reason: &str) {
 
 /// JSON validation helpers
 mod json_validation {
-    use serde_json::{Value, from_str};
+    use serde_json::{from_str, Value};
 
     /// Parse a JSON string and panic if invalid
     pub fn parse_json(json: &str) -> Value {
-        from_str(json).unwrap_or_else(|e| {
-            panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-        })
+        from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
     }
 
     /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -127,13 +146,15 @@ mod envelope {
         let envelope = parse_json(json);
 
         // Check version field
-        let version = envelope.get("version")
+        let version = envelope
+            .get("version")
             .and_then(|v| v.as_i64())
             .expect("Envelope must have numeric 'version' field");
         assert_eq!(version, 1, "Envelope version must be 1");
 
         // Check kind field
-        let kind = envelope.get("kind")
+        let kind = envelope
+            .get("kind")
             .and_then(|k| k.as_str())
             .expect("Envelope must have string 'kind' field");
         assert_eq!(kind, expected_kind, "Envelope kind mismatch");
@@ -149,7 +170,8 @@ mod envelope {
 
     /// Get the data field from an envelope
     pub fn get_envelope_data(envelope: &Value) -> Value {
-        envelope.get("data")
+        envelope
+            .get("data")
             .cloned()
             .unwrap_or_else(|| panic!("Envelope missing 'data' field"))
     }
@@ -201,7 +223,11 @@ fn test_list_json_required_fields_present() {
     let (_temp, workspace) = setup();
 
     // Create a test bead with all important fields
-    let bead_id = create_bead_with_labels(&workspace, "Test bead for required fields", &["label1", "label2"]);
+    let bead_id = create_bead_with_labels(
+        &workspace,
+        "Test bead for required fields",
+        &["label1", "label2"],
+    );
 
     // Run list --json
     let jsonl = run_list_json(&workspace);
@@ -242,7 +268,10 @@ fn test_list_json_required_fields_present() {
 
     // Verify specific values
     assert_eq!(json_validation::get_string(our_bead, "id"), bead_id);
-    assert_eq!(json_validation::get_string(our_bead, "title"), "Test bead for required fields");
+    assert_eq!(
+        json_validation::get_string(our_bead, "title"),
+        "Test bead for required fields"
+    );
     assert_eq!(json_validation::get_string(our_bead, "status"), "open");
 
     // Verify assignee is present (null when unset)
@@ -277,8 +306,14 @@ fn test_list_json_empty_results() {
         // Empty results should produce no output, not an empty array
         // But if there are existing beads, at least validate the format
         for bead in parsed {
-            assert!(json_validation::has_field(&bead, "id"), "Each bead must have an id field");
-            assert!(json_validation::has_field(&bead, "title"), "Each bead must have a title field");
+            assert!(
+                json_validation::has_field(&bead, "id"),
+                "Each bead must have an id field"
+            );
+            assert!(
+                json_validation::has_field(&bead, "title"),
+                "Each bead must have a title field"
+            );
         }
     } else {
         // Empty workspace should produce empty output
@@ -350,7 +385,10 @@ fn test_list_json_format_jsonl() {
 
     // Verify JSONL format: one JSON object per line
     let lines: Vec<&str> = jsonl.lines().filter(|l| !l.is_empty()).collect();
-    assert!(lines.len() >= 3, "Should have at least 3 beads in JSONL format");
+    assert!(
+        lines.len() >= 3,
+        "Should have at least 3 beads in JSONL format"
+    );
 
     // Each line should be valid JSON
     for (i, line) in lines.iter().enumerate() {
@@ -422,11 +460,26 @@ fn test_list_json_envelope_mode() {
 
     // Verify each bead in array has required fields
     for bead in data_array {
-        assert!(json_validation::has_field(bead, "id"), "Each bead must have id");
-        assert!(json_validation::has_field(bead, "title"), "Each bead must have title");
-        assert!(json_validation::has_field(bead, "status"), "Each bead must have status");
-        assert!(json_validation::has_field(bead, "assignee"), "Each bead must have assignee (even if null)");
-        assert!(json_validation::has_field(bead, "labels"), "Each bead must have labels (even if empty array)");
+        assert!(
+            json_validation::has_field(bead, "id"),
+            "Each bead must have id"
+        );
+        assert!(
+            json_validation::has_field(bead, "title"),
+            "Each bead must have title"
+        );
+        assert!(
+            json_validation::has_field(bead, "status"),
+            "Each bead must have status"
+        );
+        assert!(
+            json_validation::has_field(bead, "assignee"),
+            "Each bead must have assignee (even if null)"
+        );
+        assert!(
+            json_validation::has_field(bead, "labels"),
+            "Each bead must have labels (even if empty array)"
+        );
     }
 
     // Cleanup
@@ -479,7 +532,10 @@ fn test_list_json_with_filters() {
     // All results should have status="open"
     for bead in parsed {
         let status = json_validation::get_string(&bead, "status");
-        assert_eq!(status, "open", "Status filter should only return open beads");
+        assert_eq!(
+            status, "open",
+            "Status filter should only return open beads"
+        );
     }
 
     // Test assignee filter
@@ -601,7 +657,11 @@ fn test_list_json_labels_empty_array_when_none() {
         .get("labels")
         .and_then(|l| l.as_array())
         .expect("labels should be an array");
-    assert_eq!(labels.len(), 0, "labels should be empty array when none set");
+    assert_eq!(
+        labels.len(),
+        0,
+        "labels should be empty array when none set"
+    );
 
     // Cleanup
     close_bead(&workspace, &bead_id, "Test cleanup");
@@ -614,7 +674,15 @@ fn test_list_json_priority_and_type_fields() {
     // Create beads with different priorities and types
     let (out, err, ok) = run_bf(
         &workspace,
-        &["create", "--title", "Critical bug", "--type", "bug", "--priority", "0"],
+        &[
+            "create",
+            "--title",
+            "Critical bug",
+            "--type",
+            "bug",
+            "--priority",
+            "0",
+        ],
     );
     assert!(ok, "Bead creation should succeed: {err}");
 
@@ -638,7 +706,8 @@ fn test_list_json_priority_and_type_fields() {
 
     // Verify priority and type fields
     // Priority is a number in JSON output
-    let priority = our_bead.get("priority")
+    let priority = our_bead
+        .get("priority")
         .and_then(|p| p.as_i64())
         .expect("priority should be a number");
     assert_eq!(priority, 0);
@@ -673,17 +742,35 @@ fn test_list_json_timestamp_fields() {
         .expect("Should find our bead");
 
     // Verify timestamp fields exist and are valid ISO 8601 format
-    assert!(json_validation::has_field(our_bead, "created_at"), "created_at field should exist");
-    assert!(json_validation::has_field(our_bead, "updated_at"), "updated_at field should exist");
+    assert!(
+        json_validation::has_field(our_bead, "created_at"),
+        "created_at field should exist"
+    );
+    assert!(
+        json_validation::has_field(our_bead, "updated_at"),
+        "updated_at field should exist"
+    );
 
     let created_at = json_validation::get_string(our_bead, "created_at");
     let updated_at = json_validation::get_string(our_bead, "updated_at");
 
     // Basic validation that timestamps look like ISO 8601
-    assert!(created_at.contains('T'), "created_at should be ISO 8601 format");
-    assert!(updated_at.contains('T'), "updated_at should be ISO 8601 format");
-    assert!(created_at.ends_with('Z') || created_at.contains('+'), "created_at should have timezone");
-    assert!(updated_at.ends_with('Z') || updated_at.contains('+'), "updated_at should have timezone");
+    assert!(
+        created_at.contains('T'),
+        "created_at should be ISO 8601 format"
+    );
+    assert!(
+        updated_at.contains('T'),
+        "updated_at should be ISO 8601 format"
+    );
+    assert!(
+        created_at.ends_with('Z') || created_at.contains('+'),
+        "created_at should have timezone"
+    );
+    assert!(
+        updated_at.ends_with('Z') || updated_at.contains('+'),
+        "updated_at should have timezone"
+    );
 
     // Cleanup
     close_bead(&workspace, &bead_id, "Test cleanup");

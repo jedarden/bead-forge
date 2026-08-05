@@ -127,7 +127,12 @@ pub trait Formatter {
     fn format_with_envelope(&self, kind: &str, data: &str) -> String;
     /// Format data with envelope wrapping and optional warning (JSON formatters only).
     /// Text and Toon formatters return the data as-is.
-    fn format_with_envelope_and_warning(&self, kind: &str, data: &str, warning: Option<&str>) -> String;
+    fn format_with_envelope_and_warning(
+        &self,
+        kind: &str,
+        data: &str,
+        warning: Option<&str>,
+    ) -> String;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

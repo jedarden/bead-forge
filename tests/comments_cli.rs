@@ -55,7 +55,10 @@ fn comments_add_and_list_round_trip() {
     // A bead with no comments reports so.
     let (out, err, ok) = run_bf(&ws, &["comments", "list", &id]);
     assert!(ok, "comments list failed: {err}");
-    assert!(out.contains("No comments"), "unexpected empty-list output: {out}");
+    assert!(
+        out.contains("No comments"),
+        "unexpected empty-list output: {out}"
+    );
 
     // Add a single comment.
     let (out, err, ok) = run_bf(&ws, &["comments", "add", &id, "This is a test comment"]);
@@ -86,16 +89,13 @@ fn comments_list_preserves_insertion_order() {
     assert!(ok, "comments list failed: {err}");
 
     // All three present, in the order they were added.
-    let first = out
-        .find("First comment")
-        .expect("First comment missing");
-    let second = out
-        .find("Second comment")
-        .expect("Second comment missing");
-    let third = out
-        .find("Third comment")
-        .expect("Third comment missing");
-    assert!(first < second && second < third, "order not preserved: {out}");
+    let first = out.find("First comment").expect("First comment missing");
+    let second = out.find("Second comment").expect("Second comment missing");
+    let third = out.find("Third comment").expect("Third comment missing");
+    assert!(
+        first < second && second < third,
+        "order not preserved: {out}"
+    );
 }
 
 #[test]

@@ -218,15 +218,20 @@ mod tests {
         let (_temp_dir, beads_dir) = setup_test_workspace();
         let title = "Test with unicode: café and 日本語";
 
-        let (stdout, stderr, success) =
-            run_create(&beads_dir, &["--title", title, "--type", "task", "--priority", "2"]);
+        let (stdout, stderr, success) = run_create(
+            &beads_dir,
+            &["--title", title, "--type", "task", "--priority", "2"],
+        );
         assert!(success, "Create command should succeed. stderr: {}", stderr);
 
         let bead_id = stdout.trim();
 
         // Text output preserves both scripts verbatim.
         let show_output = run_show(&beads_dir, bead_id);
-        assert!(show_output.contains("café"), "Latin-extended should survive");
+        assert!(
+            show_output.contains("café"),
+            "Latin-extended should survive"
+        );
         assert!(show_output.contains("日本語"), "CJK should survive");
 
         // JSON output keeps raw UTF-8 rather than escaping to \uXXXX.

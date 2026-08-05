@@ -3,7 +3,7 @@
 //! This test module verifies that the TraceManager can successfully
 //! execute cargo test commands and capture their output.
 
-use bead_forge::trace::{TraceManager, CargoTestResult};
+use bead_forge::trace::{CargoTestResult, TraceManager};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -23,8 +23,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Create src directory and lib.rs
     let src_dir = workspace_dir.join("src");
@@ -45,8 +46,9 @@ mod tests {
         assert_eq!(3 * 3, 9);
     }
 }
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Create a TraceManager and run cargo test
     let trace_manager = TraceManager::new(workspace_dir);
@@ -80,8 +82,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     let src_dir = workspace_dir.join("src");
     std::fs::create_dir(&src_dir).unwrap();
@@ -96,8 +99,9 @@ mod tests {
         panic!("This test is designed to fail");
     }
 }
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Run cargo test - it should complete even with failing tests
     let trace_manager = TraceManager::new(workspace_dir);
@@ -129,8 +133,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     let src_dir = workspace_dir.join("src");
     std::fs::create_dir(&src_dir).unwrap();
@@ -155,8 +160,9 @@ mod tests {
         assert_eq!(3, 3);
     }
 }
-"#
-    ).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Run only test_two
     let trace_manager = TraceManager::new(workspace_dir);

@@ -206,11 +206,17 @@ fn no_auto_flush_flag_leaves_jsonl_untouched() {
     let before = std::fs::read_to_string(jsonl_path(ws.path())).unwrap();
 
     // Second create with the override must NOT touch issues.jsonl.
-    let ghost = ok(ws.path(), &["--no-auto-flush", "create", "--title", "ghost"])
-        .trim()
-        .to_string();
+    let ghost = ok(
+        ws.path(),
+        &["--no-auto-flush", "create", "--title", "ghost"],
+    )
+    .trim()
+    .to_string();
     let after = std::fs::read_to_string(jsonl_path(ws.path())).unwrap();
-    assert_eq!(before, after, "--no-auto-flush must not rewrite issues.jsonl");
+    assert_eq!(
+        before, after,
+        "--no-auto-flush must not rewrite issues.jsonl"
+    );
     assert!(find(&read_jsonl(ws.path()), &first).is_some());
     assert!(
         find(&read_jsonl(ws.path()), &ghost).is_none(),

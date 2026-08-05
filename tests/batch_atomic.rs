@@ -72,7 +72,12 @@ fn test_batch_rollback_on_invalid_dependency() {
         },
     ];
 
-    let result = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/);
+    let result = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    );
 
     // Should fail on the dependency operation
     assert!(result.is_err());
@@ -131,7 +136,12 @@ fn test_batch_rollback_on_invalid_close() {
         },
     ];
 
-    let result = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/);
+    let result = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    );
 
     // Should fail
     assert!(result.is_err());
@@ -185,7 +195,13 @@ fn test_batch_placeholder_resolution_multiple_references() {
         },
     ];
 
-    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    )
+    .unwrap();
 
     // All operations should succeed
     assert_eq!(results.len(), 4);
@@ -238,7 +254,12 @@ fn test_batch_placeholder_out_of_bounds_fails_gracefully() {
         },
     ];
 
-    let result = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/);
+    let result = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    );
 
     // Should fail because @5 doesn't exist
     assert!(result.is_err());
@@ -272,7 +293,13 @@ fn test_mitosis_atomicity_all_operations() {
     // Verify mitosis produces 5 operations
     assert_eq!(ops.len(), 5);
 
-    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    )
+    .unwrap();
 
     // All 5 operations should succeed
     assert_eq!(results.len(), 5);
@@ -326,7 +353,12 @@ fn test_mitosis_rollback_on_dependency_failure() {
     )
     .unwrap();
 
-    let result = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/);
+    let result = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    );
 
     // Should fail when trying to add dependency to non-existent parent
     assert!(result.is_err());
@@ -351,7 +383,13 @@ fn test_batch_empty_operations() {
     let storage = Storage::open(&db_path).unwrap();
 
     let ops = vec![];
-    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    )
+    .unwrap();
 
     assert_eq!(results.len(), 0);
 }
@@ -371,7 +409,13 @@ fn test_batch_single_create() {
         labels: vec![],
     }];
 
-    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    )
+    .unwrap();
 
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].status, "ok");
@@ -416,7 +460,13 @@ fn test_batch_multiple_independent_creates() {
         },
     ];
 
-    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    )
+    .unwrap();
 
     assert_eq!(results.len(), 3);
     for result in &results {
@@ -481,7 +531,12 @@ fn test_sqlite_rollback_on_database_reopen() {
         },
     ];
 
-    let result = execute_batch(&storage_fail, ops, temp_dir.path(), false /* enable auto-flush */);
+    let result = execute_batch(
+        &storage_fail,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush */
+    );
     assert!(result.is_err());
     drop(storage_fail);
 
@@ -539,7 +594,13 @@ fn test_successful_batch_persists_on_reopen() {
         },
     ];
 
-    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    )
+    .unwrap();
     assert_eq!(results.len(), 2);
     drop(storage);
 
@@ -588,7 +649,13 @@ fn test_batch_literal_id_references() {
         },
     ];
 
-    let results = execute_batch(&storage, ops, temp_dir.path(), false /* enable auto-flush **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        temp_dir.path(),
+        false, /* enable auto-flush **/
+    )
+    .unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].status, "ok");
     assert_eq!(results[1].status, "ok");

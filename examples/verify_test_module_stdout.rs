@@ -17,10 +17,16 @@ fn main() -> Result<()> {
     let test_project_dir = PathBuf::from("/tmp/stdout_test_project");
 
     if !test_project_dir.exists() {
-        anyhow::bail!("Test project directory not found at: {}", test_project_dir.display());
+        anyhow::bail!(
+            "Test project directory not found at: {}",
+            test_project_dir.display()
+        );
     }
 
-    println!("✓ Test project directory exists: {}", test_project_dir.display());
+    println!(
+        "✓ Test project directory exists: {}",
+        test_project_dir.display()
+    );
     println!();
 
     // Create trace manager for bead-forge workspace
@@ -47,12 +53,16 @@ fn main() -> Result<()> {
         &test_project_dir,
         "bf-5uq6lp",
         &metadata,
-        &["--", "--nocapture"] // CRITICAL: --nocapture shows test stdout
+        &["--", "--nocapture"], // CRITICAL: --nocapture shows test stdout
     )?;
 
     println!("=== Test Execution Complete ===\n");
     println!("Exit code: {}", result.exit_code);
-    println!("Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+    println!(
+        "Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
     println!("Trace directory: {}", result.bead_trace_dir.display());
     println!();
 
@@ -73,7 +83,7 @@ fn main() -> Result<()> {
     let expected_lines = vec![
         "MODULE_STDOUT_LINE_1",
         "MODULE_STDOUT_LINE_2",
-        "MODULE_STDOUT_LINE_3"
+        "MODULE_STDOUT_LINE_3",
     ];
 
     let mut all_found = true;
@@ -99,19 +109,34 @@ fn main() -> Result<()> {
     let stdout_path = result.bead_trace_dir.join("stdout.txt");
 
     if !stdout_path.exists() {
-        anyhow::bail!("FAIL: stdout.txt file does not exist at: {}", stdout_path.display());
+        anyhow::bail!(
+            "FAIL: stdout.txt file does not exist at: {}",
+            stdout_path.display()
+        );
     }
     println!("✓ stdout.txt file exists at: {}", stdout_path.display());
 
-    let stdout_content = std::fs::read_to_string(&stdout_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read stdout.txt: {}: {}", stdout_path.display(), e))?;
+    let stdout_content = std::fs::read_to_string(&stdout_path).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to read stdout.txt: {}: {}",
+            stdout_path.display(),
+            e
+        )
+    })?;
 
-    println!("✓ stdout.txt file is readable: {} bytes", stdout_content.len());
+    println!(
+        "✓ stdout.txt file is readable: {} bytes",
+        stdout_content.len()
+    );
 
     // Verify file content matches captured stdout
     if stdout_content != result.stdout {
         println!("✗ FAIL: File content does not match captured stdout");
-        println!("File length: {}, Captured length: {}", stdout_content.len(), result.stdout.len());
+        println!(
+            "File length: {}, Captured length: {}",
+            stdout_content.len(),
+            result.stdout.len()
+        );
         anyhow::bail!("stdout.txt content mismatch");
     }
     println!("✓ stdout.txt content matches captured stdout");
@@ -128,7 +153,10 @@ fn main() -> Result<()> {
     println!("Test stdout lines found: {}", test_output_count);
 
     if test_output_count < 3 {
-        println!("✗ FAIL: Expected 3 test stdout lines, found {}", test_output_count);
+        println!(
+            "✗ FAIL: Expected 3 test stdout lines, found {}",
+            test_output_count
+        );
         anyhow::bail!("Stdout output lost during execution");
     }
     println!("✓ All expected stdout output preserved");
@@ -177,7 +205,10 @@ fn main() -> Result<()> {
     println!("✓ AC3: Trace file shows complete stdout output");
     println!("✓ AC4: No stdout output is lost during execution");
     println!();
-    println!("Trace files available at: {}", result.bead_trace_dir.display());
+    println!(
+        "Trace files available at: {}",
+        result.bead_trace_dir.display()
+    );
     println!("Stdout capture verification complete!");
 
     Ok(())

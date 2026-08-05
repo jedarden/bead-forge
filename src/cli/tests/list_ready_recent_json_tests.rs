@@ -15,8 +15,8 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    test_workspace, bf_binary, bf_command, bf_command_with_workspace,
-    json_validation, format_detection, fixtures, capture, envelope,
+    bf_binary, bf_command, bf_command_with_workspace, capture, envelope, fixtures,
+    format_detection, json_validation, test_workspace,
 };
 
 // Import items made available in parent scope
@@ -32,8 +32,7 @@ fn create_isolated_workspace() -> TempDir {
     crate::config::init_workspace(&beads_dir, "bf-list-test")
         .expect("Failed to initialize test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
@@ -55,12 +54,7 @@ fn test_list_json_structure_validity() {
     let bead2_id = fixtures::create_bead("List test bead 2");
 
     // Get list JSON output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Verify it's valid JSONL (multiple lines, each a valid JSON object)
     let json_str = output.trim();
@@ -77,8 +71,16 @@ fn test_list_json_structure_validity() {
         // Verify required fields
         json_validation::assert_required_fields(
             &parsed,
-            &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-            "list command"
+            &[
+                "id",
+                "title",
+                "status",
+                "priority",
+                "issue_type",
+                "created_at",
+                "updated_at",
+            ],
+            "list command",
         );
     }
 
@@ -99,12 +101,7 @@ fn test_list_json_jsonl_format_structure() {
     let bead3_id = fixtures::create_bead("JSONL format test bead 3");
 
     // Get list JSON output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     let json_str = output.trim();
 
@@ -121,14 +118,27 @@ fn test_list_json_jsonl_format_structure() {
 
         // Each line must be a JSON object (not array, string, number, etc.)
         let parsed = json_validation::parse_json(line);
-        assert!(parsed.is_object(), "JSONL line {} should be a JSON object, found: {}", i, line);
+        assert!(
+            parsed.is_object(),
+            "JSONL line {} should be a JSON object, found: {}",
+            i,
+            line
+        );
 
         // Each line must represent a complete, independent JSON object
         // (i.e., not part of a larger JSON array)
         json_validation::assert_required_fields(
             &parsed,
-            &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-            "list JSONL line"
+            &[
+                "id",
+                "title",
+                "status",
+                "priority",
+                "issue_type",
+                "created_at",
+                "updated_at",
+            ],
+            "list JSONL line",
         );
     }
 
@@ -136,14 +146,23 @@ fn test_list_json_jsonl_format_structure() {
     // (i.e., the entire output is not wrapped in [ ... ])
     let first_char = json_str.chars().next().unwrap_or(' ');
     let last_char = json_str.chars().last().unwrap_or(' ');
-    assert_ne!(first_char, '[', "JSONL output should not start with '[' (JSON array marker)");
-    assert_ne!(last_char, ']', "JSONL output should not end with ']' (JSON array marker)");
+    assert_ne!(
+        first_char, '[',
+        "JSONL output should not start with '[' (JSON array marker)"
+    );
+    assert_ne!(
+        last_char, ']',
+        "JSONL output should not end with ']' (JSON array marker)"
+    );
 
     // Test 4: Verify each line can be parsed independently
     // This is the key property of JSONL - each line is a complete JSON document
     for line in lines.iter() {
         let parsed = json_validation::parse_json(line);
-        assert!(parsed.is_object(), "Each JSONL line must be independently parsable as a complete JSON object");
+        assert!(
+            parsed.is_object(),
+            "Each JSONL line must be independently parsable as a complete JSON object"
+        );
     }
 
     // Cleanup
@@ -163,7 +182,7 @@ fn test_list_json_empty_result() {
         bf_command_with_workspace(workspace)
             .arg("list")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty result should print nothing (empty string)
@@ -179,18 +198,14 @@ fn test_list_json_required_fields_types() {
 
     let bead_id = fixtures::create_bead("List field types test");
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Find our bead in the output
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in list output");
 
@@ -206,18 +221,27 @@ fn test_list_json_required_fields_types() {
 
     // status must be a string with valid value
     let status = json_validation::get_string(&parsed, "status");
-    assert!(matches!(status.as_str(), "open" | "in_progress" | "blocked" | "closed"));
+    assert!(matches!(
+        status.as_str(),
+        "open" | "in_progress" | "blocked" | "closed"
+    ));
 
     // priority must be a number (0-4)
     let priority = json_validation::get_int(&parsed, "priority");
-    assert!((0..=4).contains(&priority), "priority must be between 0 and 4");
+    assert!(
+        (0..=4).contains(&priority),
+        "priority must be between 0 and 4"
+    );
 
     // issue_type must be a string
     let issue_type = json_validation::get_string(&parsed, "issue_type");
     assert!(!issue_type.is_empty(), "issue_type must not be empty");
 
     // assignee must be present (null or string)
-    assert!(parsed.get("assignee").is_some(), "assignee field must be present");
+    assert!(
+        parsed.get("assignee").is_some(),
+        "assignee field must be present"
+    );
 
     // labels must be an array
     let labels = json_validation::get_array(&parsed, "labels");
@@ -235,12 +259,7 @@ fn test_list_json_special_characters() {
     let special_title = "Test \"quotes\" and 'apostrophes' & <symbols>";
     let bead_id = fixtures::create_bead(special_title);
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Verify it's valid JSON (proper escaping)
     let json_str = output.trim();
@@ -248,7 +267,8 @@ fn test_list_json_special_characters() {
 
     // Find our bead
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in list output");
 
@@ -257,9 +277,15 @@ fn test_list_json_special_characters() {
 
     // Verify special characters are preserved
     assert!(title.contains("quotes"), "title should contain 'quotes'");
-    assert!(title.contains("apostrophes"), "title should contain 'apostrophes'");
+    assert!(
+        title.contains("apostrophes"),
+        "title should contain 'apostrophes'"
+    );
     assert!(title.contains("&"), "title should contain '&'");
-    assert!(title.contains("<symbols>"), "title should contain '<symbols>'");
+    assert!(
+        title.contains("<symbols>"),
+        "title should contain '<symbols>'"
+    );
 
     fixtures::close_bead(&bead_id, "List special chars cleanup");
 }
@@ -290,17 +316,21 @@ fn test_list_json_with_filters() {
             .arg("--status")
             .arg("in_progress")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "filtered list should contain in_progress bead");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "filtered list should not contain open bead");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "filtered list should contain in_progress bead"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "filtered list should not contain open bead"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1_id, "Filter test cleanup");
@@ -325,7 +355,7 @@ fn test_list_json_limit() {
             .arg("--limit")
             .arg("2")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -352,7 +382,7 @@ fn test_list_json_envelope_wrapping() {
             .arg("list")
             .arg("--format")
             .arg("json")
-            .arg("--envelope")
+            .arg("--envelope"),
     );
 
     // Should be wrapped in envelope
@@ -363,7 +393,10 @@ fn test_list_json_envelope_wrapping() {
     assert!(data.is_array(), "envelope data should be an array");
 
     let array = data.as_array().expect("data should be array");
-    assert!(array.len() >= 1, "envelope should contain at least one bead");
+    assert!(
+        array.len() >= 1,
+        "envelope should contain at least one bead"
+    );
 
     fixtures::close_bead(&bead_id, "List envelope cleanup");
 }
@@ -379,7 +412,7 @@ fn test_list_json_empty_with_envelope() {
             .arg("list")
             .arg("--format")
             .arg("json")
-            .arg("--envelope")
+            .arg("--envelope"),
     );
 
     // Empty list should still have envelope
@@ -408,12 +441,7 @@ fn test_ready_json_structure_validity() {
     let bead2_id = fixtures::create_bead("Ready test bead 2");
 
     // Get ready JSON output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("ready")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("ready").arg("--format").arg("json"));
 
     // Verify it's valid JSONL or empty array
     let json_str = output.trim();
@@ -435,8 +463,16 @@ fn test_ready_json_structure_validity() {
         // Verify required fields
         json_validation::assert_required_fields(
             &parsed,
-            &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-            "ready command"
+            &[
+                "id",
+                "title",
+                "status",
+                "priority",
+                "issue_type",
+                "created_at",
+                "updated_at",
+            ],
+            "ready command",
         );
     }
 
@@ -456,7 +492,7 @@ fn test_ready_json_empty_result() {
         bf_command_with_workspace(workspace)
             .arg("ready")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty result should print []
@@ -472,12 +508,7 @@ fn test_ready_json_required_fields_types() {
 
     let bead_id = fixtures::create_bead("Ready field types test");
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("ready")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("ready").arg("--format").arg("json"));
 
     let json_str = output.trim();
 
@@ -490,7 +521,8 @@ fn test_ready_json_required_fields_types() {
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Find our bead in the output
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in ready output");
 
@@ -499,8 +531,16 @@ fn test_ready_json_required_fields_types() {
     // Verify required fields
     json_validation::assert_required_fields(
         &parsed,
-        &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-        "ready command"
+        &[
+            "id",
+            "title",
+            "status",
+            "priority",
+            "issue_type",
+            "created_at",
+            "updated_at",
+        ],
+        "ready command",
     );
 
     // id must be a string matching created bead
@@ -532,7 +572,7 @@ fn test_ready_json_limit() {
             .arg("--limit")
             .arg("2")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -547,7 +587,11 @@ fn test_ready_json_limit() {
 
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
-    assert_eq!(lines.len(), 2, "limited ready should return exactly 2 beads");
+    assert_eq!(
+        lines.len(),
+        2,
+        "limited ready should return exactly 2 beads"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1, "Ready limit cleanup");
@@ -573,7 +617,7 @@ fn test_ready_json_unlimited_limit() {
             .arg("--limit")
             .arg("0")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -589,7 +633,10 @@ fn test_ready_json_unlimited_limit() {
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should return all ready beads (at least 3)
-    assert!(lines.len() >= 3, "unlimited ready should return all ready beads");
+    assert!(
+        lines.len() >= 3,
+        "unlimited ready should return all ready beads"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1, "Ready unlimited cleanup");
@@ -610,7 +657,7 @@ fn test_ready_json_envelope_wrapping() {
             .arg("ready")
             .arg("--format")
             .arg("json")
-            .arg("--envelope")
+            .arg("--envelope"),
     );
 
     // Should be wrapped in envelope
@@ -634,7 +681,7 @@ fn test_ready_json_empty_with_envelope() {
             .arg("ready")
             .arg("--format")
             .arg("json")
-            .arg("--envelope")
+            .arg("--envelope"),
     );
 
     // Empty ready should still have envelope
@@ -662,25 +709,27 @@ fn test_ready_json_excludes_blocked_beads() {
     fixtures::add_dependency(&blocked_id, &blocker_id);
 
     // Get ready beads
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("ready")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("ready").arg("--format").arg("json"));
 
     let json_str = output.trim();
 
     // Parse the JSONL output
-    let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty() && *l != "[]").collect();
+    let lines: Vec<&str> = json_str
+        .lines()
+        .filter(|l| !l.trim().is_empty() && *l != "[]")
+        .collect();
 
     // Blocker should be in ready output (unblocked)
-    assert!(lines.iter().any(|line| line.contains(&blocker_id)),
-            "ready should include unblocked bead");
+    assert!(
+        lines.iter().any(|line| line.contains(&blocker_id)),
+        "ready should include unblocked bead"
+    );
 
     // Blocked should NOT be in ready output (has dependency)
-    assert!(!lines.iter().any(|line| line.contains(&blocked_id)),
-            "ready should not include blocked bead");
+    assert!(
+        !lines.iter().any(|line| line.contains(&blocked_id)),
+        "ready should not include blocked bead"
+    );
 
     // Cleanup
     fixtures::close_bead(&blocker_id, "Blocker cleanup");
@@ -699,19 +748,17 @@ fn test_recent_json_envelope_structure() {
 
     let bead_id = fixtures::create_bead("Recent test bead");
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     // recent command ALWAYS uses envelope
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
 
     // Data field should be a string containing JSONL
     let data = envelope::get_envelope_data(&envelope);
-    assert!(data.is_string(), "recent envelope data should be a JSONL string");
+    assert!(
+        data.is_string(),
+        "recent envelope data should be a JSONL string"
+    );
 
     // Parse the JSONL string and validate it contains at least one bead
     let jsonl_str = data.as_str().expect("data should be string");
@@ -742,14 +789,14 @@ fn test_recent_json_empty_result() {
     crate::config::init_workspace(&beads_dir, "bf-recent-empty-test")
         .expect("Failed to initialize test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
     // Empty recent should still have envelope
     let mut cmd = Command::new(bf_binary());
-    cmd.arg("-w").arg(&beads_dir)
+    cmd.arg("-w")
+        .arg(&beads_dir)
         .arg("recent")
         .arg("--format")
         .arg("json");
@@ -761,7 +808,10 @@ fn test_recent_json_empty_result() {
 
     // Data field should be a string containing JSONL (empty or whitespace)
     let data = envelope::get_envelope_data(&envelope);
-    assert!(data.is_string() || data.is_array(), "envelope data should be string or array");
+    assert!(
+        data.is_string() || data.is_array(),
+        "envelope data should be string or array"
+    );
 
     // If string, it should be empty or whitespace only
     if let Some(jsonl_str) = data.as_str() {
@@ -778,23 +828,22 @@ fn test_recent_json_required_fields_in_data() {
 
     let bead_id = fixtures::create_bead("Recent field types test");
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
-    assert!(data.is_string(), "recent envelope data should be a JSONL string");
+    assert!(
+        data.is_string(),
+        "recent envelope data should be a JSONL string"
+    );
 
     // Parse the JSONL string
     let jsonl_str = data.as_str().expect("data should be string");
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Find our bead in the JSONL lines
-    let bead_json_str = lines.iter()
+    let bead_json_str = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in recent output");
 
@@ -803,8 +852,16 @@ fn test_recent_json_required_fields_in_data() {
     // Verify required fields
     json_validation::assert_required_fields(
         &bead_json,
-        &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-        "recent command"
+        &[
+            "id",
+            "title",
+            "status",
+            "priority",
+            "issue_type",
+            "created_at",
+            "updated_at",
+        ],
+        "recent command",
     );
 
     // Verify specific field values
@@ -832,25 +889,32 @@ fn test_recent_json_time_filtering() {
             .arg("--time-period")
             .arg("1h")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
-    assert!(data.is_string(), "recent envelope data should be a JSONL string");
+    assert!(
+        data.is_string(),
+        "recent envelope data should be a JSONL string"
+    );
 
     // Parse the JSONL string
     let jsonl_str = data.as_str().expect("data should be string");
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Our bead should be in the results (created within last hour)
-    assert!(lines.iter().any(|line| {
-        let parsed = json_validation::parse_json(line);
-        parsed.get("id")
-            .and_then(|v| v.as_str())
-            .map(|id| id == &bead_id)
-            .unwrap_or(false)
-    }), "recently created bead should be in recent output");
+    assert!(
+        lines.iter().any(|line| {
+            let parsed = json_validation::parse_json(line);
+            parsed
+                .get("id")
+                .and_then(|v| v.as_str())
+                .map(|id| id == &bead_id)
+                .unwrap_or(false)
+        }),
+        "recently created bead should be in recent output"
+    );
 
     fixtures::close_bead(&bead_id, "Recent time filter cleanup");
 }
@@ -879,7 +943,7 @@ fn test_recent_json_status_filter() {
             .arg("--status")
             .arg("in_progress")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
@@ -898,18 +962,25 @@ fn test_recent_json_status_filter() {
         // Single object - convert to JSONL string
         serde_json::to_string(&data).expect("Failed to convert object to JSON")
     } else {
-        panic!("recent envelope data should be a JSONL string, array, or object, got: {:?}", data);
+        panic!(
+            "recent envelope data should be a JSONL string, array, or object, got: {:?}",
+            data
+        );
     };
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find our bead with in_progress status
-    assert!(lines.iter().any(|line| {
-        let parsed = json_validation::parse_json(line);
-        parsed.get("id")
-            .and_then(|v| v.as_str())
-            .map(|id| id == &bead_id)
-            .unwrap_or(false)
-    }), "bead with filtered status should be in recent output");
+    assert!(
+        lines.iter().any(|line| {
+            let parsed = json_validation::parse_json(line);
+            parsed
+                .get("id")
+                .and_then(|v| v.as_str())
+                .map(|id| id == &bead_id)
+                .unwrap_or(false)
+        }),
+        "bead with filtered status should be in recent output"
+    );
 
     fixtures::close_bead(&bead_id, "Recent status filter cleanup");
 }
@@ -932,18 +1003,25 @@ fn test_recent_json_limit() {
             .arg("--limit")
             .arg("2")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
-    assert!(data.is_string(), "recent envelope data should be a JSONL string");
+    assert!(
+        data.is_string(),
+        "recent envelope data should be a JSONL string"
+    );
 
     // Parse the JSONL string
     let jsonl_str = data.as_str().expect("data should be string");
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
-    assert_eq!(lines.len(), 2, "limited recent should return exactly 2 beads");
+    assert_eq!(
+        lines.len(),
+        2,
+        "limited recent should return exactly 2 beads"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1, "Recent limit cleanup");
@@ -969,19 +1047,25 @@ fn test_recent_json_unlimited_limit() {
             .arg("--limit")
             .arg("0")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
-    assert!(data.is_string(), "recent envelope data should be a JSONL string");
+    assert!(
+        data.is_string(),
+        "recent envelope data should be a JSONL string"
+    );
 
     // Parse the JSONL string
     let jsonl_str = data.as_str().expect("data should be string");
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should return all recent beads (at least 3)
-    assert!(lines.len() >= 3, "unlimited recent should return all recent beads");
+    assert!(
+        lines.len() >= 3,
+        "unlimited recent should return all recent beads"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1, "Recent unlimited cleanup");
@@ -998,23 +1082,20 @@ fn test_recent_json_always_uses_envelope() {
     let bead_id = fixtures::create_bead("Recent envelope always test");
 
     // recent command ALWAYS uses envelope, even without --envelope flag
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     // Should still be wrapped in envelope
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
 
     // Verify envelope structure
-    let version = envelope.get("version")
+    let version = envelope
+        .get("version")
         .and_then(|v| v.as_i64())
         .expect("Envelope must have numeric 'version' field");
     assert_eq!(version, 1, "Envelope version must be 1");
 
-    let kind = envelope.get("kind")
+    let kind = envelope
+        .get("kind")
         .and_then(|k| k.as_str())
         .expect("Envelope must have string 'kind' field");
     assert_eq!(kind, "recent", "Envelope kind should be 'recent'");
@@ -1036,18 +1117,16 @@ fn test_recent_json_jsonl_format_validation() {
     let bead1_id = fixtures::create_bead("Recent JSONL format test 1");
     let bead2_id = fixtures::create_bead("Recent JSONL format test 2");
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
 
     // Data should be a JSONL string
-    assert!(data.is_string(), "recent envelope data should be a JSONL string");
+    assert!(
+        data.is_string(),
+        "recent envelope data should be a JSONL string"
+    );
 
     let jsonl_str = data.as_str().expect("data should be string");
 
@@ -1061,13 +1140,25 @@ fn test_recent_json_jsonl_format_validation() {
     // Each line should be independently valid JSON
     for (i, line) in lines.iter().enumerate() {
         let parsed = json_validation::parse_json(line);
-        assert!(parsed.is_object(), "JSONL line {} should be a JSON object", i);
+        assert!(
+            parsed.is_object(),
+            "JSONL line {} should be a JSON object",
+            i
+        );
 
         // Verify required fields
         json_validation::assert_required_fields(
             &parsed,
-            &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-            "recent JSONL line"
+            &[
+                "id",
+                "title",
+                "status",
+                "priority",
+                "issue_type",
+                "created_at",
+                "updated_at",
+            ],
+            "recent JSONL line",
         );
     }
 
@@ -1084,12 +1175,7 @@ fn test_recent_json_special_characters() {
     let special_title = fixtures::SPECIAL_CHARACTERS_TITLE;
     let bead_id = fixtures::create_bead(special_title);
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
@@ -1097,7 +1183,8 @@ fn test_recent_json_special_characters() {
 
     // Find our bead in the JSONL
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    let bead_json_str = lines.iter()
+    let bead_json_str = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in recent output");
 
@@ -1106,7 +1193,10 @@ fn test_recent_json_special_characters() {
 
     // Verify special characters are preserved
     assert!(title.contains("quotes"), "title should contain 'quotes'");
-    assert!(title.contains("apostrophes"), "title should contain 'apostrophes'");
+    assert!(
+        title.contains("apostrophes"),
+        "title should contain 'apostrophes'"
+    );
     assert!(title.contains("&"), "title should contain '&'");
     assert!(title.contains("<"), "title should contain '<'");
     assert!(title.contains(">"), "title should contain '>'");
@@ -1122,12 +1212,7 @@ fn test_recent_json_field_types_validation() {
 
     let bead_id = fixtures::create_bead("Recent field types validation");
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
@@ -1135,7 +1220,8 @@ fn test_recent_json_field_types_validation() {
 
     // Find our bead in the JSONL
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    let bead_json_str = lines.iter()
+    let bead_json_str = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in recent output");
 
@@ -1149,16 +1235,25 @@ fn test_recent_json_field_types_validation() {
     assert_eq!(title, "Recent field types validation");
 
     let status = json_validation::get_string(&parsed, "status");
-    assert!(matches!(status.as_str(), "open" | "in_progress" | "blocked" | "closed"));
+    assert!(matches!(
+        status.as_str(),
+        "open" | "in_progress" | "blocked" | "closed"
+    ));
 
     let priority = json_validation::get_int(&parsed, "priority");
-    assert!((0..=4).contains(&priority), "priority must be between 0 and 4");
+    assert!(
+        (0..=4).contains(&priority),
+        "priority must be between 0 and 4"
+    );
 
     let issue_type = json_validation::get_string(&parsed, "issue_type");
     assert!(!issue_type.is_empty(), "issue_type must not be empty");
 
     // assignee should be present (null or string)
-    assert!(parsed.get("assignee").is_some(), "assignee field must be present");
+    assert!(
+        parsed.get("assignee").is_some(),
+        "assignee field must be present"
+    );
 
     // labels should be an array
     let labels = json_validation::get_array(&parsed, "labels");
@@ -1175,15 +1270,10 @@ fn test_recent_json_all_required_fields_present() {
 
     let bead_id = fixtures::create_bead_with_labels(
         "Recent all fields test",
-        &["test-label", "priority-high"]
+        &["test-label", "priority-high"],
     );
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
@@ -1191,7 +1281,8 @@ fn test_recent_json_all_required_fields_present() {
 
     // Find our bead in the JSONL
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    let bead_json_str = lines.iter()
+    let bead_json_str = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in recent output");
 
@@ -1200,13 +1291,26 @@ fn test_recent_json_all_required_fields_present() {
     // Verify all standard required fields are present
     json_validation::assert_required_fields(
         &parsed,
-        &["id", "title", "status", "priority", "issue_type", "assignee", "labels", "created_at", "updated_at"],
-        "recent command all fields"
+        &[
+            "id",
+            "title",
+            "status",
+            "priority",
+            "issue_type",
+            "assignee",
+            "labels",
+            "created_at",
+            "updated_at",
+        ],
+        "recent command all fields",
     );
 
     // Verify specific field values
     assert_eq!(json_validation::get_string(&parsed, "id"), bead_id);
-    assert_eq!(json_validation::get_string(&parsed, "title"), "Recent all fields test");
+    assert_eq!(
+        json_validation::get_string(&parsed, "title"),
+        "Recent all fields test"
+    );
 
     // Verify labels array has our labels
     let labels = json_validation::get_array(&parsed, "labels");
@@ -1224,12 +1328,7 @@ fn test_recent_json_unicode_handling() {
     let unicode_title = fixtures::UNICODE_TITLE;
     let bead_id = fixtures::create_bead(unicode_title);
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("recent")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
     let data = envelope::get_envelope_data(&envelope);
@@ -1237,7 +1336,8 @@ fn test_recent_json_unicode_handling() {
 
     // Find our bead in the JSONL
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    let bead_json_str = lines.iter()
+    let bead_json_str = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in recent output");
 
@@ -1245,8 +1345,14 @@ fn test_recent_json_unicode_handling() {
     let title = json_validation::get_string(&parsed, "title");
 
     // Verify Unicode characters are preserved
-    assert!(title.contains("café"), "Unicode characters should be preserved");
-    assert!(title.contains("日本語"), "Japanese characters should be preserved");
+    assert!(
+        title.contains("café"),
+        "Unicode characters should be preserved"
+    );
+    assert!(
+        title.contains("日本語"),
+        "Japanese characters should be preserved"
+    );
     assert!(title.contains("🎉"), "Emoji should be preserved");
 
     fixtures::close_bead(&bead_id, "Recent unicode cleanup");
@@ -1262,10 +1368,7 @@ fn test_recent_json_priority_filter() {
 
     // Update priority
     let mut cmd = bf_command();
-    cmd.arg("update")
-        .arg(&bead_id)
-        .arg("--priority")
-        .arg("3");
+    cmd.arg("update").arg(&bead_id).arg("--priority").arg("3");
     let update_output = cmd.output().expect("Failed to update");
     assert!(update_output.status.success(), "Update should succeed");
 
@@ -1276,7 +1379,7 @@ fn test_recent_json_priority_filter() {
             .arg("--priority")
             .arg("3")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let envelope = envelope::validate_envelope(&output.trim(), "recent");
@@ -1295,20 +1398,27 @@ fn test_recent_json_priority_filter() {
         // Single object - convert to JSONL string
         serde_json::to_string(&data).expect("Failed to convert object to JSON")
     } else {
-        panic!("recent envelope data should be a JSONL string, array, or object, got: {:?}", data);
+        panic!(
+            "recent envelope data should be a JSONL string, array, or object, got: {:?}",
+            data
+        );
     };
 
     // Parse the JSONL string
     let lines: Vec<&str> = jsonl_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find our bead with priority filter
-    assert!(lines.iter().any(|line| {
-        let parsed = json_validation::parse_json(line);
-        parsed.get("id")
-            .and_then(|v| v.as_str())
-            .map(|id| id == &bead_id)
-            .unwrap_or(false)
-    }), "bead with priority filter should be in recent output");
+    assert!(
+        lines.iter().any(|line| {
+            let parsed = json_validation::parse_json(line);
+            parsed
+                .get("id")
+                .and_then(|v| v.as_str())
+                .map(|id| id == &bead_id)
+                .unwrap_or(false)
+        }),
+        "bead with priority filter should be in recent output"
+    );
 
     fixtures::close_bead(&bead_id, "Recent priority filter cleanup");
 }

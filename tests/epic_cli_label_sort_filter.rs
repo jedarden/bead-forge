@@ -173,9 +173,8 @@ fn run_list_type_epic_json(workspace: &std::path::Path) -> Vec<serde_json::Value
         .lines()
         .filter(|line| !line.is_empty())
         .map(|line| {
-            serde_json::from_str(line).unwrap_or_else(|e| {
-                panic!("invalid JSON line in `bf list` output: {line:?} ({e})")
-            })
+            serde_json::from_str(line)
+                .unwrap_or_else(|e| panic!("invalid JSON line in `bf list` output: {line:?} ({e})"))
         })
         .collect()
 }
@@ -330,7 +329,11 @@ fn test_list_type_epic_includes_labeled_epic_and_renders_labels() {
     let json_labels: Vec<String> = epic
         .get("labels")
         .and_then(|l| l.as_array())
-        .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
+        .map(|a| {
+            a.iter()
+                .map(|x| x.as_str().unwrap_or("").to_string())
+                .collect()
+        })
         .unwrap_or_default();
     assert_eq!(
         json_labels,

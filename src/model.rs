@@ -826,6 +826,25 @@ impl Issue {
             ..Default::default()
         }
     }
+
+    /// Create the changes needed to clear the assignee.
+    ///
+    /// Returns an `IssueChanges` struct with the assignee set to `Some("")`.
+    /// This can be passed to `Storage::update_issue` to clear the assignee.
+    ///
+    /// The storage layer interprets `Some("")` as "clear to NULL" and sets
+    /// the database field to NULL. This is the correct way to clear assignee.
+    ///
+    /// For full assignee-clear semantics with event recording,
+    /// use `Storage::clear_assignee` directly instead.
+    #[must_use]
+    pub fn clear_assignee(&self, actor: String) -> IssueChanges {
+        IssueChanges {
+            assignee: Some(String::new()),
+            actor: Some(actor),
+            ..Default::default()
+        }
+    }
 }
 
 /// Epic completion status with child counts.
@@ -864,6 +883,10 @@ pub struct Dependency {
     /// Thread ID for conversation linking.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_id: Option<String>,
+
+    /// Title of the dependent bead (populated when loaded with JOIN).
+    #[serde(skip)]
+    pub title: Option<String>,
 }
 
 impl Default for Dependency {
@@ -876,6 +899,7 @@ impl Default for Dependency {
             created_by: None,
             metadata: None,
             thread_id: None,
+            title: None,
         }
     }
 }
@@ -1338,6 +1362,7 @@ mod tests {
                     created_by: Some("alice".to_string()),
                     metadata: Some("{\"source\":\"cli\"}".to_string()),
                     thread_id: Some("br-1".to_string()),
+                    title: None,
                 },
                 Dependency {
                     issue_id: "bd-test".to_string(),
@@ -1347,6 +1372,7 @@ mod tests {
                     created_by: Some("alice".to_string()),
                     metadata: None,
                     thread_id: None,
+                    title: None,
                 },
             ],
             comments: vec![
@@ -1757,8 +1783,14 @@ mod tests {
         assert_eq!(issue.title, "Test bead");
         assert_eq!(issue.priority, Priority::HIGH);
         assert_eq!(issue.status, Status::Open);
-        assert_eq!(issue.created_at, Utc.timestamp_opt(1_700_000_000, 0).unwrap());
-        assert_eq!(issue.labels, vec!["urgent".to_string(), "backend".to_string()]);
+        assert_eq!(
+            issue.created_at,
+            Utc.timestamp_opt(1_700_000_000, 0).unwrap()
+        );
+        assert_eq!(
+            issue.labels,
+            vec!["urgent".to_string(), "backend".to_string()]
+        );
     }
 
     #[test]
@@ -1904,5 +1936,40 @@ mod tests {
 
         let issue = candidate.to_issue();
         assert!(issue.labels.is_empty());
+    }
+
+    #[test]
+    fn test_assignee_field_in_json_when_none() {
+        // Test that assignee field is present in JSON even when None
+        let issue = Issue {
+            id: "test-1".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            assignee: None,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&issue).unwrap();
+        // With skip_serializing_if = "Option::is_none", assignee should NOT be present when None
+        // This test verifies current behavior - field should be absent
+        assert!(!json.contains("assignee"), "assignee field should be skipped when None (current behavior)");
+    }
+
+    #[test]
+    fn test_assignee_field_in_json_when_some() {
+        // Test that assignee field is present in JSON when Some
+        let issue = Issue {
+            id: "test-2".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            assignee: Some("alice".to_string()),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&issue).unwrap();
+        assert!(json.contains("assignee"), "assignee field should be present when Some");
+        assert!(json.contains("alice"), "assignee value should be present");
     }
 }

@@ -166,23 +166,15 @@ fn test_label_add_duplicate_is_idempotent() {
     let (_, stderr, success) = run_bf_command(
         workspace,
         &[
-            "label",
-            "add",
-            &bead_id,
-            "-l",
-            "feature",
-            "-l",
-            "feature", // duplicate
-            "-l",
-            "bug",
-            "-l",
-            "feature", // duplicate again
+            "label", "add", &bead_id, "-l", "feature", "-l", "feature", // duplicate
+            "-l", "bug", "-l", "feature", // duplicate again
         ],
     );
     assert!(success, "bf label add failed: {}", stderr);
 
     // Verify only unique labels exist
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     assert_eq!(labels.len(), 2, "Should have 2 unique labels");
@@ -215,15 +207,14 @@ fn test_label_remove_nonexistent_is_safe() {
     let bead_id = extract_bead_id(&stdout);
 
     // Try to remove a label that doesn't exist
-    let (_, stderr, success) = run_bf_command(
-        workspace,
-        &["label", "remove", &bead_id, "-l", "backend"],
-    );
+    let (_, stderr, success) =
+        run_bf_command(workspace, &["label", "remove", &bead_id, "-l", "backend"]);
     // Should succeed (no-op) or fail gracefully - either is acceptable behavior
     // The important thing is not to crash
 
     // Verify original labels are still intact
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     assert_eq!(labels.len(), 2);
@@ -243,21 +234,35 @@ fn test_label_remove_duplicates_fully() {
     // Create bead with label
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Remove Duplicate Test", "--label", "test-label"],
+        &[
+            "create",
+            "--title",
+            "Remove Duplicate Test",
+            "--label",
+            "test-label",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
     // Verify label exists
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
     assert_eq!(labels.len(), 1);
 
     // Remove same label multiple times
-    let _ = run_bf_command(workspace, &["label", "remove", &bead_id, "-l", "test-label"]);
-    let _ = run_bf_command(workspace, &["label", "remove", &bead_id, "-l", "test-label"]);
+    let _ = run_bf_command(
+        workspace,
+        &["label", "remove", &bead_id, "-l", "test-label"],
+    );
+    let _ = run_bf_command(
+        workspace,
+        &["label", "remove", &bead_id, "-l", "test-label"],
+    );
 
     // Verify label is completely gone
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
     assert_eq!(labels.len(), 0, "Label should be completely removed");
 }
@@ -274,15 +279,21 @@ fn test_label_list_all_with_counts() {
     // Create multiple beads with overlapping labels
     let _ = run_bf_command(
         workspace,
-        &["create", "--title", "Bead 1", "--label", "urgent", "--label", "backend"],
+        &[
+            "create", "--title", "Bead 1", "--label", "urgent", "--label", "backend",
+        ],
     );
     let _ = run_bf_command(
         workspace,
-        &["create", "--title", "Bead 2", "--label", "urgent", "--label", "frontend"],
+        &[
+            "create", "--title", "Bead 2", "--label", "urgent", "--label", "frontend",
+        ],
     );
     let _ = run_bf_command(
         workspace,
-        &["create", "--title", "Bead 3", "--label", "backend", "--label", "frontend"],
+        &[
+            "create", "--title", "Bead 3", "--label", "backend", "--label", "frontend",
+        ],
     );
 
     // List all labels
@@ -290,9 +301,18 @@ fn test_label_list_all_with_counts() {
     assert!(success, "bf label list failed: {}", stderr);
 
     // Verify the output shows label counts
-    assert!(list_stdout.contains("urgent"), "Output should contain 'urgent' label");
-    assert!(list_stdout.contains("backend"), "Output should contain 'backend' label");
-    assert!(list_stdout.contains("frontend"), "Output should contain 'frontend' label");
+    assert!(
+        list_stdout.contains("urgent"),
+        "Output should contain 'urgent' label"
+    );
+    assert!(
+        list_stdout.contains("backend"),
+        "Output should contain 'backend' label"
+    );
+    assert!(
+        list_stdout.contains("frontend"),
+        "Output should contain 'frontend' label"
+    );
 }
 
 // ============================================================================
@@ -307,7 +327,15 @@ fn test_labels_text_format() {
     // Create bead with labels
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Text Format Test", "--label", "ui", "--label", "ux"],
+        &[
+            "create",
+            "--title",
+            "Text Format Test",
+            "--label",
+            "ui",
+            "--label",
+            "ux",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
@@ -334,7 +362,15 @@ fn test_labels_json_format() {
     // Create bead with labels
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "JSON Format Test", "--label", "api", "--label", "rest"],
+        &[
+            "create",
+            "--title",
+            "JSON Format Test",
+            "--label",
+            "api",
+            "--label",
+            "rest",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
@@ -368,7 +404,8 @@ fn test_empty_label_is_rejected_or_ignored() {
     // Either fails or ignores empty label - both are acceptable
     if success {
         let bead_id = extract_bead_id(&stdout);
-        let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+        let (labels_stdout, _, _) =
+            run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
         let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
         // If empty labels are stored, deduplicate them; otherwise, they should be filtered
         let unique_labels: std::collections::HashSet<_> = labels.into_iter().collect();
@@ -392,12 +429,21 @@ fn test_label_whitespace_handling() {
     // Create bead with labels that have leading/trailing spaces
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Whitespace Test", "--label", " urgent ", "--label", "backend"],
+        &[
+            "create",
+            "--title",
+            "Whitespace Test",
+            "--label",
+            " urgent ",
+            "--label",
+            "backend",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
     // Verify labels - they might be trimmed or stored with spaces
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     // Should have labels, exact behavior depends on implementation
@@ -433,7 +479,8 @@ fn test_special_characters_in_labels() {
     let bead_id = extract_bead_id(&stdout);
 
     // Verify special character labels are preserved
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     assert_eq!(labels.len(), 3);
@@ -454,12 +501,21 @@ fn test_unicode_labels() {
     // Create bead with unicode labels
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Unicode Test", "--label", "🔥hotfix", "--label", "tâsk"],
+        &[
+            "create",
+            "--title",
+            "Unicode Test",
+            "--label",
+            "🔥hotfix",
+            "--label",
+            "tâsk",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
     // Verify unicode labels are preserved
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     assert_eq!(labels.len(), 2);
@@ -479,12 +535,23 @@ fn test_label_case_sensitivity() {
     // Create bead with different case labels
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Case Test", "--label", "urgent", "--label", "URGENT", "--label", "Urgent"],
+        &[
+            "create",
+            "--title",
+            "Case Test",
+            "--label",
+            "urgent",
+            "--label",
+            "URGENT",
+            "--label",
+            "Urgent",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
     // Verify case behavior (implementation-dependent)
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     // At minimum, should have at least one label
@@ -503,7 +570,15 @@ fn test_label_persistence_after_flush() {
     // Create bead with labels
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Persistence Test", "--label", "persistent", "--label", "test"],
+        &[
+            "create",
+            "--title",
+            "Persistence Test",
+            "--label",
+            "persistent",
+            "--label",
+            "test",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
@@ -521,7 +596,8 @@ fn test_label_persistence_after_flush() {
     assert!(success, "Second bf sync --flush-only failed");
 
     // Verify all labels persist
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     assert_eq!(labels.len(), 3);
@@ -542,23 +618,50 @@ fn test_search_by_label() {
     // Create beads with different labels
     let (epic1, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Backend Epic", "--type", "epic", "--label", "backend", "--label", "database"],
+        &[
+            "create",
+            "--title",
+            "Backend Epic",
+            "--type",
+            "epic",
+            "--label",
+            "backend",
+            "--label",
+            "database",
+        ],
     );
     let epic1_id = extract_bead_id(&epic1);
 
     let (epic2, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Frontend Epic", "--type", "epic", "--label", "frontend", "--label", "ui"],
+        &[
+            "create",
+            "--title",
+            "Frontend Epic",
+            "--type",
+            "epic",
+            "--label",
+            "frontend",
+            "--label",
+            "ui",
+        ],
     );
     let epic2_id = extract_bead_id(&epic2);
 
     // Search by label
-    let (search_stdout, stderr, success) = run_bf_command(workspace, &["search", "--label", "backend"]);
+    let (search_stdout, stderr, success) =
+        run_bf_command(workspace, &["search", "--label", "backend"]);
     assert!(success, "bf search --label failed: {}", stderr);
 
     // Should find backend epic but not frontend
-    assert!(search_stdout.contains(&epic1_id), "Search should find backend epic");
-    assert!(!search_stdout.contains(&epic2_id), "Search should not find frontend epic");
+    assert!(
+        search_stdout.contains(&epic1_id),
+        "Search should find backend epic"
+    );
+    assert!(
+        !search_stdout.contains(&epic2_id),
+        "Search should not find frontend epic"
+    );
 }
 
 // ============================================================================
@@ -573,7 +676,15 @@ fn test_labels_in_show_output() {
     // Create bead with labels
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Show Test", "--label", "visible", "--label", "demo"],
+        &[
+            "create",
+            "--title",
+            "Show Test",
+            "--label",
+            "visible",
+            "--label",
+            "demo",
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
@@ -582,7 +693,10 @@ fn test_labels_in_show_output() {
     assert!(success, "bf show failed: {}", stderr);
 
     // Verify labels are displayed
-    assert!(show_stdout.contains("Labels:"), "Show output should contain 'Labels:'");
+    assert!(
+        show_stdout.contains("Labels:"),
+        "Show output should contain 'Labels:'"
+    );
     assert!(show_stdout.contains("visible"));
     assert!(show_stdout.contains("demo"));
 
@@ -609,12 +723,19 @@ fn test_very_long_label() {
     let long_label = "a".repeat(1000);
     let (stdout, _, _) = run_bf_command(
         workspace,
-        &["create", "--title", "Long Label Test", "--label", &long_label],
+        &[
+            "create",
+            "--title",
+            "Long Label Test",
+            "--label",
+            &long_label,
+        ],
     );
     let bead_id = extract_bead_id(&stdout);
 
     // Verify long label is preserved
-    let (labels_stdout, _, _) = run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
+    let (labels_stdout, _, _) =
+        run_bf_command(workspace, &["labels", &bead_id, "--format", "json"]);
     let labels: Vec<String> = serde_json::from_str(&labels_stdout).unwrap();
 
     assert_eq!(labels.len(), 1);

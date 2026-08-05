@@ -18,8 +18,8 @@ pub mod merge;
 pub mod migrate;
 pub mod model;
 pub mod recovery;
-pub mod robot_docs;
 pub mod reopen;
+pub mod robot_docs;
 pub mod rotate;
 pub mod secrets;
 pub mod storage;
@@ -36,12 +36,12 @@ pub use config::{
     find_beads_dir, load_config, load_metadata, Config, HistoryConfig, Metadata, RotateConfig,
     SyncConfig,
 };
-pub use merge::{merge_jsonl_files, merge_maps, MergeReport};
 pub use doctor::{check, rebuild_cache, reclaim_stale, repair, verify_schema, DoctorResult};
 pub use id::{generate_id, is_valid_bead_id};
 pub use log::{
     format_event_text, format_event_toon, format_events_json, query_events, EventFilter,
 };
+pub use merge::{merge_jsonl_files, merge_maps, MergeReport};
 pub use migrate::{
     migrate, migrate_from_jsonl, migrate_workspace_from_jsonl, migrate_workspace_path_b,
     MigrateOptions, MigrateResult, VerificationResult,

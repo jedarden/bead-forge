@@ -188,7 +188,8 @@ fn fleet_concurrent_claims_no_double_claim() {
         let claimed = Arc::clone(&claimed);
         handles.push(thread::spawn(move || {
             let assignee = format!("worker-{w:02}");
-            let (out, _e, ok) = run_bf(&ws, &["claim", "--assignee", &assignee, "--format", "json"]);
+            let (out, _e, ok) =
+                run_bf(&ws, &["claim", "--assignee", &assignee, "--format", "json"]);
             if ok {
                 if let Some(id) = parse_claimed_id(&out) {
                     claimed.lock().unwrap().push(id);

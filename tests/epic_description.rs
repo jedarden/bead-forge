@@ -57,7 +57,11 @@ fn assert_description_roundtrips(issue: &Issue, expected: &str) {
 #[test]
 fn test_epic_basic_description() {
     let description = "This epic tracks the rollout of the new claiming subsystem.";
-    let e = epic("epic-desc-basic", "Basic Description Epic", Some(description));
+    let e = epic(
+        "epic-desc-basic",
+        "Basic Description Epic",
+        Some(description),
+    );
     assert_description_roundtrips(&e, description);
 }
 
@@ -111,7 +115,11 @@ fn test_epic_long_description() {
         description.len()
     );
 
-    let e = epic("epic-desc-long", "Long Description Epic", Some(&description));
+    let e = epic(
+        "epic-desc-long",
+        "Long Description Epic",
+        Some(&description),
+    );
     assert_description_roundtrips(&e, &description);
 
     // Length is the point of this test: assert it explicitly after storage.

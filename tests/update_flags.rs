@@ -813,7 +813,11 @@ fn test_cli_update_description_file_round_trip() {
     let body = "This description came from a file.";
     std::fs::write(&desc_path, body).unwrap();
 
-    update_cli_bead(workspace, &bead_id, &["--description-file", "description.md"]);
+    update_cli_bead(
+        workspace,
+        &bead_id,
+        &["--description-file", "description.md"],
+    );
 
     let bead = get_cli_bead_json(workspace, &bead_id);
     assert_eq!(bead["description"], body);
@@ -831,11 +835,7 @@ fn test_cli_update_description_file_multiline() {
     let desc_path = workspace.join("multiline.md");
     std::fs::write(&desc_path, body).unwrap();
 
-    update_cli_bead(
-        workspace,
-        &bead_id,
-        &["--description-file", "multiline.md"],
-    );
+    update_cli_bead(workspace, &bead_id, &["--description-file", "multiline.md"]);
 
     let bead = get_cli_bead_json(workspace, &bead_id);
     assert_eq!(bead["description"], body);

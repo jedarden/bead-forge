@@ -81,11 +81,7 @@ fn get_bead_labels(workspace: &std::path::Path, bead_id: &str) -> Vec<String> {
 }
 
 /// Create an epic with specified labels
-fn create_epic_with_labels(
-    workspace: &std::path::Path,
-    title: &str,
-    labels: &[&str],
-) -> String {
+fn create_epic_with_labels(workspace: &std::path::Path, title: &str, labels: &[&str]) -> String {
     let mut cmd = Command::new(get_bf_binary());
     cmd.args(["create", "--title", title, "--type", "epic"]);
     for label in labels {
@@ -379,11 +375,8 @@ fn test_epic_label_functionality_10_multiple_label_operations_in_sequence() {
     let (_temp, beads_dir) = setup_test_workspace();
     let workspace = beads_dir.parent().unwrap();
 
-    let epic_id = create_epic_with_labels(
-        workspace,
-        "Multi-Op Epic",
-        &["initial", "starting-point"],
-    );
+    let epic_id =
+        create_epic_with_labels(workspace, "Multi-Op Epic", &["initial", "starting-point"]);
 
     // Sequence: add, add, remove, add, remove
     add_labels(workspace, &epic_id, &["added-1"]);
@@ -461,7 +454,11 @@ fn test_epic_label_functionality_13_special_characters_in_labels() {
     let epic_id = create_epic_with_labels(
         workspace,
         "Special Chars Epic",
-        &["label-with-dash", "label_with_underscore", "label.with.dots"],
+        &[
+            "label-with-dash",
+            "label_with_underscore",
+            "label.with.dots",
+        ],
     );
 
     let labels = get_bead_labels(workspace, &epic_id);

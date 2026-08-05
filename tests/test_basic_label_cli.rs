@@ -297,11 +297,7 @@ fn test_label_list_single_bead() {
         "Expected header for bead: {}",
         stdout
     );
-    assert!(
-        stdout.contains("bug"),
-        "Expected 'bug' label: {}",
-        stdout
-    );
+    assert!(stdout.contains("bug"), "Expected 'bug' label: {}", stdout);
     assert!(
         stdout.contains("high-priority"),
         "Expected 'high-priority' label: {}",
@@ -369,11 +365,7 @@ fn test_label_list_all_beads() {
         "Expected 'frontend' label: {}",
         stdout
     );
-    assert!(
-        stdout.contains("ui"),
-        "Expected 'ui' label: {}",
-        stdout
-    );
+    assert!(stdout.contains("ui"), "Expected 'ui' label: {}", stdout);
     assert!(
         stdout.contains("backend"),
         "Expected 'backend' label: {}",
@@ -509,7 +501,10 @@ fn test_label_duplicate_handling_multiple() {
 
     assert_eq!(count_a, 1, "unique-a should appear once");
     assert_eq!(count_b, 1, "unique-b should appear once");
-    assert_eq!(count_shared, 1, "shared should appear once despite being added twice");
+    assert_eq!(
+        count_shared, 1,
+        "shared should appear once despite being added twice"
+    );
 
     // Clean up
     bf().arg("close")

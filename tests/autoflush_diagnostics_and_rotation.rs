@@ -54,10 +54,7 @@ fn run(ws: &Path, args: &[&str]) -> (String, String, bool) {
 /// Run a `bf` command expected to succeed; returns trimmed stdout.
 fn ok(ws: &Path, args: &[&str]) -> String {
     let (out, err, success) = run(ws, args);
-    assert!(
-        success,
-        "bf {args:?} failed: {err}"
-    );
+    assert!(success, "bf {args:?} failed: {err}");
     out.trim().to_string()
 }
 
@@ -242,7 +239,10 @@ fn autoflush_targets_only_active_jsonl_not_archives() {
     let archive_before = snapshot(&archive_path);
 
     // Mutation → auto-flush rewrites ONLY the active file (surgical line replace).
-    let (_out, err, success) = run(ws.path(), &["update", &active_id, "--status", "in_progress"]);
+    let (_out, err, success) = run(
+        ws.path(),
+        &["update", &active_id, "--status", "in_progress"],
+    );
     assert!(success, "bf update failed: {err}");
 
     // Active file: the mutation must have landed (status changed) AND the file must
@@ -257,8 +257,7 @@ fn autoflush_targets_only_active_jsonl_not_archives() {
         "active issues.jsonl mtime should have advanced after the flush"
     );
     assert!(
-        String::from_utf8_lossy(&active_after_bytes)
-            .contains(r#""status":"in_progress""#),
+        String::from_utf8_lossy(&active_after_bytes).contains(r#""status":"in_progress""#),
         "the mutated bead's new status must be present in the active file"
     );
 

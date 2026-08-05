@@ -99,12 +99,22 @@ fn test_labels_command_text_format_all_beads() {
 
     // Create multiple beads with different labels
     let storage = Storage::open(&ws.db_path()).unwrap();
-    storage.create_issue(&create_issue_with_labels("bf-text-2", vec!["urgent"])).unwrap();
-    storage.create_issue(&create_issue_with_labels("bf-text-3", vec!["backend", "frontend"])).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-text-2", vec!["urgent"]))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels(
+            "bf-text-3",
+            vec!["backend", "frontend"],
+        ))
+        .unwrap();
 
     // List all issues and verify labels
     let issues = storage.list_all_issues().unwrap();
-    let filtered: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-text")).collect();
+    let filtered: Vec<_> = issues
+        .iter()
+        .filter(|i| i.id.starts_with("bf-text"))
+        .collect();
 
     assert!(filtered.len() >= 2, "Should have at least 2 test beads");
 
@@ -161,12 +171,22 @@ fn test_labels_command_json_format_all_beads() {
 
     // Create multiple beads
     let storage = Storage::open(&ws.db_path()).unwrap();
-    storage.create_issue(&create_issue_with_labels("bf-json-2", vec!["label1"])).unwrap();
-    storage.create_issue(&create_issue_with_labels("bf-json-3", vec!["label2", "label3"])).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-json-2", vec!["label1"]))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels(
+            "bf-json-3",
+            vec!["label2", "label3"],
+        ))
+        .unwrap();
 
     // List all issues
     let issues = storage.list_all_issues().unwrap();
-    let test_issues: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-json")).collect();
+    let test_issues: Vec<_> = issues
+        .iter()
+        .filter(|i| i.id.starts_with("bf-json"))
+        .collect();
 
     // Verify each issue can be serialized with labels
     for issue in test_issues {
@@ -174,7 +194,10 @@ fn test_labels_command_json_format_all_beads() {
         let parsed: serde_json::Value = serde_json::from_str(&json_value).unwrap();
 
         assert!(parsed["labels"].is_array());
-        assert_eq!(parsed["labels"].as_array().unwrap().len(), issue.labels.len());
+        assert_eq!(
+            parsed["labels"].as_array().unwrap().len(),
+            issue.labels.len()
+        );
     }
 }
 
@@ -219,7 +242,10 @@ fn test_label_persistence_flush_only() {
 
     // Parse and verify
     let jsonl_line: Vec<&str> = jsonl_content.lines().collect();
-    let line = jsonl_line.iter().find(|l| l.contains("bf-flush-1")).unwrap();
+    let line = jsonl_line
+        .iter()
+        .find(|l| l.contains("bf-flush-1"))
+        .unwrap();
     let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
 
     assert!(parsed["labels"].is_array());
@@ -252,7 +278,10 @@ fn test_label_persistence_multiple_flushes() {
 
     // Verify all labels persisted
     let jsonl_content = fs::read_to_string(&ws.jsonl_path()).unwrap();
-    let line = jsonl_content.lines().find(|l| l.contains("bf-flush-multi")).unwrap();
+    let line = jsonl_content
+        .lines()
+        .find(|l| l.contains("bf-flush-multi"))
+        .unwrap();
     let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
 
     let labels = parsed["labels"].as_array().unwrap();
@@ -311,7 +340,10 @@ fn test_label_survival_after_add_remove() {
 
     // Verify in JSONL
     let jsonl_content = fs::read_to_string(&ws.jsonl_path()).unwrap();
-    let line = jsonl_content.lines().find(|l| l.contains("bf-survive-2")).unwrap();
+    let line = jsonl_content
+        .lines()
+        .find(|l| l.contains("bf-survive-2"))
+        .unwrap();
     let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
 
     let labels = parsed["labels"].as_array().unwrap();
@@ -479,7 +511,11 @@ fn test_label_deduplication_add_same_label_twice() {
     storage.add_label("bf-dup-1", "label1").unwrap();
 
     let labels = storage.get_labels("bf-dup-1").unwrap();
-    assert_eq!(labels.len(), 1, "Should only have one label after duplicate add");
+    assert_eq!(
+        labels.len(),
+        1,
+        "Should only have one label after duplicate add"
+    );
     assert!(labels.contains(&"label1".to_string()));
 }
 
@@ -548,7 +584,11 @@ fn test_label_deduplication_survives_sync() {
     let storage2 = Storage::open(&ws.db_path()).unwrap();
     let imported = storage2.get_issue("bf-dup-sync").unwrap().unwrap();
 
-    assert_eq!(imported.labels.len(), 2, "Should have two unique labels after sync");
+    assert_eq!(
+        imported.labels.len(),
+        2,
+        "Should have two unique labels after sync"
+    );
     assert!(imported.labels.contains(&"label1".to_string()));
     assert!(imported.labels.contains(&"label2".to_string()));
 }
@@ -562,13 +602,21 @@ fn test_label_deduplication_with_special_characters() {
     storage.create_issue(&issue).unwrap();
 
     // Add labels with special characters multiple times
-    storage.add_label("bf-dup-special", "high-priority").unwrap();
-    storage.add_label("bf-dup-special", "high-priority").unwrap();
+    storage
+        .add_label("bf-dup-special", "high-priority")
+        .unwrap();
+    storage
+        .add_label("bf-dup-special", "high-priority")
+        .unwrap();
     storage.add_label("bf-dup-special", "won't-fix").unwrap();
     storage.add_label("bf-dup-special", "won't-fix").unwrap();
 
     let labels = storage.get_labels("bf-dup-special").unwrap();
-    assert_eq!(labels.len(), 2, "Should have two unique labels with special chars");
+    assert_eq!(
+        labels.len(),
+        2,
+        "Should have two unique labels with special chars"
+    );
     assert!(labels.contains(&"high-priority".to_string()));
     assert!(labels.contains(&"won't-fix".to_string()));
 }
@@ -627,7 +675,10 @@ fn test_label_full_sync_cycle() {
         .create_issue(&create_issue_with_labels("bf-sync-1", vec!["label1"]))
         .unwrap();
     storage
-        .create_issue(&create_issue_with_labels("bf-sync-2", vec!["label2", "label3"]))
+        .create_issue(&create_issue_with_labels(
+            "bf-sync-2",
+            vec!["label2", "label3"],
+        ))
         .unwrap();
     storage
         .create_issue(&create_issue_with_labels("bf-sync-3", vec![]))
@@ -648,17 +699,26 @@ fn test_label_full_sync_cycle() {
     let jsonl_content = fs::read_to_string(&ws.jsonl_path()).unwrap();
 
     // Check bf-sync-1
-    let line1 = jsonl_content.lines().find(|l| l.contains("bf-sync-1")).unwrap();
+    let line1 = jsonl_content
+        .lines()
+        .find(|l| l.contains("bf-sync-1"))
+        .unwrap();
     let parsed1: serde_json::Value = serde_json::from_str(line1).unwrap();
     assert_eq!(parsed1["labels"].as_array().unwrap().len(), 2);
 
     // Check bf-sync-2
-    let line2 = jsonl_content.lines().find(|l| l.contains("bf-sync-2")).unwrap();
+    let line2 = jsonl_content
+        .lines()
+        .find(|l| l.contains("bf-sync-2"))
+        .unwrap();
     let parsed2: serde_json::Value = serde_json::from_str(line2).unwrap();
     assert_eq!(parsed2["labels"].as_array().unwrap().len(), 1);
 
     // Check bf-sync-3
-    let line3 = jsonl_content.lines().find(|l| l.contains("bf-sync-3")).unwrap();
+    let line3 = jsonl_content
+        .lines()
+        .find(|l| l.contains("bf-sync-3"))
+        .unwrap();
     let parsed3: serde_json::Value = serde_json::from_str(line3).unwrap();
     assert_eq!(parsed3["labels"].as_array().unwrap().len(), 1);
 }
@@ -743,7 +803,10 @@ fn test_labels_cli_text_format_all_beads() {
     // Create multiple beads with different labels
     let storage = Storage::open(&ws.db_path()).unwrap();
     storage
-        .create_issue(&create_issue_with_labels("bf-cli-1", vec!["urgent", "backend"]))
+        .create_issue(&create_issue_with_labels(
+            "bf-cli-1",
+            vec!["urgent", "backend"],
+        ))
         .unwrap();
     storage
         .create_issue(&create_issue_with_labels("bf-cli-2", vec!["frontend"]))
@@ -785,7 +848,10 @@ fn test_labels_cli_text_format_single_bead() {
     // Create bead with labels
     let storage = Storage::open(&ws.db_path()).unwrap();
     storage
-        .create_issue(&create_issue_with_labels("bf-cli-single", vec!["urgent", "bugfix", "high-priority"]))
+        .create_issue(&create_issue_with_labels(
+            "bf-cli-single",
+            vec!["urgent", "bugfix", "high-priority"],
+        ))
         .unwrap();
 
     // Run labels command with ID (single bead mode)
@@ -853,7 +919,10 @@ fn test_labels_cli_text_format_multiple_labels() {
     let storage = Storage::open(&ws.db_path()).unwrap();
     let test_labels = vec!["urgent", "backend", "database", "performance", "p1"];
     storage
-        .create_issue(&create_issue_with_labels("bf-cli-multi", test_labels.clone()))
+        .create_issue(&create_issue_with_labels(
+            "bf-cli-multi",
+            test_labels.clone(),
+        ))
         .unwrap();
 
     // Run labels command with ID
@@ -865,7 +934,11 @@ fn test_labels_cli_text_format_multiple_labels() {
     assert_eq!(lines.len(), test_labels.len());
 
     for label in &test_labels {
-        assert!(lines.contains(&label), "Label '{}' not found in output", label);
+        assert!(
+            lines.contains(&label),
+            "Label '{}' not found in output",
+            label
+        );
     }
 }
 
@@ -876,7 +949,10 @@ fn test_labels_cli_text_format_labels_are_comma_separated_in_all_mode() {
     // Create bead with multiple labels
     let storage = Storage::open(&ws.db_path()).unwrap();
     storage
-        .create_issue(&create_issue_with_labels("bf-cli-comma", vec!["label1", "label2", "label3"]))
+        .create_issue(&create_issue_with_labels(
+            "bf-cli-comma",
+            vec!["label1", "label2", "label3"],
+        ))
         .unwrap();
 
     // Run labels command without ID (all beads mode)
@@ -1021,13 +1097,25 @@ fn test_labels_json_format_all_beads_jsonl_structure() {
 
     // Create multiple beads
     let storage = Storage::open(&ws.db_path()).unwrap();
-    storage.create_issue(&create_issue_with_labels("bf-jsonl-1", vec!["label1"])).unwrap();
-    storage.create_issue(&create_issue_with_labels("bf-jsonl-2", vec!["label2", "label3"])).unwrap();
-    storage.create_issue(&create_issue_with_labels("bf-jsonl-3", vec![])).unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-jsonl-1", vec!["label1"]))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels(
+            "bf-jsonl-2",
+            vec!["label2", "label3"],
+        ))
+        .unwrap();
+    storage
+        .create_issue(&create_issue_with_labels("bf-jsonl-3", vec![]))
+        .unwrap();
 
     // List all issues
     let issues = storage.list_all_issues().unwrap();
-    let test_issues: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-jsonl")).collect();
+    let test_issues: Vec<_> = issues
+        .iter()
+        .filter(|i| i.id.starts_with("bf-jsonl"))
+        .collect();
 
     // Verify each can be serialized to JSON with required fields
     for issue in test_issues {
@@ -1044,8 +1132,14 @@ fn test_labels_json_format_all_beads_jsonl_structure() {
 
         // Verify required fields exist
         assert!(parsed.get("id").is_some(), "JSON must contain 'id' field");
-        assert!(parsed.get("title").is_some(), "JSON must contain 'title' field");
-        assert!(parsed.get("labels").is_some(), "JSON must contain 'labels' field");
+        assert!(
+            parsed.get("title").is_some(),
+            "JSON must contain 'title' field"
+        );
+        assert!(
+            parsed.get("labels").is_some(),
+            "JSON must contain 'labels' field"
+        );
 
         // Verify field types
         assert!(parsed["id"].is_string(), "id must be a string");
@@ -1055,7 +1149,10 @@ fn test_labels_json_format_all_beads_jsonl_structure() {
         // Verify values
         assert_eq!(parsed["id"].as_str().unwrap(), issue.id);
         assert_eq!(parsed["title"].as_str().unwrap(), issue.title);
-        assert_eq!(parsed["labels"].as_array().unwrap().len(), issue.labels.len());
+        assert_eq!(
+            parsed["labels"].as_array().unwrap().len(),
+            issue.labels.len()
+        );
     }
 }
 
@@ -1082,12 +1179,22 @@ fn test_labels_json_format_includes_all_required_fields() {
 
     // Check all required fields are present
     assert!(parsed.get("id").is_some(), "Missing required field: id");
-    assert!(parsed.get("title").is_some(), "Missing required field: title");
-    assert!(parsed.get("labels").is_some(), "Missing required field: labels");
+    assert!(
+        parsed.get("title").is_some(),
+        "Missing required field: title"
+    );
+    assert!(
+        parsed.get("labels").is_some(),
+        "Missing required field: labels"
+    );
 
     // Verify no extra fields at top level (for clean schema)
     let obj = parsed.as_object().unwrap();
-    assert_eq!(obj.len(), 3, "JSON object should have exactly 3 fields: id, title, labels");
+    assert_eq!(
+        obj.len(),
+        3,
+        "JSON object should have exactly 3 fields: id, title, labels"
+    );
 
     // Verify field values are correct types
     assert!(parsed["id"].is_string());
@@ -1166,7 +1273,10 @@ fn test_labels_jsonl_format_empty_bead_list() {
     let issues = storage.list_all_issues().unwrap();
 
     // Filter to test beads (should be empty)
-    let test_issues: Vec<_> = issues.iter().filter(|i| i.id.starts_with("bf-empty-test")).collect();
+    let test_issues: Vec<_> = issues
+        .iter()
+        .filter(|i| i.id.starts_with("bf-empty-test"))
+        .collect();
 
     // When empty, JSONL should output []
     assert_eq!(test_issues.len(), 0);

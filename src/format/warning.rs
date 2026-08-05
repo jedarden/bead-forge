@@ -87,9 +87,14 @@ mod tests {
     fn non_object_value_is_wrapped() {
         let v = json!(["a", "b"]);
         let out = with_warning(v, Some("heads up"));
-        assert_eq!(out.get("warning").and_then(|x| x.as_str()), Some("heads up"));
         assert_eq!(
-            out.get("result").and_then(|x| x.as_array()).map(|a| a.len()),
+            out.get("warning").and_then(|x| x.as_str()),
+            Some("heads up")
+        );
+        assert_eq!(
+            out.get("result")
+                .and_then(|x| x.as_array())
+                .map(|a| a.len()),
             Some(2)
         );
     }

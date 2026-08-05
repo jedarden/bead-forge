@@ -10,10 +10,10 @@
 //! - Text query combined with filters
 //! - Limit parameter with JSON output
 
+use serde_json::{from_str, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-use serde_json::{Value, from_str};
 
 fn bf() -> Command {
     Command::new(env!("CARGO_BIN_EXE_bf"))
@@ -42,14 +42,23 @@ fn setup() -> (TempDir, PathBuf) {
 }
 
 /// Create a test bead with the given parameters
-fn create_bead_with_params(workspace: &Path, title: &str, type_: &str, priority: i32, status: &str) -> String {
+fn create_bead_with_params(
+    workspace: &Path,
+    title: &str,
+    type_: &str,
+    priority: i32,
+    status: &str,
+) -> String {
     let (out, err, ok) = run_bf(
         workspace,
         &[
             "create",
-            "--title", title,
-            "--type", type_,
-            "--priority", &priority.to_string(),
+            "--title",
+            title,
+            "--type",
+            type_,
+            "--priority",
+            &priority.to_string(),
         ],
     );
     assert!(ok, "bf create failed: {err}");
@@ -85,9 +94,7 @@ fn close_bead(workspace: &Path, bead_id: &str, reason: &str) {
 
 /// Parse a JSON string and panic if invalid
 fn parse_json(json: &str) -> Value {
-    from_str(json).unwrap_or_else(|e| {
-        panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-    })
+    from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
 }
 
 /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -120,18 +127,25 @@ fn test_search_json_multiple_status_filters() {
     let open1 = create_bead_with_params(&workspace, "open task one", "task", 2, "open");
     let open2 = create_bead_with_params(&workspace, "open task two", "task", 2, "open");
     let blocked = create_bead_with_params(&workspace, "blocked task", "task", 2, "blocked");
-    let in_progress = create_bead_with_params(&workspace, "in progress task", "task", 2, "in_progress");
+    let in_progress =
+        create_bead_with_params(&workspace, "in progress task", "task", 2, "in_progress");
     let closed = close_bead_returning_id(&workspace, "closed task", "task", 2);
 
     // Search with multiple status filters (OR-combined)
     let (out, err, ok) = run_bf(
         &workspace,
-        &["search", "--status", "open", "--status", "blocked", "--format", "json"],
+        &[
+            "search", "--status", "open", "--status", "blocked", "--format", "json",
+        ],
     );
     assert!(ok, "Search with multiple status filters failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 3, "Should find exactly 3 beads with open OR blocked status");
+    assert_eq!(
+        parsed.len(),
+        3,
+        "Should find exactly 3 beads with open OR blocked status"
+    );
 
     let ids: Vec<String> = parsed.iter().map(|v| get_string(v, "id")).collect();
     assert!(ids.contains(&open1), "Should find open1");
@@ -158,12 +172,18 @@ fn test_search_json_multiple_type_filters() {
     // Search with multiple type filters (OR-combined)
     let (out, err, ok) = run_bf(
         &workspace,
-        &["search", "--type", "task", "--type", "epic", "--format", "json"],
+        &[
+            "search", "--type", "task", "--type", "epic", "--format", "json",
+        ],
     );
     assert!(ok, "Search with multiple type filters failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 3, "Should find exactly 3 beads with task OR epic type");
+    assert_eq!(
+        parsed.len(),
+        3,
+        "Should find exactly 3 beads with task OR epic type"
+    );
 
     let ids: Vec<String> = parsed.iter().map(|v| get_string(v, "id")).collect();
     assert!(ids.contains(&task1), "Should find task1");
@@ -189,12 +209,18 @@ fn test_search_json_multiple_label_filters() {
     // Search with multiple label filters (OR-combined)
     let (out, err, ok) = run_bf(
         &workspace,
-        &["search", "--label", "urgent", "--label", "bug", "--format", "json"],
+        &[
+            "search", "--label", "urgent", "--label", "bug", "--format", "json",
+        ],
     );
     assert!(ok, "Search with multiple label filters failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 3, "Should find exactly 3 beads with urgent OR bug label");
+    assert_eq!(
+        parsed.len(),
+        3,
+        "Should find exactly 3 beads with urgent OR bug label"
+    );
 
     let ids: Vec<String> = parsed.iter().map(|v| get_string(v, "id")).collect();
     assert!(ids.contains(&urgent), "Should find urgent");
@@ -241,7 +267,15 @@ fn test_search_json_priority_range_filters() {
     // Test both priority-min and priority-max (range)
     let (out, err, ok) = run_bf(
         &workspace,
-        &["search", "--priority-min", "1", "--priority-max", "2", "--format", "json"],
+        &[
+            "search",
+            "--priority-min",
+            "1",
+            "--priority-max",
+            "2",
+            "--format",
+            "json",
+        ],
     );
     assert!(ok, "Search with priority range failed: {err}");
 
@@ -271,9 +305,13 @@ fn test_search_json_combined_filters() {
 
     let normal_urgent_open = create_bead_with_labels(&workspace, "normal urgent open", &["urgent"]);
 
-    let high_urgent_blocked = create_bead_with_labels(&workspace, "high urgent blocked", &["urgent"]);
+    let high_urgent_blocked =
+        create_bead_with_labels(&workspace, "high urgent blocked", &["urgent"]);
     let high_urgent_blocked = update_bead_priority(&workspace, &high_urgent_blocked, 1);
-    let (_o, e, ok) = run_bf(&workspace, &["update", &high_urgent_blocked, "--status", "blocked"]);
+    let (_o, e, ok) = run_bf(
+        &workspace,
+        &["update", &high_urgent_blocked, "--status", "blocked"],
+    );
     assert!(ok, "Failed to set status: {e}");
 
     let normal_bug_open = create_bead_with_labels(&workspace, "normal bug open", &["bug"]);
@@ -281,18 +319,44 @@ fn test_search_json_combined_filters() {
     // Search with combined filters: label=urgent AND priority>=1 AND status=open
     let (out, err, ok) = run_bf(
         &workspace,
-        &["search", "--label", "urgent", "--priority-min", "1", "--status", "open", "--format", "json"],
+        &[
+            "search",
+            "--label",
+            "urgent",
+            "--priority-min",
+            "1",
+            "--status",
+            "open",
+            "--format",
+            "json",
+        ],
     );
     assert!(ok, "Search with combined filters failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 2, "Should find exactly 2 beads matching all filters");
+    assert_eq!(
+        parsed.len(),
+        2,
+        "Should find exactly 2 beads matching all filters"
+    );
 
     let ids: Vec<String> = parsed.iter().map(|v| get_string(v, "id")).collect();
-    assert!(ids.contains(&high_urgent_open), "Should find high+urgent+open");
-    assert!(ids.contains(&normal_urgent_open), "Should find normal+urgent+open");
-    assert!(!ids.contains(&high_urgent_blocked), "Should not find blocked bead");
-    assert!(!ids.contains(&normal_bug_open), "Should not find bug-labeled bead");
+    assert!(
+        ids.contains(&high_urgent_open),
+        "Should find high+urgent+open"
+    );
+    assert!(
+        ids.contains(&normal_urgent_open),
+        "Should find normal+urgent+open"
+    );
+    assert!(
+        !ids.contains(&high_urgent_blocked),
+        "Should not find blocked bead"
+    );
+    assert!(
+        !ids.contains(&normal_bug_open),
+        "Should not find bug-labeled bead"
+    );
 }
 
 // ============================================================================
@@ -316,7 +380,11 @@ fn test_search_json_text_query_with_filters() {
     assert!(ok, "Search with text query and filters failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 1, "Should find exactly 1 bead matching text AND status");
+    assert_eq!(
+        parsed.len(),
+        1,
+        "Should find exactly 1 bead matching text AND status"
+    );
 
     let found_id = get_string(&parsed[0], "id");
     assert_eq!(found_id, api_open, "Should find only the open API bead");
@@ -332,7 +400,13 @@ fn test_search_json_limit_parameter() {
 
     // Create multiple matching beads
     for i in 1..=10 {
-        create_bead_with_params(&workspace, &format!("search test bead {}", i), "task", 2, "open");
+        create_bead_with_params(
+            &workspace,
+            &format!("search test bead {}", i),
+            "task",
+            2,
+            "open",
+        );
     }
 
     // Test with limit=5
@@ -343,7 +417,11 @@ fn test_search_json_limit_parameter() {
     assert!(ok, "Search with limit failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 5, "Should return exactly 5 beads when limited");
+    assert_eq!(
+        parsed.len(),
+        5,
+        "Should return exactly 5 beads when limited"
+    );
 
     // Test with limit=0 (unlimited)
     let (out, err, ok) = run_bf(
@@ -386,7 +464,10 @@ fn test_search_json_assignee_filter() {
     // Verify other assignees are not found
     let ids: Vec<String> = parsed.iter().map(|v| get_string(v, "id")).collect();
     assert!(!ids.contains(&bob), "Should not find bob's bead");
-    assert!(!ids.contains(&unassigned), "Should not find unassigned bead");
+    assert!(
+        !ids.contains(&unassigned),
+        "Should not find unassigned bead"
+    );
 }
 
 // ============================================================================
@@ -408,7 +489,11 @@ fn test_search_json_no_matches_with_filters() {
     assert!(ok, "Search with no matches failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 0, "Should return empty results for no matches");
+    assert_eq!(
+        parsed.len(),
+        0,
+        "Should return empty results for no matches"
+    );
 }
 
 #[test]
@@ -417,7 +502,8 @@ fn test_search_json_wildcard_text_with_filters() {
 
     // Create beads
     let task1 = create_bead_with_labels(&workspace, "urgent backend task", &["urgent", "backend"]);
-    let task2 = create_bead_with_labels(&workspace, "urgent frontend task", &["urgent", "frontend"]);
+    let task2 =
+        create_bead_with_labels(&workspace, "urgent frontend task", &["urgent", "frontend"]);
     let task3 = create_bead_with_labels(&workspace, "backend task", &["backend"]);
 
     // Search for "backend" with label=urgent
@@ -428,7 +514,11 @@ fn test_search_json_wildcard_text_with_filters() {
     assert!(ok, "Search with text and label filter failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 1, "Should find exactly 1 bead matching text AND label");
+    assert_eq!(
+        parsed.len(),
+        1,
+        "Should find exactly 1 bead matching text AND label"
+    );
 
     let found_id = get_string(&parsed[0], "id");
     assert_eq!(found_id, task1, "Should find the urgent backend task");
@@ -442,7 +532,17 @@ fn test_search_json_wildcard_text_with_filters() {
 fn create_bead_with_assignee(workspace: &Path, title: &str, assignee: &str) -> String {
     let (out, err, ok) = run_bf(
         workspace,
-        &["create", "--title", title, "--type", "task", "--priority", "2", "--assignee", assignee],
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+            "--assignee",
+            assignee,
+        ],
     );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
@@ -459,7 +559,10 @@ fn close_bead_returning_id(workspace: &Path, title: &str, type_: &str, priority:
 
 /// Update a bead's priority and return its ID
 fn update_bead_priority(workspace: &Path, bead_id: &str, priority: i32) -> String {
-    let (_o, e, ok) = run_bf(workspace, &["update", bead_id, "--priority", &priority.to_string()]);
+    let (_o, e, ok) = run_bf(
+        workspace,
+        &["update", bead_id, "--priority", &priority.to_string()],
+    );
     assert!(ok, "Failed to update priority: {e}");
     bead_id.to_string()
 }

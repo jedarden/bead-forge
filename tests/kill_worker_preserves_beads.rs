@@ -116,11 +116,17 @@ fn killed_worker_between_mutation_and_flush_loses_nothing() {
     // Commit the baseline JSONL artifact.
     assert!(git(ws, &["init"]).0, "git init failed");
     assert!(git(ws, &["add", ".beads/issues.jsonl"]).0);
-    assert!(git(ws, &["commit", "-m", "baseline"]).0, "git commit failed");
+    assert!(
+        git(ws, &["commit", "-m", "baseline"]).0,
+        "git commit failed"
+    );
 
     // A mutation whose flush did not run (worker "killed" before flush, or
     // auto-flush disabled). The db commit + dirty mark land; JSONL is untouched.
-    let (out, _e, ok) = run(ws, &["--no-auto-flush", "create", "--title", "killed worker bead"]);
+    let (out, _e, ok) = run(
+        ws,
+        &["--no-auto-flush", "create", "--title", "killed worker bead"],
+    );
     assert!(ok, "create failed");
     let killed_id = out.trim().to_string();
 
@@ -132,7 +138,10 @@ fn killed_worker_between_mutation_and_flush_loses_nothing() {
     // the kill. A brand-new Storage handle still reads the committed bead.
     let (out, _e, ok) = run(ws, &["show", &killed_id]);
     assert!(ok, "bead must be readable after 'worker restart': {out:?}");
-    assert!(out.contains(&killed_id) || out.contains("ID:"), "show output must contain the bead id or ID: header");
+    assert!(
+        out.contains(&killed_id) || out.contains("ID:"),
+        "show output must contain the bead id or ID: header"
+    );
 
     // (3) Before recovery the committed artifact does NOT yet carry the bead —
     // so a plain `git diff` is empty. This is the window the criterion is about:
@@ -196,7 +205,10 @@ fn doctor_repair_on_unflushed_only_is_a_safe_noop() {
     // `bf doctor --repair` on a healthy-but-dirty workspace SUCCEEDS as a no-op:
     // it does NOT rebuild, and it does NOT lose the dirty bead.
     let (o, _e, ok) = run(ws, &["doctor", "--repair"]);
-    assert!(ok, "doctor --repair must succeed (safe no-op) on an unflushed-only workspace");
+    assert!(
+        ok,
+        "doctor --repair must succeed (safe no-op) on an unflushed-only workspace"
+    );
     assert!(
         o.contains("healthy") && o.contains("no JSONL rebuild"),
         "repair must report a healthy no-op, got: {o}"
@@ -281,7 +293,10 @@ fn doctor_repair_with_flush_first_preserves_dirty_beads() {
     let (_o, e, ok) = run(ws, &["sync", "--flush-only"]);
     assert!(ok, "sync --flush-only failed: {e}");
     let jsonl_content = fs::read_to_string(jsonl_path(ws)).unwrap();
-    assert!(jsonl_content.contains(&dirty_id), "dirty bead must be in JSONL after explicit flush");
+    assert!(
+        jsonl_content.contains(&dirty_id),
+        "dirty bead must be in JSONL after explicit flush"
+    );
 }
 
 /// Phase 7.2 safety improvement: `bf doctor --repair --force` on a *healthy*
@@ -312,7 +327,10 @@ fn doctor_repair_force_on_healthy_workspace_does_not_lose_dirty() {
     // Run `bf doctor --repair --force`. No corruption/divergence exists, so no
     // rebuild happens and --force has nothing to discard.
     let (o, _e, ok) = run(ws, &["doctor", "--repair", "--force"]);
-    assert!(ok, "doctor --repair --force must succeed on a healthy workspace");
+    assert!(
+        ok,
+        "doctor --repair --force must succeed on a healthy workspace"
+    );
     assert!(
         o.contains("healthy") && o.contains("no JSONL rebuild"),
         "healthy workspace must not rebuild even with --force, got: {o}"
@@ -322,7 +340,10 @@ fn doctor_repair_force_on_healthy_workspace_does_not_lose_dirty() {
     let (_o, _e, ok) = run(ws, &["show", &flushed_id]);
     assert!(ok, "flushed bead must exist after force repair");
     let (_o, e, ok) = run(ws, &["show", &kept_id]);
-    assert!(ok, "dirty bead must survive --force on a healthy workspace: {e}");
+    assert!(
+        ok,
+        "dirty bead must survive --force on a healthy workspace: {e}"
+    );
 }
 
 // ===========================================================================
@@ -358,7 +379,10 @@ fn default_autoflush_makes_bead_visible_immediately() {
 
     // Verify bead is in JSONL immediately.
     let jsonl_content = fs::read_to_string(jsonl_path(ws)).unwrap();
-    assert!(jsonl_content.contains(&live_id), "bead must be in JSONL immediately after create");
+    assert!(
+        jsonl_content.contains(&live_id),
+        "bead must be in JSONL immediately after create"
+    );
 
     // The worker could be killed now and `git diff .beads/` still shows it.
     let (ok, diff, _) = git(ws, &["diff", "--", ".beads/issues.jsonl"]);
@@ -412,7 +436,10 @@ fn flush_failure_surfaces_warning_in_json_output() {
         .get("warning")
         .and_then(|v| v.as_str())
         .expect("--json must carry a non-null `warning` on flush failure");
-    assert!(warning.contains("auto-flush"), "warning must mention auto-flush: {warning}");
+    assert!(
+        warning.contains("auto-flush"),
+        "warning must mention auto-flush: {warning}"
+    );
     assert!(
         warning.contains("sync --flush-only") || warning.contains("bf sync"),
         "warning must name the recovery command: {warning}"

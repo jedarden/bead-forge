@@ -698,7 +698,13 @@ mod tests {
         conn.execute(
             "INSERT INTO worker_sessions (worker_id, model, harness, bead_id, workspace_path)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params!["worker1", "claude-4.7", "cli", "bf-test-sqlite-default", "."],
+            params![
+                "worker1",
+                "claude-4.7",
+                "cli",
+                "bf-test-sqlite-default",
+                "."
+            ],
         )
         .unwrap();
 
@@ -737,7 +743,10 @@ mod tests {
         let duration_val = duration.unwrap();
         assert!(duration_val >= 0, "Duration should be non-negative");
         // Allow up to 60 seconds (test execution time)
-        assert!(duration_val <= 60, "Duration should be reasonable for test execution");
+        assert!(
+            duration_val <= 60,
+            "Duration should be reasonable for test execution"
+        );
     }
 
     #[test]
@@ -811,10 +820,18 @@ mod tests {
 
         // Verify the stats are reasonable (around 5 minutes = 300 seconds)
         let p50_val = p50.unwrap();
-        assert!(p50_val >= 290 && p50_val <= 310, "p50 should be around 300 seconds, got {}", p50_val);
+        assert!(
+            p50_val >= 290 && p50_val <= 310,
+            "p50 should be around 300 seconds, got {}",
+            p50_val
+        );
 
         let avg_val = avg.unwrap();
-        assert!(avg_val >= 290.0 && avg_val <= 310.0, "avg should be around 300 seconds, got {}", avg_val);
+        assert!(
+            avg_val >= 290.0 && avg_val <= 310.0,
+            "avg should be around 300 seconds, got {}",
+            avg_val
+        );
     }
 
     #[test]
@@ -1033,7 +1050,10 @@ mod tests {
         assert_eq!(p90.unwrap(), 300, "p90 should equal p50 for single session");
 
         assert!(avg.is_some(), "avg should be Some for single session");
-        assert!((avg.unwrap() - 300.0).abs() < 0.01, "avg should equal the single duration");
+        assert!(
+            (avg.unwrap() - 300.0).abs() < 0.01,
+            "avg should equal the single duration"
+        );
     }
 
     #[test]
@@ -1062,7 +1082,11 @@ mod tests {
         let result = get_expected_seconds(&conn, "claude-4.7", "unknown-harness", "bug").unwrap();
 
         assert!(result.is_some(), "Should find fallback to model+issue_type");
-        assert_eq!(result.unwrap(), 180, "Should return p50 from model+issue_type stats");
+        assert_eq!(
+            result.unwrap(),
+            180,
+            "Should return p50 from model+issue_type stats"
+        );
     }
 
     #[test]
@@ -1088,10 +1112,15 @@ mod tests {
         .unwrap();
 
         // Query with unknown model and harness should fallback to issue_type only
-        let result = get_expected_seconds(&conn, "unknown-model", "unknown-harness", "bug").unwrap();
+        let result =
+            get_expected_seconds(&conn, "unknown-model", "unknown-harness", "bug").unwrap();
 
         assert!(result.is_some(), "Should find fallback to issue_type only");
-        assert_eq!(result.unwrap(), 150, "Should return p50 from issue_type-only stats");
+        assert_eq!(
+            result.unwrap(),
+            150,
+            "Should return p50 from issue_type-only stats"
+        );
     }
 
     #[test]
@@ -1148,9 +1177,14 @@ mod tests {
         // No stats in database
 
         // Query should return None when no data available
-        let result = get_expected_seconds(&conn, "unknown-model", "unknown-harness", "unknown-type").unwrap();
+        let result =
+            get_expected_seconds(&conn, "unknown-model", "unknown-harness", "unknown-type")
+                .unwrap();
 
-        assert!(result.is_none(), "Should return None when no velocity data available");
+        assert!(
+            result.is_none(),
+            "Should return None when no velocity data available"
+        );
     }
 
     #[test]
@@ -1189,9 +1223,18 @@ mod tests {
         assert_eq!(stats.len(), 3, "Should return all 3 stats");
 
         // Verify ordering by sample_count DESC
-        assert_eq!(stats[0].sample_count, 15, "First should have highest sample_count");
-        assert_eq!(stats[1].sample_count, 10, "Second should have middle sample_count");
-        assert_eq!(stats[2].sample_count, 5, "Third should have lowest sample_count");
+        assert_eq!(
+            stats[0].sample_count, 15,
+            "First should have highest sample_count"
+        );
+        assert_eq!(
+            stats[1].sample_count, 10,
+            "Second should have middle sample_count"
+        );
+        assert_eq!(
+            stats[2].sample_count, 5,
+            "Third should have lowest sample_count"
+        );
     }
 
     #[test]
@@ -1228,11 +1271,20 @@ mod tests {
         let stats = get_velocity_stats(&conn, Some("claude-4.7"), None).unwrap();
 
         assert_eq!(stats.len(), 2, "Should return only claude-4.7 stats");
-        assert!(stats.iter().all(|s| s.model == "claude-4.7"), "All results should have model=claude-4.7");
+        assert!(
+            stats.iter().all(|s| s.model == "claude-4.7"),
+            "All results should have model=claude-4.7"
+        );
 
         // Verify ordering by sample_count DESC within filtered results
-        assert_eq!(stats[0].sample_count, 10, "First should have higher sample_count");
-        assert_eq!(stats[1].sample_count, 5, "Second should have lower sample_count");
+        assert_eq!(
+            stats[0].sample_count, 10,
+            "First should have higher sample_count"
+        );
+        assert_eq!(
+            stats[1].sample_count, 5,
+            "Second should have lower sample_count"
+        );
     }
 
     #[test]
@@ -1269,11 +1321,20 @@ mod tests {
         let stats = get_velocity_stats(&conn, None, Some("cli")).unwrap();
 
         assert_eq!(stats.len(), 2, "Should return only cli harness stats");
-        assert!(stats.iter().all(|s| s.harness == "cli"), "All results should have harness=cli");
+        assert!(
+            stats.iter().all(|s| s.harness == "cli"),
+            "All results should have harness=cli"
+        );
 
         // Verify ordering by sample_count DESC within filtered results
-        assert_eq!(stats[0].sample_count, 15, "First should have higher sample_count");
-        assert_eq!(stats[1].sample_count, 10, "Second should have lower sample_count");
+        assert_eq!(
+            stats[0].sample_count, 15,
+            "First should have higher sample_count"
+        );
+        assert_eq!(
+            stats[1].sample_count, 10,
+            "Second should have lower sample_count"
+        );
     }
 
     #[test]
@@ -1320,7 +1381,10 @@ mod tests {
         assert_eq!(stats.len(), 1, "Should return only claude-4.7 + cli stats");
         assert_eq!(stats[0].model, "claude-4.7", "Should match model");
         assert_eq!(stats[0].harness, "cli", "Should match harness");
-        assert_eq!(stats[0].sample_count, 10, "Should have correct sample_count");
+        assert_eq!(
+            stats[0].sample_count, 10,
+            "Should have correct sample_count"
+        );
     }
 
     #[test]
@@ -1339,13 +1403,26 @@ mod tests {
 
         // Query with non-matching filters should return empty results
         let stats = get_velocity_stats(&conn, Some("non-existent-model"), Some("cli")).unwrap();
-        assert_eq!(stats.len(), 0, "Should return empty vec for non-matching model");
+        assert_eq!(
+            stats.len(),
+            0,
+            "Should return empty vec for non-matching model"
+        );
 
-        let stats = get_velocity_stats(&conn, Some("claude-4.7"), Some("non-existent-harness")).unwrap();
-        assert_eq!(stats.len(), 0, "Should return empty vec for non-matching harness");
+        let stats =
+            get_velocity_stats(&conn, Some("claude-4.7"), Some("non-existent-harness")).unwrap();
+        assert_eq!(
+            stats.len(),
+            0,
+            "Should return empty vec for non-matching harness"
+        );
 
         let stats = get_velocity_stats(&conn, None, Some("non-existent-harness")).unwrap();
-        assert_eq!(stats.len(), 0, "Should return empty vec for non-matching harness (no model filter)");
+        assert_eq!(
+            stats.len(),
+            0,
+            "Should return empty vec for non-matching harness (no model filter)"
+        );
     }
 
     #[test]
@@ -1381,7 +1458,10 @@ mod tests {
         // Verify descending order
         let mut last_count = i64::MAX;
         for stat in &stats {
-            assert!(stat.sample_count <= last_count, "Should be sorted by sample_count DESC");
+            assert!(
+                stat.sample_count <= last_count,
+                "Should be sorted by sample_count DESC"
+            );
             last_count = stat.sample_count;
         }
 
@@ -1438,9 +1518,18 @@ mod tests {
         assert_eq!(stats.len(), 3, "Should return 3 claude-4.7 stats");
 
         // Verify ordering within filtered results
-        assert_eq!(stats[0].sample_count, 25, "First should have highest sample_count (gui)");
-        assert_eq!(stats[1].sample_count, 10, "Second should have middle sample_count (cli)");
-        assert_eq!(stats[2].sample_count, 5, "Third should have lowest sample_count (tui)");
+        assert_eq!(
+            stats[0].sample_count, 25,
+            "First should have highest sample_count (gui)"
+        );
+        assert_eq!(
+            stats[1].sample_count, 10,
+            "Second should have middle sample_count (cli)"
+        );
+        assert_eq!(
+            stats[2].sample_count, 5,
+            "Third should have lowest sample_count (tui)"
+        );
 
         // Verify harness matches ordering
         assert_eq!(stats[0].harness, "gui");

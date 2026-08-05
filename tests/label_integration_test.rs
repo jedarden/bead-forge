@@ -132,7 +132,10 @@ fn test_foreign_key_enforcement_bead_labels() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(count, 0, "Labels should be cascade deleted when issue is closed");
+    assert_eq!(
+        count, 0,
+        "Labels should be cascade deleted when issue is closed"
+    );
 }
 
 #[test]

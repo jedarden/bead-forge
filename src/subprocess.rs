@@ -200,13 +200,9 @@ pub fn execute_command(
     }
 
     // Execute the command
-    let output = cmd.output().with_context(|| {
-        format!(
-            "Failed to execute command: {} {}",
-            command,
-            args.join(" ")
-        )
-    })?;
+    let output = cmd
+        .output()
+        .with_context(|| format!("Failed to execute command: {} {}", command, args.join(" ")))?;
 
     // Calculate duration
     let duration_ms = start.elapsed().as_millis() as u64;
@@ -276,17 +272,14 @@ pub fn execute_command_to_trace(
     config: SubprocessConfig,
     trace_dir: &Path,
 ) -> Result<SubprocessResult> {
-    use std::fs;
     use chrono::Utc;
     use serde_json;
+    use std::fs;
 
     // Ensure the trace directory exists
     if !trace_dir.exists() {
         fs::create_dir_all(trace_dir).with_context(|| {
-            format!(
-                "Failed to create trace directory: {}",
-                trace_dir.display()
-            )
+            format!("Failed to create trace directory: {}", trace_dir.display())
         })?;
     }
 
@@ -300,21 +293,13 @@ pub fn execute_command_to_trace(
 
     // Write stdout to file
     let stdout_path = trace_dir.join("stdout.txt");
-    fs::write(&stdout_path, &result.stdout).with_context(|| {
-        format!(
-            "Failed to write stdout file: {}",
-            stdout_path.display()
-        )
-    })?;
+    fs::write(&stdout_path, &result.stdout)
+        .with_context(|| format!("Failed to write stdout file: {}", stdout_path.display()))?;
 
     // Write stderr to file
     let stderr_path = trace_dir.join("stderr.txt");
-    fs::write(&stderr_path, &result.stderr).with_context(|| {
-        format!(
-            "Failed to write stderr file: {}",
-            stderr_path.display()
-        )
-    })?;
+    fs::write(&stderr_path, &result.stderr)
+        .with_context(|| format!("Failed to write stderr file: {}", stderr_path.display()))?;
 
     // Create and write metadata
     let metadata = serde_json::json!({
@@ -331,12 +316,7 @@ pub fn execute_command_to_trace(
 
     let metadata_path = trace_dir.join("metadata.json");
     fs::write(&metadata_path, serde_json::to_string_pretty(&metadata)?)
-        .with_context(|| {
-            format!(
-                "Failed to write metadata file: {}",
-                metadata_path.display()
-            )
-        })?;
+        .with_context(|| format!("Failed to write metadata file: {}", metadata_path.display()))?;
 
     Ok(result)
 }
@@ -413,13 +393,9 @@ pub fn execute_command_streaming(
     }
 
     // Spawn the command
-    let mut child: Child = cmd.spawn().with_context(|| {
-        format!(
-            "Failed to spawn command: {} {}",
-            command,
-            args.join(" ")
-        )
-    })?;
+    let mut child: Child = cmd
+        .spawn()
+        .with_context(|| format!("Failed to spawn command: {} {}", command, args.join(" ")))?;
 
     let mut stdout_lines = Vec::new();
     let mut stderr_lines = Vec::new();
@@ -463,13 +439,9 @@ pub fn execute_command_streaming(
     }
 
     // Wait for command to complete
-    let status = child.wait().with_context(|| {
-        format!(
-            "Failed to wait for command: {} {}",
-            command,
-            args.join(" ")
-        )
-    })?;
+    let status = child
+        .wait()
+        .with_context(|| format!("Failed to wait for command: {} {}", command, args.join(" ")))?;
 
     // Calculate duration
     let duration_ms = start.elapsed().as_millis() as u64;
@@ -516,7 +488,10 @@ mod tests {
             .capture_stderr(true);
 
         assert_eq!(config.working_dir, Some(PathBuf::from("/tmp")));
-        assert_eq!(config.env, vec![("TEST_VAR".to_string(), "test_value".to_string())]);
+        assert_eq!(
+            config.env,
+            vec![("TEST_VAR".to_string(), "test_value".to_string())]
+        );
         assert_eq!(config.timeout_seconds, Some(30));
         assert!(config.capture_stdout);
         assert!(config.capture_stderr);
@@ -524,7 +499,8 @@ mod tests {
 
     #[test]
     fn test_execute_simple_command() {
-        let result = execute_command("echo", &["hello", "world"], SubprocessConfig::default()).unwrap();
+        let result =
+            execute_command("echo", &["hello", "world"], SubprocessConfig::default()).unwrap();
 
         assert!(result.is_success());
         assert_eq!(result.exit_code, 0);
@@ -546,7 +522,12 @@ mod tests {
 
     #[test]
     fn test_execute_command_with_stderr() {
-        let result = execute_command("sh", &["-c", "echo stdout; echo stderr >&2"], SubprocessConfig::default()).unwrap();
+        let result = execute_command(
+            "sh",
+            &["-c", "echo stdout; echo stderr >&2"],
+            SubprocessConfig::default(),
+        )
+        .unwrap();
 
         assert!(result.is_success());
         assert!(result.stdout.contains("stdout"));
@@ -595,7 +576,12 @@ mod tests {
 
     #[test]
     fn test_subprocess_result_stdout_lines() {
-        let result = execute_command("echo", &["line1\nline2\nline3"], SubprocessConfig::default()).unwrap();
+        let result = execute_command(
+            "echo",
+            &["line1\nline2\nline3"],
+            SubprocessConfig::default(),
+        )
+        .unwrap();
         let lines = result.stdout_lines();
 
         assert!(lines.len() >= 1);
@@ -604,7 +590,12 @@ mod tests {
 
     #[test]
     fn test_subprocess_result_stderr_contains() {
-        let result = execute_command("sh", &["-c", "echo error message >&2"], SubprocessConfig::default()).unwrap();
+        let result = execute_command(
+            "sh",
+            &["-c", "echo error message >&2"],
+            SubprocessConfig::default(),
+        )
+        .unwrap();
 
         assert!(result.stderr_contains("error message"));
         assert!(!result.stdout_contains("error message"));
@@ -620,7 +611,8 @@ mod tests {
             &["hello from trace"],
             SubprocessConfig::default(),
             &trace_dir,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Verify result is correct
         assert!(result.is_success());
@@ -662,7 +654,8 @@ mod tests {
             Some(&|line| {
                 stderr_clone.lock().unwrap().push(line.to_string());
             }),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(result.is_success());
         assert!(stdout_received.lock().unwrap().len() >= 2);
@@ -684,7 +677,12 @@ mod tests {
 
     #[test]
     fn test_execute_command_with_args_containing_spaces() {
-        let result = execute_command("echo", &["hello world", "foo bar"], SubprocessConfig::default()).unwrap();
+        let result = execute_command(
+            "echo",
+            &["hello world", "foo bar"],
+            SubprocessConfig::default(),
+        )
+        .unwrap();
 
         assert!(result.is_success());
         assert!(result.stdout.contains("hello world"));
@@ -697,8 +695,10 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.to_string().contains("Failed to execute command") ||
-                err.to_string().contains("No such file or directory") ||
-                err.to_string().contains("not found"));
+        assert!(
+            err.to_string().contains("Failed to execute command")
+                || err.to_string().contains("No such file or directory")
+                || err.to_string().contains("not found")
+        );
     }
 }
