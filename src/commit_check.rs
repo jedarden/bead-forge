@@ -71,7 +71,7 @@ pub fn scan_staged_beads(beads_dir: &Path) -> Result<ScanResult> {
 fn parse_diff_and_scan(
     scanner: &SecretScanner,
     diff: &str,
-    beads_dir: &Path,
+    _beads_dir: &Path,
 ) -> Result<(Vec<String>, Vec<(String, usize, String, SecretMatch)>)> {
     let mut files_scanned = Vec::new();
     let mut secrets_found = Vec::new();
@@ -142,7 +142,7 @@ fn parse_diff_and_scan(
 fn scan_staged_files(
     scanner: &SecretScanner,
     files: &[&str],
-    beads_dir: &Path,
+    _beads_dir: &Path,
 ) -> Result<ScanResult> {
     let mut secrets_found = Vec::new();
     let mut seen = HashSet::new();

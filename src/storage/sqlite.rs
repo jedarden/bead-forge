@@ -1116,24 +1116,24 @@ impl Storage {
     pub fn sync_from_jsonl(&self, jsonl_path: &Path) -> Result<ImportResult> {
         self.with_immediate_transaction(|tx| {
             import_jsonl(jsonl_path, |issue| {
-                let existing = Self::get_issue_tx(tx, &issue.id)?;
+                let existing = Self::get_issue_tx(tx, &issue.id).map_err(|e| anyhow::anyhow!(e)).map_err(|e| BeadForgeError::from(e))?;
                 match existing {
                     None => {
-                        Self::create_issue_tx(tx, issue)?;
+                        Self::create_issue_tx(tx, issue).map_err(|e| anyhow::anyhow!(e)).map_err(|e| BeadForgeError::from(e))?;
                         Ok(UpsertResult::New)
                     }
                     Some(existing_issue) => {
                         // Compute hash from incoming issue (content_hash is None from JSONL due to #[serde(skip)])
                         let incoming_hash = issue.content_hash();
                         if existing_issue.content_hash.as_ref() != Some(&incoming_hash) {
-                            Self::update_issue_from_json_tx(tx, issue)?;
+                            Self::update_issue_from_json_tx(tx, issue).map_err(|e| anyhow::anyhow!(e)).map_err(|e| BeadForgeError::from(e))?;
                             Ok(UpsertResult::Updated)
                         } else {
                             Ok(UpsertResult::Unchanged)
                         }
                     }
                 }
-            })
+            }).map_err(|e| BeadForgeError::from(e))
         })
     }
 

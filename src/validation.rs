@@ -25,7 +25,7 @@ impl ValidationResult {
     /// Returns true if the validation result is invalid.
     #[must_use]
     pub fn is_invalid(&self) -> bool {
-        !self.is_valid()
+        matches!(self, Self::Invalid(_))
     }
 
     /// Convert ValidationResult to Result<(), String>.

@@ -117,7 +117,7 @@ pub fn flush_dirty(workspace_dir: &Path) -> Result<usize> {
     let result = export_jsonl_dirty(
         &jsonl_path,
         || Ok(dirty_issues.clone()),
-        || storage.clear_dirty(),
+        || storage.clear_dirty().map_err(|e| crate::error::BeadForgeError::from(e)),
     )?;
 
     // Update export_hashes for dirty issues only
@@ -215,12 +215,12 @@ pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
     let result = storage.with_immediate_transaction(|tx| {
         import_jsonl(&jsonl_path, |issue| {
             let incoming_hash = issue.content_hash();
-            let existing = Storage::get_issue_tx(tx, &issue.id)?;
+            let existing = Storage::get_issue_tx(tx, &issue.id).map_err(|e| anyhow::anyhow!(e))?;
 
             match existing {
                 None => {
                     // New bead - insert
-                    Storage::create_issue_tx(tx, &issue)?;
+                    Storage::create_issue_tx(tx, &issue).map_err(|e| anyhow::anyhow!(e))?;
                     Ok(UpsertResult::New)
                 }
                 Some(existing_issue) => {
@@ -233,7 +233,7 @@ pub fn import(workspace_dir: &Path) -> Result<SyncResult> {
                         // Content changed - use deterministic collision resolution
                         // The bead with the later updated_at wins
                         if issue.updated_at > existing_issue.updated_at {
-                            Storage::update_issue_from_json_tx(tx, &issue)?;
+                            Storage::update_issue_from_json_tx(tx, &issue).map_err(|e| anyhow::anyhow!(e))?;
                             Ok(UpsertResult::Updated)
                         } else {
                             // SQLite version is newer - skip JSONL version

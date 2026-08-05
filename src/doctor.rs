@@ -895,12 +895,7 @@ pub fn repair(workspace_dir: &Path, flush_first: bool, force: bool) -> Result<us
     // Create new database and import JSONL
     let storage = Storage::open(&db_path)?;
 
-    let result = storage.with_immediate_transaction(|tx| {
-        import_jsonl(&jsonl_path, |issue| {
-            Storage::create_issue_tx(tx, &issue)?;
-            Ok(UpsertResult::New)
-        })
-    })?;
+    let result = storage.sync_from_jsonl(&jsonl_path)?;
 
     // Rebuild blocked cache
     storage.rebuild_blocked_cache()?;
@@ -1092,12 +1087,7 @@ fn rebuild_db_from_jsonl(db_path: &Path, jsonl_path: &Path) -> Result<usize> {
     }
 
     let storage = Storage::open(db_path)?;
-    let result = storage.with_immediate_transaction(|tx| {
-        import_jsonl(jsonl_path, |issue| {
-            Storage::create_issue_tx(tx, &issue)?;
-            Ok(UpsertResult::New)
-        })
-    })?;
+    let result = storage.sync_from_jsonl(jsonl_path)?;
     storage.rebuild_blocked_cache()?;
     storage.clear_dirty()?;
     Ok(result.imported)
@@ -1372,12 +1362,7 @@ pub fn init_from_jsonl(workspace_dir: &Path, jsonl_path: &Path) -> Result<usize>
     // Create new database and import JSONL
     let storage = Storage::open(&db_path)?;
 
-    let result = storage.with_immediate_transaction(|tx| {
-        import_jsonl(jsonl_path, |issue| {
-            Storage::create_issue_tx(tx, &issue)?;
-            Ok(UpsertResult::New)
-        })
-    })?;
+    let result = storage.sync_from_jsonl(jsonl_path)?;
 
     // Rebuild blocked cache
     storage.rebuild_blocked_cache()?;

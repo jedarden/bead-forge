@@ -213,7 +213,6 @@ impl From<anyhow::Error> for BeadForgeError {
                 path: None,
             };
         }
-        }
 
         if let Some(json_err) = err.downcast_ref::<serde_json::Error>() {
             return BeadForgeError::Parsing {

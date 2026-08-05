@@ -2395,7 +2395,7 @@ fn cmd_sync(beads_dir: &PathBuf, flush_only: bool, import_only: bool) -> Result<
 #[allow(clippy::too_many_arguments)]
 fn cmd_doctor(
     beads_dir: &PathBuf,
-    check: bool,
+    _check: bool,
     repair: bool,
     flush_first: bool,
     force: bool,
@@ -2408,7 +2408,6 @@ fn cmd_doctor(
     restore: Option<String>,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
-    let db_path = beads_dir.join(&metadata.database);
 
     if runs {
         // List verified pre-rebuild recovery runs (doctor safety stack, layer 3).
@@ -3153,7 +3152,7 @@ fn cmd_search(
     priority_max: Option<i32>,
     limit: usize,
     format: &str,
-    envelope: bool,
+    _envelope: bool,
 ) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);

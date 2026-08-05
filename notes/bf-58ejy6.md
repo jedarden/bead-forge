@@ -1,72 +1,116 @@
-# Batch Operations Test Output Format Analysis
+# Batch Output Format Investigation (bf-58ejy6)
 
-## Test Location
-`tests/test_p0_multilabel_cli.rs:370-419` (test_p0_batch_operations_with_labels)
+## Task
 
-## Test Commands
-The test runs:
-```bash
-bf batch --stdin
-```
-**without** specifying `--format json`
+Debug batch operations test output format in `test_p0_batch_operations_with_labels`.
 
-## Actual Output Format
+## Investigation
 
-### Default (Text Format)
-When `--format` is not specified, batch outputs text format:
-```
-[op 0] ok: bf-ui4
-[op 1] ok: bf-jx2
-[op 2] ok: bf-kp8
-```
+### Test Location
+File: `tests/test_p0_multilabel_cli.rs:370-419`
 
-### JSON Format (when `--format json` is specified)
+### Expected Output Format
+
+Based on the envelope specification in `src/format/envelope.rs:36`:
+
 ```json
-{"version":1,"kind":"batch","data":[{"id":"bf-ui4","message":"Created bead bf-ui4","op":0,"status":"ok"}]}
-```
-
-This is an envelope structure with:
-- `version`: 1
-- `kind`: "batch" 
-- `data`: Array of BatchResult objects
-- `warning`: Optional field (present only on auto-flush failure)
-
-## Code Location
-The output format is generated in:
-- `src/cli/mod.rs` - `cmd_batch()` function (lines ~1340-1380)
-- `src/format/json.rs` - `JsonFormatter::format_with_envelope()` (lines 64-73)
-
-## Format Structure Details
-
-### BatchResult Structure
-```rust
-pub struct BatchResult {
-    pub op: usize,        // Operation index
-    pub status: String,   // "ok" or "error"
-    pub id: Option<String>,  // Created bead ID (for create ops)
-    pub error: Option<String>, // Error message (if status == "error")
-    pub message: Option<String>, // Success message
+{
+  "version": 1,
+  "kind": "batch",
+  "data": [
+    {"op": 0, "status": "ok", "id": "bf-xxx", "message": "..."},
+    {"op": 1, "status": "ok", "id": "bf-yyy", "message": "..."},
+    {"op": 2, "status": "ok", "id": "bf-zzz", "message": "..."}
+  ]
 }
 ```
 
-### Envelope Generation
+Where:
+- `version`: Always `1` (envelope version)
+- `kind`: Always `"batch"` (command identifier)
+- `data`: Array of `BatchResult` objects
+
+### BatchResult Structure
+
+From `src/batch.rs:113-122`:
+
 ```rust
-// In cmd_batch(), when OutputFormat::Json:
-let json_array = serde_json::to_string(&results).unwrap_or_default();
-println!("{}", formatter.format_with_envelope("batch", &json_array));
+pub struct BatchResult {
+    pub op: usize,              // Operation index (0-based)
+    pub status: String,         // "ok" or "error"
+    pub id: Option<String>,    // Bead ID (if successful)
+    pub error: Option<String>, // Error message (if failed)
+    pub message: Option<String>, // Optional message
+}
 ```
 
-The envelope wraps the serialized array of BatchResult objects.
+### Output Generation Flow
 
-## Test Behavior
-The test **does not currently validate** the batch command's stdout output. It only:
-1. Checks `output.status.success()` - exit code is 0
-2. Uses `bf list --priority 0 --json --envelope` to verify beads were created
+From `src/cli/mod.rs:2714-2724`:
 
-## Key Findings
-1. **No format mismatch in the test** - the test doesn't check stdout format
-2. **Default format is text** - human-readable `[op N] ok: id` format
-3. **JSON format uses envelope** - structured response with version/kind/data
-4. **No bug in output** - the code correctly implements both formats
+1. **Execute batch**: `let results = execute_batch(&storage, ops, beads_dir, no_auto_flush)?;`
+   - Returns: `Vec<BatchResult>`
 
-The actual batch output is working correctly. The test simply doesn't validate the stdout format, focusing instead on successful execution and verifying the created beads via `bf list`.
+2. **Serialize to JSON**: `let json_array = serde_json::to_string(&results).unwrap_or_default();`
+   - Converts `Vec<BatchResult>` to JSON array string
+   - Example: `"[{\"op\":0,\"status\":\"ok\",\"id\":\"bf-xxx\"},...]"`
+
+3. **Wrap in envelope**: `println!("{}", formatter.format_with_envelope("batch", &json_array));`
+   - From `src/format/json.rs:105-114`:
+     ```rust
+     fn format_with_envelope(&self, kind: &str, data: &str) -> String {
+         let json_value: Value = serde_json::from_str(data)
+             .unwrap_or_else(|_| Value::String(data.to_string()));
+         JsonEnvelope::new(kind, json_value).to_json_compact()
+             .unwrap_or_else(|_| "{}".to_string())
+     }
+     ```
+   - Parses JSON string back to `Value` (array)
+   - Wraps in envelope: `{"version":1,"kind":"batch","data":[...]}`
+   - Serializes to compact JSON
+
+### Actual Output Format
+
+The batch command output should be:
+
+```json
+{
+  "version": 1,
+  "kind": "batch",
+  "data": [
+    {"op": 0, "status": "ok", "id": "bf-xxx", "message": "Created bead bf-xxx"},
+    {"op": 1, "status": "ok", "id": "bf-yyy", "message": "Created bead bf-yyy"},
+    {"op": 2, "status": "ok", "id": "bf-zzz", "message": "Created bead bf-zzz"}
+  ]
+}
+```
+
+### Current Status
+
+**Codebase has compilation errors** preventing test execution:
+
+```
+error[E0282]: type annotations needed
+   --> src/doctor.rs:900:58
+
+error[E0308]: mismatched types
+   --> src/error.rs:202:25
+   --> src/storage/sqlite.rs:1144:20
+   --> src/sync.rs:120:12
+
+error[E0599]: no method named `into_inner` found for struct `anyhow::Error`
+   --> src/error.rs:232:39
+```
+
+These errors are unrelated to batch output format but must be fixed before the test can run.
+
+## Conclusions
+
+1. **Format is correct**: The batch output format follows the envelope specification correctly.
+2. **Data structure**: `data` field contains a JSON array of `BatchResult` objects
+3. **Serialization path**: `Vec<BatchResult>` → JSON string → parsed as Value → wrapped in envelope
+4. **Test issue**: The test at line 402-403 doesn't actually verify the batch output format—it only checks that the command succeeds (`output.status.success()`), then uses `list` to verify beads were created.
+
+## Next Steps
+
+Fix the compilation errors in the codebase before the test can be executed to capture actual output.
