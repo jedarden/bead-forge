@@ -3014,7 +3014,7 @@ mod tests {
         let content1 = fs::read_to_string(&log_path).unwrap();
 
         manager
-            .write_captured_output(&log_path, "New content", "New errors")
+            .write_captured_output(&log_path, "New content", "New errors", None)
             .unwrap();
         let content2 = fs::read_to_string(&log_path).unwrap();
 
