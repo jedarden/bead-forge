@@ -826,6 +826,22 @@ impl Issue {
             ..Default::default()
         }
     }
+
+    /// Create the changes needed to clear the assignee.
+    ///
+    /// Returns an `IssueChanges` struct with the assignee set to `None`.
+    /// This can be passed to `Storage::update_issue` to clear the assignee.
+    ///
+    /// For full assignee-clear semantics with event recording,
+    /// use `Storage::clear_assignee` directly instead.
+    #[must_use]
+    pub fn clear_assignee(&self, actor: String) -> IssueChanges {
+        IssueChanges {
+            assignee: None,
+            actor: Some(actor),
+            ..Default::default()
+        }
+    }
 }
 
 /// Epic completion status with child counts.
@@ -864,6 +880,10 @@ pub struct Dependency {
     /// Thread ID for conversation linking.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_id: Option<String>,
+
+    /// Title of the dependent bead (populated when loaded with JOIN).
+    #[serde(skip)]
+    pub title: Option<String>,
 }
 
 impl Default for Dependency {
@@ -876,6 +896,7 @@ impl Default for Dependency {
             created_by: None,
             metadata: None,
             thread_id: None,
+            title: None,
         }
     }
 }
@@ -1338,6 +1359,7 @@ mod tests {
                     created_by: Some("alice".to_string()),
                     metadata: Some("{\"source\":\"cli\"}".to_string()),
                     thread_id: Some("br-1".to_string()),
+                    title: None,
                 },
                 Dependency {
                     issue_id: "bd-test".to_string(),
@@ -1347,6 +1369,7 @@ mod tests {
                     created_by: Some("alice".to_string()),
                     metadata: None,
                     thread_id: None,
+                    title: None,
                 },
             ],
             comments: vec![
