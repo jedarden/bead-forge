@@ -243,6 +243,21 @@ impl Storage {
             params.push(value.clone());
             param_idx += 1;
         }
+        if let Some(ref labels) = filter.labels {
+            if !labels.is_empty() {
+                // Subquery to find issues that have ALL the specified labels
+                let label_conditions: Vec<String> = labels
+                    .iter()
+                    .enumerate()
+                    .map(|(i, label)| {
+                        params.push(label.clone());
+                        param_idx += 1;
+                        format!("EXISTS (SELECT 1 FROM bead_labels bl{} WHERE bl{}.bead_id = i.id AND bl{}.label = ?{})", i, i, i, param_idx - 1)
+                    })
+                    .collect();
+                query.push_str(&format!(" AND ({}) ", label_conditions.join(" AND ")));
+            }
+        }
         if let Some(ref updated_since) = filter.updated_since {
             query.push_str(&format!(" AND i.updated_at >= ?{}", param_idx));
             params.push(updated_since.to_rfc3339());
@@ -1651,7 +1666,6 @@ impl Storage {
                     i.sender, i.ephemeral, i.pinned, i.is_template,
                     GROUP_CONCAT(bl.label) AS labels
              FROM issues i
-             LEFT JOIN labels l ON i.id = l.issue_id
              LEFT JOIN bead_labels bl ON i.id = bl.bead_id
              WHERE i.deleted_at IS NULL",
         );
@@ -1697,16 +1711,17 @@ impl Storage {
             param_idx += 1;
         }
         if !labels.is_empty() {
+            // Subquery to find issues that have ALL the specified labels
             let label_conditions: Vec<String> = labels
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("l.label = ?{}", param_idx + i))
+                .map(|(i, label)| {
+                    params.push(label.clone());
+                    param_idx += 1;
+                    format!("EXISTS (SELECT 1 FROM bead_labels bl{} WHERE bl{}.bead_id = i.id AND bl{}.label = ?{})", i, i, i, param_idx - 1)
+                })
                 .collect();
-            sql.push_str(&format!(" AND ({}) ", label_conditions.join(" OR ")));
-            for label in labels {
-                params.push(label.clone());
-                param_idx += 1;
-            }
+            sql.push_str(&format!(" AND ({}) ", label_conditions.join(" AND ")));
         }
         if let Some(min) = priority_min {
             sql.push_str(&format!(" AND i.priority >= ?{}", param_idx));
@@ -2273,6 +2288,107 @@ fn parse_datetime(s: String) -> Result<DateTime<Utc>> {
             }
             Err(e.into())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Issue, IssueType, Priority, Status};
+    use chrono::Utc;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_multi_label_persistence() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue with multiple labels
+        let mut issue = Issue::new("bf-test-multilabel".to_string(), "Test multi-label support".to_string(), ".".to_string());
+        issue.labels = vec![
+            "phase-1".to_string(),
+            "model".to_string(),
+            "backend".to_string(),
+            "urgent".to_string(),
+        ];
+        issue.status = Status::Open;
+        issue.priority = Priority::HIGH;
+
+        // Create the issue
+        storage.create_issue(&issue).unwrap();
+
+        // Read it back
+        let retrieved = storage.get_issue("bf-test-multilabel").unwrap().unwrap();
+
+        // Verify all labels persisted correctly
+        assert_eq!(retrieved.labels.len(), 4);
+        assert!(retrieved.labels.contains(&"phase-1".to_string()));
+        assert!(retrieved.labels.contains(&"model".to_string()));
+        assert!(retrieved.labels.contains(&"backend".to_string()));
+        assert!(retrieved.labels.contains(&"urgent".to_string()));
+    }
+
+    #[test]
+    fn test_multi_label_update() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue with initial labels
+        let mut issue = Issue::new("bf-update-labels".to_string(), "Test label updates".to_string(), ".".to_string());
+        issue.labels = vec!["initial".to_string(), "old".to_string()];
+        storage.create_issue(&issue).unwrap();
+
+        // Update with new labels
+        let mut changes = IssueChanges::default();
+        changes.labels = Some(vec![
+            "updated".to_string(),
+            "phase-2".to_string(),
+            "backend".to_string(),
+        ]);
+        storage.update_issue("bf-update-labels", &changes).unwrap();
+
+        // Verify the labels were updated
+        let retrieved = storage.get_issue("bf-update-labels").unwrap().unwrap();
+        assert_eq!(retrieved.labels.len(), 3);
+        assert!(retrieved.labels.contains(&"updated".to_string()));
+        assert!(retrieved.labels.contains(&"phase-2".to_string()));
+        assert!(retrieved.labels.contains(&"backend".to_string()));
+        assert!(!retrieved.labels.contains(&"initial".to_string()));
+    }
+
+    #[test]
+    fn test_label_filtering() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create multiple issues with different labels
+        let mut issue1 = Issue::new("bf-1".to_string(), "Issue 1".to_string(), ".".to_string());
+        issue1.labels = vec!["backend".to_string(), "urgent".to_string()];
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-2".to_string(), "Issue 2".to_string(), ".".to_string());
+        issue2.labels = vec!["frontend".to_string()];
+        storage.create_issue(&issue2).unwrap();
+
+        let mut issue3 = Issue::new("bf-3".to_string(), "Issue 3".to_string(), ".".to_string());
+        issue3.labels = vec!["backend".to_string(), "phase-2".to_string()];
+        storage.create_issue(&issue3).unwrap();
+
+        // Filter by label
+        let mut filter = IssueFilter::default();
+        filter.labels = Some(vec!["backend".to_string()]);
+
+        let results = storage.list_issues(&filter).unwrap();
+
+        // Should return 2 issues with "backend" label
+        assert_eq!(results.len(), 2);
+        let ids: Vec<&str> = results.iter().map(|i| i.id.as_str()).collect();
+        assert!(ids.contains(&"bf-1"));
+        assert!(ids.contains(&"bf-3"));
+        assert!(!ids.contains(&"bf-2"));
     }
 }
 

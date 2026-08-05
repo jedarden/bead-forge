@@ -1447,10 +1447,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 &format,
             )
         }
-        Commands::RobotDocs { .. } => {
-            eprintln!("Error: robot-docs command is not yet implemented");
-            std::process::exit(1);
-        }
+        Commands::RobotDocs { format } => cmd_robot_docs(&format),
         Commands::Init { .. } => unreachable!("Init command handled earlier"),
     }
 }
@@ -3831,6 +3828,21 @@ fn cmd_recent(
         }
         _ => {
             print!("{}", formatter.format_issues(&issues));
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_robot_docs(format: &str) -> Result<()> {
+    let docs = RobotDocs::generate();
+
+    match format {
+        "json" => {
+            println!("{}", docs.to_json()?);
+        }
+        _ => {
+            return Err(anyhow!("Invalid format '{}'. robot-docs only supports 'json' output", format));
         }
     }
 

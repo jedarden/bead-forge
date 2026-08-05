@@ -340,6 +340,52 @@ impl RobotDocs {
                         "Operations are executed atomically; any failure rolls back the entire batch.".to_string(),
                     ],
                 },
+                CommandDoc {
+                    command: "labels".to_string(),
+                    description: "Show labels for beads.".to_string(),
+                    example: "bf labels --json".to_string(),
+                    data_shape: DataShape::Array,
+                    data_schema: Some(json!({
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Array of {id, title, labels} objects (one per bead when no ID specified), or array of label strings (when bead ID specified)"
+                    })),
+                    notes: vec![
+                        "With bead ID: data is array of label strings.".to_string(),
+                        "Without bead ID: data is array of {id, title, labels} objects for all beads.".to_string(),
+                        "Empty result: data is an empty array [].".to_string(),
+                    ],
+                },
+                CommandDoc {
+                    command: "log".to_string(),
+                    description: "Show event log for beads.".to_string(),
+                    example: "bf log --json".to_string(),
+                    data_shape: DataShape::Array,
+                    data_schema: Some(json!({
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Array of event objects with event_type, actor, old_value, new_value, comment, and created_at fields"
+                    })),
+                    notes: vec![
+                        "Empty result: data is an empty array [] (no events).".to_string(),
+                        "With bead ID: only events for that bead. Without: all events.".to_string(),
+                    ],
+                },
+                CommandDoc {
+                    command: "critical-path".to_string(),
+                    description: "Show longest chain of blocking dependencies from a root bead.".to_string(),
+                    example: "bf critical-path bf-epic --json".to_string(),
+                    data_shape: DataShape::Array,
+                    data_schema: Some(json!({
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Array of {id, title, status, priority, float} objects representing beads on the critical path"
+                    })),
+                    notes: vec![
+                        "Empty result: data is an empty array [] (no dependencies found).".to_string(),
+                        "Beads with zero float are on the critical path.".to_string(),
+                    ],
+                },
             ],
         }
     }
