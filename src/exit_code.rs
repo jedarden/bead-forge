@@ -574,4 +574,59 @@ mod tests {
         assert!(second.contains("=== Exit Code: 1 ==="));
         assert!(second.contains("=== Exit Code: 2 ==="));
     }
+
+    // Tests for format_exit_code function
+
+    #[test]
+    fn test_format_exit_code_code_variant() {
+        let code = ExitCode::Code(0);
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 0 ===");
+
+        let code = ExitCode::Code(1);
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 1 ===");
+
+        let code = ExitCode::Code(42);
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 42 ===");
+
+        let code = ExitCode::Code(255);
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 255 ===");
+    }
+
+    #[test]
+    fn test_format_exit_code_signal_variant() {
+        let signal = ExitCode::Signal("SIGTERM".to_string());
+        assert_eq!(format_exit_code(Some(signal)), "=== Signal: SIGTERM ===");
+
+        let signal = ExitCode::Signal("SIGKILL".to_string());
+        assert_eq!(format_exit_code(Some(signal)), "=== Signal: SIGKILL ===");
+
+        let signal = ExitCode::Signal("SIGINT".to_string());
+        assert_eq!(format_exit_code(Some(signal)), "=== Signal: SIGINT ===");
+    }
+
+    #[test]
+    fn test_format_exit_code_none_case() {
+        // Test with ExitCode::None variant
+        let none = ExitCode::None;
+        assert_eq!(format_exit_code(Some(none)), "=== Exit Code: (none) ===");
+
+        // Test with Option::None
+        assert_eq!(format_exit_code(None), "=== Exit Code: (none) ===");
+    }
+
+    #[test]
+    fn test_format_exit_code_separator_format() {
+        // Verify exactly 3 equals signs on each side
+        let result = format_exit_code(Some(ExitCode::Code(0)));
+        assert!(result.starts_with("==="));
+        assert!(result.ends_with("==="));
+        assert!(!result.starts_with("===="));
+        assert!(!result.ends_with("===="));
+    }
+
+    #[test]
+    fn test_format_exit_code_negative_code() {
+        let code = ExitCode::Code(-1);
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: -1 ===");
+    }
 }
