@@ -1369,6 +1369,7 @@ impl Storage {
             labels,
             dependencies: Vec::new(),  // Loaded separately via batch_load_dependencies
             comments: Vec::new(),      // Loaded separately via batch_load_comments
+            events: Vec::new(),        // Loaded separately via batch_load_events
             annotations: BTreeMap::new(),  // Loaded separately via batch_load_annotations
             id,
         })
