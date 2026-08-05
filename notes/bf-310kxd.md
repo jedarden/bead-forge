@@ -1,8 +1,17 @@
-# Batch Operations Output Format - Code Locations
+# Batch Operations Output Format Generation - Complete Analysis
 
-## Summary
+## Task Completion Summary
 
-Located all code responsible for batch operations output format generation in bead-forge CLI.
+Located all code responsible for batch operations output format generation in the bead-forge CLI.
+
+## Key Finding: Single Output Formatting Pipeline
+
+Batch operations output is generated through a clear, unified pipeline:
+
+1. **Parse** → `BatchOp` enum (`src/batch.rs:parse_stdin()`)
+2. **Execute** → `Vec<BatchResult>` (`src/batch.rs:execute_batch()`)
+3. **Format** → JSON or text (`src/cli/mod.rs:cmd_batch()`)
+4. **Print** → stdout/stderr with optional envelope wrapper
 
 ## Primary Data Structure
 
@@ -11,7 +20,7 @@ Located all code responsible for batch operations output format generation in be
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchResult {
-    pub op: usize,              // Operation index
+    pub op: usize,              // Operation index in batch
     pub status: String,         // "ok" or "error"
     pub id: Option<String>,     // Created bead ID (for create ops)
     pub error: Option<String>,  // Error message (for failed ops)
@@ -19,14 +28,17 @@ pub struct BatchResult {
 }
 ```
 
-## Output Generation Function
+## Core Execution Function
 
 **File:** `src/batch.rs` (lines 191-435)
 
-Function: `execute_batch()`
-- Returns: `Result<Vec<BatchResult>>`
-- Each operation in the batch returns a `BatchResult` struct
-- The struct is serialized to JSON for JSON output mode
+Function: `execute_batch(storage, ops, workspace_dir, no_auto_flush) -> Result<Vec<BatchResult>>`
+
+**Key characteristics:**
+- Executes all operations atomically under `with_immediate_transaction`
+- Returns `Vec<BatchResult>` - one result per operation
+- Handles auto-flush after successful transaction commit
+- Fail-fast on first error (transaction rollback)
 
 ## CLI Output Formatting
 
