@@ -107,6 +107,14 @@ fn get_array(json: &Value, field: &str) -> Vec<Value> {
         .unwrap_or_else(|| vec![])
 }
 
+/// Get a numeric field from JSON (i64 or u64)
+fn get_number(json: &Value, field: &str) -> i64 {
+    json.get(field)
+        .and_then(|v| v.as_i64())
+        .or_else(|| json.get(field).and_then(|v| v.as_u64().map(|n| n as i64)))
+        .unwrap_or_else(|| panic!("Field '{}' is not a number or is missing: {}", field, json))
+}
+
 // ============================================================================
 // CREATE command tests
 // ============================================================================
@@ -126,8 +134,8 @@ fn test_create_bead_with_defaults() {
     let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id]);
     assert!(ok, "show should succeed");
     assert!(stdout.contains("Test bead with defaults"), "show should display the title");
-    assert!(stdout.contains("open"), "default status should be open");
-    assert!(stdout.contains("priority: 2"), "default priority should be 2");
+    assert!(stdout.contains("Status: open"), "default status should be open");
+    assert!(stdout.contains("Priority: P2"), "default priority should be P2");
 }
 
 #[test]
@@ -156,7 +164,7 @@ fn test_create_bead_with_custom_type_and_priority() {
 
     let bead_json = parse_json(&stdout.trim().trim_start_matches('[').trim_end_matches(']'));
     assert_eq!(get_string(&bead_json, "issue_type"), "bug");
-    assert_eq!(get_string(&bead_json, "priority"), "0");
+    assert_eq!(get_number(&bead_json, "priority"), 0);
 }
 
 #[test]
@@ -194,7 +202,7 @@ fn test_create_bead_with_all_fields() {
     let bead_json = parse_json(&stdout.trim().trim_start_matches('[').trim_end_matches(']'));
     assert_eq!(get_string(&bead_json, "title"), "Full feature bead");
     assert_eq!(get_string(&bead_json, "issue_type"), "feature");
-    assert_eq!(get_string(&bead_json, "priority"), "1");
+    assert_eq!(get_number(&bead_json, "priority"), 1);
     assert_eq!(get_string(&bead_json, "description"), "Complete description");
     assert_eq!(get_string(&bead_json, "assignee"), "test-worker");
 
@@ -202,6 +210,72 @@ fn test_create_bead_with_all_fields() {
     assert_eq!(labels.len(), 2);
     assert!(labels.iter().any(|l| l.as_str() == Some("backend")));
     assert!(labels.iter().any(|l| l.as_str() == Some("urgent")));
+}
+
+#[test]
+fn test_create_p0_bead_with_multiple_labels() {
+    let (_t, ws) = setup();
+
+    // Create a P0 priority bead with multiple labels
+    let (stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Critical P0 bead with multiple labels",
+            "--priority",
+            "0",
+            "--type",
+            "bug",
+            "--label",
+            "critical",
+            "--label",
+            "security",
+            "--label",
+            "urgent",
+            "--label",
+            "production",
+            "--description",
+            "This is a P0 critical issue that affects production security",
+        ],
+    );
+    assert!(ok, "create P0 bead with multiple labels should succeed");
+
+    let id = stdout.trim();
+
+    // Verify the bead was created with P0 priority
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok, "show should succeed");
+
+    let bead_json = parse_json(&stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+
+    // Verify P0 priority
+    assert_eq!(get_number(&bead_json, "priority"), 0, "priority should be P0 (0)");
+
+    // Verify bug type
+    assert_eq!(get_string(&bead_json, "issue_type"), "bug", "type should be bug");
+
+    // Verify all 4 labels are present
+    let labels = get_array(&bead_json, "labels");
+    assert_eq!(labels.len(), 4, "should have exactly 4 labels");
+
+    // Verify each specific label exists
+    let label_values: Vec<&str> = labels.iter()
+        .filter_map(|l| l.as_str())
+        .collect();
+
+    assert!(label_values.contains(&"critical"), "should contain 'critical' label");
+    assert!(label_values.contains(&"security"), "should contain 'security' label");
+    assert!(label_values.contains(&"urgent"), "should contain 'urgent' label");
+    assert!(label_values.contains(&"production"), "should contain 'production' label");
+
+    // Verify description
+    assert_eq!(get_string(&bead_json, "description"), "This is a P0 critical issue that affects production security");
+
+    // Verify the bead appears in P0 priority listings
+    let (list_stdout, _stderr, ok) = run_bf(&ws, &["list", "--priority", "0"]);
+    assert!(ok, "list by P0 priority should succeed");
+    assert!(list_stdout.contains("Critical P0 bead with multiple labels"), "P0 bead should appear in priority 0 list");
 }
 
 #[test]
@@ -284,8 +358,8 @@ fn test_show_displays_all_fields() {
     // Verify all important fields are displayed
     assert!(stdout.contains(&id), "should show ID");
     assert!(stdout.contains("Show test bead"), "should show title");
-    assert!(stdout.contains("priority: 1"), "should show priority");
-    assert!(stdout.contains("type: task"), "should show type");
+    assert!(stdout.contains("Priority: P1"), "should show priority");
+    assert!(stdout.contains("Type: task"), "should show type");
     assert!(stdout.contains("Test description"), "should show description");
     assert!(stdout.contains("worker-1"), "should show assignee");
     assert!(stdout.contains("test-label"), "should show label");
@@ -338,9 +412,12 @@ fn test_list_displays_beads() {
     let (_t, ws) = setup();
 
     // Create multiple beads
-    run_bf(&ws, &["create", "--title", "First bead"]).unwrap();
-    run_bf(&ws, &["create", "--title", "Second bead"]).unwrap();
-    run_bf(&ws, &["create", "--title", "Third bead"]).unwrap();
+    let (_o1, _e1, ok1) = run_bf(&ws, &["create", "--title", "First bead"]);
+    assert!(ok1, "create first bead should succeed");
+    let (_o2, _e2, ok2) = run_bf(&ws, &["create", "--title", "Second bead"]);
+    assert!(ok2, "create second bead should succeed");
+    let (_o3, _e3, ok3) = run_bf(&ws, &["create", "--title", "Third bead"]);
+    assert!(ok3, "create third bead should succeed");
 
     let (stdout, _stderr, ok) = run_bf(&ws, &["list"]);
     assert!(ok, "list should succeed");
@@ -451,9 +528,12 @@ fn test_list_json_output() {
 fn test_list_limit() {
     let (_t, ws) = setup();
 
-    run_bf(&ws, &["create", "--title", "Bead 1"]).unwrap();
-    run_bf(&ws, &["create", "--title", "Bead 2"]).unwrap();
-    run_bf(&ws, &["create", "--title", "Bead 3"]).unwrap();
+    let (_stdout1, _stderr1, ok1) = run_bf(&ws, &["create", "--title", "Bead 1"]);
+    assert!(ok1);
+    let (_stdout2, _stderr2, ok2) = run_bf(&ws, &["create", "--title", "Bead 2"]);
+    assert!(ok2);
+    let (_stdout3, _stderr3, ok3) = run_bf(&ws, &["create", "--title", "Bead 3"]);
+    assert!(ok3);
 
     let (stdout, _stderr, ok) = run_bf(&ws, &["list", "--limit", "2"]);
     assert!(ok, "list --limit should succeed");
@@ -495,7 +575,7 @@ fn test_update_modifies_only_specified_fields() {
 
     let bead_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
     assert_eq!(get_string(&bead_json, "title"), "New title", "title should be updated");
-    assert_eq!(get_string(&bead_json, "priority"), "2", "priority should remain unchanged");
+    assert_eq!(get_number(&bead_json, "priority"), 2, "priority should remain unchanged");
     assert_eq!(get_string(&bead_json, "issue_type"), "task", "type should remain unchanged");
 }
 
@@ -532,7 +612,7 @@ fn test_update_multiple_fields() {
 
     let bead_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
     assert_eq!(get_string(&bead_json, "title"), "Updated title");
-    assert_eq!(get_string(&bead_json, "priority"), "0");
+    assert_eq!(get_number(&bead_json, "priority"), 0);
     assert_eq!(get_string(&bead_json, "status"), "in_progress");
     assert_eq!(get_string(&bead_json, "assignee"), "test-worker");
 }
@@ -565,15 +645,15 @@ fn test_update_description() {
 fn test_update_clear_assignee() {
     let (_t, ws) = setup();
 
-    let (id_stdout, _stderr, ok) = run_bf(
+    let (id_stdout, _stderr1, ok1) = run_bf(
         &ws,
         &["create", "--title", "Assigned bead", "--assignee", "worker-1"],
     );
-    assert!(ok);
+    assert!(ok1);
     let id = id_stdout.trim();
 
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["update", &id, "--clear-assignee"]);
-    assert!(ok, "update --clear-assignee should succeed");
+    let (_stdout, _stderr2, ok2) = run_bf(&ws, &["update", &id, "--clear-assignee"]);
+    assert!(ok2, "update --clear-assignee should succeed");
 
     let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
     assert!(ok);
@@ -670,29 +750,30 @@ fn test_close_nonexistent_bead_error() {
 fn test_reopen_resets_closed_bead_to_open() {
     let (_t, ws) = setup();
 
-    let (id_stdout, _stderr, ok) = run_bf(
+    let (id_stdout, _stderr1, ok1) = run_bf(
         &ws,
         &["create", "--title", "To reopen", "--assignee", "worker-1"],
     );
-    assert!(ok);
+    assert!(ok1);
     let id = id_stdout.trim();
 
     // First close the bead
-    run_bf(&ws, &["close", &id, "--reason", "Done"]).unwrap();
+    let (_stdout1, _stderr2, ok2) = run_bf(&ws, &["close", &id, "--reason", "Done"]);
+    assert!(ok2);
 
     // Now reopen it
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["reopen", &id]);
-    assert!(ok, "reopen should succeed");
+    let (_stdout, _stderr3, ok3) = run_bf(&ws, &["reopen", &id]);
+    assert!(ok3, "reopen should succeed");
 
-    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
-    assert!(ok);
+    let (stdout, _stderr, ok4) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok4);
 
     let bead_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
     assert_eq!(get_string(&bead_json, "status"), "open", "status should be open");
-    assert!(bead_json.get("close_reason").unwrap().is_null(), "close_reason should be null");
-    assert!(bead_json.get("closed_at").unwrap().is_null(), "closed_at should be null");
+    assert!(bead_json.get("close_reason").map_or(true, |v| v.is_null()), "close_reason should be null or missing");
+    assert!(bead_json.get("closed_at").map_or(true, |v| v.is_null()), "closed_at should be null or missing");
     // assignee should be cleared on reopen
-    assert!(bead_json.get("assignee").unwrap().is_null(), "assignee should be cleared");
+    assert!(bead_json.get("assignee").map_or(true, |v| v.is_null()), "assignee should be null or missing");
 }
 
 #[test]
@@ -725,26 +806,26 @@ fn test_reopen_open_bead_error() {
 fn test_delete_permanently_removes_bead() {
     let (_t, ws) = setup();
 
-    let (id_stdout, _stderr, ok) = run_bf(&ws, &["create", "--title", "To delete"]);
-    assert!(ok);
+    let (id_stdout, _stderr1, ok1) = run_bf(&ws, &["create", "--title", "To delete"]);
+    assert!(ok1);
     let id = id_stdout.trim();
 
     // Verify bead exists
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["show", &id]);
-    assert!(ok, "bead should exist before delete");
+    let (_stdout1, _stderr2, ok2) = run_bf(&ws, &["show", &id]);
+    assert!(ok2, "bead should exist before delete");
 
     // Delete the bead
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["delete", &id]);
-    assert!(ok, "delete should succeed");
+    let (_stdout2, _stderr3, ok3) = run_bf(&ws, &["delete", &id]);
+    assert!(ok3, "delete should succeed");
 
     // Verify bead no longer exists
-    let (_stdout, stderr, ok) = run_bf(&ws, &["show", &id]);
-    assert!(!ok, "show should fail after delete");
+    let (_stdout3, stderr, ok4) = run_bf(&ws, &["show", &id]);
+    assert!(!ok4, "show should fail after delete");
     assert!(stderr.contains("not found"), "error should mention bead not found");
 
     // Verify it's not in the list
-    let (stdout, _stderr, ok) = run_bf(&ws, &["list"]);
-    assert!(ok);
+    let (stdout, _stderr4, ok5) = run_bf(&ws, &["list"]);
+    assert!(ok5);
     assert!(!stdout.contains("To delete"), "deleted bead should not appear in list");
 }
 
@@ -762,8 +843,8 @@ fn test_delete_nonexistent_bead_error() {
 fn test_delete_removes_from_jsonl() {
     let (_t, ws) = setup();
 
-    let (id_stdout, _stderr, ok) = run_bf(&ws, &["create", "--title", "Delete from JSONL"]);
-    assert!(ok);
+    let (id_stdout, _stderr1, ok1) = run_bf(&ws, &["create", "--title", "Delete from JSONL"]);
+    assert!(ok1);
     let id = id_stdout.trim();
 
     // Verify bead is in JSONL
@@ -771,7 +852,8 @@ fn test_delete_removes_from_jsonl() {
     assert!(beads_before.iter().any(|b| b.get("id").and_then(|v| v.as_str()) == Some(id)));
 
     // Delete the bead
-    run_bf(&ws, &["delete", &id]).unwrap();
+    let (_stdout, _stderr2, ok2) = run_bf(&ws, &["delete", &id]);
+    assert!(ok2);
 
     // Verify bead is removed from JSONL (should be pruned on flush)
     let beads_after = read_beads_from_jsonl(&ws);
@@ -787,7 +869,7 @@ fn test_full_bead_lifecycle() {
     let (_t, ws) = setup();
 
     // 1. Create a bead
-    let (id_stdout, _stderr, ok) = run_bf(
+    let (id_stdout, _stderr1, ok1) = run_bf(
         &ws,
         &[
             "create",
@@ -803,55 +885,55 @@ fn test_full_bead_lifecycle() {
             "lifecycle",
         ],
     );
-    assert!(ok);
+    assert!(ok1);
     let id = id_stdout.trim();
 
     // 2. Show the bead
-    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id]);
-    assert!(ok);
-    assert!(stdout.contains("Lifecycle test"));
+    let (stdout1, _stderr2, ok2) = run_bf(&ws, &["show", &id]);
+    assert!(ok2);
+    assert!(stdout1.contains("Lifecycle test"));
 
     // 3. Update the bead
-    let (_stdout, _stderr, ok) = run_bf(
+    let (_stdout1, _stderr3, ok3) = run_bf(
         &ws,
         &["update", &id, "--status", "in_progress", "--assignee", "worker-1"],
     );
-    assert!(ok);
+    assert!(ok3);
 
     // 4. Verify update
-    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
-    assert!(ok);
-    let bead_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    let (stdout2, _stderr4, ok4) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok4);
+    let bead_json = parse_json(stdout2.trim().trim_start_matches('[').trim_end_matches(']'));
     assert_eq!(get_string(&bead_json, "status"), "in_progress");
     assert_eq!(get_string(&bead_json, "assignee"), "worker-1");
 
     // 5. Close the bead
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["close", &id, "--reason", "Feature complete"]);
-    assert!(ok);
+    let (_stdout2, _stderr5, ok5) = run_bf(&ws, &["close", &id, "--reason", "Feature complete"]);
+    assert!(ok5);
 
     // 6. Verify close
-    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
-    assert!(ok);
-    let bead_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    let (stdout3, _stderr6, ok6) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok6);
+    let bead_json = parse_json(stdout3.trim().trim_start_matches('[').trim_end_matches(']'));
     assert_eq!(get_string(&bead_json, "status"), "closed");
 
     // 7. Reopen the bead
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["reopen", &id]);
-    assert!(ok);
+    let (_stdout3, _stderr7, ok7) = run_bf(&ws, &["reopen", &id]);
+    assert!(ok7);
 
     // 8. Verify reopen
-    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id]);
-    assert!(ok);
-    assert!(stdout.contains("open"));
-    assert!(stdout.contains("status: open"));
+    let (stdout4, _stderr8, ok8) = run_bf(&ws, &["show", &id]);
+    assert!(ok8);
+    assert!(stdout4.contains("open"));
+    assert!(stdout4.contains("status: open"));
 
     // 9. Delete the bead
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["delete", &id]);
-    assert!(ok);
+    let (_stdout4, _stderr9, ok9) = run_bf(&ws, &["delete", &id]);
+    assert!(ok9);
 
     // 10. Verify deletion
-    let (_stdout, _stderr, ok) = run_bf(&ws, &["show", &id]);
-    assert!(!ok, "bead should not exist after deletion");
+    let (_stdout5, _stderr10, ok10) = run_bf(&ws, &["show", &id]);
+    assert!(!ok10, "bead should not exist after deletion");
 }
 
 // ============================================================================
@@ -925,3 +1007,503 @@ fn test_json_output_consistency() {
         assert!(has_field(&show_bead, field), "show should have field: {}", field);
     }
 }
+
+// ============================================================================
+// P0 EPIC CLI tests
+// ============================================================================
+
+#[test]
+fn test_create_p0_epic_with_labels_via_cli() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic with labels using CLI
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Critical Infrastructure Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0", // P0 = Critical
+            "--description",
+            "Database migration requiring immediate attention",
+            "--assignee",
+            "infra-team",
+            "--label",
+            "critical",
+            "--label",
+            "infrastructure",
+            "--label",
+            "database",
+        ],
+    );
+    assert!(ok, "create P0 epic should succeed");
+
+    let id = id_stdout.trim();
+    assert!(id.starts_with("bf-"), "ID should have bf- prefix");
+
+    // Verify the epic via JSON output
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok, "show should succeed");
+
+    let epic_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+
+    // Verify all fields
+    assert_eq!(get_string(&epic_json, "title"), "Critical Infrastructure Epic");
+    assert_eq!(get_string(&epic_json, "issue_type"), "epic");
+    assert_eq!(get_number(&epic_json, "priority"), 0, "P0 should be priority 0");
+    assert_eq!(get_string(&epic_json, "status"), "open");
+    assert_eq!(
+        get_string(&epic_json, "description"),
+        "Database migration requiring immediate attention"
+    );
+    assert_eq!(get_string(&epic_json, "assignee"), "infra-team");
+
+    // Verify labels
+    let labels = get_array(&epic_json, "labels");
+    assert_eq!(labels.len(), 3);
+    assert!(labels.iter().any(|l| l.as_str() == Some("critical")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("infrastructure")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("database")));
+}
+
+#[test]
+fn test_p0_epic_text_output_display() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P0 Security Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "security",
+            "--label",
+            "urgent",
+        ],
+    );
+    assert!(ok);
+    let id = id_stdout.trim();
+
+    // Verify text output shows P0 format correctly
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id]);
+    assert!(ok, "show should succeed");
+
+    assert!(stdout.contains("P0 Security Epic"), "should show title");
+    assert!(stdout.contains("Type: epic"), "should show epic type");
+    assert!(stdout.contains("Priority: P0"), "should display P0 priority");
+    assert!(stdout.contains("Status: open"), "should show open status");
+    assert!(stdout.contains("security"), "should show security label");
+    assert!(stdout.contains("urgent"), "should show urgent label");
+}
+
+#[test]
+fn test_list_p0_epics_by_priority() {
+    let (_t, ws) = setup();
+
+    // Create multiple epics with different priorities
+    let (_o1, _e1, ok1) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P0 Critical Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "critical",
+        ],
+    );
+    assert!(ok1);
+
+    let (_o2, _e2, ok2) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P1 High Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "1",
+            "--label",
+            "important",
+        ],
+    );
+    assert!(ok2);
+
+    let (_o3, _e3, ok3) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P2 Normal Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "2",
+        ],
+    );
+    assert!(ok3);
+
+    // List only P0 epics
+    let (stdout, _stderr, ok) = run_bf(&ws, &["list", "--type", "epic", "--priority", "0"]);
+    assert!(ok, "list P0 epics should succeed");
+
+    assert!(stdout.contains("P0 Critical Epic"), "should show P0 epic");
+    assert!(!stdout.contains("P1 High Epic"), "should not show P1 epic");
+    assert!(!stdout.contains("P2 Normal Epic"), "should not show P2 epic");
+}
+
+#[test]
+fn test_p0_epic_json_serialization() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic with labels
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "JSON Test P0 Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "critical",
+            "--label",
+            "test",
+            "--json",
+        ],
+    );
+    assert!(ok);
+
+    let json_output = id_stdout.trim();
+    let epic_json = parse_json(json_output);
+
+    // Verify JSON structure
+    assert!(has_field(&epic_json, "id"));
+    assert!(has_field(&epic_json, "title"));
+    assert!(has_field(&epic_json, "issue_type"));
+    assert!(has_field(&epic_json, "priority"));
+    assert!(has_field(&epic_json, "status"));
+    assert!(has_field(&epic_json, "labels"));
+
+    assert_eq!(get_string(&epic_json, "title"), "JSON Test P0 Epic");
+    assert_eq!(get_string(&epic_json, "issue_type"), "epic");
+    assert_eq!(get_number(&epic_json, "priority"), 0, "P0 = 0");
+    assert_eq!(get_string(&epic_json, "status"), "open");
+
+    let labels = get_array(&epic_json, "labels");
+    assert_eq!(labels.len(), 2);
+    assert!(labels.iter().any(|l| l.as_str() == Some("critical")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("test")));
+}
+
+#[test]
+fn test_p0_epic_with_multiple_labels_cli() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic with many labels
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Multi-label P0 Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "critical",
+            "--label",
+            "security",
+            "--label",
+            "frontend",
+            "--label",
+            "backend",
+            "--label",
+            "database",
+            "--label",
+            "urgent",
+        ],
+    );
+    assert!(ok);
+
+    let id = id_stdout.trim();
+
+    // Verify all labels are present
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok);
+
+    let epic_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    let labels = get_array(&epic_json, "labels");
+
+    assert_eq!(labels.len(), 5);
+    assert!(labels.iter().any(|l| l.as_str() == Some("critical")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("security")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("frontend")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("backend")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("database")));
+    assert!(labels.iter().any(|l| l.as_str() == Some("urgent")));
+}
+
+#[test]
+fn test_p0_epic_label_filtering() {
+    let (_t, ws) = setup();
+
+    // Create epics with different labels
+    let (_o1, _e1, ok1) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Security P0 Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "security",
+            "--label",
+            "critical",
+        ],
+    );
+    assert!(ok1);
+
+    let (_o2, _e2, ok2) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Infrastructure P0 Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "infrastructure",
+            "--label",
+            "critical",
+        ],
+    );
+    assert!(ok2);
+
+    let (_o3, _e3, ok3) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Feature P1 Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "1",
+            "--label",
+            "feature",
+        ],
+    );
+    assert!(ok3);
+
+    // List all P0 epics (should show both security and infrastructure)
+    let (stdout, _stderr, ok) = run_bf(&ws, &["list", "--type", "epic", "--priority", "0"]);
+    assert!(ok);
+
+    assert!(stdout.contains("Security P0 Epic"), "should show security P0 epic");
+    assert!(stdout.contains("Infrastructure P0 Epic"), "should show infrastructure P0 epic");
+    assert!(!stdout.contains("Feature P1 Epic"), "should not show P1 epic");
+
+    // Both should have critical label
+    assert!(stdout.contains("critical"), "should show critical label");
+}
+
+#[test]
+fn test_p0_epic_priority_comparison() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic
+    let (id1, _e1, ok1) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P0 Highest Priority",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+        ],
+    );
+    assert!(ok1);
+    let id1 = id1.trim();
+
+    // Create P1 epic
+    let (_o2, _e2, ok2) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P1 High Priority",
+            "--type",
+            "epic",
+            "--priority",
+            "1",
+        ],
+    );
+    assert!(ok2);
+
+    // Verify P0 shows correctly
+    let (stdout1, _stderr, ok) = run_bf(&ws, &["show", id1]);
+    assert!(ok);
+    assert!(stdout1.contains("Priority: P0"), "P0 should display as P0");
+
+    // List sorted by priority (P0 should come first)
+    let (list_out, _stderr, ok) = run_bf(&ws, &["list", "--type", "epic"]);
+    assert!(ok);
+
+    // P0 should appear before P1 in output
+    let p0_pos = list_out.find("P0 Highest Priority");
+    let p1_pos = list_out.find("P1 High Priority");
+    assert!(p0_pos < p1_pos, "P0 epic should appear before P1 epic");
+}
+
+#[test]
+fn test_p0_epic_update_preserves_priority() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Original P0 Epic",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "critical",
+        ],
+    );
+    assert!(ok);
+    let id = id_stdout.trim();
+
+    // Update title and description (not priority)
+    let (_o, _e, ok) = run_bf(
+        &ws,
+        &[
+            "update",
+            &id,
+            "--title",
+            "Updated P0 Epic",
+            "--description",
+            "Updated description",
+        ],
+    );
+    assert!(ok, "update should succeed");
+
+    // Verify priority is still P0
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok);
+
+    let epic_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    assert_eq!(get_number(&epic_json, "priority"), 0, "priority should remain P0");
+    assert_eq!(get_string(&epic_json, "title"), "Updated P0 Epic");
+    assert_eq!(get_string(&epic_json, "description"), "Updated description");
+}
+
+#[test]
+fn test_p0_epic_close_and_reopen() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P0 Epic to Close",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+            "--label",
+            "critical",
+            "--assignee",
+            "worker-1",
+        ],
+    );
+    assert!(ok);
+    let id = id_stdout.trim();
+
+    // Close the epic
+    let (_o, _e, ok) = run_bf(&ws, &["close", &id, "--reason", "P0 epic completed"]);
+    assert!(ok, "close should succeed");
+
+    // Verify close
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok);
+
+    let epic_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    assert_eq!(get_string(&epic_json, "status"), "closed");
+    assert_eq!(get_string(&epic_json, "close_reason"), "P0 epic completed");
+
+    // Reopen the epic
+    let (_o, _e, ok) = run_bf(&ws, &["reopen", &id]);
+    assert!(ok, "reopen should succeed");
+
+    // Verify reopen
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok);
+
+    let epic_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    assert_eq!(get_string(&epic_json, "status"), "open");
+    assert_eq!(get_number(&epic_json, "priority"), 0, "priority should remain P0 after reopen");
+}
+
+#[test]
+fn test_p0_epic_without_labels() {
+    let (_t, ws) = setup();
+
+    // Create P0 epic without labels
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P0 Epic No Labels",
+            "--type",
+            "epic",
+            "--priority",
+            "0",
+        ],
+    );
+    assert!(ok);
+
+    let id = id_stdout.trim();
+
+    // Verify P0 priority but no labels
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok);
+
+    let epic_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    assert_eq!(get_number(&epic_json, "priority"), 0, "should be P0");
+    assert_eq!(get_string(&epic_json, "issue_type"), "epic");
+
+    let labels = get_array(&epic_json, "labels");
+    assert_eq!(labels.len(), 0, "should have no labels");
+}
+
