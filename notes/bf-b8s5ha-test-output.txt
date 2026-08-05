@@ -1,0 +1,2021 @@
+[cargo-remote] uncommitted changes detected — running locally
+[cargo-remote] falling back to local (CPUQuota=200%, MemoryMax=6G)
+   Compiling bead-forge v0.4.0 (/home/coding/bead-forge)
+warning: unused imports: `UpsertResult` and `import_jsonl`
+ --> src/doctor.rs:7:20
+  |
+7 | use crate::jsonl::{import_jsonl, stream_issues, UpsertResult};
+  |                    ^^^^^^^^^^^^                 ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::storage::schema`
+   --> src/claim.rs:849:13
+    |
+849 |         use crate::storage::schema;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::process::Command`
+  --> src/cli/tests/edge_case_json_tests.rs:12:5
+   |
+12 | use std::process::Command;
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `bf_binary` and `format_detection`
+  --> src/cli/tests/edge_case_json_tests.rs:17:5
+   |
+17 |     bf_binary, bf_command, bf_command_with_workspace, capture, envelope, fixtures,
+   |     ^^^^^^^^^
+18 |     format_detection, json_validation, test_workspace,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+  --> src/cli/tests/edge_case_json_tests.rs:22:5
+   |
+22 | use super::*;
+   |     ^^^^^^^^
+
+warning: unused import: `format_detection`
+  --> src/cli/tests/error_json_tests.rs:28:74
+   |
+28 |     bf_binary, bf_command, bf_command_with_workspace, capture, fixtures, format_detection,
+   |                                                                          ^^^^^^^^^^^^^^^^
+
+warning: unused import: `PathBuf`
+  --> src/cli/tests/json_output.rs:83:23
+   |
+83 | use std::path::{Path, PathBuf};
+   |                       ^^^^^^^
+
+warning: unused import: `std::process::Command`
+   --> src/cli/tests/json_output.rs:303:9
+    |
+303 |     use std::process::Command;
+    |         ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::process::Command`
+  --> src/cli/tests/json_schema_validation.rs:38:5
+   |
+38 | use std::process::Command;
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `bf_binary` and `format_detection`
+  --> src/cli/tests/json_schema_validation.rs:43:5
+   |
+43 |     bf_binary, bf_command, bf_command_with_workspace, capture, envelope, fixtures,
+   |     ^^^^^^^^^
+44 |     format_detection, json_validation, test_workspace,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+  --> src/cli/tests/json_schema_validation.rs:48:5
+   |
+48 | use super::*;
+   |     ^^^^^^^^
+
+warning: unused import: `super::*`
+  --> src/cli/tests/list_ready_recent_json_tests.rs:23:5
+   |
+23 | use super::*;
+   |     ^^^^^^^^
+
+warning: unused import: `std::process::Command`
+  --> src/cli/tests/search_json_tests.rs:14:5
+   |
+14 | use std::process::Command;
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+  --> src/cli/tests/search_json_tests.rs:23:5
+   |
+23 | use super::*;
+   |     ^^^^^^^^
+
+warning: unused import: `std::process::Command`
+  --> src/cli/tests/show_json_tests.rs:10:5
+   |
+10 | use std::process::Command;
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `bf_binary` and `format_detection`
+  --> src/cli/tests/show_json_tests.rs:15:5
+   |
+15 |     bf_binary, bf_command, capture, fixtures, format_detection, json_validation, test_workspace,
+   |     ^^^^^^^^^                                 ^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+  --> src/cli/tests/show_json_tests.rs:19:5
+   |
+19 | use super::*;
+   |     ^^^^^^^^
+
+warning: unused import: `crate::config::init_workspace`
+    --> src/cli/mod.rs:3954:13
+     |
+3954 |     pub use crate::config::init_workspace;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::Storage`
+    --> src/cli/mod.rs:3955:13
+     |
+3955 |     pub use crate::Storage;
+     |             ^^^^^^^^^^^^^^
+
+warning: unused import: `Duration`
+  --> src/close.rs:37:18
+   |
+37 |     use chrono::{Duration, Utc};
+   |                  ^^^^^^^^
+
+warning: unused imports: `UpsertResult` and `import_jsonl`
+ --> src/doctor.rs:7:20
+  |
+7 | use crate::jsonl::{import_jsonl, stream_issues, UpsertResult};
+  |                    ^^^^^^^^^^^^                 ^^^^^^^^^^^^
+
+warning: unused import: `crate::format::json::JsonFormatter`
+   --> src/format/envelope.rs:894:9
+    |
+894 |     use crate::format::json::JsonFormatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::format::Formatter`
+   --> src/format/envelope.rs:895:9
+    |
+895 |     use crate::format::Formatter;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Priority` and `Status`
+   --> src/secrets.rs:316:31
+    |
+316 |     use crate::model::{Issue, Priority, Status};
+    |                               ^^^^^^^^  ^^^^^^
+
+warning: unused import: `IssueType`
+    --> src/storage/sqlite.rs:2660:31
+     |
+2660 |     use crate::model::{Issue, IssueType, Priority, Status};
+     |                               ^^^^^^^^^
+
+warning: unused import: `chrono::Utc`
+    --> src/storage/sqlite.rs:2661:9
+     |
+2661 |     use chrono::Utc;
+     |         ^^^^^^^^^^^
+
+warning: unused import: `Status`
+   --> src/velocity.rs:405:42
+    |
+405 |     use crate::model::{Issue, IssueType, Status};
+    |                                          ^^^^^^
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1118:13
+     |
+1118 | /             import_jsonl(jsonl_path, |issue| {
+1119 | |                 let existing = Self::get_issue_tx(tx, &issue.id)?;
+1120 | |                 match existing {
+1121 | |                     None => {
+...    |
+1136 | |             })
+     | |______________^ expected `Result<_, Error>`, found `Result<ImportResult, BeadForgeError>`
+     |
+     = note: expected enum `std::result::Result<_, anyhow::Error>`
+                found enum `std::result::Result<ImportResult, BeadForgeError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1118 ~             Ok(import_jsonl(jsonl_path, |issue| {
+1119 |                 let existing = Self::get_issue_tx(tx, &issue.id)?;
+ ...
+1135 |                 }
+1136 ~             })?)
+     |
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1144:20
+     |
+1144 |                 || self.list_dirty_issues().map_err(|e| anyhow::anyhow!(e)),
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1144 |                 || Ok(self.list_dirty_issues().map_err(|e| anyhow::anyhow!(e))?),
+     |                    +++                                                        ++
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1145:20
+     |
+1145 |                 || self.clear_dirty().map_err(|e| anyhow::anyhow!(e)),
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), BeadForgeError>`, found `Result<(), Error>`
+     |
+     = note: expected enum `std::result::Result<_, BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1145 |                 || Ok(self.clear_dirty().map_err(|e| anyhow::anyhow!(e))?),
+     |                    +++                                                  ++
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1149:54
+     |
+1149 |             let result = export_jsonl(jsonl_path, || self.list_all_issues().map_err(|e| anyhow::anyhow!(e)))?;
+     |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1149 |             let result = export_jsonl(jsonl_path, || Ok(self.list_all_issues().map_err(|e| anyhow::anyhow!(e))?))?;
+     |                                                      +++                                                      ++
+
+error[E0308]: mismatched types
+   --> src/sync.rs:120:12
+    |
+120 |         || storage.clear_dirty(),
+    |            ^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), BeadForgeError>`, found `Result<(), Error>`
+    |
+    = note: expected enum `std::result::Result<_, BeadForgeError>`
+               found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+120 |         || Ok(storage.clear_dirty()?),
+    |            +++                     ++
+
+error[E0308]: mismatched types
+   --> src/sync.rs:216:9
+    |
+216 | /         import_jsonl(&jsonl_path, |issue| {
+217 | |             let incoming_hash = issue.content_hash();
+218 | |             let existing = Storage::get_issue_tx(tx, &issue.id)?;
+...   |
+245 | |         })
+    | |__________^ expected `Result<_, Error>`, found `Result<ImportResult, BeadForgeError>`
+    |
+    = note: expected enum `std::result::Result<_, anyhow::Error>`
+               found enum `std::result::Result<ImportResult, BeadForgeError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+216 ~         Ok(import_jsonl(&jsonl_path, |issue| {
+217 |             let incoming_hash = issue.content_hash();
+...
+244 |             }
+245 ~         })?)
+    |
+
+error[E0308]: mismatched types
+    --> src/doctor.rs:1467:38
+     |
+1467 |         export_jsonl(&jsonl_path, || storage.list_all_issues()).unwrap();
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1467 |         export_jsonl(&jsonl_path, || Ok(storage.list_all_issues()?)).unwrap();
+     |                                      +++                         ++
+
+error[E0308]: mismatched types
+    --> src/doctor.rs:1547:38
+     |
+1547 |         export_jsonl(&jsonl_path, || storage.list_all_issues()).unwrap();
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1547 |         export_jsonl(&jsonl_path, || Ok(storage.list_all_issues()?)).unwrap();
+     |                                      +++                         ++
+
+error[E0308]: mismatched types
+    --> src/doctor.rs:1592:38
+     |
+1592 |         export_jsonl(&jsonl_path, || storage.list_all_issues()).unwrap();
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1592 |         export_jsonl(&jsonl_path, || Ok(storage.list_all_issues()?)).unwrap();
+     |                                      +++                         ++
+
+error[E0308]: mismatched types
+    --> src/doctor.rs:1645:38
+     |
+1645 |         export_jsonl(&jsonl_path, || storage.list_all_issues()).unwrap();
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1645 |         export_jsonl(&jsonl_path, || Ok(storage.list_all_issues()?)).unwrap();
+     |                                      +++                         ++
+
+error[E0308]: mismatched types
+    --> src/doctor.rs:1687:38
+     |
+1687 |         export_jsonl(&jsonl_path, || storage.list_all_issues()).unwrap();
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1687 |         export_jsonl(&jsonl_path, || Ok(storage.list_all_issues()?)).unwrap();
+     |                                      +++                         ++
+
+error[E0308]: mismatched types
+    --> src/doctor.rs:1787:38
+     |
+1787 |         export_jsonl(&jsonl_path, || storage.list_all_issues()).unwrap();
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1787 |         export_jsonl(&jsonl_path, || Ok(storage.list_all_issues()?)).unwrap();
+     |                                      +++                         ++
+
+warning: unused variable: `check`
+    --> src/cli/mod.rs:2398:5
+     |
+2398 |     check: bool,
+     |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_check`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_path`
+    --> src/cli/mod.rs:2411:9
+     |
+2411 |     let db_path = beads_dir.join(&metadata.database);
+     |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_path`
+
+warning: unused variable: `envelope`
+    --> src/cli/mod.rs:3156:5
+     |
+3156 |     envelope: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_envelope`
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:403:32
+    |
+403 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `chrono::NaiveDateTime::from_timestamp_opt`: use `DateTime::from_timestamp` instead
+   --> src/git_log.rs:417:32
+    |
+417 |                 NaiveDateTime::from_timestamp_opt(1704067200, 0).unwrap(),
+    |                                ^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `beads_dir`
+  --> src/commit_check.rs:74:5
+   |
+74 |     beads_dir: &Path,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+warning: unused variable: `beads_dir`
+   --> src/commit_check.rs:145:5
+    |
+145 |     beads_dir: &Path,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_beads_dir`
+
+error[E0308]: mismatched types
+   --> src/jsonl.rs:966:13
+    |
+966 |             Err::<UpsertResult, anyhow::Error>(anyhow::anyhow!("Database error"))
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<UpsertResult, BeadForgeError>`, found `Result<UpsertResult, Error>`
+    |
+    = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+               found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+966 |             Ok(Err::<UpsertResult, anyhow::Error>(anyhow::anyhow!("Database error"))?)
+    |             +++                                                                     ++
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db_corrupted`
+   --> src/doctor.rs:803:25
+    |
+803 |     let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    |                         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_corrupted`
+
+warning: unused variable: `stdout`
+   --> src/module_test.rs:233:9
+    |
+233 |     let stdout = if stdout_handle.is_finished() {
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stderr`
+   --> src/module_test.rs:239:9
+    |
+239 |     let stderr = if stderr_handle.is_finished() {
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stderr`
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1118:13
+     |
+1118 | /             import_jsonl(jsonl_path, |issue| {
+1119 | |                 let existing = Self::get_issue_tx(tx, &issue.id)?;
+1120 | |                 match existing {
+1121 | |                     None => {
+...    |
+1136 | |             })
+     | |______________^ expected `Result<_, Error>`, found `Result<ImportResult, BeadForgeError>`
+     |
+     = note: expected enum `std::result::Result<_, anyhow::Error>`
+                found enum `std::result::Result<ImportResult, error::BeadForgeError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1118 ~             Ok(import_jsonl(jsonl_path, |issue| {
+1119 |                 let existing = Self::get_issue_tx(tx, &issue.id)?;
+ ...
+1135 |                 }
+1136 ~             })?)
+     |
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1144:20
+     |
+1144 |                 || self.list_dirty_issues().map_err(|e| anyhow::anyhow!(e)),
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1144 |                 || Ok(self.list_dirty_issues().map_err(|e| anyhow::anyhow!(e))?),
+     |                    +++                                                        ++
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1145:20
+     |
+1145 |                 || self.clear_dirty().map_err(|e| anyhow::anyhow!(e)),
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), BeadForgeError>`, found `Result<(), Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1145 |                 || Ok(self.clear_dirty().map_err(|e| anyhow::anyhow!(e))?),
+     |                    +++                                                  ++
+
+error[E0308]: mismatched types
+    --> src/storage/sqlite.rs:1149:54
+     |
+1149 |             let result = export_jsonl(jsonl_path, || self.list_all_issues().map_err(|e| anyhow::anyhow!(e)))?;
+     |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Vec<Issue>, BeadForgeError>`, found `Result<Vec<Issue>, Error>`
+     |
+     = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+                found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+     |
+1149 |             let result = export_jsonl(jsonl_path, || Ok(self.list_all_issues().map_err(|e| anyhow::anyhow!(e))?))?;
+     |                                                      +++                                                      ++
+
+warning: unused variable: `num`
+   --> src/rotate.rs:313:10
+    |
+313 |     for (num, path) in archives.into_iter().take(num_to_delete) {
+    |          ^^^ help: if this is intentional, prefix it with an underscore: `_num`
+
+error[E0308]: mismatched types
+   --> src/sync.rs:120:12
+    |
+120 |         || storage.clear_dirty(),
+    |            ^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), BeadForgeError>`, found `Result<(), Error>`
+    |
+    = note: expected enum `std::result::Result<_, error::BeadForgeError>`
+               found enum `std::result::Result<_, anyhow::Error>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+120 |         || Ok(storage.clear_dirty()?),
+    |            +++                     ++
+
+warning: value assigned to `param_idx` is never read
+   --> src/storage/sqlite.rs:304:13
+    |
+304 |             param_idx += 1;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+   --> src/sync.rs:216:9
+    |
+216 | /         import_jsonl(&jsonl_path, |issue| {
+217 | |             let incoming_hash = issue.content_hash();
+218 | |             let existing = Storage::get_issue_tx(tx, &issue.id)?;
+...   |
+245 | |         })
+    | |__________^ expected `Result<_, Error>`, found `Result<ImportResult, BeadForgeError>`
+    |
+    = note: expected enum `std::result::Result<_, anyhow::Error>`
+               found enum `std::result::Result<ImportResult, error::BeadForgeError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+216 ~         Ok(import_jsonl(&jsonl_path, |issue| {
+217 |             let incoming_hash = issue.content_hash();
+...
+244 |             }
+245 ~         })?)
+    |
+
+warning: variable does not need to be mutable
+   --> src/storage/sqlite.rs:760:29
+    |
+760 |                         let mut dependents = tx.prepare(
+    |                             ----^^^^^^^^^^
+    |                             |
+    |                             help: remove this `mut`
+
+warning: unused variable: `dep_col`
+    --> src/storage/sqlite.rs:1661:51
+     |
+1661 |         let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+     |                                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dep_col`
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:1941:13
+     |
+1941 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `param_idx` is never read
+    --> src/storage/sqlite.rs:2097:13
+     |
+2097 |             param_idx += 1;
+     |             ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:290:9
+    |
+290 |     let mut result = execute_command(command, args, config)?;
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:404:17
+    |
+404 |     if let Some(mut stdout) = child.stdout.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/subprocess.rs:423:17
+    |
+423 |     if let Some(mut stderr) = child.stderr.take() {
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/timing.rs:317:35
+    |
+317 |     pub fn complete_with_metadata(mut self, bead_id: &str) -> Result<crate::trace::TraceMetadata> {
+    |                                   ----^^^^
+    |                                   |
+    |                                   help: remove this `mut`
+
+warning: value assigned to `param_idx` is never read
+   --> src/velocity.rs:374:9
+    |
+374 |         param_idx += 1;
+    |         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `bead-forge` (lib) generated 21 warnings
+error: could not compile `bead-forge` (lib) due to 6 previous errors; 21 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: variable does not need to be mutable
+    --> src/batch.rs:1756:13
+     |
+1756 |         let mut ops = vec![
+     |             ----^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:694:21
+    |
+694 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:722:21
+    |
+722 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:734:21
+    |
+734 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:851:21
+    |
+851 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/claim.rs:947:21
+    |
+947 |         let (_temp, mut storage) = setup_test_db();
+    |                     ----^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1011:21
+     |
+1011 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1038:21
+     |
+1038 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1067:21
+     |
+1067 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/claim.rs:1140:21
+     |
+1140 |         let (_temp, mut storage) = setup_test_db();
+     |                     ----^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: unused variable: `workspace`
+  --> src/cli/tests/edge_case_json_tests.rs:49:9
+   |
+49 |     let workspace = test_workspace();
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `output`
+  --> src/cli/tests/edge_case_json_tests.rs:57:9
+   |
+57 |     let output = capture::capture_stdout(
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_output`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:102:9
+    |
+102 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `output`
+   --> src/cli/tests/edge_case_json_tests.rs:112:9
+    |
+112 |     let output = capture::capture_stdout(
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_output`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:167:9
+    |
+167 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:236:9
+    |
+236 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:312:9
+    |
+312 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:367:9
+    |
+367 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:425:9
+    |
+425 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:482:9
+    |
+482 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:540:9
+    |
+540 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/edge_case_json_tests.rs:543:10
+    |
+543 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:573:9
+    |
+573 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/edge_case_json_tests.rs:576:10
+    |
+576 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:638:9
+    |
+638 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/edge_case_json_tests.rs:641:10
+    |
+641 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/edge_case_json_tests.rs:671:10
+    |
+671 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stderr`
+   --> src/cli/tests/edge_case_json_tests.rs:671:18
+    |
+671 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |                  ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stderr`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:857:9
+    |
+857 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/edge_case_json_tests.rs:950:9
+    |
+950 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/edge_case_json_tests.rs:1010:9
+     |
+1010 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/edge_case_json_tests.rs:1049:9
+     |
+1049 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/edge_case_json_tests.rs:1114:9
+     |
+1114 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/edge_case_json_tests.rs:1168:9
+     |
+1168 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/edge_case_json_tests.rs:1240:9
+     |
+1240 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/edge_case_json_tests.rs:1288:9
+     |
+1288 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/edge_case_json_tests.rs:1337:9
+     |
+1337 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+  --> src/cli/tests/error_json_tests.rs:57:9
+   |
+57 |     let workspace = test_workspace();
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:123:9
+    |
+123 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:132:14
+    |
+132 |         let (stdout, stderr, success) = capture::capture_failed_command(
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:157:9
+    |
+157 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:179:9
+    |
+179 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:181:10
+    |
+181 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:201:9
+    |
+201 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:209:10
+    |
+209 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:241:9
+    |
+241 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:249:10
+    |
+249 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:282:9
+    |
+282 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:292:10
+    |
+292 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:328:9
+    |
+328 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:361:9
+    |
+361 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:386:9
+    |
+386 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:417:9
+    |
+417 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:450:9
+    |
+450 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:482:9
+    |
+482 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:492:14
+    |
+492 |         let (stdout, stderr, success) = capture::capture_failed_command(
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:520:9
+    |
+520 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:561:9
+    |
+561 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:602:9
+    |
+602 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:654:9
+    |
+654 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `i`
+   --> src/cli/tests/error_json_tests.rs:670:10
+    |
+670 |     for (i, query) in long_queries.iter().enumerate() {
+    |          ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:691:9
+    |
+691 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:726:9
+    |
+726 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:812:9
+    |
+812 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:865:14
+    |
+865 |         let (stdout, stderr, success, description) = scenario();
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:881:9
+    |
+881 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+   --> src/cli/tests/error_json_tests.rs:917:14
+    |
+917 |         let (stdout, stderr, success, description) = scenario();
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/error_json_tests.rs:933:9
+    |
+933 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1051:9
+     |
+1051 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1150:9
+     |
+1150 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1154:10
+     |
+1154 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1177:9
+     |
+1177 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1179:10
+     |
+1179 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1196:9
+     |
+1196 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1200:10
+     |
+1200 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1222:9
+     |
+1222 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `output`
+    --> src/cli/tests/error_json_tests.rs:1227:9
+     |
+1227 |     let output = capture::capture_stdout(
+     |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_output`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1255:9
+     |
+1255 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `output`
+    --> src/cli/tests/error_json_tests.rs:1270:13
+     |
+1270 |         let output = capture::capture_stdout(
+     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_output`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1303:9
+     |
+1303 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1305:10
+     |
+1305 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1320:9
+     |
+1320 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1322:10
+     |
+1322 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1342:9
+     |
+1342 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1385:9
+     |
+1385 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1390:14
+     |
+1390 |         let (stdout, stderr, success) = capture::capture_failed_command(
+     |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1417:9
+     |
+1417 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1427:14
+     |
+1427 |         let (stdout, stderr, success) = capture::capture_failed_command(
+     |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1498:10
+     |
+1498 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1560:9
+     |
+1560 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1612:9
+     |
+1612 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1658:9
+     |
+1658 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1763:9
+     |
+1763 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1795:9
+     |
+1795 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stdout`
+    --> src/cli/tests/error_json_tests.rs:1801:10
+     |
+1801 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1837:9
+     |
+1837 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1883:9
+     |
+1883 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:1958:9
+     |
+1958 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2015:9
+     |
+2015 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2060:9
+     |
+2060 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2098:9
+     |
+2098 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `description`
+    --> src/cli/tests/error_json_tests.rs:2136:22
+     |
+2136 |         let (stdout, description) = scenario();
+     |                      ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_description`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2150:9
+     |
+2150 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `success`
+    --> src/cli/tests/error_json_tests.rs:2156:26
+     |
+2156 |     let (stdout, stderr, success) = capture::capture_failed_command(
+     |                          ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_success`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2188:9
+     |
+2188 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2249:9
+     |
+2249 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2350:9
+     |
+2350 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2425:9
+     |
+2425 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2486:9
+     |
+2486 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2527:9
+     |
+2527 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2567:9
+     |
+2567 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/error_json_tests.rs:2608:9
+     |
+2608 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `i`
+   --> src/cli/tests/json_output.rs:196:14
+    |
+196 |         for (i, line) in jsonl.lines().enumerate() {
+    |              ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:249:9
+    |
+249 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stderr`
+   --> src/cli/tests/json_schema_validation.rs:260:22
+    |
+260 |         let (stdout, stderr, success) = capture::capture_failed_command(
+    |                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stderr`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:312:9
+    |
+312 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:361:9
+    |
+361 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `stderr`
+   --> src/cli/tests/json_schema_validation.rs:499:18
+    |
+499 |     let (stdout, stderr, success) = capture::capture_failed_command(
+    |                  ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stderr`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:582:9
+    |
+582 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:667:9
+    |
+667 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:722:9
+    |
+722 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:756:9
+    |
+756 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:788:9
+    |
+788 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:833:9
+    |
+833 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `parsed`
+   --> src/cli/tests/json_schema_validation.rs:849:9
+    |
+849 |     let parsed = json_validation::parse_json(&output);
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parsed`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:875:9
+    |
+875 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:911:9
+    |
+911 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:947:9
+    |
+947 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/json_schema_validation.rs:994:9
+    |
+994 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/json_schema_validation.rs:1046:9
+     |
+1046 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/json_schema_validation.rs:1098:9
+     |
+1098 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/json_schema_validation.rs:1146:9
+     |
+1146 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/json_schema_validation.rs:1189:9
+     |
+1189 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/json_schema_validation.rs:1261:9
+     |
+1261 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+  --> src/cli/tests/list_ready_recent_json_tests.rs:50:9
+   |
+50 |     let workspace = test_workspace();
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+  --> src/cli/tests/list_ready_recent_json_tests.rs:96:9
+   |
+96 |     let workspace = test_workspace();
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:197:9
+    |
+197 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `labels`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:247:9
+    |
+247 |     let labels = json_validation::get_array(&parsed, "labels");
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_labels`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:257:9
+    |
+257 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:297:9
+    |
+297 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:344:9
+    |
+344 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:376:9
+    |
+376 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:437:9
+    |
+437 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:507:9
+    |
+507 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:561:9
+    |
+561 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:606:9
+    |
+606 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:651:9
+    |
+651 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:702:9
+    |
+702 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:747:9
+    |
+747 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:780:9
+    |
+780 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:827:9
+    |
+827 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:881:9
+    |
+881 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:926:9
+    |
+926 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/list_ready_recent_json_tests.rs:992:9
+    |
+992 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1036:9
+     |
+1036 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1080:9
+     |
+1080 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1114:9
+     |
+1114 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1173:9
+     |
+1173 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1211:9
+     |
+1211 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `labels`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1259:9
+     |
+1259 |     let labels = json_validation::get_array(&parsed, "labels");
+     |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_labels`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1269:9
+     |
+1269 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1326:9
+     |
+1326 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/list_ready_recent_json_tests.rs:1365:9
+     |
+1365 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:157:9
+    |
+157 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:209:9
+    |
+209 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:263:9
+    |
+263 |     let workspace = temp_dir.path();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:283:9
+    |
+283 |     let workspace = temp_dir.path();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:346:9
+    |
+346 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:394:9
+    |
+394 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:434:9
+    |
+434 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:466:9
+    |
+466 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:498:9
+    |
+498 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:530:9
+    |
+530 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `labels`
+   --> src/cli/tests/search_json_tests.rs:586:9
+    |
+586 |     let labels = json_validation::get_array(&parsed, "labels");
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_labels`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:600:9
+    |
+600 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:628:9
+    |
+628 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:666:9
+    |
+666 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:713:9
+    |
+713 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:743:9
+    |
+743 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:782:9
+    |
+782 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:838:9
+    |
+838 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:876:9
+    |
+876 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:913:9
+    |
+913 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/search_json_tests.rs:950:9
+    |
+950 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1006:9
+     |
+1006 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1054:9
+     |
+1054 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1106:9
+     |
+1106 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1143:9
+     |
+1143 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1185:9
+     |
+1185 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1226:9
+     |
+1226 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1255:9
+     |
+1255 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1301:9
+     |
+1301 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1353:9
+     |
+1353 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1394:9
+     |
+1394 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1459:9
+     |
+1459 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1491:9
+     |
+1491 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1537:9
+     |
+1537 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1606:9
+     |
+1606 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1663:9
+     |
+1663 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1709:9
+     |
+1709 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+    --> src/cli/tests/search_json_tests.rs:1756:9
+     |
+1756 |     let workspace = test_workspace();
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+  --> src/cli/tests/show_json_tests.rs:46:9
+   |
+46 |     let workspace = test_workspace();
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:100:9
+    |
+100 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:133:9
+    |
+133 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `labels`
+   --> src/cli/tests/show_json_tests.rs:192:9
+    |
+192 |     let labels = json_validation::get_array(bead, "labels");
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_labels`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:202:9
+    |
+202 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:258:9
+    |
+258 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:300:9
+    |
+300 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:354:9
+    |
+354 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:400:9
+    |
+400 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:447:9
+    |
+447 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:505:9
+    |
+505 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:541:9
+    |
+541 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:577:9
+    |
+577 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: unused variable: `workspace`
+   --> src/cli/tests/show_json_tests.rs:625:9
+    |
+625 |     let workspace = test_workspace();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workspace`
+
+warning: variable does not need to be mutable
+  --> src/critical_path.rs:95:9
+   |
+95 |     let mut max_iterations = 1000; // Safety limit
+   |         ----^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `critical`
+   --> src/critical_path.rs:558:13
+    |
+558 |         let critical: Vec<&str> = result
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_critical`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1720:13
+     |
+1720 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1826:13
+     |
+1826 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `jsonl_path`
+    --> src/doctor.rs:1875:13
+     |
+1875 |         let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_jsonl_path`
+
+warning: unused variable: `import_result`
+    --> src/doctor.rs:1914:13
+     |
+1914 |         let import_result = crate::sync::import(workspace).unwrap();
+     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_import_result`
+
+warning: unused variable: `before_export`
+   --> src/jsonl.rs:605:13
+    |
+605 |         let before_export = std::fs::read_to_string(&path).unwrap();
+    |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_before_export`
+
+warning: unused variable: `issue`
+   --> src/jsonl.rs:814:43
+    |
+814 |         let result = import_jsonl(&path, |issue| {
+    |                                           ^^^^^ help: if this is intentional, prefix it with an underscore: `_issue`
+
+warning: unused variable: `issue`
+    --> src/jsonl.rs:1086:43
+     |
+1086 |         let result = import_jsonl(&path, |issue| Ok(UpsertResult::New));
+     |                                           ^^^^^ help: if this is intentional, prefix it with an underscore: `_issue`
+
+warning: unused variable: `path`
+    --> src/jsonl.rs:1452:13
+     |
+1452 |         let path = tmp.path().join("readonly.jsonl");
+     |             ^^^^ help: if this is intentional, prefix it with an underscore: `_path`
+
+warning: unused variable: `issue`
+    --> src/jsonl.rs:1535:43
+     |
+1535 |         let result = import_jsonl(&path, |issue| Ok(UpsertResult::New));
+     |                                           ^^^^^ help: if this is intentional, prefix it with an underscore: `_issue`
+
+warning: variable does not need to be mutable
+    --> src/jsonl.rs:1959:13
+     |
+1959 |         let mut initial_issues = vec![
+     |             ----^^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `before`
+    --> src/jsonl.rs:1965:13
+     |
+1965 |         let before = std::fs::read_to_string(&jsonl_path).unwrap();
+     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_before`
+
+warning: variable does not need to be mutable
+    --> src/model.rs:1397:13
+     |
+1397 |         let mut issue1 = Issue {
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: `bead-forge` (lib test) generated 276 warnings (19 duplicates)
+error: could not compile `bead-forge` (lib test) due to 13 previous errors; 276 warnings emitted
