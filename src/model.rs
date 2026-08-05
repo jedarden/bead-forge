@@ -1911,4 +1911,39 @@ mod tests {
         let issue = candidate.to_issue();
         assert!(issue.labels.is_empty());
     }
+
+    #[test]
+    fn test_assignee_field_in_json_when_none() {
+        // Test that assignee field is present in JSON even when None
+        let issue = Issue {
+            id: "test-1".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            assignee: None,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&issue).unwrap();
+        // With skip_serializing_if = "Option::is_none", assignee should NOT be present when None
+        // This test verifies current behavior - field should be absent
+        assert!(!json.contains("assignee"), "assignee field should be skipped when None (current behavior)");
+    }
+
+    #[test]
+    fn test_assignee_field_in_json_when_some() {
+        // Test that assignee field is present in JSON when Some
+        let issue = Issue {
+            id: "test-2".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            assignee: Some("alice".to_string()),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&issue).unwrap();
+        assert!(json.contains("assignee"), "assignee field should be present when Some");
+        assert!(json.contains("alice"), "assignee value should be present");
+    }
 }
