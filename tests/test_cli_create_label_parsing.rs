@@ -173,3 +173,28 @@ fn test_create_p0_label_specifically() {
         _ => panic!("Expected Create command, got a different command"),
     }
 }
+
+#[test]
+fn test_create_no_labels() {
+    // Test parsing of `bf create --title "Test"` (no --label flag)
+    // Verifies parsed labels Vec is empty
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Test",
+    ];
+
+    let cli = Cli::parse_from(args);
+
+    let command = cli.command.expect("Command should be present");
+    match command {
+        Commands::Create { label, .. } => {
+            // Verify count is 0
+            assert_eq!(label.len(), 0, "Labels count should be 0");
+            // Verify Vec<String>.is_empty() returns true
+            assert!(label.is_empty(), "Labels Vec should be empty");
+        }
+        _ => panic!("Expected Create command, got a different command"),
+    }
+}
