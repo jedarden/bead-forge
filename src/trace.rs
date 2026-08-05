@@ -285,6 +285,63 @@ impl TraceManager {
         Ok(bead_dir)
     }
 
+    /// Create a trace directory with comprehensive error handling and writable verification
+    ///
+    /// This function creates the `.beads/traces/{bead_id}/` directory structure
+    /// with the following guarantees:
+    /// - Uses `std::fs::create_dir_all()` to ensure full path creation
+    /// - Handles permission errors gracefully with descriptive messages
+    /// - Verifies the directory is writable before returning success
+    /// - Returns success/failure status via Result type
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead identifier (e.g., "bf-4kzs6h-remaining")
+    ///
+    /// # Returns
+    /// * `Result<PathBuf>` - Path to the created directory on success, error on failure
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let trace_dir = manager.create_trace_dir("bf-4kzs6h-remaining")?;
+    /// println!("Created and verified directory: {}", trace_dir.display());
+    /// ```
+    pub fn create_trace_dir(&self, bead_id: &str) -> Result<PathBuf> {
+        // Ensure the base traces directory exists
+        self.ensure_traces_dir()?;
+
+        let trace_dir = self.traces_dir.join(bead_id);
+
+        // Use create_dir_all() to ensure full directory path is created
+        // This handles the case where parent directories might not exist
+        fs::create_dir_all(&trace_dir).with_context(|| {
+            format!(
+                "Failed to create trace directory: {}. Check permissions and disk space.",
+                trace_dir.display()
+            )
+        })?;
+
+        // Verify the directory is writable by attempting to create a test file
+        // This catches permission issues that create_dir_all might not detect
+        let test_file = trace_dir.join(".write_test");
+        fs::write(&test_file, b"test").with_context(|| {
+            format!(
+                "Failed to verify write permissions for directory: {}. Directory may be read-only.",
+                trace_dir.display()
+            )
+        })?;
+
+        // Clean up the test file
+        fs::remove_file(&test_file).with_context(|| {
+            format!(
+                "Failed to clean up test file in directory: {}",
+                trace_dir.display()
+            )
+        })?;
+
+        Ok(trace_dir)
+    }
+
     /// Generate a unique bead trace directory name with timestamp suffix
     ///
     /// This ensures multiple test runs for the same bead create distinct trace files.

@@ -213,7 +213,9 @@ pub fn claim(
         let m = model.as_deref().unwrap_or("");
         let h = harness.as_deref().unwrap_or("");
 
-        let mut stmt = tx.prepare(
+        // P0 Performance Fix: Use blocked_issues_cache instead of NOT EXISTS subquery
+        // This changes complexity from O(n × m) to O(n) with indexed lookups
+        let mut stmt = tx.prepare_cached(
             "SELECT i.id
              FROM issues i
              LEFT JOIN dependencies d ON d.depends_on_id = i.id
@@ -227,13 +229,7 @@ pub fn claim(
                AND i.pinned = 0
                AND i.is_template = 0
                AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-               )
+               AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
              ORDER BY (
                  COALESCE(COUNT(d.issue_id), 0) * 3.0

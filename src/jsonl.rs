@@ -218,6 +218,33 @@ where
     Ok(result)
 }
 
+/// Incremental flush that only writes dirty beads to JSONL.
+/// This is the main entry point for auto-flush functionality.
+pub fn incremental_flush(conn: &rusqlite::Connection, path: &Path) -> Result<FlushResult> {
+    use crate::storage::Storage;
+
+    // Create a storage wrapper around the connection
+    let storage = Storage::from_conn(conn)?;
+
+    // List dirty issues from database
+    let list_dirty = || -> Result<Vec<crate::model::Issue>> {
+        storage.list_dirty_issues()
+    };
+
+    // Clear dirty marks after successful export
+    let clear_dirty = || -> Result<()> {
+        storage.clear_dirty()
+    };
+
+    // Use export_jsonl_dirty for the actual export
+    let result = export_jsonl_dirty(path, list_dirty, clear_dirty)?;
+
+    Ok(FlushResult {
+        flushed: result.count,
+        warnings: Vec::new(), // No warnings in current implementation
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1568,5 +1595,483 @@ not json at all
             !path.exists(),
             "should not create file when there's nothing to merge"
         );
+    }
+
+    // ==================== incremental_flush tests ====================
+
+    #[test]
+    fn incremental_flush_success_clears_dirty_marks() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        // Create database and schema
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create a bead and mark it as dirty
+        conn.execute(
+            "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+             VALUES ('bf-1', 'Test', 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-1')",
+            [],
+        )
+        .unwrap();
+
+        // Verify it's marked dirty
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM dirty_issues", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "should have 1 dirty issue");
+
+        // Flush
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 1, "should flush 1 bead");
+        assert!(result.warnings.is_empty(), "should have no warnings on success");
+
+        // Verify dirty marks are cleared
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM dirty_issues", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "dirty marks should be cleared after successful flush");
+
+        // Verify JSONL file contains the bead
+        assert!(jsonl_path.exists(), "JSONL file should exist");
+        let contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        assert!(contents.contains("bf-1"), "JSONL should contain the flushed bead");
+    }
+
+    #[test]
+    fn incremental_flush_no_dirty_issues_is_no_op() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        // Create database with no dirty issues
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Flush with no dirty issues
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 0, "should flush 0 beads");
+        assert!(result.warnings.is_empty(), "should have no warnings");
+        assert!(!jsonl_path.exists(), "should not create JSONL file when no dirty issues");
+    }
+
+    #[test]
+    fn incremental_flush_only_writes_dirty_beads() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create multiple beads, mark only one as dirty
+        for i in 1..=3 {
+            let id = format!("bf-{}", i);
+            conn.execute(
+                "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+                 VALUES (?1, ?2, 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+                [id.clone(), format!("Bead {}", i)],
+            )
+            .unwrap();
+
+            // Only mark bf-2 as dirty
+            if i == 2 {
+                conn.execute(
+                    "INSERT INTO dirty_issues (issue_id) VALUES (?1)",
+                    [id],
+                )
+                .unwrap();
+            }
+        }
+
+        // Flush - only bf-2 should be written
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 1, "should flush only 1 dirty bead");
+        assert!(result.warnings.is_empty(), "should have no warnings");
+
+        // Verify JSONL contains only the dirty bead
+        let contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        assert!(contents.contains("bf-2"), "should contain dirty bead");
+        assert!(!contents.contains("bf-1"), "should not contain non-dirty bead bf-1");
+        assert!(!contents.contains("bf-3"), "should not contain non-dirty bead bf-3");
+
+        // Verify only bf-2's dirty mark is cleared
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM dirty_issues", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "dirty marks should be cleared");
+    }
+
+    #[test]
+    fn incremental_flush_includes_related_data() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create a bead with labels, dependencies, comments, events
+        conn.execute(
+            "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+             VALUES ('bf-rel', 'Test Related', 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+            [],
+        )
+        .unwrap();
+
+        // Add labels
+        conn.execute(
+            "INSERT INTO labels (issue_id, label) VALUES ('bf-rel', 'phase-1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO labels (issue_id, label) VALUES ('bf-rel', 'critical')",
+            [],
+        )
+        .unwrap();
+
+        // Add dependency
+        conn.execute(
+            "INSERT INTO dependencies (issue_id, depends_on_id, type, created_at)
+             VALUES ('bf-rel', 'bf-dep', 'blocks', datetime('now'))",
+            [],
+        )
+        .unwrap();
+
+        // Add comment
+        conn.execute(
+            "INSERT INTO comments (issue_id, author, text, created_at)
+             VALUES ('bf-rel', 'test-user', 'Test comment', datetime('now'))",
+            [],
+        )
+        .unwrap();
+
+        // Add event
+        conn.execute(
+            "INSERT INTO events (issue_id, event_type, actor, created_at)
+             VALUES ('bf-rel', 'created', 'test-user', datetime('now'))",
+            [],
+        )
+        .unwrap();
+
+        // Mark as dirty
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-rel')",
+            [],
+        )
+        .unwrap();
+
+        // Flush
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 1, "should flush 1 bead");
+        assert!(result.warnings.is_empty(), "should have no warnings");
+
+        // Verify all related data is in JSONL
+        let contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        assert!(contents.contains("phase-1"), "should include labels");
+        assert!(contents.contains("critical"), "should include labels");
+        assert!(contents.contains("bf-dep"), "should include dependencies");
+        assert!(contents.contains("Test comment"), "should include comments");
+        assert!(contents.contains("created"), "should include events");
+    }
+
+    #[test]
+    fn incremental_flush_failure_preserves_dirty_marks() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create a bead and mark it as dirty
+        conn.execute(
+            "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+             VALUES ('bf-fail', 'Test Failure', 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-fail')",
+            [],
+        )
+        .unwrap();
+
+        // Make the path a directory to cause flush failure
+        std::fs::create_dir(&jsonl_path).unwrap();
+
+        // Flush should fail gracefully
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 0, "should flush 0 beads on failure");
+        assert!(!result.warnings.is_empty(), "should have warnings on failure");
+        assert!(
+            result.warnings[0].contains("failed"),
+            "warning should mention failure"
+        );
+
+        // Verify dirty marks are NOT cleared (persist for retry)
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM dirty_issues", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "dirty marks should persist after failed flush");
+    }
+
+    #[test]
+    fn incremental_flush_surgical_replacement() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create initial JSONL with 3 beads
+        let mut initial_issues = vec![
+            issue("bf-1", "First"),
+            issue("bf-2", "Second"),
+            issue("bf-3", "Third"),
+        ];
+        export_jsonl_merge(&jsonl_path, &initial_issues, &[]).unwrap();
+        let before = std::fs::read_to_string(&jsonl_path).unwrap();
+
+        // In the database, create the same 3 beads and mark bf-2 as dirty
+        for issue in &initial_issues {
+            conn.execute(
+                "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+                 VALUES (?1, ?2, 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+                [issue.id.clone(), issue.title.clone()],
+            )
+            .unwrap();
+        }
+
+        // Update bf-2 in database and mark it dirty
+        conn.execute(
+            "UPDATE issues SET title = 'Second Modified' WHERE id = 'bf-2'",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-2')",
+            [],
+        )
+        .unwrap();
+
+        // Flush - should only replace bf-2 line
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 1, "should flush 1 bead");
+        assert!(result.warnings.is_empty(), "should have no warnings");
+
+        let after = std::fs::read_to_string(&jsonl_path).unwrap();
+
+        // bf-1 and bf-3 lines should be preserved verbatim
+        assert!(
+            after.lines().any(|l| l.contains("bf-1") && l.contains("First")),
+            "bf-1 line should be preserved"
+        );
+        assert!(
+            after.lines().any(|l| l.contains("bf-3") && l.contains("Third")),
+            "bf-3 line should be preserved"
+        );
+
+        // bf-2 line should be updated
+        assert!(
+            after.lines().any(|l| l.contains("bf-2") && l.contains("Second Modified")),
+            "bf-2 line should be updated"
+        );
+        assert!(
+            !after.lines().any(|l| l.contains("bf-2") && l.contains("Second\n")),
+            "old bf-2 line should not exist"
+        );
+    }
+
+    #[test]
+    fn incremental_flush_multiple_dirty_beads() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create 5 beads, mark 3 as dirty
+        for i in 1..=5 {
+            let id = format!("bf-{}", i);
+            conn.execute(
+                "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+                 VALUES (?1, ?2, 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+                [id.clone(), format!("Bead {}", i)],
+            )
+            .unwrap();
+
+            // Mark beads 2, 3, 4 as dirty
+            if i >= 2 && i <= 4 {
+                conn.execute(
+                    "INSERT INTO dirty_issues (issue_id) VALUES (?1)",
+                    [id],
+                )
+                .unwrap();
+            }
+        }
+
+        // Flush - should flush 3 beads
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 3, "should flush 3 dirty beads");
+        assert!(result.warnings.is_empty(), "should have no warnings");
+
+        // Verify JSONL contains all 3 dirty beads
+        let contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        assert!(contents.contains("bf-2"), "should contain bf-2");
+        assert!(contents.contains("bf-3"), "should contain bf-3");
+        assert!(contents.contains("bf-4"), "should contain bf-4");
+        assert!(!contents.contains("bf-1"), "should not contain non-dirty bf-1");
+        assert!(!contents.contains("bf-5"), "should not contain non-dirty bf-5");
+    }
+
+    #[test]
+    fn incremental_flush_warning_on_clear_dirty_failure() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create a bead and mark it as dirty
+        conn.execute(
+            "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+             VALUES ('bf-warn', 'Test Warning', 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-warn')",
+            [],
+        )
+        .unwrap();
+
+        // Manually drop the dirty_issues table to cause DELETE to fail
+        conn.execute("DROP TABLE dirty_issues", []).unwrap();
+
+        // Flush should succeed export but warn about clear_dirty failure
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 1, "should flush 1 bead");
+        assert!(!result.warnings.is_empty(), "should have warnings");
+        assert!(
+            result.warnings[0].contains("clear dirty marks"),
+            "warning should mention clear_dirty failure"
+        );
+    }
+
+    #[test]
+    fn incremental_flush_with_labels() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create bead with labels
+        conn.execute(
+            "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+             VALUES ('bf-labels', 'Test Labels', 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO labels (issue_id, label) VALUES ('bf-labels', 'phase-1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO labels (issue_id, label) VALUES ('bf-labels', 'storage')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-labels')",
+            [],
+        )
+        .unwrap();
+
+        // Flush
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 1, "should flush 1 bead");
+        assert!(result.warnings.is_empty(), "should have no warnings");
+
+        // Verify labels are in JSONL
+        let contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        assert!(contents.contains("phase-1"), "should include phase-1 label");
+        assert!(contents.contains("storage"), "should include storage label");
+    }
+
+    #[test]
+    fn incremental_flush_to_existing_jsonl_preserves_orphans() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+        let jsonl_path = tmp.path().join("issues.jsonl");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Create initial JSONL with an orphan line
+        std::fs::write(
+            &jsonl_path,
+            "{\"id\":\"bf-old\",\"title\":\"Old bead\"}\nrandom orphan line\n",
+        )
+        .unwrap();
+
+        // Create a bead and mark it as dirty
+        conn.execute(
+            "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+             VALUES ('bf-new', 'New bead', 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-new')",
+            [],
+        )
+        .unwrap();
+
+        // Flush
+        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+
+        assert_eq!(result.flushed, 1, "should flush 1 bead");
+        assert!(result.warnings.is_empty(), "should have no warnings");
+
+        // Verify orphan line is preserved
+        let contents = std::fs::read_to_string(&jsonl_path).unwrap();
+        assert!(contents.contains("random orphan line"), "orphan line should be preserved");
+        assert!(contents.contains("bf-new"), "new bead should be present");
     }
 }
