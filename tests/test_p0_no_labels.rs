@@ -347,17 +347,15 @@ fn test_p0_update_preserves_priority_without_labels() {
     storage.create_issue(&p0_bead).unwrap();
 
     // Update the bead (should preserve P0 priority and no labels)
-    let updated = Issue {
-        id: "bf-nolabel-update".to_string(),
-        title: "Updated Title".to_string(),
-        issue_type: IssueType::Task,
-        status: Status::InProgress,
-        priority: Priority::CRITICAL,
-        labels: vec![], // Still no labels
+    let changes = IssueChanges {
+        title: Some("Updated Title".to_string()),
+        status: Some(Status::InProgress),
+        priority: Some(Priority::CRITICAL.0), // IssueChanges expects i32, not Priority
         assignee: Some("new-assignee".to_string()),
+        actor: Some("test".to_string()),
         ..Default::default()
     };
-    storage.update_issue(&updated).unwrap();
+    storage.update_issue("bf-nolabel-update", &changes).unwrap();
 
     // Verify priority is still P0 and still no labels
     let retrieved = storage.get_issue("bf-nolabel-update").unwrap().unwrap();
@@ -424,7 +422,7 @@ fn test_p0_list_without_labels() {
     }
 
     // List all issues
-    let all_issues = storage.list_issues().unwrap();
+    let all_issues = storage.list_issues(&bead_forge::model::IssueFilter::default()).unwrap();
 
     // Filter P0 bugs
     let p0_bugs: Vec<_> = all_issues
@@ -470,7 +468,7 @@ fn test_p0_all_issue_types_without_labels() {
     ];
 
     for (id, issue_type) in &issue_types {
-        let issue = create_p0_no_labels(id, &format!("P0 {:?}", issue_type), *issue_type);
+        let issue = create_p0_no_labels(id, &format!("P0 {:?}", issue_type), issue_type.clone());
         storage.create_issue(&issue).unwrap();
     }
 
