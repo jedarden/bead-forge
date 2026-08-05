@@ -394,6 +394,21 @@ impl Storage {
         Ok(())
     }
 
+    /// Query all bead IDs from the dirty_issues table.
+    ///
+    /// Returns a vector of bead IDs that have been marked as dirty and need flushing to JSONL.
+    /// Returns an empty vector if the table is empty.
+    pub fn query_dirty_issues(&self) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare_cached("SELECT bead_id FROM dirty_issues ORDER BY bead_id")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        let mut bead_ids = Vec::new();
+        for bead_id in rows {
+            bead_ids.push(bead_id?);
+        }
+        Ok(bead_ids)
+    }
+
     pub fn create_issue(&self, issue: &Issue) -> Result<()> {
         // Scan for secrets before creating
         if let Some(scanner) = &*self.secret_scanner.lock().unwrap() {
