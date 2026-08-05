@@ -1064,6 +1064,7 @@ impl ReadyCandidate {
             is_template: false,
             dependencies: Vec::new(),
             comments: Vec::new(),
+            events: Vec::new(),
             annotations: BTreeMap::new(),
         }
     }

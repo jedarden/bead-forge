@@ -309,6 +309,14 @@ pub enum Commands {
         fallback: Option<String>,
 
         /// Workspace paths to search (only used with --any)
+        ///
+        /// CLAP MULTI-VALUE PATTERN:
+        /// - `Vec<PathBuf>` collects multiple workspace path arguments
+        /// - Usage: `bf claim --any --workspace-paths /path1 /path2 /path3`
+        /// - clap v4 parses each subsequent argument as a PathBuf value
+        /// - Positional multi-value: all args after flag are collected until next flag
+        /// - Gotcha: values must be valid paths; clap validates PathBuf parsing
+        /// - Alternative: could use `num_args(1..)` for explicit "at least one" requirement
         #[arg(long)]
         workspace_paths: Vec<PathBuf>,
 
@@ -580,10 +588,25 @@ pub enum Commands {
         query: Option<String>,
 
         /// Filter by status
+        ///
+        /// CLAP MULTI-VALUE PATTERN:
+        /// - `Vec<String>` with short/long flags enables repetition: `-s open -s closed`
+        /// - clap v4 automatically collects repeated flag values into Vec
+        /// - Usage: `--status open --status closed` or `-s open -s closed`
+        /// - Values are OR-combined in the search logic (match any status)
+        /// - No `num_args` needed for repeated flags (clap's default for Vec)
+        /// - Gotcha: order matters if the handler is order-sensitive
         #[arg(short, long)]
         status: Vec<String>,
 
         /// Filter by type
+        ///
+        /// CLAP MULTI-VALUE PATTERN:
+        /// - Same pattern as status: repeated flags collect into Vec
+        /// - Usage: `--type task --type bug` or `-t task -t bug`
+        /// - clap's default Append action for Vec types handles collection
+        /// - Each occurrence appends to the vector: ["task", "bug"]
+        /// - No min/max count specified: zero occurrences yields empty Vec
         #[arg(short, long)]
         type_: Vec<String>,
 

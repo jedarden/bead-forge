@@ -111,6 +111,41 @@ pub fn format_exit_code_to_log(code: i32) -> String {
     format!("Exit code {}: {}", code, status)
 }
 
+/// Format an ExitCode for display with separator.
+///
+/// Converts an ExitCode enum variant into a formatted string with clear
+/// separator lines, suitable for appending to log file content.
+///
+/// # Arguments
+///
+/// * `code` - Optional ExitCode to format
+///
+/// # Returns
+///
+/// A formatted string with the exit code or signal information
+///
+/// # Examples
+///
+/// ```
+/// use bead_forge::exit_code::{ExitCode, format_exit_code};
+///
+/// let code = ExitCode::Code(0);
+/// assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 0 ===");
+///
+/// let signal = ExitCode::Signal("SIGTERM".to_string());
+/// assert_eq!(format_exit_code(Some(signal)), "=== Signal: SIGTERM ===");
+///
+/// assert_eq!(format_exit_code(None), "=== Exit Code: (none) ===");
+/// ```
+pub fn format_exit_code(code: Option<ExitCode>) -> String {
+    match code {
+        Some(ExitCode::Code(n)) => format!("=== Exit Code: {} ===", n),
+        Some(ExitCode::Signal(signal)) => format!("=== Signal: {} ===", signal),
+        Some(ExitCode::None) => "=== Exit Code: (none) ===".to_string(),
+        None => "=== Exit Code: (none) ===".to_string(),
+    }
+}
+
 /// Process termination information.
 ///
 /// Represents how a process terminated, either by exit code or signal.

@@ -1211,6 +1211,7 @@ impl Storage {
             labels,
             dependencies: Self::load_dependencies_conn(conn, &id)?,
             comments: Self::load_comments_conn(conn, &id)?,
+            events: Self::load_events_conn(conn, &id)?,
             annotations: Self::load_annotations_conn(conn, &id)?,
             id,
         })
@@ -1267,6 +1268,29 @@ impl Storage {
             });
         }
         Ok(comments)
+    }
+
+    fn load_events_conn(conn: &Connection, issue_id: &str) -> Result<Vec<Event>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, issue_id, event_type, actor, old_value, new_value, comment, created_at
+             FROM events WHERE issue_id = ?1",
+        )?;
+        let mut rows = stmt.query(params![issue_id])?;
+        let mut events = Vec::new();
+        while let Some(row) = rows.next()? {
+            let event_type_str: String = row.get(2)?;
+            events.push(Event {
+                id: row.get(0)?,
+                issue_id: row.get(1)?,
+                event_type: EventType::from_str(&event_type_str).unwrap_or(EventType::Custom(event_type_str)),
+                actor: row.get(3)?,
+                old_value: row.get(4)?,
+                new_value: row.get(5)?,
+                comment: row.get(6)?,
+                created_at: parse_required_datetime(row.get(7)?)?,
+            });
+        }
+        Ok(events)
     }
 
     fn load_annotations_conn(
