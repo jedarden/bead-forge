@@ -26,7 +26,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#
+"#,
     )?;
 
     let src_dir = workspace_dir.join("src");
@@ -48,7 +48,7 @@ mod tests {
         assert!(true);
     }
 }
-"#
+"#,
     )?;
 
     println!("✓ Created test workspace");
@@ -71,15 +71,16 @@ mod tests {
 
     // Run cargo test with trace capture
     println!("\n=== Running cargo test with trace capture ===");
-    let result = trace_manager.run_cargo_test_to_bead_trace(
-        workspace_dir,
-        "bf-verify-trace",
-        &metadata
-    )?;
+    let result =
+        trace_manager.run_cargo_test_to_bead_trace(workspace_dir, "bf-verify-trace", &metadata)?;
 
     println!("✓ Cargo test completed");
     println!("  Exit code: {}", result.exit_code);
-    println!("  Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+    println!(
+        "  Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
     println!("  Trace directory: {}", result.bead_trace_dir.display());
 
     // Verify stdout capture
@@ -132,7 +133,15 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&content)?;
 
         // Verify required fields
-        let required_fields = ["bead_id", "agent", "exit_code", "outcome", "start_time", "end_time", "duration_ms"];
+        let required_fields = [
+            "bead_id",
+            "agent",
+            "exit_code",
+            "outcome",
+            "start_time",
+            "end_time",
+            "duration_ms",
+        ];
         for field in &required_fields {
             if parsed.get(*field).is_some() {
                 println!("  ✓ Field '{}': present", field);
@@ -172,7 +181,10 @@ mod tests {
         println!("  ✓ Both stdout and stderr are captured");
         println!("  ✓ Execution time is recorded");
         println!("  ✓ Trace file format is complete and valid");
-        println!("\nTrace files available at: {}", result.bead_trace_dir.display());
+        println!(
+            "\nTrace files available at: {}",
+            result.bead_trace_dir.display()
+        );
         return Ok(());
     } else {
         println!("✗ Some acceptance criteria not met");

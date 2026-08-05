@@ -197,9 +197,7 @@ impl Storage {
         let needs_annotation_join = filter.annotation.is_some();
 
         if needs_annotation_join {
-            query.push_str(
-                " LEFT JOIN bead_annotations a ON i.id = a.bead_id",
-            );
+            query.push_str(" LEFT JOIN bead_annotations a ON i.id = a.bead_id");
         }
 
         query.push_str(" WHERE i.deleted_at IS NULL");
@@ -550,6 +548,20 @@ impl Storage {
                     updates.push("closed_at = NULL");
                     updates.push("close_reason = NULL");
                     updates.push("closed_by_session = NULL");
+                }
+                // Set closed fields when transitioning TO closed (satisfies CHECK constraint)
+                else if matches!(status, Status::Closed) {
+                    // Only set if not already closed (avoid overwriting existing close metadata)
+                    if !matches!(current_status, Some(Status::Closed)) {
+                        let now = Utc::now();
+                        updates.push("closed_at = ?");
+                        params.push(Box::new(now.to_rfc3339()));
+                        updates.push("close_reason = ?");
+                        params.push(Box::new(String::new())); // Empty reason when closed via update
+                        updates.push("closed_by_session = ?");
+                        let actor = changes.actor.as_deref().unwrap_or("cli");
+                        params.push(Box::new(actor.to_string()));
+                    }
                 }
             }
             if let Some(priority) = changes.priority {
@@ -960,9 +972,8 @@ impl Storage {
     /// a JSON array of blocker IDs.
     pub fn get_blocked_issues(&self) -> Result<Vec<(String, String)>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT issue_id, blocked_by FROM blocked_issues_cache ORDER BY issue_id"
-        )?;
+        let mut stmt = conn
+            .prepare("SELECT issue_id, blocked_by FROM blocked_issues_cache ORDER BY issue_id")?;
 
         let result = stmt
             .query_map([], |row| {
@@ -2003,7 +2014,10 @@ impl Storage {
             .unwrap_or_else(|| issue.content_hash());
 
         tx.execute("DELETE FROM labels WHERE issue_id = ?1", params![&issue.id])?;
-        tx.execute("DELETE FROM bead_labels WHERE bead_id = ?1", params![&issue.id])?;
+        tx.execute(
+            "DELETE FROM bead_labels WHERE bead_id = ?1",
+            params![&issue.id],
+        )?;
         tx.execute(
             "DELETE FROM dependencies WHERE issue_id = ?1",
             params![&issue.id],

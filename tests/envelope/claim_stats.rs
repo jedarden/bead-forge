@@ -13,8 +13,7 @@ use tempfile::TempDir;
 
 /// Resolve the freshly-built bf binary.
 fn bf_path() -> String {
-    std::env::var("CARGO_BIN_EXE_bf")
-        .unwrap_or_else(|_| "./target/debug/bf".to_string())
+    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
 }
 
 /// Create an isolated workspace via `bf init`.
@@ -36,7 +35,15 @@ fn init_workspace() -> TempDir {
 /// Create a task bead via the CLI, returning its printed id.
 fn create_bead(workspace: &std::path::Path, title: &str) -> String {
     let out = Command::new(bf_path())
-        .args(["create", "--title", title, "--type", "task", "--priority", "2"])
+        .args([
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ])
         .current_dir(workspace)
         .output()
         .expect("Failed to run bf create");
@@ -63,11 +70,18 @@ fn run_envelope_command(workspace: &std::path::Path, args: &[&str]) -> serde_jso
     let stderr = String::from_utf8(out.stderr).unwrap();
 
     if !out.status.success() {
-        panic!("Command failed: {:?}\nstdout: {}\nstderr: {}", full_args, stdout, stderr);
+        panic!(
+            "Command failed: {:?}\nstdout: {}\nstderr: {}",
+            full_args, stdout, stderr
+        );
     }
 
-    serde_json::from_str(&stdout)
-        .unwrap_or_else(|e| panic!("Invalid JSON output from {:?}: {}\nOutput: {}\nstderr: {}", full_args, e, stdout, stderr))
+    serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!(
+            "Invalid JSON output from {:?}: {}\nOutput: {}\nstderr: {}",
+            full_args, e, stdout, stderr
+        )
+    })
 }
 
 /// Verify envelope structure is stable and valid.
@@ -211,7 +225,10 @@ fn stats_envelope_data_fields() {
 
     // Verify data is an object with at least total field
     assert!(data.is_object(), "stats data must be an object");
-    assert!(data.as_object().unwrap().contains_key("total"), "stats data must contain 'total'");
+    assert!(
+        data.as_object().unwrap().contains_key("total"),
+        "stats data must contain 'total'"
+    );
 }
 
 /// Test: stats --json --envelope kind field matches command
@@ -257,7 +274,8 @@ fn claim_envelope_has_stable_structure() {
     let ws = init_workspace();
     create_bead(ws.path(), "claim test");
 
-    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "test-worker", "--json"]);
+    let envelope =
+        run_envelope_command(ws.path(), &["claim", "--assignee", "test-worker", "--json"]);
 
     // Verify envelope structure
     verify_envelope_structure(&envelope, "claim");
@@ -267,8 +285,14 @@ fn claim_envelope_has_stable_structure() {
     assert!(data.is_object(), "claim data must be an object");
 
     // Should have bead_id and assignee
-    assert!(data.get("bead_id").is_some(), "claim data must have 'bead_id'");
-    assert!(data.get("assignee").is_some(), "claim data must have 'assignee'");
+    assert!(
+        data.get("bead_id").is_some(),
+        "claim data must have 'bead_id'"
+    );
+    assert!(
+        data.get("assignee").is_some(),
+        "claim data must have 'assignee'"
+    );
 }
 
 /// Test: claim --json --envelope has correct metadata fields
@@ -278,12 +302,24 @@ fn claim_envelope_metadata_fields() {
     let ws = init_workspace();
     create_bead(ws.path(), "claim metadata test");
 
-    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "metadata-worker", "--json"]);
+    let envelope = run_envelope_command(
+        ws.path(),
+        &["claim", "--assignee", "metadata-worker", "--json"],
+    );
 
     // Verify all required metadata fields are present
-    assert!(envelope.get("version").is_some(), "claim envelope must have 'version' field");
-    assert!(envelope.get("kind").is_some(), "claim envelope must have 'kind' field");
-    assert!(envelope.get("data").is_some(), "claim envelope must have 'data' field");
+    assert!(
+        envelope.get("version").is_some(),
+        "claim envelope must have 'version' field"
+    );
+    assert!(
+        envelope.get("kind").is_some(),
+        "claim envelope must have 'kind' field"
+    );
+    assert!(
+        envelope.get("data").is_some(),
+        "claim envelope must have 'data' field"
+    );
 
     // Verify version value
     assert_eq!(
@@ -317,7 +353,10 @@ fn claim_envelope_successful_case() {
     let ws = init_workspace();
     let bead_id = create_bead(ws.path(), "claimable bead");
 
-    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "test-assignee", "--json"]);
+    let envelope = run_envelope_command(
+        ws.path(),
+        &["claim", "--assignee", "test-assignee", "--json"],
+    );
 
     // Verify envelope structure
     verify_envelope_structure(&envelope, "claim");
@@ -328,11 +367,19 @@ fn claim_envelope_successful_case() {
 
     // Check bead_id matches
     let claimed_bead_id = data.get("bead_id").and_then(|id| id.as_str());
-    assert_eq!(claimed_bead_id, Some(bead_id.as_str()), "claim bead_id must match created bead");
+    assert_eq!(
+        claimed_bead_id,
+        Some(bead_id.as_str()),
+        "claim bead_id must match created bead"
+    );
 
     // Check assignee matches
     let assignee = data.get("assignee").and_then(|a| a.as_str());
-    assert_eq!(assignee, Some("test-assignee"), "claim assignee must match input");
+    assert_eq!(
+        assignee,
+        Some("test-assignee"),
+        "claim assignee must match input"
+    );
 }
 
 /// Test: claim --json --envelope with empty workspace
@@ -341,7 +388,10 @@ fn claim_envelope_successful_case() {
 fn claim_envelope_empty_workspace() {
     let ws = init_workspace();
 
-    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "empty-worker", "--json"]);
+    let envelope = run_envelope_command(
+        ws.path(),
+        &["claim", "--assignee", "empty-worker", "--json"],
+    );
 
     // Verify envelope structure even when empty
     verify_envelope_structure(&envelope, "claim");
@@ -349,7 +399,10 @@ fn claim_envelope_empty_workspace() {
     // Verify data is an empty object
     let data = &envelope["data"];
     assert!(data.is_object(), "claim data must be an object");
-    assert!(data.as_object().unwrap().is_empty(), "claim data must be empty when no beads available");
+    assert!(
+        data.as_object().unwrap().is_empty(),
+        "claim data must be empty when no beads available"
+    );
 }
 
 /// Test: claim --json --envelope data contains expected fields
@@ -359,7 +412,10 @@ fn claim_envelope_data_fields() {
     let ws = init_workspace();
     create_bead(ws.path(), "claim fields test");
 
-    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "fields-worker", "--json"]);
+    let envelope = run_envelope_command(
+        ws.path(),
+        &["claim", "--assignee", "fields-worker", "--json"],
+    );
 
     let data = &envelope["data"];
 
@@ -377,8 +433,14 @@ fn claim_envelope_data_fields() {
     }
 
     // Verify data object contains expected fields
-    assert!(data.as_object().unwrap().contains_key("bead_id"), "claim data must contain 'bead_id'");
-    assert!(data.as_object().unwrap().contains_key("assignee"), "claim data must contain 'assignee'");
+    assert!(
+        data.as_object().unwrap().contains_key("bead_id"),
+        "claim data must contain 'bead_id'"
+    );
+    assert!(
+        data.as_object().unwrap().contains_key("assignee"),
+        "claim data must contain 'assignee'"
+    );
 }
 
 /// Test: claim --json --envelope kind field matches command
@@ -388,7 +450,8 @@ fn claim_envelope_kind_matches_command() {
     let ws = init_workspace();
     create_bead(ws.path(), "claim kind test");
 
-    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "kind-worker", "--json"]);
+    let envelope =
+        run_envelope_command(ws.path(), &["claim", "--assignee", "kind-worker", "--json"]);
 
     // Verify kind field is exactly 'claim'
     assert_eq!(
@@ -405,7 +468,10 @@ fn claim_envelope_version_always_one() {
     let ws = init_workspace();
     create_bead(ws.path(), "claim version test");
 
-    let envelope = run_envelope_command(ws.path(), &["claim", "--assignee", "version-worker", "--json"]);
+    let envelope = run_envelope_command(
+        ws.path(),
+        &["claim", "--assignee", "version-worker", "--json"],
+    );
 
     // Verify version is exactly 1
     assert_eq!(
@@ -423,12 +489,18 @@ fn claim_envelope_structure_consistency() {
 
     // First claim
     create_bead(ws.path(), "first bead");
-    let envelope1 = run_envelope_command(ws.path(), &["claim", "--assignee", "consistency-worker", "--json"]);
+    let envelope1 = run_envelope_command(
+        ws.path(),
+        &["claim", "--assignee", "consistency-worker", "--json"],
+    );
     verify_envelope_structure(&envelope1, "claim");
 
     // Second claim (should have same structure)
     create_bead(ws.path(), "second bead");
-    let envelope2 = run_envelope_command(ws.path(), &["claim", "--assignee", "consistency-worker", "--json"]);
+    let envelope2 = run_envelope_command(
+        ws.path(),
+        &["claim", "--assignee", "consistency-worker", "--json"],
+    );
     verify_envelope_structure(&envelope2, "claim");
 
     // Both envelopes have same structure

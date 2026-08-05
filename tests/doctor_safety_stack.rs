@@ -55,7 +55,10 @@ fn setup_rebuild_needed_with_unflushed() -> common::TempWorkspace {
     }
 
     // Bead present only in JSONL → forces a rebuild (missing_in_sqlite).
-    append_jsonl_line(&ws, &common::sample_bead_jsonl("bf-jsonl", "JSONL-only bead"));
+    append_jsonl_line(
+        &ws,
+        &common::sample_bead_jsonl("bf-jsonl", "JSONL-only bead"),
+    );
 
     ws
 }
@@ -94,7 +97,10 @@ fn induced_rebuild_preserves_unflushed_bead_with_labels_and_comments() {
     // Its label and comment survived.
     let storage = ws.storage().unwrap();
     assert!(
-        storage.get_labels("bf-dirty").unwrap().contains(&"preserve-me".to_string()),
+        storage
+            .get_labels("bf-dirty")
+            .unwrap()
+            .contains(&"preserve-me".to_string()),
         "label must survive rebuild"
     );
     let comments = storage.list_comments("bf-dirty").unwrap();
@@ -124,7 +130,10 @@ fn induced_rebuild_preserves_unflushed_bead_with_labels_and_comments() {
         .map(|f| f.name.as_str())
         .collect();
     assert!(names.iter().any(|n| n.ends_with(".db")), "db backed up");
-    assert!(names.iter().any(|n| n.ends_with(".jsonl")), "jsonl backed up");
+    assert!(
+        names.iter().any(|n| n.ends_with(".jsonl")),
+        "jsonl backed up"
+    );
 }
 
 /// Exit criterion #2: repair on a healthy workspace is a no-op — no rebuild, no
@@ -142,7 +151,10 @@ fn healthy_workspace_repair_is_a_noop() {
     assert!(report.healthy, "healthy workspace reported healthy");
     assert!(!report.rebuilt, "healthy workspace must NOT rebuild");
     assert_eq!(report.imported, 0);
-    assert!(report.backup_run_id.is_none(), "no backup run on healthy repair");
+    assert!(
+        report.backup_run_id.is_none(),
+        "no backup run on healthy repair"
+    );
 
     // No recovery runs were created at all.
     let beads_dir = ws.workspace_path().join(".beads");
@@ -165,7 +177,10 @@ fn unflushed_beads_alone_do_not_trigger_rebuild() {
     ws.create_bead("bf-unflushed", "Unflushed").unwrap();
 
     let report = doctor::repair_stack(ws.workspace_path(), &RepairOptions::default()).unwrap();
-    assert!(!report.rebuilt, "no rebuild when only unflushed beads exist");
+    assert!(
+        !report.rebuilt,
+        "no rebuild when only unflushed beads exist"
+    );
     assert!(report.healthy);
     // The bead is still there and still dirty.
     assert!(ws.get_bead("bf-unflushed").unwrap().is_some());
@@ -324,7 +339,11 @@ fn backup_restore_round_trips() {
         .into_iter()
         .find(|m| m.run_id == run_id)
         .unwrap();
-    let db_entry = manifest.files.iter().find(|f| f.name.ends_with(".db")).unwrap();
+    let db_entry = manifest
+        .files
+        .iter()
+        .find(|f| f.name.ends_with(".db"))
+        .unwrap();
 
     // Clobber the live DB to simulate a later problem, then restore.
     fs::write(&db_path, b"garbage-not-a-database").unwrap();

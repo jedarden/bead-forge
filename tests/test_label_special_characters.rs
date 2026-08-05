@@ -95,9 +95,19 @@ fn test_labels_with_colons() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), colon_labels.len(), "Expected {} colon labels, got {}", colon_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        colon_labels.len(),
+        "Expected {} colon labels, got {}",
+        colon_labels.len(),
+        labels.len()
+    );
     for label in &colon_labels {
-        assert!(labels.contains(&label.to_string()), "Missing colon label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing colon label '{}'",
+            label
+        );
     }
 
     // Clean up
@@ -149,9 +159,19 @@ fn test_labels_with_slashes() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), slash_labels.len(), "Expected {} slash labels, got {}", slash_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        slash_labels.len(),
+        "Expected {} slash labels, got {}",
+        slash_labels.len(),
+        labels.len()
+    );
     for label in &slash_labels {
-        assert!(labels.contains(&label.to_string()), "Missing slash label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing slash label '{}'",
+            label
+        );
     }
 
     // Clean up
@@ -204,9 +224,19 @@ fn test_labels_with_hyphens() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), hyphen_labels.len(), "Expected {} hyphen labels, got {}", hyphen_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        hyphen_labels.len(),
+        "Expected {} hyphen labels, got {}",
+        hyphen_labels.len(),
+        labels.len()
+    );
     for label in &hyphen_labels {
-        assert!(labels.contains(&label.to_string()), "Missing hyphen label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing hyphen label '{}'",
+            label
+        );
     }
 
     // Clean up
@@ -258,9 +288,19 @@ fn test_labels_with_underscores() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), underscore_labels.len(), "Expected {} underscore labels, got {}", underscore_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        underscore_labels.len(),
+        "Expected {} underscore labels, got {}",
+        underscore_labels.len(),
+        labels.len()
+    );
     for label in &underscore_labels {
-        assert!(labels.contains(&label.to_string()), "Missing underscore label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing underscore label '{}'",
+            label
+        );
     }
 
     // Clean up
@@ -316,9 +356,19 @@ fn test_mixed_special_character_labels() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), mixed_labels.len(), "Expected {} mixed labels, got {}", mixed_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        mixed_labels.len(),
+        "Expected {} mixed labels, got {}",
+        mixed_labels.len(),
+        labels.len()
+    );
     for label in &mixed_labels {
-        assert!(labels.contains(&label.to_string()), "Missing mixed special char label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing mixed special char label '{}'",
+            label
+        );
     }
 
     // Verify text format shows all labels
@@ -330,7 +380,11 @@ fn test_mixed_special_character_labels() {
 
     let text = String::from_utf8(text_output.stdout).expect("Invalid UTF-8");
     for label in &mixed_labels {
-        assert!(text.contains(label), "Missing label '{}' in text output", label);
+        assert!(
+            text.contains(label),
+            "Missing label '{}' in text output",
+            label
+        );
     }
 
     // Clean up
@@ -353,7 +407,7 @@ fn test_complex_label_patterns() {
         "feature/auth/oauth",        // Multiple slashes
         "priority:blocker-database", // Colon and hyphen
         "status:in_progress",        // Colon and underscore
-        "type:ui-component/layout", // Complex nesting pattern
+        "type:ui-component/layout",  // Complex nesting pattern
         "team:back-end/core",        // Mixed separators
     ];
 
@@ -388,9 +442,19 @@ fn test_complex_label_patterns() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), complex_labels.len(), "Expected {} complex labels, got {}", complex_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        complex_labels.len(),
+        "Expected {} complex labels, got {}",
+        complex_labels.len(),
+        labels.len()
+    );
     for label in &complex_labels {
-        assert!(labels.contains(&label.to_string()), "Missing complex label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing complex label '{}'",
+            label
+        );
     }
 
     // Clean up
@@ -408,12 +472,7 @@ fn test_special_character_label_persistence() {
     // Test that special character labels persist through sync
     let bead_id = create_test_bead("Special char persistence test bead");
 
-    let special_labels = vec![
-        "bug:critical",
-        "ui/component",
-        "back-end",
-        "test_case",
-    ];
+    let special_labels = vec!["bug:critical", "ui/component", "back-end", "test_case"];
 
     // Add labels
     for label in &special_labels {
@@ -451,9 +510,19 @@ fn test_special_character_label_persistence() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), special_labels.len(), "Expected {} labels after flush, got {}", special_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        special_labels.len(),
+        "Expected {} labels after flush, got {}",
+        special_labels.len(),
+        labels.len()
+    );
     for label in &special_labels {
-        assert!(labels.contains(&label.to_string()), "Missing special char label '{}' after flush", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing special char label '{}' after flush",
+            label
+        );
     }
 
     // Clean up
@@ -471,12 +540,7 @@ fn test_special_character_label_removal() {
     // Test removing labels with special characters
     let bead_id = create_test_bead("Special char removal test bead");
 
-    let labels = vec![
-        "bug:critical",
-        "ui/component",
-        "back-end",
-        "test_case",
-    ];
+    let labels = vec!["bug:critical", "ui/component", "back-end", "test_case"];
 
     // Add all labels
     for label in &labels {
@@ -511,13 +575,31 @@ fn test_special_character_label_removal() {
         .expect("Failed to list labels after removal");
 
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    let remaining_labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
+    let remaining_labels: Vec<String> =
+        serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(remaining_labels.len(), labels.len() - to_remove.len(), "Expected {} remaining labels", labels.len() - to_remove.len());
-    assert!(remaining_labels.contains(&"ui/component".to_string()), "Missing 'ui/component'");
-    assert!(remaining_labels.contains(&"test_case".to_string()), "Missing 'test_case'");
-    assert!(!remaining_labels.contains(&"bug:critical".to_string()), "'bug:critical' should be removed");
-    assert!(!remaining_labels.contains(&"back-end".to_string()), "'back-end' should be removed");
+    assert_eq!(
+        remaining_labels.len(),
+        labels.len() - to_remove.len(),
+        "Expected {} remaining labels",
+        labels.len() - to_remove.len()
+    );
+    assert!(
+        remaining_labels.contains(&"ui/component".to_string()),
+        "Missing 'ui/component'"
+    );
+    assert!(
+        remaining_labels.contains(&"test_case".to_string()),
+        "Missing 'test_case'"
+    );
+    assert!(
+        !remaining_labels.contains(&"bug:critical".to_string()),
+        "'bug:critical' should be removed"
+    );
+    assert!(
+        !remaining_labels.contains(&"back-end".to_string()),
+        "'back-end' should be removed"
+    );
 
     // Clean up
     bf().arg("close")
@@ -572,9 +654,19 @@ fn test_label_with_multiple_colons() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), multi_colon_labels.len(), "Expected {} multi-colon labels, got {}", multi_colon_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        multi_colon_labels.len(),
+        "Expected {} multi-colon labels, got {}",
+        multi_colon_labels.len(),
+        labels.len()
+    );
     for label in &multi_colon_labels {
-        assert!(labels.contains(&label.to_string()), "Missing multi-colon label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing multi-colon label '{}'",
+            label
+        );
     }
 
     // Clean up
@@ -630,9 +722,19 @@ fn test_label_with_multiple_slashes() {
     let json_output = String::from_utf8(output.stdout).expect("Invalid UTF-8");
     let labels: Vec<String> = serde_json::from_str(&json_output).expect("Failed to parse JSON");
 
-    assert_eq!(labels.len(), multi_slash_labels.len(), "Expected {} multi-slash labels, got {}", multi_slash_labels.len(), labels.len());
+    assert_eq!(
+        labels.len(),
+        multi_slash_labels.len(),
+        "Expected {} multi-slash labels, got {}",
+        multi_slash_labels.len(),
+        labels.len()
+    );
     for label in &multi_slash_labels {
-        assert!(labels.contains(&label.to_string()), "Missing multi-slash label '{}'", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Missing multi-slash label '{}'",
+            label
+        );
     }
 
     // Clean up

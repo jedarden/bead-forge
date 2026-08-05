@@ -81,16 +81,28 @@ fn setup_test_workspace() -> tempfile::TempDir {
     let storage = Storage::open(&db_path).unwrap();
 
     // Create a few test beads across different states for comprehensive testing
-    let mut open_bead = Issue::new("bf-open".to_string(), "Open task".to_string(), ".".to_string());
+    let mut open_bead = Issue::new(
+        "bf-open".to_string(),
+        "Open task".to_string(),
+        ".".to_string(),
+    );
     open_bead.priority = Priority(2);
     open_bead.status = Status::Open;
 
-    let mut in_progress_bead = Issue::new("bf-inprog".to_string(), "In progress".to_string(), ".".to_string());
+    let mut in_progress_bead = Issue::new(
+        "bf-inprog".to_string(),
+        "In progress".to_string(),
+        ".".to_string(),
+    );
     in_progress_bead.priority = Priority(1);
     in_progress_bead.status = Status::InProgress;
     in_progress_bead.assignee = Some("worker-1".to_string());
 
-    let mut closed_bead = Issue::new("bf-closed".to_string(), "Closed task".to_string(), ".".to_string());
+    let mut closed_bead = Issue::new(
+        "bf-closed".to_string(),
+        "Closed task".to_string(),
+        ".".to_string(),
+    );
     closed_bead.priority = Priority(0);
     closed_bead.status = Status::Closed;
     closed_bead.closed_at = Some(Utc::now());
@@ -100,17 +112,28 @@ fn setup_test_workspace() -> tempfile::TempDir {
     storage.create_issue(&closed_bead).unwrap();
 
     // Add some dependencies
-    storage.add_dependency("bf-inprog", "bf-open", &bead_forge::model::DependencyType::Blocks, "test").unwrap();
+    storage
+        .add_dependency(
+            "bf-inprog",
+            "bf-open",
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // Add a comment
-    storage.add_comment("bf-open", "test-user", "Test comment").unwrap();
+    storage
+        .add_comment("bf-open", "test-user", "Test comment")
+        .unwrap();
 
     // Add labels
     storage.add_label("bf-open", "test-label").unwrap();
     storage.add_label("bf-inprog", "priority").unwrap();
 
     // Add annotations
-    storage.set_annotation("bf-open", "test-key", "test-value").unwrap();
+    storage
+        .set_annotation("bf-open", "test-key", "test-value")
+        .unwrap();
 
     // Flush to JSONL so we have a known baseline
     let jsonl_path = beads_dir.join("issues.jsonl");
@@ -170,9 +193,7 @@ macro_rules! test_readonly_command_with_exit {
             let jsonl_path = workspace.join(".beads/issues.jsonl");
 
             let before = FileSnapshot::snapshot(&jsonl_path);
-            let _ = std::panic::catch_unwind(|| {
-                run_command(workspace, &$command_args)
-            });
+            let _ = std::panic::catch_unwind(|| run_command(workspace, &$command_args));
             before.assert_unchanged(&jsonl_path, $label);
         }
     };
@@ -205,9 +226,17 @@ macro_rules! test_readonly_variants {
 // This makes it easy to add new read-only commands - just add an entry to the list
 
 // Basic single-variant tests
-test_readonly_command!(test_critical_path, ["critical-path", "bf-inprog"], "bf critical-path");
+test_readonly_command!(
+    test_critical_path,
+    ["critical-path", "bf-inprog"],
+    "bf critical-path"
+);
 test_readonly_command!(test_doctor, ["doctor"], "bf doctor");
-test_readonly_command!(test_comments_list, ["comments", "list", "bf-open"], "bf comments list");
+test_readonly_command!(
+    test_comments_list,
+    ["comments", "list", "bf-open"],
+    "bf comments list"
+);
 test_readonly_command!(test_search, ["search", "Open"], "bf search");
 test_readonly_command!(test_count, ["count"], "bf count");
 test_readonly_command!(test_log, ["log"], "bf log");
@@ -215,8 +244,16 @@ test_readonly_command!(test_recent, ["recent"], "bf recent");
 test_readonly_command!(test_dep_list, ["dep", "list", "bf-inprog"], "bf dep list");
 test_readonly_command!(test_dep_tree, ["dep", "tree", "bf-inprog"], "bf dep tree");
 test_readonly_command!(test_label_list, ["label", "list"], "bf label list");
-test_readonly_command!(test_annotate_get, ["annotate", "get", "bf-open", "test-key"], "bf annotate get");
-test_readonly_command!(test_annotate_list, ["annotate", "list", "bf-open"], "bf annotate list");
+test_readonly_command!(
+    test_annotate_get,
+    ["annotate", "get", "bf-open", "test-key"],
+    "bf annotate get"
+);
+test_readonly_command!(
+    test_annotate_list,
+    ["annotate", "list", "bf-open"],
+    "bf annotate list"
+);
 test_readonly_command!(test_schema, ["schema", "all"], "bf schema all");
 // NOTE: test_sync_status disabled - bf sync does not have a --status option
 //test_readonly_command!(test_sync_status, ["sync", "--status"], "bf sync --status");
@@ -241,7 +278,10 @@ test_readonly_variants!(
     test_show_variants,
     [
         (["show", "bf-open"], "bf show"),
-        (["show", "bf-open", "--format", "json"], "bf show --format json")
+        (
+            ["show", "bf-open", "--format", "json"],
+            "bf show --format json"
+        )
     ]
 );
 
@@ -266,7 +306,10 @@ test_readonly_variants!(
     test_velocity_variants,
     [
         (["velocity"], "bf velocity"),
-        (["velocity", "--format", "json"], "bf velocity --format json")
+        (
+            ["velocity", "--format", "json"],
+            "bf velocity --format json"
+        )
     ]
 );
 
@@ -274,7 +317,10 @@ test_readonly_variants!(
     test_labels_variants,
     [
         (["labels", "bf-open"], "bf labels"),
-        (["labels", "bf-open", "--format", "json"], "bf labels --format json")
+        (
+            ["labels", "bf-open", "--format", "json"],
+            "bf labels --format json"
+        )
     ]
 );
 

@@ -146,10 +146,7 @@ mod tests {
         let bead_b = extract_bead_id(&stdout).expect("Could not extract bead B ID");
 
         // Add blocking dependency: A blocks B
-        let (_, _, success) = run_bf(
-            &beads_dir,
-            &["dep", "add", "--blocks", &bead_b, &bead_a],
-        );
+        let (_, _, success) = run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_a]);
         assert!(success, "dep add failed");
 
         // Verify B is blocked
@@ -157,12 +154,18 @@ mod tests {
         assert_eq!(status_b, "blocked", "B should be blocked while A is open");
 
         // Close A
-        let (_, _, success) = run_bf(&beads_dir, &["close", &bead_a, "--reason", "Phase 1 complete"]);
+        let (_, _, success) = run_bf(
+            &beads_dir,
+            &["close", &bead_a, "--reason", "Phase 1 complete"],
+        );
         assert!(success, "Close A failed");
 
         // CRITICAL: B should now be open (cascaded from blocked->open)
         let status_b = get_bead_status(&beads_dir, &bead_b);
-        assert_eq!(status_b, "open", "B should transition to open when A closes (bf-5id)");
+        assert_eq!(
+            status_b, "open",
+            "B should transition to open when A closes (bf-5id)"
+        );
 
         // Verify B is not in blocked_issues_cache
         assert!(
@@ -199,16 +202,17 @@ mod tests {
         let bead_c = extract_bead_id(&stdout).expect("Could not extract bead C ID");
 
         // B is blocked by both A and C
-        let (_, _, success) =
-            run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_a]);
+        let (_, _, success) = run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_a]);
         assert!(success, "dep add A failed");
-        let (_, _, success) =
-            run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_c]);
+        let (_, _, success) = run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_c]);
         assert!(success, "dep add C failed");
 
         // Verify B is blocked
         let status_b = get_bead_status(&beads_dir, &bead_b);
-        assert_eq!(status_b, "blocked", "B should be blocked while both A and C are open");
+        assert_eq!(
+            status_b, "blocked",
+            "B should be blocked while both A and C are open"
+        );
 
         // Close A
         let (_, _, success) = run_bf(&beads_dir, &["close", &bead_a, "--reason", "A complete"]);
@@ -259,21 +263,21 @@ mod tests {
         let bead_b = extract_bead_id(&stdout).expect("Could not extract bead B ID");
 
         // Set B to in_progress manually BEFORE adding dependencies
-        let (_, _, success) =
-            run_bf(&beads_dir, &["update", &bead_b, "--status", "in_progress"]);
+        let (_, _, success) = run_bf(&beads_dir, &["update", &bead_b, "--status", "in_progress"]);
         assert!(success, "Update B to in_progress failed");
 
         // Add blocking dependencies (A blocks B, C blocks B)
-        let (_, _, success) =
-            run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_a]);
+        let (_, _, success) = run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_a]);
         assert!(success, "dep add A failed");
-        let (_, _, success) =
-            run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_c]);
+        let (_, _, success) = run_bf(&beads_dir, &["dep", "add", "--blocks", &bead_b, &bead_c]);
         assert!(success, "dep add C failed");
 
         // After adding blockers, B should become 'blocked' (it now has active blockers)
         let status_b = get_bead_status(&beads_dir, &bead_b);
-        assert_eq!(status_b, "blocked", "B should be blocked after adding blockers");
+        assert_eq!(
+            status_b, "blocked",
+            "B should be blocked after adding blockers"
+        );
 
         // Close A (but C remains open)
         let (_, _, success) = run_bf(&beads_dir, &["close", &bead_a, "--reason", "A done"]);
@@ -295,7 +299,13 @@ mod tests {
         // Create genesis bead
         let (stdout, _, success) = run_bf(
             &beads_dir,
-            &["create", "--title", "Genesis: Project X", "--type", "genesis"],
+            &[
+                "create",
+                "--title",
+                "Genesis: Project X",
+                "--type",
+                "genesis",
+            ],
         );
         assert!(success, "Create genesis failed");
         let genesis = extract_bead_id(&stdout).expect("Could not extract genesis ID");
@@ -308,8 +318,7 @@ mod tests {
         assert!(success, "Create phase 1 failed");
         let phase1 = extract_bead_id(&stdout).expect("Could not extract phase1 ID");
 
-        let (_, _, success) =
-            run_bf(&beads_dir, &["dep", "add", "--blocks", &phase1, &genesis]);
+        let (_, _, success) = run_bf(&beads_dir, &["dep", "add", "--blocks", &phase1, &genesis]);
         assert!(success, "phase1 blocked by genesis failed");
 
         // Create Phase 2, blocked by phase 1
@@ -320,8 +329,7 @@ mod tests {
         assert!(success, "Create phase 2 failed");
         let phase2 = extract_bead_id(&stdout).expect("Could not extract phase2 ID");
 
-        let (_, _, success) =
-            run_bf(&beads_dir, &["dep", "add", "--blocks", &phase2, &phase1]);
+        let (_, _, success) = run_bf(&beads_dir, &["dep", "add", "--blocks", &phase2, &phase1]);
         assert!(success, "phase2 blocked by phase1 failed");
 
         // Verify all phases blocked
@@ -329,8 +337,10 @@ mod tests {
         assert_eq!(get_bead_status(&beads_dir, &phase2), "blocked");
 
         // Close genesis → phase1 should open, phase2 still blocked
-        let (_, _, success) =
-            run_bf(&beads_dir, &["close", &genesis, "--reason", "Genesis complete"]);
+        let (_, _, success) = run_bf(
+            &beads_dir,
+            &["close", &genesis, "--reason", "Genesis complete"],
+        );
         assert!(success, "Close genesis failed");
 
         assert_eq!(
@@ -345,8 +355,10 @@ mod tests {
         );
 
         // Close phase1 → phase2 should open
-        let (_, _, success) =
-            run_bf(&beads_dir, &["close", &phase1, "--reason", "Phase 1 complete"]);
+        let (_, _, success) = run_bf(
+            &beads_dir,
+            &["close", &phase1, "--reason", "Phase 1 complete"],
+        );
         assert!(success, "Close phase1 failed");
 
         assert_eq!(

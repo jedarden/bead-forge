@@ -11,10 +11,10 @@
 //! - Labels survive export/import cycle
 //! - Labels survive after full sync operations
 
-use bead_forge::sync;
-use bead_forge::model::{Issue, IssueChanges, Priority, Status, IssueType};
-use bead_forge::storage::Storage;
 use bead_forge::config::init_workspace;
+use bead_forge::model::{Issue, IssueChanges, IssueType, Priority, Status};
+use bead_forge::storage::Storage;
+use bead_forge::sync;
 use chrono::Utc;
 use std::fs;
 use tempfile::TempDir;
@@ -84,34 +84,54 @@ fn test_labels_persist_through_flush_only() {
     for line in jsonl_contents.lines() {
         if let Ok(parsed) = serde_json::from_str::<Issue>(line) {
             if parsed.id == "bf-flush-labels" {
-                assert_eq!(parsed.labels.len(), 3, "Issue should have 3 labels in JSONL");
+                assert_eq!(
+                    parsed.labels.len(),
+                    3,
+                    "Issue should have 3 labels in JSONL"
+                );
                 assert!(parsed.labels.contains(&"phase-1".to_string()));
                 assert!(parsed.labels.contains(&"storage".to_string()));
                 assert!(parsed.labels.contains(&"critical".to_string()));
                 found_with_labels = true;
             } else if parsed.id == "bf-flush-nolabels" {
-                assert_eq!(parsed.labels.len(), 0, "Issue should have no labels in JSONL");
+                assert_eq!(
+                    parsed.labels.len(),
+                    0,
+                    "Issue should have no labels in JSONL"
+                );
                 found_without_labels = true;
             }
         }
     }
 
     assert!(found_with_labels, "Issue with labels should be in JSONL");
-    assert!(found_without_labels, "Issue without labels should be in JSONL");
+    assert!(
+        found_without_labels,
+        "Issue without labels should be in JSONL"
+    );
 
     // Verify labels in the database bead_labels table
-    storage.with_immediate_transaction(|tx| {
-        let mut stmt = tx.prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label").unwrap();
-        let labels: Vec<String> = stmt.query_map(
-            rusqlite::params!["bf-flush-labels"],
-            |row| row.get::<_, String>(0)
-        ).unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    storage
+        .with_immediate_transaction(|tx| {
+            let mut stmt = tx
+                .prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label")
+                .unwrap();
+            let labels: Vec<String> = stmt
+                .query_map(rusqlite::params!["bf-flush-labels"], |row| {
+                    row.get::<_, String>(0)
+                })
+                .unwrap()
+                .filter_map(|r| r.ok())
+                .collect();
 
-        assert_eq!(labels, vec!["critical", "phase-1", "storage"], "Labels should be in bead_labels table");
-        Ok(())
-    }).unwrap();
+            assert_eq!(
+                labels,
+                vec!["critical", "phase-1", "storage"],
+                "Labels should be in bead_labels table"
+            );
+            Ok(())
+        })
+        .unwrap();
 }
 
 /// Test that labels survive export/import cycle
@@ -202,13 +222,19 @@ fn test_labels_survive_export_import_cycle() {
 
     // Step 3: Import - restore from JSONL
     let result = sync::import(workspace).unwrap();
-    assert_eq!(result.imported, test_cases.len(), "All issues should be imported");
+    assert_eq!(
+        result.imported,
+        test_cases.len(),
+        "All issues should be imported"
+    );
 
     // Step 4: Verify all labels survived the cycle
     let storage2 = Storage::open(&db_path).unwrap();
 
     for original in &test_cases {
-        let imported = storage2.get_issue(&original.id).unwrap()
+        let imported = storage2
+            .get_issue(&original.id)
+            .unwrap()
             .expect(&format!("Issue {} should be imported", original.id));
 
         assert_eq!(
@@ -235,50 +261,54 @@ fn test_labels_survive_export_import_cycle() {
         let mut original_sorted = original.labels.clone();
         original_sorted.sort();
         assert_eq!(
-            imported_sorted,
-            original_sorted,
+            imported_sorted, original_sorted,
             "Issue {} labels should match exactly after cycle",
             original.id
         );
     }
 
     // Verify bead_labels table is correct
-    storage2.with_immediate_transaction(|tx| {
-        // Check total label count
-        let mut stmt = tx.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
-        let total_labels: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+    storage2
+        .with_immediate_transaction(|tx| {
+            // Check total label count
+            let mut stmt = tx.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
+            let total_labels: i64 = stmt
+                .query([])
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap()
+                .get(0)
+                .unwrap();
 
-        let expected_total: usize = test_cases.iter()
-            .map(|issue| issue.labels.len())
-            .sum();
-
-        assert_eq!(
-            total_labels as usize,
-            expected_total,
-            "Total label count in database should match"
-        );
-
-        // Check each issue's label count
-        for issue in &test_cases {
-            let mut stmt = tx.prepare(
-                "SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1"
-            ).unwrap();
-            let count: i64 = stmt.query_row(
-                rusqlite::params![&issue.id],
-                |row| row.get(0)
-            ).unwrap();
+            let expected_total: usize = test_cases.iter().map(|issue| issue.labels.len()).sum();
 
             assert_eq!(
-                count as usize,
-                issue.labels.len(),
-                "Issue {} should have {} labels in bead_labels table",
-                issue.id,
-                issue.labels.len()
+                total_labels as usize, expected_total,
+                "Total label count in database should match"
             );
-        }
 
-        Ok(())
-    }).unwrap();
+            // Check each issue's label count
+            for issue in &test_cases {
+                let mut stmt = tx
+                    .prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1")
+                    .unwrap();
+                let count: i64 = stmt
+                    .query_row(rusqlite::params![&issue.id], |row| row.get(0))
+                    .unwrap();
+
+                assert_eq!(
+                    count as usize,
+                    issue.labels.len(),
+                    "Issue {} should have {} labels in bead_labels table",
+                    issue.id,
+                    issue.labels.len()
+                );
+            }
+
+            Ok(())
+        })
+        .unwrap();
 }
 
 /// Test label survival after full sync operations
@@ -362,7 +392,9 @@ fn test_labels_survive_full_sync_operations() {
     let storage2 = Storage::open(&db_path).unwrap();
 
     for expected in &issues {
-        let imported = storage2.get_issue(&expected.id).unwrap()
+        let imported = storage2
+            .get_issue(&expected.id)
+            .unwrap()
             .expect(&format!("Issue {} should be imported", expected.id));
 
         assert_eq!(
@@ -433,9 +465,7 @@ fn test_labels_persist_through_incremental_flush() {
 
     // Verify JSONL contains updated labels
     let jsonl_contents = fs::read_to_string(&jsonl_path).unwrap();
-    let parsed: Issue = serde_json::from_str(
-        jsonl_contents.lines().next().unwrap()
-    ).unwrap();
+    let parsed: Issue = serde_json::from_str(jsonl_contents.lines().next().unwrap()).unwrap();
 
     assert_eq!(parsed.labels.len(), 3);
     assert!(parsed.labels.contains(&"initial".to_string()));
@@ -490,10 +520,7 @@ fn test_labels_persist_across_multiple_sync_cycles() {
 
     // Update labels
     let changes = IssueChanges {
-        labels: Some(vec![
-            "cycle-1".to_string(),
-            "cycle-2".to_string(),
-        ]),
+        labels: Some(vec!["cycle-1".to_string(), "cycle-2".to_string()]),
         ..Default::default()
     };
     storage.update_issue("bf-multi-cycle", &changes).unwrap();
@@ -652,7 +679,11 @@ fn test_labels_persist_empty_label_edge_case() {
     // Verify labels are empty
     let storage2 = Storage::open(&db_path).unwrap();
     let final_issue = storage2.get_issue("bf-empty-edge").unwrap().unwrap();
-    assert_eq!(final_issue.labels.len(), 0, "Labels should be empty after clearing");
+    assert_eq!(
+        final_issue.labels.len(),
+        0,
+        "Labels should be empty after clearing"
+    );
 }
 
 /// Test that labels persist after add/remove operations through sync
@@ -698,14 +729,21 @@ fn test_labels_persist_after_add_remove_operations() {
     // Verify JSONL contains the updated labels
     let jsonl_path = beads_dir.join("issues.jsonl");
     let jsonl_contents = fs::read_to_string(&jsonl_path).unwrap();
-    let parsed: Issue = serde_json::from_str(
-        jsonl_contents.lines().next().unwrap()
-    ).unwrap();
+    let parsed: Issue = serde_json::from_str(jsonl_contents.lines().next().unwrap()).unwrap();
 
     assert_eq!(parsed.labels.len(), 2);
-    assert!(parsed.labels.contains(&"keep-me".to_string()), "Kept label should be present");
-    assert!(parsed.labels.contains(&"added-label".to_string()), "Added label should be present");
-    assert!(!parsed.labels.contains(&"initial".to_string()), "Removed label should not be present");
+    assert!(
+        parsed.labels.contains(&"keep-me".to_string()),
+        "Kept label should be present"
+    );
+    assert!(
+        parsed.labels.contains(&"added-label".to_string()),
+        "Added label should be present"
+    );
+    assert!(
+        !parsed.labels.contains(&"initial".to_string()),
+        "Removed label should not be present"
+    );
 
     // Clear database and restore from JSONL
     drop(storage);
@@ -716,10 +754,23 @@ fn test_labels_persist_after_add_remove_operations() {
     let storage2 = Storage::open(&db_path).unwrap();
     let final_issue = storage2.get_issue("bf-addremove-1").unwrap().unwrap();
 
-    assert_eq!(final_issue.labels.len(), 2, "Should have 2 labels after roundtrip");
-    assert!(final_issue.labels.contains(&"keep-me".to_string()), "Kept label should persist");
-    assert!(final_issue.labels.contains(&"added-label".to_string()), "Added label should persist");
-    assert!(!final_issue.labels.contains(&"initial".to_string()), "Removed label should not persist");
+    assert_eq!(
+        final_issue.labels.len(),
+        2,
+        "Should have 2 labels after roundtrip"
+    );
+    assert!(
+        final_issue.labels.contains(&"keep-me".to_string()),
+        "Kept label should persist"
+    );
+    assert!(
+        final_issue.labels.contains(&"added-label".to_string()),
+        "Added label should persist"
+    );
+    assert!(
+        !final_issue.labels.contains(&"initial".to_string()),
+        "Removed label should not persist"
+    );
 }
 
 /// Test atomic transaction handling for labels
@@ -756,15 +807,26 @@ fn test_label_atomic_transaction_handling() {
 
     // Verify all labels are in the database
     let current_labels = storage.get_labels("bf-atomic-labels").unwrap();
-    assert_eq!(current_labels.len(), 3, "All labels should be present after atomic adds");
+    assert_eq!(
+        current_labels.len(),
+        3,
+        "All labels should be present after atomic adds"
+    );
 
     // Perform remove_label - should be atomic
     storage.remove_label("bf-atomic-labels", "label-2").unwrap();
 
     // Verify remove was atomic
     let after_remove = storage.get_labels("bf-atomic-labels").unwrap();
-    assert_eq!(after_remove.len(), 2, "One label should be removed atomically");
-    assert!(!after_remove.contains(&"label-2".to_string()), "Removed label should not be present");
+    assert_eq!(
+        after_remove.len(),
+        2,
+        "One label should be removed atomically"
+    );
+    assert!(
+        !after_remove.contains(&"label-2".to_string()),
+        "Removed label should not be present"
+    );
 
     // Flush to JSONL
     sync::flush(workspace).unwrap();
@@ -772,11 +834,13 @@ fn test_label_atomic_transaction_handling() {
     // Verify atomic operations persisted to JSONL
     let jsonl_path = beads_dir.join("issues.jsonl");
     let jsonl_contents = fs::read_to_string(&jsonl_path).unwrap();
-    let parsed: Issue = serde_json::from_str(
-        jsonl_contents.lines().next().unwrap()
-    ).unwrap();
+    let parsed: Issue = serde_json::from_str(jsonl_contents.lines().next().unwrap()).unwrap();
 
-    assert_eq!(parsed.labels.len(), 2, "JSONL should reflect atomic operations");
+    assert_eq!(
+        parsed.labels.len(),
+        2,
+        "JSONL should reflect atomic operations"
+    );
     assert!(parsed.labels.contains(&"label-1".to_string()));
     assert!(parsed.labels.contains(&"label-3".to_string()));
     assert!(!parsed.labels.contains(&"label-2".to_string()));
@@ -790,33 +854,44 @@ fn test_label_atomic_transaction_handling() {
     let storage2 = Storage::open(&db_path).unwrap();
     let final_issue = storage2.get_issue("bf-atomic-labels").unwrap().unwrap();
 
-    assert_eq!(final_issue.labels.len(), 2, "Atomic operations should survive sync cycle");
+    assert_eq!(
+        final_issue.labels.len(),
+        2,
+        "Atomic operations should survive sync cycle"
+    );
     assert!(final_issue.labels.contains(&"label-1".to_string()));
     assert!(final_issue.labels.contains(&"label-3".to_string()));
     assert!(!final_issue.labels.contains(&"label-2".to_string()));
 
     // Verify database consistency - all labels should be in both tables atomically
-    storage2.with_immediate_transaction(|tx| {
-        // Check bead_labels table
-        let mut stmt = tx.prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1").unwrap();
-        let bead_count: i64 = stmt.query_row(
-            rusqlite::params!["bf-atomic-labels"],
-            |row| row.get(0)
-        ).unwrap();
+    storage2
+        .with_immediate_transaction(|tx| {
+            // Check bead_labels table
+            let mut stmt = tx
+                .prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1")
+                .unwrap();
+            let bead_count: i64 = stmt
+                .query_row(rusqlite::params!["bf-atomic-labels"], |row| row.get(0))
+                .unwrap();
 
-        // Check labels table
-        let mut stmt = tx.prepare("SELECT COUNT(*) FROM labels WHERE issue_id = ?1").unwrap();
-        let label_count: i64 = stmt.query_row(
-            rusqlite::params!["bf-atomic-labels"],
-            |row| row.get(0)
-        ).unwrap();
+            // Check labels table
+            let mut stmt = tx
+                .prepare("SELECT COUNT(*) FROM labels WHERE issue_id = ?1")
+                .unwrap();
+            let label_count: i64 = stmt
+                .query_row(rusqlite::params!["bf-atomic-labels"], |row| row.get(0))
+                .unwrap();
 
-        assert_eq!(bead_count, 2, "bead_labels should have 2 labels");
-        assert_eq!(label_count, 2, "labels table should have 2 labels");
-        assert_eq!(bead_count, label_count, "Both label tables should be in sync");
+            assert_eq!(bead_count, 2, "bead_labels should have 2 labels");
+            assert_eq!(label_count, 2, "labels table should have 2 labels");
+            assert_eq!(
+                bead_count, label_count,
+                "Both label tables should be in sync"
+            );
 
-        Ok(())
-    }).unwrap();
+            Ok(())
+        })
+        .unwrap();
 }
 
 /// Test that multiple label operations in sequence persist correctly
@@ -879,11 +954,21 @@ fn test_labels_persist_through_multiple_add_remove_sequences() {
     let final_issue = storage2.get_issue("bf-sequence-labels").unwrap().unwrap();
 
     // Should have: a, c, d, e (b and start were removed)
-    assert_eq!(final_issue.labels.len(), 4, "Should have 4 labels after all sequences");
+    assert_eq!(
+        final_issue.labels.len(),
+        4,
+        "Should have 4 labels after all sequences"
+    );
     assert!(final_issue.labels.contains(&"a".to_string()));
     assert!(final_issue.labels.contains(&"c".to_string()));
     assert!(final_issue.labels.contains(&"d".to_string()));
     assert!(final_issue.labels.contains(&"e".to_string()));
-    assert!(!final_issue.labels.contains(&"b".to_string()), "Removed label should not persist");
-    assert!(!final_issue.labels.contains(&"start".to_string()), "Removed label should not persist");
+    assert!(
+        !final_issue.labels.contains(&"b".to_string()),
+        "Removed label should not persist"
+    );
+    assert!(
+        !final_issue.labels.contains(&"start".to_string()),
+        "Removed label should not persist"
+    );
 }

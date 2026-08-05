@@ -206,12 +206,23 @@ fn test_close_cascades_chain_of_dependencies() {
     storage.create_issue(&phase3).unwrap();
 
     // Verify initial state
-    assert_eq!(storage.get_issue("bf-phase1").unwrap().unwrap().status, Status::Open);
-    assert_eq!(storage.get_issue("bf-phase2").unwrap().unwrap().status, Status::Blocked);
-    assert_eq!(storage.get_issue("bf-phase3").unwrap().unwrap().status, Status::Blocked);
+    assert_eq!(
+        storage.get_issue("bf-phase1").unwrap().unwrap().status,
+        Status::Open
+    );
+    assert_eq!(
+        storage.get_issue("bf-phase2").unwrap().unwrap().status,
+        Status::Blocked
+    );
+    assert_eq!(
+        storage.get_issue("bf-phase3").unwrap().unwrap().status,
+        Status::Blocked
+    );
 
     // Close Phase1
-    storage.close_issue("bf-phase1", "Phase 1 complete", "test-user").unwrap();
+    storage
+        .close_issue("bf-phase1", "Phase 1 complete", "test-user")
+        .unwrap();
 
     // Phase2 should transition to 'open'
     assert_eq!(
@@ -228,7 +239,9 @@ fn test_close_cascades_chain_of_dependencies() {
     );
 
     // Close Phase2
-    storage.close_issue("bf-phase2", "Phase 2 complete", "test-user").unwrap();
+    storage
+        .close_issue("bf-phase2", "Phase 2 complete", "test-user")
+        .unwrap();
 
     // Phase3 should now transition to 'open'
     assert_eq!(

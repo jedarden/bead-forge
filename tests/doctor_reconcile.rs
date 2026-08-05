@@ -123,11 +123,19 @@ fn reconcile_reports_but_does_not_touch_blocked_beads_with_no_dependencies() {
 #[test]
 fn reconcile_normalizes_empty_string_assignees_to_null() {
     let ws = common::TempWorkspace::new().unwrap();
-    let mut legacy = Issue::new("bf-legacy".to_string(), "Legacy".to_string(), ".".to_string());
+    let mut legacy = Issue::new(
+        "bf-legacy".to_string(),
+        "Legacy".to_string(),
+        ".".to_string(),
+    );
     legacy.assignee = Some(String::new());
     ws.create_issue(&legacy).unwrap();
 
-    let mut claimed = Issue::new("bf-claimed".to_string(), "Claimed".to_string(), ".".to_string());
+    let mut claimed = Issue::new(
+        "bf-claimed".to_string(),
+        "Claimed".to_string(),
+        ".".to_string(),
+    );
     claimed.assignee = Some("worker-1".to_string());
     ws.create_issue(&claimed).unwrap();
 
@@ -160,13 +168,22 @@ fn reconciled_rows_are_marked_dirty_for_the_next_flush() {
     seed(&ws, "bf-blocker", Status::Closed);
     seed(&ws, "bf-stuck", Status::Blocked);
     block(&ws, "bf-stuck", "bf-blocker");
-    let mut legacy = Issue::new("bf-legacy".to_string(), "Legacy".to_string(), ".".to_string());
+    let mut legacy = Issue::new(
+        "bf-legacy".to_string(),
+        "Legacy".to_string(),
+        ".".to_string(),
+    );
     legacy.assignee = Some(String::new());
     ws.create_issue(&legacy).unwrap();
 
     // Flush everything first so the only dirty rows afterwards are reconcile's own.
     ws.export_jsonl(false).unwrap();
-    assert!(ws.storage().unwrap().list_dirty_issues().unwrap().is_empty());
+    assert!(ws
+        .storage()
+        .unwrap()
+        .list_dirty_issues()
+        .unwrap()
+        .is_empty());
 
     doctor::reconcile(ws.workspace_path()).unwrap();
 
@@ -189,7 +206,11 @@ fn reconcile_is_idempotent() {
     seed(&ws, "bf-blocker", Status::Closed);
     seed(&ws, "bf-stuck", Status::Blocked);
     block(&ws, "bf-stuck", "bf-blocker");
-    let mut legacy = Issue::new("bf-legacy".to_string(), "Legacy".to_string(), ".".to_string());
+    let mut legacy = Issue::new(
+        "bf-legacy".to_string(),
+        "Legacy".to_string(),
+        ".".to_string(),
+    );
     legacy.assignee = Some(String::new());
     ws.create_issue(&legacy).unwrap();
 

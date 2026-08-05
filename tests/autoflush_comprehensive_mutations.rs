@@ -89,9 +89,7 @@ fn field(bead: &Value, key: &str) -> String {
 
 /// Get an integer field from a bead JSON value.
 fn field_int(bead: &Value, key: &str) -> i64 {
-    bead.get(key)
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0)
+    bead.get(key).and_then(|v| v.as_i64()).unwrap_or(0)
 }
 
 use serde_json::Value;
@@ -113,16 +111,26 @@ fn create_autoflush_creates_issues_jsonl_entry() {
 #[test]
 fn create_autoflush_with_all_fields() {
     let (_t, ws) = setup();
-    let (out, err, ok) = run_bf(&ws, &[
-        "create",
-        "--title", "Full bead",
-        "--type", "bug",
-        "--priority", "1",
-        "--assignee", "tester",
-        "--label", "urgent",
-        "--label", "bug",
-        "--description", "Test description"
-    ]);
+    let (out, err, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "Full bead",
+            "--type",
+            "bug",
+            "--priority",
+            "1",
+            "--assignee",
+            "tester",
+            "--label",
+            "urgent",
+            "--label",
+            "bug",
+            "--description",
+            "Test description",
+        ],
+    );
     assert!(ok, "create failed: {err}");
     let id = out.trim().to_string();
 
@@ -133,7 +141,8 @@ fn create_autoflush_with_all_fields() {
     assert_eq!(field(&bead, "assignee"), "tester");
 
     // Check labels
-    let labels = bead.get("labels")
+    let labels = bead
+        .get("labels")
         .and_then(|v| v.as_array())
         .expect("labels must be present");
     assert_eq!(labels.len(), 2);
@@ -149,8 +158,10 @@ fn create_no_autoflush_leaves_jsonl_empty() {
     let id = out.trim().to_string();
 
     // With --no-auto-flush, issues.jsonl should not exist or be empty
-    assert!(!jsonl_path(&ws).exists() || read_beads(&ws).is_empty(),
-            "--no-auto-flush should not create issues.jsonl");
+    assert!(
+        !jsonl_path(&ws).exists() || read_beads(&ws).is_empty(),
+        "--no-auto-flush should not create issues.jsonl"
+    );
 
     // Bead exists in database (can verify by running a manual flush)
     let (_o, e, ok) = run_bf(&ws, &["sync", "--flush-only"]);
@@ -174,8 +185,10 @@ fn create_config_auto_flush_disabled() {
     assert!(ok, "create failed: {e}");
 
     // With config disabled, issues.jsonl should not exist
-    assert!(!jsonl_path(&ws).exists(),
-            "sync.auto_flush: false should not create issues.jsonl");
+    assert!(
+        !jsonl_path(&ws).exists(),
+        "sync.auto_flush: false should not create issues.jsonl"
+    );
 }
 
 // ==================== UPDATE OPERATIONS ====================
@@ -189,7 +202,11 @@ fn update_autoflush_modifies_existing_entry() {
     assert!(ok, "update failed: {e}");
 
     let bead = find_bead(&ws, &id).expect("updated bead must be in issues.jsonl");
-    assert_eq!(field(&bead, "title"), "Updated title", "title should be updated in JSONL");
+    assert_eq!(
+        field(&bead, "title"),
+        "Updated title",
+        "title should be updated in JSONL"
+    );
 }
 
 #[test]
@@ -223,12 +240,17 @@ fn update_no_autoflush_doesnt_modify_jsonl() {
 
     let before_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
 
-    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "update", &id, "--title", "After update"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &["--no-auto-flush", "update", &id, "--title", "After update"],
+    );
     assert!(ok, "update failed: {e}");
 
     let after_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
-    assert_eq!(before_json, after_json,
-               "JSONL should not change with --no-auto-flush update");
+    assert_eq!(
+        before_json, after_json,
+        "JSONL should not change with --no-auto-flush update"
+    );
 
     let bead = find_bead(&ws, &id).expect("bead should still have old title in JSONL");
     assert_eq!(field(&bead, "title"), "Before update");
@@ -248,8 +270,16 @@ fn claim_autoflush_updates_assignee_and_status() {
     assert!(out.contains(&id), "claim output should contain bead ID");
 
     let bead = find_bead(&ws, &id).expect("claimed bead must be in issues.jsonl");
-    assert_eq!(field(&bead, "assignee"), "worker-1", "assignee should be updated");
-    assert_eq!(field(&bead, "status"), "in_progress", "status should change to in_progress");
+    assert_eq!(
+        field(&bead, "assignee"),
+        "worker-1",
+        "assignee should be updated"
+    );
+    assert_eq!(
+        field(&bead, "status"),
+        "in_progress",
+        "status should change to in_progress"
+    );
 }
 
 #[test]
@@ -260,8 +290,12 @@ fn claim_autoflush_with_json_output() {
     let (out, err, ok) = run_bf(&ws, &["claim", "--assignee", "worker-2", "--json"]);
     assert!(ok, "claim failed: {err}");
 
-    let parsed: Value = serde_json::from_str(out.trim()).expect("claim --json should be valid JSON");
-    assert_eq!(parsed.get("bead_id").and_then(|v| v.as_str()), Some(id.as_str()));
+    let parsed: Value =
+        serde_json::from_str(out.trim()).expect("claim --json should be valid JSON");
+    assert_eq!(
+        parsed.get("bead_id").and_then(|v| v.as_str()),
+        Some(id.as_str())
+    );
 
     let bead = find_bead(&ws, &id).expect("claimed bead must be flushed");
     assert_eq!(field(&bead, "assignee"), "worker-2");
@@ -282,8 +316,16 @@ fn claim_no_autoflush_doesnt_modify_jsonl() {
     assert_eq!(before_json, after_json, "JSONL should not change");
 
     let bead = find_bead(&ws, &id).expect("bead should still be in JSONL");
-    assert_eq!(field(&bead, "status"), "open", "status should not change in JSONL");
-    assert!(field(&bead, "assignee").is_empty() || field(&bead, "assignee") == "null" || field(&bead, "assignee") == "");
+    assert_eq!(
+        field(&bead, "status"),
+        "open",
+        "status should not change in JSONL"
+    );
+    assert!(
+        field(&bead, "assignee").is_empty()
+            || field(&bead, "assignee") == "null"
+            || field(&bead, "assignee") == ""
+    );
 }
 
 // ==================== CLOSE OPERATIONS ====================
@@ -379,13 +421,19 @@ fn delete_autoflush_removes_entry() {
     let id = create_bead(&ws, "Deletable bead");
 
     // Verify it exists
-    assert!(find_bead(&ws, &id).is_some(), "bead should exist before delete");
+    assert!(
+        find_bead(&ws, &id).is_some(),
+        "bead should exist before delete"
+    );
 
     let (_o, e, ok) = run_bf(&ws, &["delete", &id]);
     assert!(ok, "delete failed: {e}");
 
     // Verify it's gone from JSONL
-    assert!(find_bead(&ws, &id).is_none(), "deleted bead should not be in issues.jsonl");
+    assert!(
+        find_bead(&ws, &id).is_none(),
+        "deleted bead should not be in issues.jsonl"
+    );
 }
 
 #[test]
@@ -399,7 +447,10 @@ fn delete_autoflush_preserves_other_beads() {
     assert!(ok, "delete failed: {e}");
 
     // Verify id2 is gone
-    assert!(find_bead(&ws, &id2).is_none(), "deleted bead should be removed");
+    assert!(
+        find_bead(&ws, &id2).is_none(),
+        "deleted bead should be removed"
+    );
 
     // Verify others remain
     assert!(find_bead(&ws, &id1).is_some(), "other beads should remain");
@@ -436,12 +487,16 @@ fn dep_add_autoflush_adds_dependency() {
 
     let bead = find_bead(&ws, &blocked).expect("blocked bead must be in issues.jsonl");
     let empty_deps = vec![];
-    let deps = bead.get("dependencies")
+    let deps = bead
+        .get("dependencies")
         .and_then(|v| v.as_array())
         .unwrap_or(&empty_deps);
 
-    assert!(deps.iter().any(|d| d.get("depends_on_id").and_then(|v| v.as_str()) == Some(blocker.as_str())),
-            "blocked bead should depend on blocker");
+    assert!(
+        deps.iter()
+            .any(|d| d.get("depends_on_id").and_then(|v| v.as_str()) == Some(blocker.as_str())),
+        "blocked bead should depend on blocker"
+    );
 }
 
 #[test]
@@ -460,12 +515,17 @@ fn dep_remove_autoflush_removes_dependency() {
 
     let bead = find_bead(&ws, &blocked).expect("blocked bead must be in issues.jsonl");
     let empty_deps = vec![];
-    let deps = bead.get("dependencies")
+    let deps = bead
+        .get("dependencies")
         .and_then(|v| v.as_array())
         .unwrap_or(&empty_deps);
 
-    assert!(!deps.iter().any(|d| d.get("depends_on_id").and_then(|v| v.as_str()) == Some(blocker.as_str())),
-            "dependency should be removed");
+    assert!(
+        !deps
+            .iter()
+            .any(|d| d.get("depends_on_id").and_then(|v| v.as_str()) == Some(blocker.as_str())),
+        "dependency should be removed"
+    );
 }
 
 #[test]
@@ -476,7 +536,17 @@ fn dep_add_no_autoflush_doesnt_modify_jsonl() {
 
     let before_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
 
-    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "dep", "add", &blocker, "--blocks", &blocked]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &[
+            "--no-auto-flush",
+            "dep",
+            "add",
+            &blocker,
+            "--blocks",
+            &blocked,
+        ],
+    );
     assert!(ok, "dep add failed: {e}");
 
     let after_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
@@ -494,11 +564,15 @@ fn label_add_autoflush_adds_label() {
     assert!(ok, "label add failed: {e}");
 
     let bead = find_bead(&ws, &id).expect("bead must be in issues.jsonl");
-    let labels = bead.get("labels")
+    let labels = bead
+        .get("labels")
         .and_then(|v| v.as_array())
         .expect("labels must be present");
 
-    assert!(labels.iter().any(|l| l.as_str() == Some("urgent")), "label should be added");
+    assert!(
+        labels.iter().any(|l| l.as_str() == Some("urgent")),
+        "label should be added"
+    );
 }
 
 #[test]
@@ -506,11 +580,25 @@ fn label_add_multiple_autoflush() {
     let (_t, ws) = setup();
     let id = create_bead(&ws, "Multi-label bead");
 
-    let (_o, e, ok) = run_bf(&ws, &["label", "add", &id, "--label", "urgent", "--label", "bug", "--label", "high-priority"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &[
+            "label",
+            "add",
+            &id,
+            "--label",
+            "urgent",
+            "--label",
+            "bug",
+            "--label",
+            "high-priority",
+        ],
+    );
     assert!(ok, "label add failed: {e}");
 
     let bead = find_bead(&ws, &id).expect("bead must be in issues.jsonl");
-    let labels = bead.get("labels")
+    let labels = bead
+        .get("labels")
         .and_then(|v| v.as_array())
         .expect("labels must be present");
 
@@ -526,7 +614,10 @@ fn label_remove_autoflush_removes_label() {
     let id = create_bead(&ws, "Label removal test");
 
     // Add labels first
-    let (_o, e, ok) = run_bf(&ws, &["label", "add", &id, "--label", "urgent", "--label", "bug"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &["label", "add", &id, "--label", "urgent", "--label", "bug"],
+    );
     assert!(ok, "label add failed: {e}");
 
     // Remove one label
@@ -534,12 +625,19 @@ fn label_remove_autoflush_removes_label() {
     assert!(ok, "label remove failed: {e}");
 
     let bead = find_bead(&ws, &id).expect("bead must be in issues.jsonl");
-    let labels = bead.get("labels")
+    let labels = bead
+        .get("labels")
         .and_then(|v| v.as_array())
         .expect("labels must be present");
 
-    assert!(!labels.iter().any(|l| l.as_str() == Some("urgent")), "removed label should not be present");
-    assert!(labels.iter().any(|l| l.as_str() == Some("bug")), "other labels should remain");
+    assert!(
+        !labels.iter().any(|l| l.as_str() == Some("urgent")),
+        "removed label should not be present"
+    );
+    assert!(
+        labels.iter().any(|l| l.as_str() == Some("bug")),
+        "other labels should remain"
+    );
 }
 
 #[test]
@@ -549,7 +647,10 @@ fn label_add_no_autoflush_doesnt_modify_jsonl() {
 
     let before_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
 
-    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "label", "add", &id, "--label", "urgent"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &["--no-auto-flush", "label", "add", &id, "--label", "urgent"],
+    );
     assert!(ok, "label add failed: {e}");
 
     let after_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
@@ -567,16 +668,20 @@ fn comment_add_autoflush_adds_comment() {
     assert!(ok, "comments add failed: {e}");
 
     let bead = find_bead(&ws, &id).expect("bead must be in issues.jsonl");
-    let comments = bead.get("comments")
+    let comments = bead
+        .get("comments")
         .and_then(|v| v.as_array())
         .expect("comments must be present");
 
-    assert!(comments.iter().any(|c| {
-        c.get("text")
-            .and_then(|v| v.as_str())
-            .map(|t| t.contains("This is a comment"))
-            .unwrap_or(false)
-    }), "comment should be added");
+    assert!(
+        comments.iter().any(|c| {
+            c.get("text")
+                .and_then(|v| v.as_str())
+                .map(|t| t.contains("This is a comment"))
+                .unwrap_or(false)
+        }),
+        "comment should be added"
+    );
 }
 
 #[test]
@@ -593,7 +698,8 @@ fn comment_add_multiple_autoflush() {
     assert!(ok, "second comment add failed: {e}");
 
     let bead = find_bead(&ws, &id).expect("bead must be in issues.jsonl");
-    let comments = bead.get("comments")
+    let comments = bead
+        .get("comments")
         .and_then(|v| v.as_array())
         .expect("comments must be present");
 
@@ -607,7 +713,10 @@ fn comment_add_no_autoflush_doesnt_modify_jsonl() {
 
     let before_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
 
-    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "comments", "add", &id, "Test", "comment"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &["--no-auto-flush", "comments", "add", &id, "Test", "comment"],
+    );
     assert!(ok, "comments add failed: {e}");
 
     let after_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
@@ -628,14 +737,21 @@ fn annotate_set_autoflush_triggers_flush() {
     assert!(ok, "annotate set failed: {e}");
 
     // The flush should recreate issues.jsonl
-    assert!(jsonl_path(&ws).exists(), "annotate set should trigger flush");
+    assert!(
+        jsonl_path(&ws).exists(),
+        "annotate set should trigger flush"
+    );
 
     let bead = find_bead(&ws, &id).expect("annotated bead must be in issues.jsonl");
-    let annotations = bead.get("annotations")
+    let annotations = bead
+        .get("annotations")
         .and_then(|v| v.as_object())
         .expect("annotations must be present");
 
-    assert_eq!(annotations.get("env").and_then(|v| v.as_str()), Some("production"));
+    assert_eq!(
+        annotations.get("env").and_then(|v| v.as_str()),
+        Some("production")
+    );
 }
 
 #[test]
@@ -652,12 +768,19 @@ fn annotate_set_multiple_autoflush() {
     assert!(ok, "second annotate set failed: {e}");
 
     let bead = find_bead(&ws, &id).expect("annotated bead must be in issues.jsonl");
-    let annotations = bead.get("annotations")
+    let annotations = bead
+        .get("annotations")
         .and_then(|v| v.as_object())
         .expect("annotations must be present");
 
-    assert_eq!(annotations.get("env").and_then(|v| v.as_str()), Some("prod"));
-    assert_eq!(annotations.get("sprint").and_then(|v| v.as_str()), Some("sprint-7"));
+    assert_eq!(
+        annotations.get("env").and_then(|v| v.as_str()),
+        Some("prod")
+    );
+    assert_eq!(
+        annotations.get("sprint").and_then(|v| v.as_str()),
+        Some("sprint-7")
+    );
 }
 
 #[test]
@@ -667,7 +790,10 @@ fn annotate_set_no_autoflush_doesnt_modify_jsonl() {
 
     let before_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
 
-    let (_o, e, ok) = run_bf(&ws, &["--no-auto-flush", "annotate", "set", &id, "env", "test"]);
+    let (_o, e, ok) = run_bf(
+        &ws,
+        &["--no-auto-flush", "annotate", "set", &id, "env", "test"],
+    );
     assert!(ok, "annotate set failed: {e}");
 
     let after_json = fs::read_to_string(jsonl_path(&ws)).unwrap();
@@ -701,10 +827,15 @@ fn create_flush_failure_succeeds_and_warns() {
     assert!(ok, "create must not fail on flush error");
 
     let id = out.trim();
-    assert!(!id.is_empty(), "create should return ID despite flush failure");
+    assert!(
+        !id.is_empty(),
+        "create should return ID despite flush failure"
+    );
 
-    assert!(err.contains("warning:") && err.contains("auto-flush"),
-            "stderr should contain flush warning");
+    assert!(
+        err.contains("warning:") && err.contains("auto-flush"),
+        "stderr should contain flush warning"
+    );
 
     // Clear the wedge and verify recovery works
     unwedge_flush(&ws);
@@ -724,8 +855,10 @@ fn update_flush_failure_succeeds_and_warns() {
     let (_o, err, ok) = run_bf(&ws, &["update", &id, "--title", "Updated"]);
     assert!(ok, "update must not fail on flush error");
 
-    assert!(err.contains("warning:") && err.contains("auto-flush"),
-            "stderr should contain flush warning");
+    assert!(
+        err.contains("warning:") && err.contains("auto-flush"),
+        "stderr should contain flush warning"
+    );
 }
 
 #[test]
@@ -737,8 +870,10 @@ fn claim_flush_failure_succeeds_and_warns() {
     let (_o, err, ok) = run_bf(&ws, &["claim", "--assignee", "worker"]);
     assert!(ok, "claim must not fail on flush error");
 
-    assert!(err.contains("warning:") && err.contains("auto-flush"),
-            "stderr should contain flush warning");
+    assert!(
+        err.contains("warning:") && err.contains("auto-flush"),
+        "stderr should contain flush warning"
+    );
 }
 
 #[test]
@@ -750,8 +885,10 @@ fn close_flush_failure_succeeds_and_warns() {
     let (_o, err, ok) = run_bf(&ws, &["close", &id, "--reason", "Done"]);
     assert!(ok, "close must not fail on flush error");
 
-    assert!(err.contains("warning:") && err.contains("auto-flush"),
-            "stderr should contain flush warning");
+    assert!(
+        err.contains("warning:") && err.contains("auto-flush"),
+        "stderr should contain flush warning"
+    );
 }
 
 #[test]
@@ -763,8 +900,10 @@ fn delete_flush_failure_succeeds_and_warns() {
     let (_o, err, ok) = run_bf(&ws, &["delete", &id]);
     assert!(ok, "delete must not fail on flush error");
 
-    assert!(err.contains("warning:") && err.contains("auto-flush"),
-            "stderr should contain flush warning");
+    assert!(
+        err.contains("warning:") && err.contains("auto-flush"),
+        "stderr should contain flush warning"
+    );
 }
 
 #[test]
@@ -781,14 +920,22 @@ fn json_output_with_flush_failure_contains_warning() {
     let has_id = parsed.get("id").is_some();
     let has_warning = parsed.get("warning").is_some();
 
-    assert!(has_id || has_warning, "JSON should contain either ID or warning field");
+    assert!(
+        has_id || has_warning,
+        "JSON should contain either ID or warning field"
+    );
 
     if let Some(warning) = parsed.get("warning").and_then(|v| v.as_str()) {
-        assert!(warning.contains("auto-flush"), "warning should mention auto-flush");
+        assert!(
+            warning.contains("auto-flush"),
+            "warning should mention auto-flush"
+        );
     }
 
-    assert!(err.contains("warning:") && err.contains("auto-flush"),
-            "stderr should also contain warning");
+    assert!(
+        err.contains("warning:") && err.contains("auto-flush"),
+        "stderr should also contain warning"
+    );
 }
 
 // ==================== ISSUES.JSONL CORRECTNESS ====================
@@ -818,8 +965,9 @@ fn issues_jsonl_maintains_valid_json_after_mutation() {
     let content = fs::read_to_string(jsonl_path(&ws)).unwrap();
     for (i, line) in content.lines().enumerate() {
         if !line.trim().is_empty() {
-            let _: Value = serde_json::from_str(line)
-                .unwrap_or_else(|e| panic!("Line {} is not valid JSON: {}\nLine: {}", i+1, e, line));
+            let _: Value = serde_json::from_str(line).unwrap_or_else(|e| {
+                panic!("Line {} is not valid JSON: {}\nLine: {}", i + 1, e, line)
+            });
         }
     }
 }
@@ -837,11 +985,16 @@ fn issues_jsonl_no_duplicate_lines_after_mutation() {
 
     // Count occurrences of the bead ID
     let content = fs::read_to_string(jsonl_path(&ws)).unwrap();
-    let count = content.lines()
+    let count = content
+        .lines()
         .filter(|line| line.contains(&format!("\"id\":\"{}\"", id)))
         .count();
 
-    assert_eq!(count, 1, "Bead should appear exactly once in JSONL, not {}", count);
+    assert_eq!(
+        count, 1,
+        "Bead should appear exactly once in JSONL, not {}",
+        count
+    );
 }
 
 #[test]
@@ -849,7 +1002,9 @@ fn issues_jsonl_preserves_all_beads_after_partial_mutation() {
     let (_t, ws) = setup();
 
     // Create multiple beads
-    let ids: Vec<String> = (1..=10).map(|i| create_bead(&ws, &format!("Bead {}", i))).collect();
+    let ids: Vec<String> = (1..=10)
+        .map(|i| create_bead(&ws, &format!("Bead {}", i)))
+        .collect();
 
     // Mutate only some
     let (_o, e, ok) = run_bf(&ws, &["update", &ids[2], "--status", "in_progress"]);
@@ -864,8 +1019,11 @@ fn issues_jsonl_preserves_all_beads_after_partial_mutation() {
     // Verify all beads are still present
     let content = fs::read_to_string(jsonl_path(&ws)).unwrap();
     for id in &ids {
-        assert!(content.contains(&format!("\"id\":\"{}\"", id)),
-                "Bead {} should be present in JSONL", id);
+        assert!(
+            content.contains(&format!("\"id\":\"{}\"", id)),
+            "Bead {} should be present in JSONL",
+            id
+        );
     }
 }
 
@@ -894,7 +1052,7 @@ fn issues_jsonl_newline_separated_after_multiple_mutations() {
     for (i, line) in lines.iter().enumerate() {
         if !line.trim().is_empty() {
             let _: Value = serde_json::from_str(line)
-                .unwrap_or_else(|e| panic!("Line {} is not valid JSON: {}", i+1, e));
+                .unwrap_or_else(|e| panic!("Line {} is not valid JSON: {}", i + 1, e));
         }
     }
 }

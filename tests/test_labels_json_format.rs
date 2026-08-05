@@ -3,8 +3,8 @@
 //! These tests verify that `bf labels --format json` outputs valid JSON
 //! with the correct structure for both single-bead and all-beads modes.
 
-use std::process::Command;
 use serde_json::Value;
+use std::process::Command;
 
 /// Resolve the freshly-built bf binary — never the system-installed one.
 fn bf_binary() -> String {
@@ -103,8 +103,7 @@ fn test_labels_json_single_bead_empty_labels() {
     let trimmed = stdout.trim();
 
     // Should be valid JSON array
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Output should be valid JSON");
+    let parsed: Value = serde_json::from_str(trimmed).expect("Output should be valid JSON");
 
     assert!(parsed.is_array(), "Output should be an array");
     assert_eq!(
@@ -147,8 +146,7 @@ fn test_labels_json_single_bead_single_label() {
     let trimmed = stdout.trim();
 
     // Should be valid JSON array with one element
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Output should be valid JSON");
+    let parsed: Value = serde_json::from_str(trimmed).expect("Output should be valid JSON");
 
     assert!(parsed.is_array(), "Output should be an array");
     let labels = parsed.as_array().unwrap();
@@ -196,8 +194,7 @@ fn test_labels_json_single_bead_multiple_labels() {
     let trimmed = stdout.trim();
 
     // Should be valid JSON array with all labels
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Output should be valid JSON");
+    let parsed: Value = serde_json::from_str(trimmed).expect("Output should be valid JSON");
 
     assert!(parsed.is_array(), "Output should be an array");
     let labels = parsed.as_array().unwrap();
@@ -284,18 +281,21 @@ fn test_labels_json_all_beads_with_labels() {
     // Parse each line as a JSON object
     let mut found_beads = std::collections::HashMap::new();
     for line in lines {
-        let parsed: Value = serde_json::from_str(line)
-            .expect(&format!("Each line should be valid JSON: {}", line));
+        let parsed: Value =
+            serde_json::from_str(line).expect(&format!("Each line should be valid JSON: {}", line));
 
         assert!(parsed.is_object(), "Each line should be a JSON object");
 
-        let id = parsed.get("id")
+        let id = parsed
+            .get("id")
             .and_then(|v| v.as_str())
             .expect("Object should have 'id' field");
-        let title = parsed.get("title")
+        let title = parsed
+            .get("title")
             .and_then(|v| v.as_str())
             .expect("Object should have 'title' field");
-        let labels = parsed.get("labels")
+        let labels = parsed
+            .get("labels")
             .and_then(|v| v.as_array())
             .expect("Object should have 'labels' array");
 
@@ -310,14 +310,22 @@ fn test_labels_json_all_beads_with_labels() {
     // Verify bead1 has 2 labels
     let bead1_data = found_beads.get(&bead1).expect("Should find bead1");
     assert_eq!(bead1_data.1.len(), 2, "bead1 should have 2 labels");
-    let bead1_labels: Vec<String> = bead1_data.1.iter().map(|v| v.as_str().unwrap().to_string()).collect();
+    let bead1_labels: Vec<String> = bead1_data
+        .1
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
     assert!(bead1_labels.contains(&"backend".to_string()));
     assert!(bead1_labels.contains(&"urgent".to_string()));
 
     // Verify bead2 has 2 labels
     let bead2_data = found_beads.get(&bead2).expect("Should find bead2");
     assert_eq!(bead2_data.1.len(), 2, "bead2 should have 2 labels");
-    let bead2_labels: Vec<String> = bead2_data.1.iter().map(|v| v.as_str().unwrap().to_string()).collect();
+    let bead2_labels: Vec<String> = bead2_data
+        .1
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
     assert!(bead2_labels.contains(&"frontend".to_string()));
     assert!(bead2_labels.contains(&"urgent".to_string()));
 
@@ -365,8 +373,7 @@ fn test_labels_json_structure_matches_schema() {
     let trimmed = stdout.trim();
 
     // Parse and verify schema
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(trimmed).expect("Should be valid JSON");
 
     // Should be an array
     assert!(parsed.is_array(), "Single bead output should be an array");
@@ -410,8 +417,8 @@ fn test_labels_json_structure_all_beads_schema() {
 
     // Parse each line and verify schema
     for line in lines {
-        let parsed: Value = serde_json::from_str(line)
-            .expect(&format!("Each line should be valid JSON: {}", line));
+        let parsed: Value =
+            serde_json::from_str(line).expect(&format!("Each line should be valid JSON: {}", line));
 
         // Should be an object with specific fields
         assert!(parsed.is_object(), "Line should be a JSON object");
@@ -419,17 +426,11 @@ fn test_labels_json_structure_all_beads_schema() {
         // Check required fields exist and have correct types
         let id = parsed.get("id");
         assert!(id.is_some(), "Object must have 'id' field");
-        assert!(
-            id.unwrap().is_string(),
-            "'id' field must be a string"
-        );
+        assert!(id.unwrap().is_string(), "'id' field must be a string");
 
         let title = parsed.get("title");
         assert!(title.is_some(), "Object must have 'title' field");
-        assert!(
-            title.unwrap().is_string(),
-            "'title' field must be a string"
-        );
+        assert!(title.unwrap().is_string(), "'title' field must be a string");
 
         let labels = parsed.get("labels");
         assert!(labels.is_some(), "Object must have 'labels' field");
@@ -473,8 +474,14 @@ fn test_labels_json_compact_format() {
     let trimmed = stdout.trim();
 
     // Should NOT contain whitespace (compact JSON)
-    assert!(!trimmed.contains("\n"), "Compact JSON should not contain newlines");
-    assert!(!trimmed.contains("  "), "Compact JSON should not contain extra spaces");
+    assert!(
+        !trimmed.contains("\n"),
+        "Compact JSON should not contain newlines"
+    );
+    assert!(
+        !trimmed.contains("  "),
+        "Compact JSON should not contain extra spaces"
+    );
 
     // Clean up
     let close_output = bf()
@@ -538,12 +545,16 @@ fn test_labels_json_special_characters() {
     let trimmed = stdout.trim();
 
     // Parse JSON
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Should be valid JSON with special characters");
+    let parsed: Value =
+        serde_json::from_str(trimmed).expect("Should be valid JSON with special characters");
 
     assert!(parsed.is_array(), "Should be an array");
     let labels = parsed.as_array().unwrap();
-    assert_eq!(labels.len(), special_labels.len(), "Should have all special labels");
+    assert_eq!(
+        labels.len(),
+        special_labels.len(),
+        "Should have all special labels"
+    );
 
     // Verify each special character label is present
     let label_strings: Vec<String> = labels
@@ -576,13 +587,7 @@ fn test_labels_json_unicode_characters() {
     let bead_id = create_test_bead("Unicode test");
 
     // Add labels with unicode characters
-    let unicode_labels = vec![
-        "émoji",
-        "中文标签",
-        "🔧",
-        "café",
-        "тест",
-    ];
+    let unicode_labels = vec!["émoji", "中文标签", "🔧", "café", "тест"];
 
     for label in &unicode_labels {
         let output = bf()
@@ -614,12 +619,16 @@ fn test_labels_json_unicode_characters() {
     let trimmed = stdout.trim();
 
     // Parse JSON
-    let parsed: Value = serde_json::from_str(trimmed)
-        .expect("Should be valid JSON with unicode characters");
+    let parsed: Value =
+        serde_json::from_str(trimmed).expect("Should be valid JSON with unicode characters");
 
     assert!(parsed.is_array(), "Should be an array");
     let labels = parsed.as_array().unwrap();
-    assert_eq!(labels.len(), unicode_labels.len(), "Should have all unicode labels");
+    assert_eq!(
+        labels.len(),
+        unicode_labels.len(),
+        "Should have all unicode labels"
+    );
 
     // Clean up
     bf().arg("close")

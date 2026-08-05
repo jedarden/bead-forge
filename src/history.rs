@@ -188,9 +188,9 @@ mod tests {
             .iter()
             .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
-        assert!(names.iter().all(|n| n.contains("000007")
-            || n.contains("000008")
-            || n.contains("000009")));
+        assert!(names
+            .iter()
+            .all(|n| n.contains("000007") || n.contains("000008") || n.contains("000009")));
     }
 
     #[test]

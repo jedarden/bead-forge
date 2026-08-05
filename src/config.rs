@@ -404,16 +404,14 @@ checkpoint:
         // A config.yaml with no `sync:` block must still deserialize and report
         // auto_flush=true, matching the compiled default.
         let yaml = "issue_prefixes:\n- bf\n";
-        let cfg: Config =
-            serde_yaml::from_str(yaml).expect("config without sync block must parse");
+        let cfg: Config = serde_yaml::from_str(yaml).expect("config without sync block must parse");
         assert!(cfg.sync.auto_flush);
     }
 
     #[test]
     fn test_sync_config_parses_auto_flush_false() {
         let yaml = "sync:\n  auto_flush: false\n";
-        let cfg: Config =
-            serde_yaml::from_str(yaml).expect("populated sync block must parse");
+        let cfg: Config = serde_yaml::from_str(yaml).expect("populated sync block must parse");
         assert!(!cfg.sync.auto_flush, "auto_flush: false must disable");
     }
 
@@ -422,8 +420,7 @@ checkpoint:
         // Partial block: only `enabled: true`. The other two fields must fall
         // back to their serde defaults rather than zero values.
         let yaml = "checkpoint:\n  enabled: true\n";
-        let cfg: Config =
-            serde_yaml::from_str(yaml).expect("partial checkpoint block must parse");
+        let cfg: Config = serde_yaml::from_str(yaml).expect("partial checkpoint block must parse");
         assert!(cfg.checkpoint.enabled);
         assert_eq!(cfg.checkpoint.interval_minutes, 60);
         assert!(!cfg.checkpoint.push);

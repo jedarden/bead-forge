@@ -36,7 +36,15 @@ fn init_workspace() -> TempDir {
 /// Create a task bead via the CLI, returning its printed id.
 fn create_bead(workspace: &std::path::Path, title: &str) -> String {
     let out = Command::new(bf_path())
-        .args(["create", "--title", title, "--type", "task", "--priority", "2"])
+        .args([
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ])
         .current_dir(workspace)
         .output()
         .expect("Failed to run bf create");
@@ -86,8 +94,7 @@ fn parse_jsonl(stdout: &str) -> Vec<serde_json::Value> {
         .map(str::trim)
         .filter(|line| !line.is_empty() && *line != "[]")
         .map(|line| {
-            serde_json::from_str(line)
-                .unwrap_or_else(|e| panic!("invalid JSON line {line:?}: {e}"))
+            serde_json::from_str(line).unwrap_or_else(|e| panic!("invalid JSON line {line:?}: {e}"))
         })
         .collect()
 }
@@ -189,7 +196,10 @@ fn ready_json_single_bead_is_one_valid_line() {
 
     let bead = &parsed[0];
     assert_eq!(bead.get("id").and_then(|v| v.as_str()), Some(id.as_str()));
-    assert_eq!(bead.get("title").and_then(|v| v.as_str()), Some("ready one"));
+    assert_eq!(
+        bead.get("title").and_then(|v| v.as_str()),
+        Some("ready one")
+    );
     // Ready candidates are open.
     assert_eq!(bead.get("status").and_then(|v| v.as_str()), Some("open"));
 }

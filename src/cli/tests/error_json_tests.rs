@@ -25,8 +25,8 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    test_workspace, bf_binary, bf_command, bf_command_with_workspace,
-    json_validation, format_detection, fixtures, capture,
+    bf_binary, bf_command, bf_command_with_workspace, capture, fixtures, format_detection,
+    json_validation, test_workspace,
 };
 
 /// Create an isolated test workspace
@@ -39,8 +39,7 @@ fn create_isolated_workspace() -> TempDir {
     crate::config::init_workspace(&beads_dir, "bf-error-test")
         .expect("Failed to initialize test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
@@ -81,11 +80,15 @@ fn test_show_json_malformed_bead_id() {
                 .arg("show")
                 .arg(&malformed_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Command should fail
-        assert!(!success, "show should fail for malformed ID: {}", malformed_id);
+        assert!(
+            !success,
+            "show should fail for malformed ID: {}",
+            malformed_id
+        );
 
         // Stdout should be empty or contain only valid JSON (no partial/error JSON)
         let stdout_trimmed = stdout.trim();
@@ -94,15 +97,19 @@ fn test_show_json_malformed_bead_id() {
         }
 
         // Stderr should contain error message
-        assert!(!stderr.is_empty(), "stderr should contain error for malformed ID: {}", malformed_id);
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for malformed ID: {}",
+            malformed_id
+        );
 
         // Error should reference the invalid ID or indicate format/validation issue
         assert!(
-            stderr.contains(malformed_id.as_str()) ||
-            stderr.contains("not found") ||
-            stderr.contains("invalid") ||
-            stderr.contains("format") ||
-            stderr.contains("malformed"),
+            stderr.contains(malformed_id.as_str())
+                || stderr.contains("not found")
+                || stderr.contains("invalid")
+                || stderr.contains("format")
+                || stderr.contains("malformed"),
             "Error should reference the invalid ID or indicate problem, got: {}",
             stderr
         );
@@ -127,11 +134,19 @@ fn test_update_json_malformed_bead_id() {
                 .arg("update")
                 .arg(&malformed_id)
                 .arg("--description")
-                .arg("Test update")
+                .arg("Test update"),
         );
 
-        assert!(!success, "update should fail for malformed ID: {}", malformed_id);
-        assert!(!stderr.is_empty(), "stderr should contain error for malformed ID: {}", malformed_id);
+        assert!(
+            !success,
+            "update should fail for malformed ID: {}",
+            malformed_id
+        );
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for malformed ID: {}",
+            malformed_id
+        );
     }
 }
 
@@ -146,12 +161,15 @@ fn test_close_json_nonexistent_bead_id() {
             .arg("close")
             .arg("bf-nonexistent-12345")
             .arg("--reason")
-            .arg("Test close")
+            .arg("Test close"),
     );
 
     assert!(!success, "close should fail for non-existent bead ID");
     assert!(!stderr.is_empty(), "stderr should contain error message");
-    assert!(stdout.trim().is_empty(), "stdout should be empty for close error");
+    assert!(
+        stdout.trim().is_empty(),
+        "stdout should be empty for close error"
+    );
 }
 
 #[test]
@@ -165,7 +183,7 @@ fn test_comment_json_nonexistent_bead_id() {
             .arg("comment")
             .arg("bf-nonexistent-comment-123")
             .arg("--text")
-            .arg("Test comment")
+            .arg("Test comment"),
     );
 
     assert!(!success, "comment should fail for non-existent bead ID");
@@ -194,7 +212,7 @@ fn test_dep_add_json_invalid_blocker_id() {
             .arg("add")
             .arg(&blocked_id)
             .arg("--blocks")
-            .arg(invalid_blocker)
+            .arg(invalid_blocker),
     );
 
     assert!(!success, "dep add should fail for invalid blocker ID");
@@ -202,12 +220,12 @@ fn test_dep_add_json_invalid_blocker_id() {
 
     // Error should mention the dependency, blocker, or foreign key constraint
     assert!(
-        stderr.contains("depend") ||
-        stderr.contains("block") ||
-        stderr.contains("not found") ||
-        stderr.contains(invalid_blocker) ||
-        stderr.contains("FOREIGN KEY") ||
-        stderr.contains("constraint"),
+        stderr.contains("depend")
+            || stderr.contains("block")
+            || stderr.contains("not found")
+            || stderr.contains(invalid_blocker)
+            || stderr.contains("FOREIGN KEY")
+            || stderr.contains("constraint"),
         "Error should reference the dependency issue, got: {}",
         stderr
     );
@@ -234,7 +252,7 @@ fn test_dep_add_json_invalid_blocked_id() {
             .arg("add")
             .arg(invalid_blocked)
             .arg("--blocks")
-            .arg(&blocker_id)
+            .arg(&blocker_id),
     );
 
     // May or may not fail depending on implementation
@@ -243,11 +261,11 @@ fn test_dep_add_json_invalid_blocked_id() {
 
         // Error should mention the dependency issue or foreign key constraint
         assert!(
-            stderr.contains("depend") ||
-            stderr.contains("block") ||
-            stderr.contains("not found") ||
-            stderr.contains("FOREIGN KEY") ||
-            stderr.contains("constraint"),
+            stderr.contains("depend")
+                || stderr.contains("block")
+                || stderr.contains("not found")
+                || stderr.contains("FOREIGN KEY")
+                || stderr.contains("constraint"),
             "Error should reference the dependency issue, got: {}",
             stderr
         );
@@ -277,17 +295,18 @@ fn test_dep_add_json_circular_dependency() {
             .arg("add")
             .arg(&bead1_id)
             .arg("--blocks")
-            .arg(&bead2_id)
+            .arg(&bead2_id),
     );
 
     // Should either fail (circular detected) or succeed (some implementations allow it)
     if !success {
-        assert!(!stderr.is_empty(), "stderr should contain error about circular dependency");
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error about circular dependency"
+        );
         // Error should mention circular or cycle
         assert!(
-            stderr.contains("circular") ||
-            stderr.contains("cycle") ||
-            stderr.contains("depend"),
+            stderr.contains("circular") || stderr.contains("cycle") || stderr.contains("depend"),
             "Error should mention circular dependency, got: {}",
             stderr
         );
@@ -317,12 +336,15 @@ fn test_search_json_empty_query() {
             .arg("search")
             .arg("")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty query might be rejected or return empty
     if !success {
-        assert!(!stderr.is_empty(), "stderr should contain error for empty query");
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for empty query"
+        );
     } else {
         // If it succeeds, should return valid JSON
         json_validation::assert_valid_jsonl(&stdout);
@@ -340,19 +362,7 @@ fn test_search_json_query_with_only_special_chars() {
 
     // Queries with only special characters (avoiding CLI flag conflicts)
     let special_queries = vec![
-        "!!!",
-        "@@@",
-        "$$$",
-        "%%%",
-        "^^^",
-        "&&&",
-        "***",
-        "((((",
-        "))))",
-        "___",
-        "+++",
-        "===",
-        "???",
+        "!!!", "@@@", "$$$", "%%%", "^^^", "&&&", "***", "((((", "))))", "___", "+++", "===", "???",
     ];
 
     for query in special_queries {
@@ -361,7 +371,7 @@ fn test_search_json_query_with_only_special_chars() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL (even if empty)
@@ -380,14 +390,7 @@ fn test_search_json_query_with_unmatched_brackets() {
 
     // Query with unmatched brackets
     let bracket_queries = vec![
-        "[test",
-        "test]",
-        "(test",
-        "test)",
-        "{test",
-        "test}",
-        "[[test",
-        "test]]",
+        "[test", "test]", "(test", "test)", "{test", "test}", "[[test", "test]]",
     ];
 
     for query in bracket_queries {
@@ -396,7 +399,7 @@ fn test_search_json_query_with_unmatched_brackets() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL (even if empty or error in search)
@@ -432,7 +435,7 @@ fn test_list_json_invalid_status_filter() {
                 .arg("--status")
                 .arg(invalid_status)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL (even if empty results due to no matching status)
@@ -464,7 +467,7 @@ fn test_list_json_invalid_type_filter() {
                 .arg("--type")
                 .arg(invalid_type)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL (even if empty results due to no matching type)
@@ -479,12 +482,10 @@ fn test_list_json_invalid_priority_filter() {
     let workspace = test_workspace();
 
     let invalid_priorities = vec![
-        "invalid",
-        "abc",
-        "5.5", // decimal
-        "-1",  // negative
+        "invalid", "abc", "5.5",  // decimal
+        "-1",   // negative
         "1000", // out of range
-        "😀", // emoji
+        "😀",   // emoji
     ];
 
     for invalid_priority in invalid_priorities {
@@ -494,14 +495,21 @@ fn test_list_json_invalid_priority_filter() {
                 .arg("--priority-min")
                 .arg(invalid_priority)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should fail for invalid priority
-        assert!(!success, "list should fail for invalid priority: {}", invalid_priority);
+        assert!(
+            !success,
+            "list should fail for invalid priority: {}",
+            invalid_priority
+        );
 
         // Stderr should mention the invalid value
-        assert!(!stderr.is_empty(), "stderr should contain error for invalid priority");
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for invalid priority"
+        );
     }
 }
 
@@ -526,12 +534,15 @@ fn test_list_json_invalid_limit_filter() {
                 .arg("--limit")
                 .arg(invalid_limit)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should fail with invalid limit
         if !success {
-            assert!(!stderr.is_empty(), "stderr should contain error for invalid limit");
+            assert!(
+                !stderr.is_empty(),
+                "stderr should contain error for invalid limit"
+            );
         } else {
             // If succeeds, should return valid JSONL
             json_validation::assert_valid_jsonl(&stdout);
@@ -573,7 +584,7 @@ fn test_search_json_unicode_edge_cases() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL (even if empty results)
@@ -625,7 +636,7 @@ fn test_search_json_injection_attempts() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL and not crash
@@ -647,13 +658,13 @@ fn test_search_json_extremely_long_query() {
 
     // Test various long query scenarios
     let long_queries = vec![
-        "a".repeat(10000), // 10k 'a' characters
-        " ".repeat(5000), // 5k spaces
+        "a".repeat(10000),           // 10k 'a' characters
+        " ".repeat(5000),            // 5k spaces
         "search term ".repeat(1000), // Repeated phrase
-        "🔥".repeat(1000), // Many emoji
-        "test\n".repeat(100), // Newlines
-        "a\tb\tc".repeat(500), // Tabs
-        "test\r\n".repeat(200), // Windows newlines
+        "🔥".repeat(1000),           // Many emoji
+        "test\n".repeat(100),        // Newlines
+        "a\tb\tc".repeat(500),       // Tabs
+        "test\r\n".repeat(200),      // Windows newlines
     ];
 
     for (i, query) in long_queries.iter().enumerate() {
@@ -662,7 +673,7 @@ fn test_search_json_extremely_long_query() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL without crashing
@@ -685,9 +696,9 @@ fn test_search_json_query_with_null_bytes_and_controls() {
     // but we can test other control characters
     let control_queries = vec![
         "\x01\x02\x03", // Start of heading, start of text, end of text
-        "\x07\x08", // Bell, backspace
-        "\x1b", // Escape
-        "\x7f", // Delete
+        "\x07\x08",     // Bell, backspace
+        "\x1b",         // Escape
+        "\x7f",         // Delete
         "test\x1btest", // Escape in middle
     ];
 
@@ -697,7 +708,7 @@ fn test_search_json_query_with_null_bytes_and_controls() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL
@@ -726,7 +737,7 @@ fn test_malformed_command_syntax_invalid_flag_combinations() {
                     .arg("--limit")
                     .arg("10")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "duplicate limit flags")
         },
@@ -740,7 +751,7 @@ fn test_malformed_command_syntax_invalid_flag_combinations() {
                     .arg("--status")
                     .arg("closed")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "duplicate status flags")
         },
@@ -754,7 +765,7 @@ fn test_malformed_command_syntax_invalid_flag_combinations() {
                     .arg("--type")
                     .arg("bug")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "duplicate type flags")
         },
@@ -768,7 +779,7 @@ fn test_malformed_command_syntax_invalid_flag_combinations() {
                     .arg("--priority-max")
                     .arg("1")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "priority min > max")
         },
@@ -779,7 +790,11 @@ fn test_malformed_command_syntax_invalid_flag_combinations() {
 
         // Should either fail or succeed with valid JSON
         if !success {
-            assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+            assert!(
+                !stderr.is_empty(),
+                "stderr should contain error for: {}",
+                description
+            );
         } else {
             // If it succeeds, output should still be valid JSON
             let stdout_trimmed = stdout.trim();
@@ -806,7 +821,7 @@ fn test_malformed_command_syntax_invalid_flags() {
                     .arg("--non-existent-flag")
                     .arg("value")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "non-existent flag")
         },
@@ -817,7 +832,7 @@ fn test_malformed_command_syntax_invalid_flags() {
                     .arg("list")
                     .arg("--limit")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "flag with missing value")
         },
@@ -828,7 +843,7 @@ fn test_malformed_command_syntax_invalid_flags() {
                     .arg("list")
                     .arg("-x")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "invalid short flag")
         },
@@ -840,7 +855,7 @@ fn test_malformed_command_syntax_invalid_flags() {
                     .arg("--limit")
                     .arg("")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "flag with empty value")
         },
@@ -851,7 +866,11 @@ fn test_malformed_command_syntax_invalid_flags() {
 
         // Should fail for invalid flags
         assert!(!success, "command should fail for: {}", description);
-        assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for: {}",
+            description
+        );
     }
 }
 
@@ -866,10 +885,7 @@ fn test_malformed_command_syntax_invalid_subcommands() {
         // Non-existent subcommand
         || {
             let (stdout, stderr, success) = capture::capture_failed_command(
-                &mut bf_command()
-                    .arg("nonexistent")
-                    .arg("--format")
-                    .arg("json")
+                &mut bf_command().arg("nonexistent").arg("--format").arg("json"),
             );
             (stdout, stderr, success, "non-existent subcommand")
         },
@@ -879,7 +895,7 @@ fn test_malformed_command_syntax_invalid_subcommands() {
                 &mut bf_command()
                     .arg("shwo") // typo for "show"
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "typo in subcommand")
         },
@@ -891,7 +907,7 @@ fn test_malformed_command_syntax_invalid_subcommands() {
                     .arg("--invalid-arg")
                     .arg("value")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "invalid argument to valid command")
         },
@@ -902,7 +918,11 @@ fn test_malformed_command_syntax_invalid_subcommands() {
 
         // Should fail for invalid subcommands
         assert!(!success, "command should fail for: {}", description);
-        assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for: {}",
+            description
+        );
     }
 }
 
@@ -924,7 +944,7 @@ fn test_out_of_range_parameters_extended() {
                     .arg("--priority-min")
                     .arg("999999999999999999999")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "very large priority-min")
         },
@@ -935,7 +955,7 @@ fn test_out_of_range_parameters_extended() {
                     .arg("--limit")
                     .arg("999999999999999999999")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "very large limit")
         },
@@ -947,7 +967,7 @@ fn test_out_of_range_parameters_extended() {
                     .arg("--priority-min")
                     .arg("-999999999999999999999")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "very large negative priority")
         },
@@ -959,7 +979,7 @@ fn test_out_of_range_parameters_extended() {
                     .arg("--limit")
                     .arg("0")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "zero limit")
         },
@@ -971,7 +991,7 @@ fn test_out_of_range_parameters_extended() {
                     .arg("--priority-min")
                     .arg("1e10")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "scientific notation")
         },
@@ -983,7 +1003,7 @@ fn test_out_of_range_parameters_extended() {
                     .arg("--priority-min")
                     .arg("0x10")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "hexadecimal value")
         },
@@ -995,7 +1015,7 @@ fn test_out_of_range_parameters_extended() {
                     .arg("--priority-min")
                     .arg("010")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "octal value")
         },
@@ -1006,7 +1026,11 @@ fn test_out_of_range_parameters_extended() {
 
         // Should either fail with clear error or succeed with valid JSON
         if !success {
-            assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+            assert!(
+                !stderr.is_empty(),
+                "stderr should contain error for: {}",
+                description
+            );
         } else {
             // If succeeds, should return valid JSON
             let stdout_trimmed = stdout.trim();
@@ -1038,7 +1062,7 @@ fn test_invalid_parameter_formats() {
                     .arg("--limit")
                     .arg("https://example.com")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "URL as limit")
         },
@@ -1050,7 +1074,7 @@ fn test_invalid_parameter_formats() {
                     .arg("--limit")
                     .arg("test@example.com")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "email as limit")
         },
@@ -1062,7 +1086,7 @@ fn test_invalid_parameter_formats() {
                     .arg("--priority-min")
                     .arg("{\"key\": \"value\"}")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "JSON as priority")
         },
@@ -1074,7 +1098,7 @@ fn test_invalid_parameter_formats() {
                     .arg("--priority-min")
                     .arg("<value>123</value>")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "XML as priority")
         },
@@ -1086,7 +1110,7 @@ fn test_invalid_parameter_formats() {
                     .arg("--limit")
                     .arg("/path/to/file")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, stderr, success, "file path as limit")
         },
@@ -1097,7 +1121,11 @@ fn test_invalid_parameter_formats() {
 
         // Should fail for invalid formats
         if !success {
-            assert!(!stderr.is_empty(), "stderr should contain error for: {}", description);
+            assert!(
+                !stderr.is_empty(),
+                "stderr should contain error for: {}",
+                description
+            );
         } else {
             // If succeeds, should return valid JSON
             let stdout_trimmed = stdout.trim();
@@ -1129,11 +1157,14 @@ fn test_label_add_json_empty_label() {
             .arg("add")
             .arg(&bead_id)
             .arg("--label")
-            .arg("")
+            .arg(""),
     );
 
     assert!(!success, "label add should fail for empty label");
-    assert!(!stderr.is_empty(), "stderr should contain error for empty label");
+    assert!(
+        !stderr.is_empty(),
+        "stderr should contain error for empty label"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Empty label cleanup");
@@ -1151,7 +1182,7 @@ fn test_label_add_json_nonexistent_bead() {
             .arg("add")
             .arg("bf-nonexistent-label-999")
             .arg("--label")
-            .arg("test-label")
+            .arg("test-label"),
     );
 
     assert!(!success, "label add should fail for non-existent bead");
@@ -1172,7 +1203,7 @@ fn test_label_remove_json_nonexistent_label() {
             .arg("remove")
             .arg(&bead_id)
             .arg("--label")
-            .arg("nonexistent-label-xyz")
+            .arg("nonexistent-label-xyz"),
     );
 
     // Should either succeed (no-op) or fail with clear message
@@ -1198,7 +1229,7 @@ fn test_update_json_empty_assignee() {
             .arg("update")
             .arg(&bead_id)
             .arg("--assignee")
-            .arg("")
+            .arg(""),
     );
 
     // Should succeed (clearing assignee is valid)
@@ -1208,7 +1239,7 @@ fn test_update_json_empty_assignee() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     json_validation::assert_valid_json(&show_output);
@@ -1241,7 +1272,7 @@ fn test_update_json_invalid_email_format() {
                 .arg("update")
                 .arg(&bead_id)
                 .arg("--assignee")
-                .arg(invalid_email)
+                .arg(invalid_email),
         );
 
         // System may accept any string as assignee (no email validation)
@@ -1251,7 +1282,7 @@ fn test_update_json_invalid_email_format() {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         json_validation::assert_valid_json(&show_output);
@@ -1272,15 +1303,14 @@ fn test_show_json_missing_required_argument() {
     let workspace = test_workspace();
 
     let (stdout, stderr, success) = capture::capture_failed_command(
-        &mut bf_command()
-            .arg("show")
-            .arg("--format")
-            .arg("json")
-        // Missing bead ID argument
+        &mut bf_command().arg("show").arg("--format").arg("json"), // Missing bead ID argument
     );
 
     assert!(!success, "show should fail without bead ID");
-    assert!(!stderr.is_empty(), "stderr should contain error about missing argument");
+    assert!(
+        !stderr.is_empty(),
+        "stderr should contain error about missing argument"
+    );
 }
 
 #[test]
@@ -1295,12 +1325,14 @@ fn test_create_json_missing_title() {
             .arg("--type")
             .arg("task")
             .arg("--priority")
-            .arg("2")
-        // Missing --title
+            .arg("2"), // Missing --title
     );
 
     assert!(!success, "create should fail without title");
-    assert!(!stderr.is_empty(), "stderr should contain error about missing title");
+    assert!(
+        !stderr.is_empty(),
+        "stderr should contain error about missing title"
+    );
 }
 
 #[test]
@@ -1320,7 +1352,7 @@ fn test_create_json_invalid_type() {
             .arg("invalid-type-xyz")
             .arg("--priority")
             .arg("2")
-            .arg("--json")
+            .arg("--json"),
     );
 
     // Should succeed and return valid JSON
@@ -1337,7 +1369,7 @@ fn test_create_json_invalid_type() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     json_validation::assert_valid_json(&show_output);
@@ -1352,13 +1384,7 @@ fn test_create_json_invalid_priority() {
     let _ws = create_isolated_workspace();
     let workspace = test_workspace();
 
-    let invalid_priorities = vec![
-        "invalid",
-        "abc",
-        "5.5",
-        "-1",
-        "1000",
-    ];
+    let invalid_priorities = vec!["invalid", "abc", "5.5", "-1", "1000"];
 
     for invalid_priority in invalid_priorities {
         let (stdout, stderr, success) = capture::capture_failed_command(
@@ -1369,11 +1395,18 @@ fn test_create_json_invalid_priority() {
                 .arg("--type")
                 .arg("task")
                 .arg("--priority")
-                .arg(invalid_priority)
+                .arg(invalid_priority),
         );
 
-        assert!(!success, "create should fail for invalid priority: {}", invalid_priority);
-        assert!(!stderr.is_empty(), "stderr should contain error for invalid priority");
+        assert!(
+            !success,
+            "create should fail for invalid priority: {}",
+            invalid_priority
+        );
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for invalid priority"
+        );
     }
 }
 
@@ -1384,12 +1417,10 @@ fn test_ready_json_invalid_time_period() {
     let workspace = test_workspace();
 
     let invalid_periods = vec![
-        "invalid",
-        "xyz",
-        "1x",   // wrong unit
-        "-1h",  // negative
-        "0",    // no unit
-        "h",    // no number
+        "invalid", "xyz", "1x",  // wrong unit
+        "-1h", // negative
+        "0",   // no unit
+        "h",   // no number
     ];
 
     for invalid_period in invalid_periods {
@@ -1399,12 +1430,19 @@ fn test_ready_json_invalid_time_period() {
                 .arg("--time-period")
                 .arg(invalid_period)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should fail for invalid time period
-        assert!(!success, "ready should fail for invalid time period: {}", invalid_period);
-        assert!(!stderr.is_empty(), "stderr should contain error for invalid time period");
+        assert!(
+            !success,
+            "ready should fail for invalid time period: {}",
+            invalid_period
+        );
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error for invalid time period"
+        );
     }
 }
 
@@ -1427,7 +1465,7 @@ fn test_command_json_nonexistent_workspace() {
             .arg(nonexistent_workspace)
             .arg("list")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Command behavior may vary - just verify it doesn't crash
@@ -1449,8 +1487,7 @@ fn test_command_json_corrupted_database() {
     let beads_dir = workspace.join(".beads");
 
     // Load metadata to find database path
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let db_path = beads_dir.join(&metadata.database);
 
     // Corrupt the database by writing garbage
@@ -1464,18 +1501,21 @@ fn test_command_json_corrupted_database() {
             .arg(&beads_dir)
             .arg("list")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     assert!(!success, "command should fail with corrupted database");
-    assert!(!stderr.is_empty(), "stderr should contain error about database");
+    assert!(
+        !stderr.is_empty(),
+        "stderr should contain error about database"
+    );
 
     // Error should mention database or corruption
     assert!(
-        stderr.contains("database") ||
-        stderr.contains("corrupted") ||
-        stderr.contains("malformed") ||
-        stderr.contains("disk"),
+        stderr.contains("database")
+            || stderr.contains("corrupted")
+            || stderr.contains("malformed")
+            || stderr.contains("disk"),
         "Error should mention database issue, got: {}",
         stderr
     );
@@ -1497,7 +1537,7 @@ fn test_command_json_missing_config() {
             .arg(&beads_dir)
             .arg("list")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // bead-forge may auto-initialize or handle missing config gracefully
@@ -1531,7 +1571,7 @@ fn test_error_responses_dont_emit_partial_json() {
                     .arg("show")
                     .arg("bf-invalid-id")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             stdout
         },
@@ -1541,7 +1581,7 @@ fn test_error_responses_dont_emit_partial_json() {
                     .arg("update")
                     .arg("bf-invalid")
                     .arg("--description")
-                    .arg("test")
+                    .arg("test"),
             );
             stdout
         },
@@ -1583,13 +1623,16 @@ fn test_empty_result_maintains_schema() {
             .arg("search")
             .arg("nonexistent-search-term-xyz-123")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty search returns nothing
     let search_trimmed = search_output.trim();
-    assert!(search_trimmed.is_empty() || search_trimmed == "[]",
-           "Empty search should be empty or [], got: '{}'", search_trimmed);
+    assert!(
+        search_trimmed.is_empty() || search_trimmed == "[]",
+        "Empty search should be empty or [], got: '{}'",
+        search_trimmed
+    );
 
     // Test 2: List closed beads (if only closed beads exist, open filter returns empty)
     let list_output = capture::capture_stdout(
@@ -1598,7 +1641,7 @@ fn test_empty_result_maintains_schema() {
             .arg("--status")
             .arg("open")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return valid JSONL (possibly empty)
@@ -1624,7 +1667,7 @@ fn test_json_output_field_consistency_on_errors() {
             .arg("update")
             .arg(&bead1_id)
             .arg("--description")
-            .arg("Description with special chars: \"quotes\" & symbols")
+            .arg("Description with special chars: \"quotes\" & symbols"),
     );
 
     capture::capture_stdout(
@@ -1633,18 +1676,16 @@ fn test_json_output_field_consistency_on_errors() {
             .arg("add")
             .arg(&bead2_id)
             .arg("--label")
-            .arg("test-label")
+            .arg("test-label"),
     );
 
     // Verify both beads have consistent field presence in JSON output
-    let list_output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let list_output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
-    let lines: Vec<&str> = list_output.lines().filter(|l| !l.trim().is_empty()).collect();
+    let lines: Vec<&str> = list_output
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
 
     for line in lines {
         let parsed = json_validation::parse_json(line);
@@ -1654,12 +1695,18 @@ fn test_json_output_field_consistency_on_errors() {
         json_validation::assert_required_fields(
             &parsed,
             &["id", "title", "status", "priority", "issue_type"],
-            "consistency check"
+            "consistency check",
         );
 
         // Assignee and labels should always be present (display normalization)
-        assert!(parsed.get("assignee").is_some(), "assignee field must be present");
-        assert!(parsed.get("labels").is_some(), "labels field must be present");
+        assert!(
+            parsed.get("assignee").is_some(),
+            "assignee field must be present"
+        );
+        assert!(
+            parsed.get("labels").is_some(),
+            "labels field must be present"
+        );
     }
 
     // Cleanup
@@ -1684,19 +1731,22 @@ fn test_claim_json_no_ready_beads() {
             .arg("--assignee")
             .arg("test-worker")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should fail (no beads to claim)
     if !success {
-        assert!(!stderr.is_empty(), "stderr should contain error about no beads");
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error about no beads"
+        );
 
         // Error should mention no beads or nothing available
         assert!(
-            stderr.contains("no") ||
-            stderr.contains("available") ||
-            stderr.contains("nothing") ||
-            stderr.contains("ready"),
+            stderr.contains("no")
+                || stderr.contains("available")
+                || stderr.contains("nothing")
+                || stderr.contains("ready"),
             "Error should mention no beads available, got: {}",
             stderr
         );
@@ -1721,7 +1771,7 @@ fn test_show_json_already_closed_bead() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     json_validation::assert_valid_json(&output);
@@ -1729,7 +1779,9 @@ fn test_show_json_already_closed_bead() {
     // Parse and verify status is "closed"
     let json_str = output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let status = json_validation::get_string(bead, "status");
@@ -1751,12 +1803,15 @@ fn test_update_json_closed_bead() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg("Should not update closed bead")
+            .arg("Should not update closed bead"),
     );
 
     // May or may not be allowed depending on implementation
     if !success {
-        assert!(!stderr.is_empty(), "stderr should contain error about updating closed bead");
+        assert!(
+            !stderr.is_empty(),
+            "stderr should contain error about updating closed bead"
+        );
     } else {
         // If update succeeded, verify it actually updated
         let show_output = capture::capture_stdout(
@@ -1764,7 +1819,7 @@ fn test_update_json_closed_bead() {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         json_validation::assert_valid_json(&show_output);
@@ -1791,7 +1846,7 @@ fn test_error_json_structure_is_valid() {
                     .arg("show")
                     .arg("bf-invalid-id-xyz-999")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             stdout
         },
@@ -1804,7 +1859,7 @@ fn test_error_json_structure_is_valid() {
                     .arg("--text")
                     .arg("Test")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             stdout
         },
@@ -1829,20 +1884,32 @@ fn test_parse_errors_vs_runtime_errors() {
 
     // Parse errors: invalid command-line arguments caught by clap
     let parse_error_cases = vec![
-        (vec!["list", "--priority-min", "invalid"], "invalid priority value"),
-        (vec!["create", "--priority", "5.5", "--title", "Test"], "decimal priority"),
-        (vec!["ready", "--time-period", "invalid"], "invalid time period"),
+        (
+            vec!["list", "--priority-min", "invalid"],
+            "invalid priority value",
+        ),
+        (
+            vec!["create", "--priority", "5.5", "--title", "Test"],
+            "decimal priority",
+        ),
+        (
+            vec!["ready", "--time-period", "invalid"],
+            "invalid time period",
+        ),
     ];
 
     for (args, description) in parse_error_cases {
-        let (stdout, stderr, success) = capture::capture_failed_command(
-            &mut bf_command().args(args)
-        );
+        let (stdout, stderr, success) =
+            capture::capture_failed_command(&mut bf_command().args(args));
 
         assert!(!success, "{} should fail (parse error)", description);
 
         // Parse errors should have informative stderr
-        assert!(!stderr.is_empty(), "parse error should produce stderr output: {}", description);
+        assert!(
+            !stderr.is_empty(),
+            "parse error should produce stderr output: {}",
+            description
+        );
 
         // Stdout should be empty or valid JSON
         let stdout_trimmed = stdout.trim();
@@ -1853,19 +1920,28 @@ fn test_parse_errors_vs_runtime_errors() {
 
     // Runtime errors: valid command syntax but execution fails
     let runtime_error_cases = vec![
-        (vec!["show", "bf-nonexistent-runtime-999", "--format", "json"], "nonexistent bead"),
-        (vec!["comment", "bf-nonexistent-comment-888", "--text", "Test"], "comment on nonexistent bead"),
+        (
+            vec!["show", "bf-nonexistent-runtime-999", "--format", "json"],
+            "nonexistent bead",
+        ),
+        (
+            vec!["comment", "bf-nonexistent-comment-888", "--text", "Test"],
+            "comment on nonexistent bead",
+        ),
     ];
 
     for (args, description) in runtime_error_cases {
-        let (stdout, stderr, success) = capture::capture_failed_command(
-            &mut bf_command().args(args)
-        );
+        let (stdout, stderr, success) =
+            capture::capture_failed_command(&mut bf_command().args(args));
 
         assert!(!success, "{} should fail (runtime error)", description);
 
         // Runtime errors should have informative stderr
-        assert!(!stderr.is_empty(), "runtime error should produce stderr output: {}", description);
+        assert!(
+            !stderr.is_empty(),
+            "runtime error should produce stderr output: {}",
+            description
+        );
 
         // Stdout should be empty or valid JSON
         let stdout_trimmed = stdout.trim();
@@ -1893,7 +1969,7 @@ fn test_error_messages_properly_escaped_in_json() {
                     .arg("search")
                     .arg("test with \"quotes\" and 'apostrophes'")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             output
         },
@@ -1904,7 +1980,7 @@ fn test_error_messages_properly_escaped_in_json() {
                     .arg("search")
                     .arg("test with\nnewline\tand\ttabs")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             output
         },
@@ -1915,7 +1991,7 @@ fn test_error_messages_properly_escaped_in_json() {
                     .arg("search")
                     .arg("test with unicode: café, 日本語")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             output
         },
@@ -1947,7 +2023,7 @@ fn test_error_json_content_and_field_types() {
             .arg("show")
             .arg("bf-invalid-error-content-test")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     assert!(!success, "should fail for invalid bead ID");
@@ -1994,13 +2070,16 @@ fn test_constraint_violation_errors() {
             .arg("add")
             .arg(&bead_id)
             .arg("--blocks")
-            .arg("bf-nonexistent-constraint-test-999")
+            .arg("bf-nonexistent-constraint-test-999"),
     );
 
     assert!(!success, "should fail for foreign key constraint violation");
 
     // Stderr should mention the constraint or dependency issue
-    assert!(!stderr.is_empty(), "stderr should contain constraint error message");
+    assert!(
+        !stderr.is_empty(),
+        "stderr should contain constraint error message"
+    );
 
     // Stdout should be empty or valid JSON
     let stdout_trimmed = stdout.trim();
@@ -2028,17 +2107,14 @@ fn test_multiple_errors_formatting_consistency() {
                     .arg("show")
                     .arg("bf-invalid-1")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, "invalid bead ID")
         },
         // Scenario 2: Missing required argument
         || {
             let (stdout, _, _) = capture::capture_failed_command(
-                &mut bf_command()
-                    .arg("show")
-                    .arg("--format")
-                    .arg("json")
+                &mut bf_command().arg("show").arg("--format").arg("json"),
             );
             (stdout, "missing required argument")
         },
@@ -2050,7 +2126,7 @@ fn test_multiple_errors_formatting_consistency() {
                     .arg("--priority-min")
                     .arg("abc")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             (stdout, "invalid filter value")
         },
@@ -2082,7 +2158,7 @@ fn test_error_with_special_characters_in_stderr() {
             .arg("comment")
             .arg("bf-nonexistent-with-special-chars")
             .arg("--text")
-            .arg("Text with \"quotes\" and 'apostrophes'")
+            .arg("Text with \"quotes\" and 'apostrophes'"),
     );
 
     // Stderr should contain the error message
@@ -2121,7 +2197,7 @@ fn test_list_json_empty_results_with_multiple_filters() {
             .arg("update")
             .arg(&bead1_id)
             .arg("--priority")
-            .arg("4")
+            .arg("4"),
     );
 
     capture::capture_stdout(
@@ -2129,7 +2205,7 @@ fn test_list_json_empty_results_with_multiple_filters() {
             .arg("update")
             .arg(&bead2_id)
             .arg("--priority")
-            .arg("1")
+            .arg("1"),
     );
 
     // Test filter combination that should return no results
@@ -2141,7 +2217,7 @@ fn test_list_json_empty_results_with_multiple_filters() {
             .arg("--priority")
             .arg("3")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return valid JSONL (possibly empty)
@@ -2180,7 +2256,7 @@ fn test_search_json_empty_results_with_complex_queries() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg("This bead contains specific technical content about API endpoints")
+            .arg("This bead contains specific technical content about API endpoints"),
     );
 
     // Test complex queries that should return no results
@@ -2198,7 +2274,7 @@ fn test_search_json_empty_results_with_complex_queries() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL (possibly empty)
@@ -2208,7 +2284,10 @@ fn test_search_json_empty_results_with_complex_queries() {
         if !trimmed.is_empty() {
             // If not empty, verify results actually match
             let lines: Vec<&str> = trimmed.lines().filter(|l| !l.trim().is_empty()).collect();
-            assert!(!lines.is_empty(), "If output not empty, should have content");
+            assert!(
+                !lines.is_empty(),
+                "If output not empty, should have content"
+            );
         }
     }
 
@@ -2238,7 +2317,7 @@ fn test_ready_json_empty_results_with_specific_conditions() {
         bf_command_with_workspace(workspace)
             .arg("ready")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return valid JSONL or empty array
@@ -2249,8 +2328,11 @@ fn test_ready_json_empty_results_with_specific_conditions() {
 
         // Check if it's actually empty or just empty array representation
         let lines: Vec<&str> = trimmed.lines().filter(|l| !l.trim().is_empty()).collect();
-        assert!(lines.is_empty() || (lines.len() == 1 && lines[0] == "[]"),
-               "Ready with blocked beads should return empty or empty array, got: {}", trimmed);
+        assert!(
+            lines.is_empty() || (lines.len() == 1 && lines[0] == "[]"),
+            "Ready with blocked beads should return empty or empty array, got: {}",
+            trimmed
+        );
     }
 
     // Cleanup
@@ -2276,7 +2358,7 @@ fn test_error_json_field_consistency_across_command_types() {
                     .arg("show")
                     .arg("bf-invalid-error-test")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             ("show", stdout)
         },
@@ -2287,7 +2369,7 @@ fn test_error_json_field_consistency_across_command_types() {
                     .arg("update")
                     .arg("bf-invalid-error-test")
                     .arg("--description")
-                    .arg("test")
+                    .arg("test"),
             );
             ("update", stdout)
         },
@@ -2300,7 +2382,7 @@ fn test_error_json_field_consistency_across_command_types() {
                     .arg("--text")
                     .arg("test")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             ("comment", stdout)
         },
@@ -2324,8 +2406,13 @@ fn test_error_json_field_consistency_across_command_types() {
                 let has_data_field = json_validation::has_field(&parsed, "data");
 
                 // At least one of these should be present for object responses
-                assert!(has_error_field || has_data_field || parsed.as_object().map(|o| o.is_empty()).unwrap_or(false),
-                       "{} error response should have error field, data field, or be empty", command_name);
+                assert!(
+                    has_error_field
+                        || has_data_field
+                        || parsed.as_object().map(|o| o.is_empty()).unwrap_or(false),
+                    "{} error response should have error field, data field, or be empty",
+                    command_name
+                );
             }
         }
     }
@@ -2349,7 +2436,7 @@ fn test_error_response_with_null_and_missing_fields() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg("Should not work")
+            .arg("Should not work"),
     );
 
     // Verify error handling
@@ -2370,9 +2457,17 @@ fn test_error_response_with_null_and_missing_fields() {
                 if let Some(obj) = parsed.as_object() {
                     for (key, value) in obj {
                         // All values should be proper JSON types (including null)
-                        assert!(value.is_string() || value.is_number() || value.as_bool().is_some() ||
-                               value.is_null() || value.is_array() || value.is_object(),
-                               "Field '{}' should be valid JSON type, got: {:?}", key, value);
+                        assert!(
+                            value.is_string()
+                                || value.is_number()
+                                || value.as_bool().is_some()
+                                || value.is_null()
+                                || value.is_array()
+                                || value.is_object(),
+                            "Field '{}' should be valid JSON type, got: {:?}",
+                            key,
+                            value
+                        );
                     }
                 }
             }
@@ -2414,7 +2509,7 @@ fn test_search_json_with_path_traversal_attempts() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL without crashing
@@ -2454,7 +2549,7 @@ fn test_search_json_with_command_injection_attempts() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL and not execute commands
@@ -2495,7 +2590,7 @@ fn test_search_json_with_format_string_attempts() {
                 .arg("search")
                 .arg(query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL and not crash
@@ -2522,7 +2617,7 @@ fn test_list_json_with_all_filter_combinations_empty() {
             .arg("update")
             .arg(&bead1_id)
             .arg("--priority")
-            .arg("3")
+            .arg("3"),
     );
 
     capture::capture_stdout(
@@ -2530,7 +2625,7 @@ fn test_list_json_with_all_filter_combinations_empty() {
             .arg("update")
             .arg(&bead2_id)
             .arg("--priority")
-            .arg("2")
+            .arg("2"),
     );
 
     // Test filter combinations that should return empty results
@@ -2541,14 +2636,18 @@ fn test_list_json_with_all_filter_combinations_empty() {
             .arg("--status")
             .arg("blocked")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
     json_validation::assert_valid_jsonl(&output1);
     let trimmed1 = output1.trim();
     if !trimmed1.is_empty() {
         let lines: Vec<&str> = trimmed1.lines().filter(|l| !l.trim().is_empty()).collect();
-        assert!(lines.is_empty() || json_validation::get_string(&json_validation::parse_json(lines[0]), "status") == "blocked",
-               "Results should match blocked status filter");
+        assert!(
+            lines.is_empty()
+                || json_validation::get_string(&json_validation::parse_json(lines[0]), "status")
+                    == "blocked",
+            "Results should match blocked status filter"
+        );
     }
 
     // Test 2: Type that doesn't exist
@@ -2558,10 +2657,13 @@ fn test_list_json_with_all_filter_combinations_empty() {
             .arg("--type")
             .arg("nonexistent-type")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
     json_validation::assert_valid_jsonl(&output2);
-    assert!(output2.trim().is_empty() || output2.trim() == "[]", "Nonexistent type should return empty");
+    assert!(
+        output2.trim().is_empty() || output2.trim() == "[]",
+        "Nonexistent type should return empty"
+    );
 
     // Test 3: Priority that doesn't match any bead
     let output3 = capture::capture_stdout(
@@ -2570,10 +2672,13 @@ fn test_list_json_with_all_filter_combinations_empty() {
             .arg("--priority")
             .arg("999")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
     json_validation::assert_valid_jsonl(&output3);
-    assert!(output3.trim().is_empty() || output3.trim() == "[]", "Non-matching priority should return empty");
+    assert!(
+        output3.trim().is_empty() || output3.trim() == "[]",
+        "Non-matching priority should return empty"
+    );
 
     // Test 4: Assignee that doesn't exist
     let output4 = capture::capture_stdout(
@@ -2582,10 +2687,13 @@ fn test_list_json_with_all_filter_combinations_empty() {
             .arg("--assignee")
             .arg("nonexistent@example.com")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
     json_validation::assert_valid_jsonl(&output4);
-    assert!(output4.trim().is_empty() || output4.trim() == "[]", "Nonexistent assignee should return empty");
+    assert!(
+        output4.trim().is_empty() || output4.trim() == "[]",
+        "Nonexistent assignee should return empty"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1_id, "Filter combination cleanup 1");

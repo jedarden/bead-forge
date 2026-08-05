@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Path::new("/home/coding/bead-forge"),
         "bf-5wg4sb",
         &metadata,
-        &["--test", "test_version_display"]
+        &["--test", "test_version_display"],
     )?;
 
     println!("\n=== TRACE CAPTURE VERIFICATION RESULTS ===\n");
@@ -43,7 +43,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Verify timing information
     println!("✓ Execution time recorded");
-    println!("  Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+    println!(
+        "  Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
     if let Some(ref start) = result.start_time {
         println!("  Start time: {}", start);
     }
@@ -61,17 +65,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stderr_path = result.bead_trace_dir.join("stderr.txt");
 
     println!("\n✓ Trace files generated:");
-    println!("  metadata.json: {} ({} bytes)",
+    println!(
+        "  metadata.json: {} ({} bytes)",
         if metadata_path.exists() { "✓" } else { "✗" },
-        metadata_path.exists().then(|| std::fs::metadata(&metadata_path).map(|m| m.len()).unwrap_or(0)).unwrap_or(0)
+        metadata_path
+            .exists()
+            .then(|| std::fs::metadata(&metadata_path)
+                .map(|m| m.len())
+                .unwrap_or(0))
+            .unwrap_or(0)
     );
-    println!("  stdout.txt: {} ({} bytes)",
+    println!(
+        "  stdout.txt: {} ({} bytes)",
         if stdout_path.exists() { "✓" } else { "✗" },
-        stdout_path.exists().then(|| std::fs::metadata(&stdout_path).map(|m| m.len()).unwrap_or(0)).unwrap_or(0)
+        stdout_path
+            .exists()
+            .then(|| std::fs::metadata(&stdout_path)
+                .map(|m| m.len())
+                .unwrap_or(0))
+            .unwrap_or(0)
     );
-    println!("  stderr.txt: {} ({} bytes)",
+    println!(
+        "  stderr.txt: {} ({} bytes)",
         if stderr_path.exists() { "✓" } else { "✗" },
-        stderr_path.exists().then(|| std::fs::metadata(&stderr_path).map(|m| m.len()).unwrap_or(0)).unwrap_or(0)
+        stderr_path
+            .exists()
+            .then(|| std::fs::metadata(&stderr_path)
+                .map(|m| m.len())
+                .unwrap_or(0))
+            .unwrap_or(0)
     );
 
     // Verify output capture
@@ -85,10 +107,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if metadata_path.exists() {
         let content = std::fs::read_to_string(&metadata_path)?;
         println!("\n✓ Timing information in metadata:");
-        println!("  Contains start_time: {}", content.contains("\"start_time\""));
+        println!(
+            "  Contains start_time: {}",
+            content.contains("\"start_time\"")
+        );
         println!("  Contains end_time: {}", content.contains("\"end_time\""));
-        println!("  Contains duration_ms: {}", content.contains("\"duration_ms\""));
-        println!("  Contains exit_code: {}", content.contains("\"exit_code\""));
+        println!(
+            "  Contains duration_ms: {}",
+            content.contains("\"duration_ms\"")
+        );
+        println!(
+            "  Contains exit_code: {}",
+            content.contains("\"exit_code\"")
+        );
 
         // Parse and display metadata
         let trace_metadata: TraceMetadata = serde_json::from_str(&content)?;
@@ -110,7 +141,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let first_lines: Vec<&str> = stdout_content.lines().take(5).collect();
         println!("  First 5 lines of stdout:");
         for (i, line) in first_lines.iter().enumerate() {
-            println!("    {}: {}", i+1, line);
+            println!("    {}: {}", i + 1, line);
         }
     }
 
@@ -122,7 +153,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let first_lines: Vec<&str> = stderr_content.lines().take(3).collect();
             println!("  First 3 lines of stderr:");
             for (i, line) in first_lines.iter().enumerate() {
-                println!("    {}: {}", i+1, line);
+                println!("    {}: {}", i + 1, line);
             }
         } else {
             println!("  stderr.txt is empty (expected for successful tests)");

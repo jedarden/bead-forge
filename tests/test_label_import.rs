@@ -3,9 +3,9 @@
 //! This test verifies that labels are properly imported from JSONL during
 //! `bf sync --import` or database rebuild operations.
 
-use bead_forge::sync;
-use bead_forge::model::{Issue, Priority, Status, IssueType};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
+use bead_forge::sync;
 use chrono::Utc;
 use std::fs;
 use std::io::Write;
@@ -34,14 +34,23 @@ fn test_label_import_from_jsonl() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
         source_repo: Some(".".to_string()),
-        labels: vec!["phase-1".to_string(), "storage".to_string(), "critical".to_string()],
+        labels: vec![
+            "phase-1".to_string(),
+            "storage".to_string(),
+            "critical".to_string(),
+        ],
         ..Default::default()
     };
 
     // Write to JSONL
     {
         let mut file = fs::File::create(&jsonl_path).unwrap();
-        writeln!(file, "{}", serde_json::to_string(&issue_with_labels).unwrap()).unwrap();
+        writeln!(
+            file,
+            "{}",
+            serde_json::to_string(&issue_with_labels).unwrap()
+        )
+        .unwrap();
     }
 
     // Import from JSONL
@@ -58,9 +67,18 @@ fn test_label_import_from_jsonl() {
 
     // Labels are unordered - compare as sets
     assert_eq!(imported.labels.len(), 3, "Should have 3 labels");
-    assert!(imported.labels.contains(&"phase-1".to_string()), "Should contain phase-1 label");
-    assert!(imported.labels.contains(&"storage".to_string()), "Should contain storage label");
-    assert!(imported.labels.contains(&"critical".to_string()), "Should contain critical label");
+    assert!(
+        imported.labels.contains(&"phase-1".to_string()),
+        "Should contain phase-1 label"
+    );
+    assert!(
+        imported.labels.contains(&"storage".to_string()),
+        "Should contain storage label"
+    );
+    assert!(
+        imported.labels.contains(&"critical".to_string()),
+        "Should contain critical label"
+    );
 }
 
 #[test]
@@ -97,7 +115,11 @@ fn test_label_import_with_empty_labels() {
     let storage = Storage::open(&db_path).unwrap();
     let imported = storage.get_issue("bf-no-labels").unwrap().unwrap();
 
-    assert_eq!(imported.labels, Vec::<String>::new(), "Issue should have no labels");
+    assert_eq!(
+        imported.labels,
+        Vec::<String>::new(),
+        "Issue should have no labels"
+    );
 }
 
 #[test]
@@ -127,7 +149,10 @@ fn test_label_import_null_field_rejected() {
     // Import from JSONL should fail because null is not a valid value for labels array
     let result = sync::import(workspace);
 
-    assert!(result.is_err(), "Import should fail when labels field is null");
+    assert!(
+        result.is_err(),
+        "Import should fail when labels field is null"
+    );
     let err = result.unwrap_err();
     let err_msg = err.to_string();
     assert!(
@@ -164,13 +189,20 @@ fn test_label_import_empty_array() {
     // Import from JSONL
     let result = sync::import(workspace).unwrap();
 
-    assert_eq!(result.imported, 1, "Should import 1 issue with empty labels array");
+    assert_eq!(
+        result.imported, 1,
+        "Should import 1 issue with empty labels array"
+    );
 
     // Verify the issue was imported with no labels
     let storage = Storage::open(&db_path).unwrap();
     let imported = storage.get_issue("bf-empty-array").unwrap().unwrap();
 
-    assert_eq!(imported.labels, Vec::<String>::new(), "Issue with empty labels array should have no labels");
+    assert_eq!(
+        imported.labels,
+        Vec::<String>::new(),
+        "Issue with empty labels array should have no labels"
+    );
 }
 
 #[test]
@@ -207,13 +239,25 @@ fn test_label_import_mixed_empty_scenarios() {
     let storage = Storage::open(&db_path).unwrap();
 
     let missing = storage.get_issue("bf-mixed-missing").unwrap().unwrap();
-    assert_eq!(missing.labels, Vec::<String>::new(), "Missing labels should be empty");
+    assert_eq!(
+        missing.labels,
+        Vec::<String>::new(),
+        "Missing labels should be empty"
+    );
 
     let empty = storage.get_issue("bf-mixed-empty").unwrap().unwrap();
-    assert_eq!(empty.labels, Vec::<String>::new(), "Empty array labels should be empty");
+    assert_eq!(
+        empty.labels,
+        Vec::<String>::new(),
+        "Empty array labels should be empty"
+    );
 
     let valid = storage.get_issue("bf-mixed-valid").unwrap().unwrap();
-    assert_eq!(valid.labels, vec!["phase-1"], "Valid labels should be preserved");
+    assert_eq!(
+        valid.labels,
+        vec!["phase-1"],
+        "Valid labels should be preserved"
+    );
 }
 
 #[test]
@@ -237,7 +281,11 @@ fn test_label_import_roundtrip() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
         source_repo: Some(".".to_string()),
-        labels: vec!["bug".to_string(), "backend".to_string(), "urgent".to_string()],
+        labels: vec![
+            "bug".to_string(),
+            "backend".to_string(),
+            "urgent".to_string(),
+        ],
         ..Default::default()
     };
 
@@ -260,9 +308,18 @@ fn test_label_import_roundtrip() {
     let imported = storage2.get_issue("bf-roundtrip").unwrap().unwrap();
 
     assert_eq!(imported.labels.len(), 3, "Should have 3 labels");
-    assert!(imported.labels.contains(&"bug".to_string()), "Should contain 'bug' label");
-    assert!(imported.labels.contains(&"backend".to_string()), "Should contain 'backend' label");
-    assert!(imported.labels.contains(&"urgent".to_string()), "Should contain 'urgent' label");
+    assert!(
+        imported.labels.contains(&"bug".to_string()),
+        "Should contain 'bug' label"
+    );
+    assert!(
+        imported.labels.contains(&"backend".to_string()),
+        "Should contain 'backend' label"
+    );
+    assert!(
+        imported.labels.contains(&"urgent".to_string()),
+        "Should contain 'urgent' label"
+    );
 }
 
 #[test]
@@ -299,21 +356,40 @@ fn test_label_import_idempotent() {
     sync::import(workspace).unwrap();
     let result2 = sync::import(workspace).unwrap();
 
-    assert_eq!(result2.imported, 0, "Second import should not create new issues");
-    assert_eq!(result2.skipped, 1, "Second import should skip existing issue");
+    assert_eq!(
+        result2.imported, 0,
+        "Second import should not create new issues"
+    );
+    assert_eq!(
+        result2.skipped, 1,
+        "Second import should skip existing issue"
+    );
 
     // Verify no duplicate labels
     let storage = Storage::open(&db_path).unwrap();
     let imported = storage.get_issue("bf-idempotent").unwrap().unwrap();
 
-    assert_eq!(imported.labels, vec!["test"], "Should have exactly one label");
+    assert_eq!(
+        imported.labels,
+        vec!["test"],
+        "Should have exactly one label"
+    );
 
     // Check database directly for duplicates
     let conn = storage.conn.lock().unwrap();
     let mut stmt = conn
-        .prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = 'bf-idempotent' AND label = 'test'")
+        .prepare(
+            "SELECT COUNT(*) FROM bead_labels WHERE bead_id = 'bf-idempotent' AND label = 'test'",
+        )
         .unwrap();
-    let count: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+    let count: i64 = stmt
+        .query([])
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .get(0)
+        .unwrap();
     assert_eq!(count, 1, "Should have exactly one label entry in database");
 }
 
@@ -538,21 +614,34 @@ fn test_label_roundtrip_verification_comprehensive() {
 
     // Verify they were created correctly
     let all_issues = storage.list_all_issues().unwrap();
-    assert_eq!(all_issues.len(), test_cases.len(), "All test issues should be created");
+    assert_eq!(
+        all_issues.len(),
+        test_cases.len(),
+        "All test issues should be created"
+    );
 
     // Step 2: Run sync --flush-only (export to JSONL)
     let export_count = sync::flush(workspace).unwrap();
-    assert_eq!(export_count, test_cases.len(), "All issues should be exported");
+    assert_eq!(
+        export_count,
+        test_cases.len(),
+        "All issues should be exported"
+    );
 
     // Verify JSONL file was created and contains our data
     assert!(jsonl_path.exists(), "JSONL file should exist after flush");
     let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
     let lines: Vec<&str> = jsonl_content.lines().collect();
-    assert_eq!(lines.len(), test_cases.len(), "JSONL should have one line per issue");
+    assert_eq!(
+        lines.len(),
+        test_cases.len(),
+        "JSONL should have one line per issue"
+    );
 
     // Verify labels are in the JSONL
     for issue in &test_cases {
-        let json_line = lines.iter()
+        let json_line = lines
+            .iter()
             .find(|line| line.contains(&format!("\"id\":\"{}\"", issue.id)))
             .expect(&format!("Issue {} should be in JSONL", issue.id));
 
@@ -600,7 +689,11 @@ fn test_label_roundtrip_verification_comprehensive() {
 
     // Step 4: Run sync --import (restore from JSONL)
     let result = sync::import(workspace).unwrap();
-    assert_eq!(result.imported, test_cases.len(), "All issues should be imported");
+    assert_eq!(
+        result.imported,
+        test_cases.len(),
+        "All issues should be imported"
+    );
 
     // Step 5: Verify all labels are restored correctly
     let storage2 = Storage::open(&db_path).unwrap();
@@ -618,14 +711,9 @@ fn test_label_roundtrip_verification_comprehensive() {
             .unwrap()
             .expect(&format!("Issue {} should be imported", original_issue.id));
 
+        assert_eq!(imported.id, original_issue.id, "Issue ID should match");
         assert_eq!(
-            imported.id,
-            original_issue.id,
-            "Issue ID should match"
-        );
-        assert_eq!(
-            imported.title,
-            original_issue.title,
+            imported.title, original_issue.title,
             "Issue title should match for {}",
             original_issue.id
         );
@@ -655,8 +743,7 @@ fn test_label_roundtrip_verification_comprehensive() {
         let mut original_labels_sorted = original_issue.labels.clone();
         original_labels_sorted.sort();
         assert_eq!(
-            imported_labels_sorted,
-            original_labels_sorted,
+            imported_labels_sorted, original_labels_sorted,
             "Issue {} labels should match exactly after round-trip",
             original_issue.id
         );
@@ -667,18 +754,21 @@ fn test_label_roundtrip_verification_comprehensive() {
 
     // Check total label count
     let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
-    let total_labels: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+    let total_labels: i64 = stmt
+        .query([])
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .get(0)
+        .unwrap();
 
-    let expected_total: usize = test_cases.iter()
-        .map(|issue| issue.labels.len())
-        .sum();
+    let expected_total: usize = test_cases.iter().map(|issue| issue.labels.len()).sum();
 
     assert_eq!(
-        total_labels as usize,
-        expected_total,
+        total_labels as usize, expected_total,
         "Total label count should match: expected {}, got {}",
-        expected_total,
-        total_labels
+        expected_total, total_labels
     );
 
     // Check each issue's label count in database
@@ -689,7 +779,14 @@ fn test_label_roundtrip_verification_comprehensive() {
                 issue.id
             ))
             .unwrap();
-        let count: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+        let count: i64 = stmt
+            .query([])
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .get(0)
+            .unwrap();
 
         assert_eq!(
             count as usize,
@@ -835,7 +932,11 @@ fn test_label_multiple_import_cycles() {
         );
 
         // Verify JSONL file exists and has correct content
-        assert!(jsonl_path.exists(), "Cycle {}: JSONL should exist after flush", cycle + 1);
+        assert!(
+            jsonl_path.exists(),
+            "Cycle {}: JSONL should exist after flush",
+            cycle + 1
+        );
         let jsonl_content = fs::read_to_string(&jsonl_path).unwrap();
         let lines: Vec<&str> = jsonl_content.lines().collect();
         assert_eq!(
@@ -848,7 +949,11 @@ fn test_label_multiple_import_cycles() {
 
         // Clear database
         fs::remove_file(&db_path).unwrap();
-        assert!(!db_path.exists(), "Cycle {}: Database should be deleted", cycle + 1);
+        assert!(
+            !db_path.exists(),
+            "Cycle {}: Database should be deleted",
+            cycle + 1
+        );
 
         // Import from JSONL
         let result = sync::import(workspace).unwrap();
@@ -876,7 +981,11 @@ fn test_label_multiple_import_cycles() {
             let imported = storage2
                 .get_issue(&original_issue.id)
                 .unwrap()
-                .expect(&format!("Cycle {}: Issue {} should be imported", cycle + 1, original_issue.id));
+                .expect(&format!(
+                    "Cycle {}: Issue {} should be imported",
+                    cycle + 1,
+                    original_issue.id
+                ));
 
             assert_eq!(
                 imported.id,
@@ -933,7 +1042,14 @@ fn test_label_multiple_import_cycles() {
         // Check total label count in database
         let total_labels: i64 = {
             let mut stmt = conn.prepare("SELECT COUNT(*) FROM bead_labels").unwrap();
-            let count = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+            let count = stmt
+                .query([])
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap()
+                .get(0)
+                .unwrap();
             drop(stmt);
             count
         };
@@ -957,7 +1073,14 @@ fn test_label_multiple_import_cycles() {
                         issue.id
                     ))
                     .unwrap();
-                let distinct_count: i64 = stmt.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+                let distinct_count: i64 = stmt
+                    .query([])
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .unwrap()
+                    .get(0)
+                    .unwrap();
 
                 let mut stmt2 = conn
                     .prepare(&format!(
@@ -965,7 +1088,14 @@ fn test_label_multiple_import_cycles() {
                         issue.id
                     ))
                     .unwrap();
-                let total_count: i64 = stmt2.query([]).unwrap().next().unwrap().unwrap().get(0).unwrap();
+                let total_count: i64 = stmt2
+                    .query([])
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .unwrap()
+                    .get(0)
+                    .unwrap();
 
                 assert_eq!(
                     distinct_count,
@@ -999,7 +1129,10 @@ fn test_label_multiple_import_cycles() {
 
     // Final label integrity check
     for original_issue in &test_issues {
-        let final_issue = final_storage.get_issue(&original_issue.id).unwrap().unwrap();
+        let final_issue = final_storage
+            .get_issue(&original_issue.id)
+            .unwrap()
+            .unwrap();
 
         let mut final_labels_sorted = final_issue.labels.clone();
         final_labels_sorted.sort();
@@ -1007,8 +1140,7 @@ fn test_label_multiple_import_cycles() {
         original_labels_sorted.sort();
 
         assert_eq!(
-            final_labels_sorted,
-            original_labels_sorted,
+            final_labels_sorted, original_labels_sorted,
             "After all cycles: Issue {} labels should match original",
             original_issue.id
         );

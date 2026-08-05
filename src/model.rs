@@ -1757,8 +1757,14 @@ mod tests {
         assert_eq!(issue.title, "Test bead");
         assert_eq!(issue.priority, Priority::HIGH);
         assert_eq!(issue.status, Status::Open);
-        assert_eq!(issue.created_at, Utc.timestamp_opt(1_700_000_000, 0).unwrap());
-        assert_eq!(issue.labels, vec!["urgent".to_string(), "backend".to_string()]);
+        assert_eq!(
+            issue.created_at,
+            Utc.timestamp_opt(1_700_000_000, 0).unwrap()
+        );
+        assert_eq!(
+            issue.labels,
+            vec!["urgent".to_string(), "backend".to_string()]
+        );
     }
 
     #[test]

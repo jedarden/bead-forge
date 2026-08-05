@@ -40,9 +40,17 @@ fn init_workspace() -> TempDir {
 
 fn create_bead(workspace: &std::path::Path, title: &str, extra: &[&str]) -> String {
     let mut cmd = Command::new(bf_path());
-    cmd.args(["create", "--title", title, "--type", "task", "--priority", "2"])
-        .args(extra)
-        .current_dir(workspace);
+    cmd.args([
+        "create",
+        "--title",
+        title,
+        "--type",
+        "task",
+        "--priority",
+        "2",
+    ])
+    .args(extra)
+    .current_dir(workspace);
     let out = cmd.output().expect("Failed to create bead");
     assert!(
         out.status.success(),
@@ -72,8 +80,8 @@ fn ready_json(workspace: &std::path::Path) -> std::collections::HashMap<String, 
         if line.is_empty() || line == "[]" {
             continue;
         }
-        let v: serde_json::Value =
-            serde_json::from_str(line).unwrap_or_else(|e| panic!("invalid JSON line {line:?}: {e}"));
+        let v: serde_json::Value = serde_json::from_str(line)
+            .unwrap_or_else(|e| panic!("invalid JSON line {line:?}: {e}"));
         if let Some(id) = v.get("id").and_then(|i| i.as_str()) {
             map.insert(id.to_string(), v);
         }

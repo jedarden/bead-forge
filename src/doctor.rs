@@ -227,7 +227,7 @@ fn check_stale_blocked_statuses(db_path: &Path) -> Result<Vec<String>> {
             AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')
         ) = 0
         ORDER BY i.id
-        "#
+        "#,
     )?;
 
     let ids = stmt
@@ -244,9 +244,8 @@ fn check_stale_blocked_statuses(db_path: &Path) -> Result<Vec<String>> {
 fn check_empty_assignees(db_path: &Path) -> Result<Vec<String>> {
     let conn = Connection::open(db_path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
-    let mut stmt = conn.prepare(
-        "SELECT id FROM issues WHERE assignee = '' AND deleted_at IS NULL ORDER BY id",
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT id FROM issues WHERE assignee = '' AND deleted_at IS NULL ORDER BY id")?;
     let ids = stmt
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -301,7 +300,10 @@ fn not_null_columns(conn: &Connection) -> Result<Vec<NotNullColumn>> {
     let mut cols = Vec::new();
     for table in user_tables(conn)? {
         // PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
-        let mut stmt = conn.prepare(&format!("PRAGMA table_info(\"{}\")", table.replace('"', "\"\"")))?;
+        let mut stmt = conn.prepare(&format!(
+            "PRAGMA table_info(\"{}\")",
+            table.replace('"', "\"\"")
+        ))?;
         let rows = stmt
             .query_map([], |row| {
                 let name: String = row.get(1)?;
@@ -1216,9 +1218,10 @@ pub fn repair_stack(workspace_dir: &Path, opts: &RepairOptions) -> Result<Repair
         // Only possible if the DB is readable; skip silently on a corrupt DB.
         if let Ok(storage) = Storage::open(&db_path) {
             if let Ok(flushed) = storage.sync_to_jsonl(&jsonl_path, false) {
-                report
-                    .messages
-                    .push(format!("Flushed {} bead(s) to JSONL before rebuild", flushed));
+                report.messages.push(format!(
+                    "Flushed {} bead(s) to JSONL before rebuild",
+                    flushed
+                ));
             }
         }
     }

@@ -35,7 +35,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Run each test module sequentially with trace capture
     for (i, (module, description)) in test_modules.iter().enumerate() {
-        println!("=== Running test module {}/{}: {} ===", i + 1, test_modules.len(), module);
+        println!(
+            "=== Running test module {}/{}: {} ===",
+            i + 1,
+            test_modules.len(),
+            module
+        );
         println!("Description: {}\n", description);
 
         // Create metadata for this test run
@@ -55,12 +60,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Path::new("/home/coding/bead-forge"),
             "bf-2vwrhb",
             &metadata,
-            &["--test", module]
+            &["--test", module],
         )?;
 
         println!("✓ Test module {} completed", module);
         println!("  Exit code: {}", result.exit_code);
-        println!("  Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+        println!(
+            "  Duration: {}ms ({:.2}s)",
+            result.duration_ms,
+            result.duration_ms as f64 / 1000.0
+        );
         println!("  Start time: {:?}", result.start_time);
         println!("  End time: {:?}", result.end_time);
         println!("  Trace directory: {}", result.bead_trace_dir.display());
@@ -71,22 +80,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let stderr_path = result.bead_trace_dir.join("stderr.txt");
 
         println!("  Trace files:");
-        println!("    metadata.json: {} ({} bytes)",
+        println!(
+            "    metadata.json: {} ({} bytes)",
             if metadata_path.exists() { "✓" } else { "✗" },
-            metadata_path.exists().then(|| std::fs::metadata(&metadata_path).map(|m| m.len()).unwrap_or(0)).unwrap_or(0)
+            metadata_path
+                .exists()
+                .then(|| std::fs::metadata(&metadata_path)
+                    .map(|m| m.len())
+                    .unwrap_or(0))
+                .unwrap_or(0)
         );
-        println!("    stdout.txt: {} ({} bytes)",
+        println!(
+            "    stdout.txt: {} ({} bytes)",
             if stdout_path.exists() { "✓" } else { "✗" },
-            stdout_path.exists().then(|| std::fs::metadata(&stdout_path).map(|m| m.len()).unwrap_or(0)).unwrap_or(0)
+            stdout_path
+                .exists()
+                .then(|| std::fs::metadata(&stdout_path)
+                    .map(|m| m.len())
+                    .unwrap_or(0))
+                .unwrap_or(0)
         );
-        println!("    stderr.txt: {} ({} bytes)",
+        println!(
+            "    stderr.txt: {} ({} bytes)",
             if stderr_path.exists() { "✓" } else { "✗" },
-            stderr_path.exists().then(|| std::fs::metadata(&stderr_path).map(|m| m.len()).unwrap_or(0)).unwrap_or(0)
+            stderr_path
+                .exists()
+                .then(|| std::fs::metadata(&stderr_path)
+                    .map(|m| m.len())
+                    .unwrap_or(0))
+                .unwrap_or(0)
         );
 
         println!("  Output capture:");
-        println!("    Stdout: {} bytes, {} lines", result.stdout.len(), result.stdout.lines().count());
-        println!("    Stderr: {} bytes, {} lines", result.stderr.len(), result.stderr.lines().count());
+        println!(
+            "    Stdout: {} bytes, {} lines",
+            result.stdout.len(),
+            result.stdout.lines().count()
+        );
+        println!(
+            "    Stderr: {} bytes, {} lines",
+            result.stderr.len(),
+            result.stderr.lines().count()
+        );
 
         trace_dirs.push(result.bead_trace_dir);
         println!();
@@ -115,7 +150,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let stderr_path = dir.join("stderr.txt");
 
         let all_exist = metadata_path.exists() && stdout_path.exists() && stderr_path.exists();
-        println!("  Module {}: {}", i + 1, if all_exist { "✓ Complete" } else { "✗ Incomplete" });
+        println!(
+            "  Module {}: {}",
+            i + 1,
+            if all_exist {
+                "✓ Complete"
+            } else {
+                "✗ Incomplete"
+            }
+        );
     }
 
     // Verify timing information is captured for each module
@@ -127,16 +170,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let has_timing = content.contains("\"start_time\"")
                 && content.contains("\"end_time\"")
                 && content.contains("\"duration_ms\"");
-            println!("  Module {}: {}", i + 1, if has_timing { "✓ Timing recorded" } else { "✗ Timing missing" });
+            println!(
+                "  Module {}: {}",
+                i + 1,
+                if has_timing {
+                    "✓ Timing recorded"
+                } else {
+                    "✗ Timing missing"
+                }
+            );
         }
     }
 
     println!("\n=== ACCEPTANCE CRITERIA VERIFICATION ===");
-    println!("✓ Selected 2-3 representative test modules: {} modules selected", test_modules.len());
+    println!(
+        "✓ Selected 2-3 representative test modules: {} modules selected",
+        test_modules.len()
+    );
     println!("✓ Run each module with trace capture enabled: All modules executed");
-    println!("✓ Verify each module generates its own trace file: {} unique directories", trace_dirs.len());
+    println!(
+        "✓ Verify each module generates its own trace file: {} unique directories",
+        trace_dirs.len()
+    );
     println!("✓ Confirm no conflicts between concurrent trace writes: All directories distinct");
-    println!("✓ All modules complete with output captured: {} modules finished", trace_dirs.len());
+    println!(
+        "✓ All modules complete with output captured: {} modules finished",
+        trace_dirs.len()
+    );
 
     println!("\n=== VERIFICATION COMPLETE ===");
     println!("All acceptance criteria met. Multi-module trace capture scales correctly.");

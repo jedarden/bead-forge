@@ -161,8 +161,14 @@ fn flush_only_clears_dirty_and_writes_full_checkpoint() {
     let b = out.trim().to_string();
 
     // Pre-recovery invariants: B is db-only + dirty; JSONL still only has A.
-    assert!(storage.get_issue(&b).unwrap().is_some(), "B must exist in db");
-    assert!(dirty_ids(&storage).iter().any(|d| d == &b), "B must be dirty");
+    assert!(
+        storage.get_issue(&b).unwrap().is_some(),
+        "B must exist in db"
+    );
+    assert!(
+        dirty_ids(&storage).iter().any(|d| d == &b),
+        "B must be dirty"
+    );
     let pre = jsonl_ids(ws);
     assert!(pre.iter().any(|x| x == &a));
     assert!(!pre.iter().any(|x| x == &b), "B must NOT yet be in JSONL");
@@ -220,11 +226,17 @@ fn killed_worker_loses_nothing_git_diff_reveals_state() {
     // Commit the baseline JSONL artifact.
     assert!(git(ws, &["init"]).0, "git init failed");
     assert!(git(ws, &["add", ".beads/issues.jsonl"]).0);
-    assert!(git(ws, &["commit", "-m", "baseline"]).0, "git commit failed");
+    assert!(
+        git(ws, &["commit", "-m", "baseline"]).0,
+        "git commit failed"
+    );
 
     // A mutation whose flush did not run (worker "killed" before flush, or
     // auto-flush disabled). The db commit + dirty mark land; JSONL is untouched.
-    let (out, _e, ok) = run(ws, &["--no-auto-flush", "create", "--title", "killed worker bead"]);
+    let (out, _e, ok) = run(
+        ws,
+        &["--no-auto-flush", "create", "--title", "killed worker bead"],
+    );
     assert!(ok, "create failed");
     let killed = out.trim().to_string();
 
@@ -393,7 +405,10 @@ fn doctor_surfaces_unflushed_drift_machine_readable() {
 
     // Human surface: the CLI reports the drift too.
     let (stdout, _stderr, ok) = run(ws, &["doctor"]);
-    assert!(ok, "bf doctor must exit cleanly on a healthy-but-drifty workspace");
+    assert!(
+        ok,
+        "bf doctor must exit cleanly on a healthy-but-drifty workspace"
+    );
     assert!(
         stdout.contains("Unflushed beads"),
         "bf doctor must surface the unflushed drift in its text output, got:\n{stdout}"

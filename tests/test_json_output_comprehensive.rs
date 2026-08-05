@@ -16,10 +16,10 @@
 //! - Edge cases covered (empty results, multiple items, special characters, etc.)
 //! - All tests pass with cargo test
 
+use serde_json::{from_str, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-use serde_json::{Value, from_str};
 
 fn bf() -> Command {
     Command::new(env!("CARGO_BIN_EXE_bf"))
@@ -49,7 +49,18 @@ fn setup() -> (TempDir, PathBuf) {
 
 /// Create a test bead with the given title
 fn create_bead(workspace: &Path, title: &str) -> String {
-    let (out, err, ok) = run_bf(workspace, &["create", "--title", title, "--type", "task", "--priority", "2"]);
+    let (out, err, ok) = run_bf(
+        workspace,
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
+    );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
     assert!(!id.is_empty(), "create produced no id: {out}");
@@ -60,7 +71,17 @@ fn create_bead(workspace: &Path, title: &str) -> String {
 fn create_bead_with_description(workspace: &Path, title: &str, description: &str) -> String {
     let (out, err, ok) = run_bf(
         workspace,
-        &["create", "--title", title, "--type", "task", "--priority", "2", "--description", description],
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+            "--description",
+            description,
+        ],
     );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
@@ -70,7 +91,10 @@ fn create_bead_with_description(workspace: &Path, title: &str, description: &str
 
 /// Update a bead's description
 fn update_bead_description(workspace: &Path, bead_id: &str, description: &str) {
-    let (_out, err, ok) = run_bf(workspace, &["update", bead_id, "--description", description]);
+    let (_out, err, ok) = run_bf(
+        workspace,
+        &["update", bead_id, "--description", description],
+    );
     assert!(ok, "Failed to update bead description: {err}");
 }
 
@@ -106,9 +130,7 @@ fn add_dependency(workspace: &Path, blocked: &str, blocker: &str) {
 
 /// Parse a JSON string and panic if invalid
 fn parse_json(json: &str) -> Value {
-    from_str(json).unwrap_or_else(|e| {
-        panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-    })
+    from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
 }
 
 /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -175,14 +197,32 @@ fn test_list_json_single_item() {
     assert_eq!(get_string(bead, "title"), "Test list single item");
 
     // Verify required fields are present
-    assert!(bead.get("status").is_some(), "status field should be present");
-    assert!(bead.get("priority").is_some(), "priority field should be present");
-    assert!(bead.get("issue_type").is_some(), "issue_type field should be present");
-    assert!(bead.get("created_at").is_some(), "created_at field should be present");
+    assert!(
+        bead.get("status").is_some(),
+        "status field should be present"
+    );
+    assert!(
+        bead.get("priority").is_some(),
+        "priority field should be present"
+    );
+    assert!(
+        bead.get("issue_type").is_some(),
+        "issue_type field should be present"
+    );
+    assert!(
+        bead.get("created_at").is_some(),
+        "created_at field should be present"
+    );
 
     // Verify assignee and labels are present (even if empty/null)
-    assert!(bead.get("assignee").is_some(), "assignee field should be present");
-    assert!(bead.get("labels").is_some(), "labels field should be present");
+    assert!(
+        bead.get("assignee").is_some(),
+        "assignee field should be present"
+    );
+    assert!(
+        bead.get("labels").is_some(),
+        "labels field should be present"
+    );
 }
 
 #[test]
@@ -215,7 +255,10 @@ fn test_list_json_with_status_filter() {
     close_bead(&workspace, &closed_bead, "Test close");
 
     // List only open beads
-    let (out, err, ok) = run_bf(&workspace, &["list", "--status", "open", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["list", "--status", "open", "--format", "json"],
+    );
     assert!(ok, "list with status filter failed: {err}");
 
     let parsed = parse_jsonl(&out);
@@ -229,7 +272,10 @@ fn test_list_json_with_type_filter() {
     let (_temp, workspace) = setup();
 
     create_bead(&workspace, "Task bead");
-    let (out, err, ok) = run_bf(&workspace, &["create", "--title", "Epic bead", "--type", "epic"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["create", "--title", "Epic bead", "--type", "epic"],
+    );
     assert!(ok, "create epic failed: {err}");
     let epic_id = out.trim().to_string();
 
@@ -253,7 +299,10 @@ fn test_list_json_with_assignee_filter() {
     let bead2_id = create_bead(&workspace, "Unassigned bead");
 
     // List only beads assigned to worker-1
-    let (out, err, ok) = run_bf(&workspace, &["list", "--assignee", "worker-1", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["list", "--assignee", "worker-1", "--format", "json"],
+    );
     assert!(ok, "list with assignee filter failed: {err}");
 
     let parsed = parse_jsonl(&out);
@@ -266,7 +315,10 @@ fn test_list_json_with_assignee_filter() {
 fn test_list_json_with_priority_filter() {
     let (_temp, workspace) = setup();
 
-    let (out, err, ok) = run_bf(&workspace, &["create", "--title", "Critical", "--priority", "0"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["create", "--title", "Critical", "--priority", "0"],
+    );
     assert!(ok, "create critical failed: {err}");
     let critical_id = out.trim().to_string();
 
@@ -308,7 +360,10 @@ fn test_list_json_empty_results() {
     close_bead(&workspace, &bead_id, "Test");
 
     // List only open beads (should be empty - we only have a closed bead)
-    let (out, err, ok) = run_bf(&workspace, &["list", "--status", "in_progress", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["list", "--status", "in_progress", "--format", "json"],
+    );
     assert!(ok, "list with no results failed: {err}");
 
     // Empty list returns "[]" (empty array representation)
@@ -331,7 +386,9 @@ fn test_list_json_with_labels() {
 
     // Verify labels are present as array
     assert!(bead["labels"].is_array(), "labels should be an array");
-    let labels: Vec<&str> = bead["labels"].as_array().unwrap()
+    let labels: Vec<&str> = bead["labels"]
+        .as_array()
+        .unwrap()
         .iter()
         .map(|l| l.as_str().unwrap())
         .collect();
@@ -445,7 +502,11 @@ fn test_ready_json_excludes_blocked_beads() {
     assert!(ok, "ready failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 1, "Should have exactly one ready bead (the blocker)");
+    assert_eq!(
+        parsed.len(),
+        1,
+        "Should have exactly one ready bead (the blocker)"
+    );
     assert_eq!(get_string(&parsed[0], "id"), blocker_id);
 }
 
@@ -569,7 +630,11 @@ fn test_search_json_matches_title() {
 fn test_search_json_matches_description() {
     let (_temp, workspace) = setup();
 
-    let bead_id = create_bead_with_description(&workspace, "Bead title", "Unique search term in description");
+    let bead_id = create_bead_with_description(
+        &workspace,
+        "Bead title",
+        "Unique search term in description",
+    );
 
     let (out, err, ok) = run_bf(&workspace, &["search", "Unique", "--format", "json"]);
     assert!(ok, "search failed: {err}");
@@ -587,7 +652,10 @@ fn test_search_json_with_status_filter() {
     let closed_id = create_bead(&workspace, "Test bead for status");
     close_bead(&workspace, &closed_id, "Test");
 
-    let (out, err, ok) = run_bf(&workspace, &["search", "Test", "--status", "open", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["search", "Test", "--status", "open", "--format", "json"],
+    );
     assert!(ok, "search with status filter failed: {err}");
 
     let parsed = parse_jsonl(&out);
@@ -599,13 +667,19 @@ fn test_search_json_with_status_filter() {
 fn test_search_json_with_type_filter() {
     let (_temp, workspace) = setup();
 
-    let (out, err, ok) = run_bf(&workspace, &["create", "--title", "Test epic", "--type", "epic"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["create", "--title", "Test epic", "--type", "epic"],
+    );
     assert!(ok, "create epic failed: {err}");
     let epic_id = out.trim().to_string();
 
     create_bead(&workspace, "Test task");
 
-    let (out, err, ok) = run_bf(&workspace, &["search", "Test", "--type", "epic", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["search", "Test", "--type", "epic", "--format", "json"],
+    );
     assert!(ok, "search with type filter failed: {err}");
 
     let parsed = parse_jsonl(&out);
@@ -622,7 +696,10 @@ fn test_search_json_with_label_filter() {
 
     create_bead(&workspace, "Test unlabeled bead");
 
-    let (out, err, ok) = run_bf(&workspace, &["search", "Test", "--label", "urgent", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["search", "Test", "--label", "urgent", "--format", "json"],
+    );
     assert!(ok, "search with label filter failed: {err}");
 
     let parsed = parse_jsonl(&out);
@@ -634,19 +711,41 @@ fn test_search_json_with_label_filter() {
 fn test_search_json_with_priority_range() {
     let (_temp, workspace) = setup();
 
-    let (out, err, ok) = run_bf(&workspace, &["create", "--title", "Test priority", "--priority", "0"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["create", "--title", "Test priority", "--priority", "0"],
+    );
     assert!(ok, "create priority 0 failed: {err}");
     let p0_id = out.trim().to_string();
 
-    let (out, err, ok) = run_bf(&workspace, &["create", "--title", "Test priority", "--priority", "4"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["create", "--title", "Test priority", "--priority", "4"],
+    );
     assert!(ok, "create priority 4 failed: {err}");
     let p4_id = out.trim().to_string();
 
-    let (out, err, ok) = run_bf(&workspace, &["search", "priority", "--priority-min", "0", "--priority-max", "1", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &[
+            "search",
+            "priority",
+            "--priority-min",
+            "0",
+            "--priority-max",
+            "1",
+            "--format",
+            "json",
+        ],
+    );
     assert!(ok, "search with priority range failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 1, "Should find exactly one bead in priority range");
+    assert_eq!(
+        parsed.len(),
+        1,
+        "Should find exactly one bead in priority range"
+    );
     assert_eq!(get_string(&parsed[0], "id"), p0_id);
 }
 
@@ -658,7 +757,10 @@ fn test_search_json_with_limit() {
     create_bead(&workspace, "Test bead 2");
     create_bead(&workspace, "Test bead 3");
 
-    let (out, err, ok) = run_bf(&workspace, &["search", "Test", "--limit", "2", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["search", "Test", "--limit", "2", "--format", "json"],
+    );
     assert!(ok, "search with limit failed: {err}");
 
     let parsed = parse_jsonl(&out);
@@ -724,8 +826,10 @@ fn test_recent_json_multiple_items() {
     assert!(parsed.len() >= 1, "Should find at least one recent bead");
 
     let ids: Vec<String> = parsed.iter().map(|b| get_string(b, "id")).collect();
-    assert!(ids.contains(&bead3) || ids.contains(&bead2) || ids.contains(&bead1),
-            "Should contain at least one of the created beads");
+    assert!(
+        ids.contains(&bead3) || ids.contains(&bead2) || ids.contains(&bead1),
+        "Should contain at least one of the created beads"
+    );
 }
 
 #[test]
@@ -736,7 +840,10 @@ fn test_recent_json_with_status_filter() {
     let closed_id = create_bead(&workspace, "Recent closed");
     close_bead(&workspace, &closed_id, "Test");
 
-    let (out, err, ok) = run_bf(&workspace, &["recent", "--status", "closed", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["recent", "--status", "closed", "--format", "json"],
+    );
     assert!(ok, "recent with status filter failed: {err}");
 
     let envelope = parse_envelope(&out);
@@ -754,13 +861,19 @@ fn test_recent_json_with_status_filter() {
 fn test_recent_json_with_type_filter() {
     let (_temp, workspace) = setup();
 
-    let (out, err, ok) = run_bf(&workspace, &["create", "--title", "Recent epic", "--type", "epic"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["create", "--title", "Recent epic", "--type", "epic"],
+    );
     assert!(ok, "create epic failed: {err}");
     let epic_id = out.trim().to_string();
 
     create_bead(&workspace, "Recent task");
 
-    let (out, err, ok) = run_bf(&workspace, &["recent", "--type", "epic", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["recent", "--type", "epic", "--format", "json"],
+    );
     assert!(ok, "recent with type filter failed: {err}");
 
     let envelope = parse_envelope(&out);
@@ -783,7 +896,10 @@ fn test_recent_json_with_assignee_filter() {
 
     create_bead(&workspace, "Recent unassigned");
 
-    let (out, err, ok) = run_bf(&workspace, &["recent", "--assignee", "worker-1", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["recent", "--assignee", "worker-1", "--format", "json"],
+    );
     assert!(ok, "recent with assignee filter failed: {err}");
 
     let envelope = parse_envelope(&out);
@@ -801,13 +917,19 @@ fn test_recent_json_with_assignee_filter() {
 fn test_recent_json_with_priority_filter() {
     let (_temp, workspace) = setup();
 
-    let (out, err, ok) = run_bf(&workspace, &["create", "--title", "Recent critical", "--priority", "0"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["create", "--title", "Recent critical", "--priority", "0"],
+    );
     assert!(ok, "create critical failed: {err}");
     let critical_id = out.trim().to_string();
 
     create_bead(&workspace, "Recent normal");
 
-    let (out, err, ok) = run_bf(&workspace, &["recent", "--priority", "0", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["recent", "--priority", "0", "--format", "json"],
+    );
     assert!(ok, "recent with priority filter failed: {err}");
 
     let envelope = parse_envelope(&out);
@@ -827,7 +949,10 @@ fn test_recent_json_with_time_period() {
 
     create_bead(&workspace, "Recent bead");
 
-    let (out, err, ok) = run_bf(&workspace, &["recent", "--time-period", "1h", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["recent", "--time-period", "1h", "--format", "json"],
+    );
     assert!(ok, "recent with time period failed: {err}");
 
     let envelope = parse_envelope(&out);
@@ -859,7 +984,10 @@ fn test_recent_json_with_count_limit() {
     };
 
     // With limit 10, should get at least 1 and at most 3 beads
-    assert!(parsed.len() >= 1 && parsed.len() <= 3, "Should find between 1 and 3 recent beads");
+    assert!(
+        parsed.len() >= 1 && parsed.len() <= 3,
+        "Should find between 1 and 3 recent beads"
+    );
 }
 
 #[test]
@@ -871,7 +999,10 @@ fn test_recent_json_empty_results() {
     close_bead(&workspace, &bead_id, "Test");
 
     // Query for recent open beads in a very short time window (should be empty)
-    let (out, err, ok) = run_bf(&workspace, &["recent", "--status", "in_progress", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["recent", "--status", "in_progress", "--format", "json"],
+    );
     assert!(ok, "recent failed: {err}");
 
     let envelope = parse_envelope(&out);
@@ -932,7 +1063,9 @@ fn test_show_json_with_all_fields() {
 
     // Verify labels
     assert!(bead["labels"].is_array());
-    let labels: Vec<&str> = bead["labels"].as_array().unwrap()
+    let labels: Vec<&str> = bead["labels"]
+        .as_array()
+        .unwrap()
         .iter()
         .map(|l| l.as_str().unwrap())
         .collect();
@@ -955,7 +1088,10 @@ fn test_show_json_with_closed_bead() {
 
     assert_eq!(get_string(bead, "status"), "closed");
     assert_eq!(get_string(bead, "close_reason"), "Test completed");
-    assert!(bead.get("closed_at").is_some(), "closed_at should be present");
+    assert!(
+        bead.get("closed_at").is_some(),
+        "closed_at should be present"
+    );
 }
 
 #[test]
@@ -973,9 +1109,14 @@ fn test_show_json_with_dependencies() {
     let bead = &parsed.as_array().unwrap()[0];
 
     // Dependencies should not be present in JSON output (NEEDLE compatibility)
-    assert!(bead.get("dependencies").is_none() ||
-            bead["dependencies"].as_array().map(|a| a.is_empty()).unwrap_or(false),
-            "Dependencies should be stripped or empty");
+    assert!(
+        bead.get("dependencies").is_none()
+            || bead["dependencies"]
+                .as_array()
+                .map(|a| a.is_empty())
+                .unwrap_or(false),
+        "Dependencies should be stripped or empty"
+    );
 }
 
 // ============================================================================
@@ -996,8 +1137,15 @@ fn test_claim_json_success() {
 
     assert_eq!(get_string(&parsed, "bead_id"), bead_id);
     assert_eq!(get_string(&parsed, "assignee"), "worker-1");
-    assert!(parsed.get("reclaimed").is_some(), "should have reclaimed field");
-    assert_eq!(parsed["reclaimed"].as_u64().unwrap(), 0, "reclaimed should be 0 for new claim");
+    assert!(
+        parsed.get("reclaimed").is_some(),
+        "should have reclaimed field"
+    );
+    assert_eq!(
+        parsed["reclaimed"].as_u64().unwrap(),
+        0,
+        "reclaimed should be 0 for new claim"
+    );
 }
 
 #[test]
@@ -1006,14 +1154,21 @@ fn test_claim_json_with_metadata() {
 
     create_bead(&workspace, "Claimable with metadata");
 
-    let (out, err, ok) = run_bf(&workspace, &[
-        "claim",
-        "--assignee", "worker-1",
-        "--model", "claude-sonnet-4-6",
-        "--harness", "needle",
-        "--harness-version", "0.5.2",
-        "--json"
-    ]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &[
+            "claim",
+            "--assignee",
+            "worker-1",
+            "--model",
+            "claude-sonnet-4-6",
+            "--harness",
+            "needle",
+            "--harness-version",
+            "0.5.2",
+            "--json",
+        ],
+    );
     assert!(ok, "claim with metadata failed: {err}");
 
     let parsed = parse_json(&out);
@@ -1021,7 +1176,10 @@ fn test_claim_json_with_metadata() {
 
     assert_eq!(get_string(&parsed, "assignee"), "worker-1");
     assert!(parsed.get("bead_id").is_some(), "should have bead_id field");
-    assert!(parsed.get("reclaimed").is_some(), "should have reclaimed field");
+    assert!(
+        parsed.get("reclaimed").is_some(),
+        "should have reclaimed field"
+    );
 }
 
 #[test]
@@ -1036,12 +1194,17 @@ fn test_claim_json_empty_queue() {
     assert!(ok, "claim on empty queue failed: {err}");
 
     let parsed = parse_json(&out);
-    assert!(parsed.is_object(), "claim should return an object even when empty");
+    assert!(
+        parsed.is_object(),
+        "claim should return an object even when empty"
+    );
 
     // When no bead is claimed, should return empty object or object with null bead_id
     if let Some(bead_id) = parsed.get("bead_id") {
-        assert!(bead_id.is_null() || bead_id.as_str().map(|s| s.is_empty()).unwrap_or(false),
-                "bead_id should be null or empty when no bead claimed");
+        assert!(
+            bead_id.is_null() || bead_id.as_str().map(|s| s.is_empty()).unwrap_or(false),
+            "bead_id should be null or empty when no bead claimed"
+        );
     }
 }
 
@@ -1064,7 +1227,11 @@ fn test_claim_json_with_reclamation() {
         if !claimed_bead_id.is_null() {
             assert_eq!(get_string(&parsed, "bead_id"), bead_id);
             assert_eq!(get_string(&parsed, "assignee"), "new-worker");
-            assert_eq!(parsed["reclaimed"].as_u64().unwrap(), 1, "reclaimed should be 1");
+            assert_eq!(
+                parsed["reclaimed"].as_u64().unwrap(),
+                1,
+                "reclaimed should be 1"
+            );
         }
     }
 }
@@ -1082,8 +1249,14 @@ fn test_create_outputs_text_only() {
 
     let trimmed = out.trim();
     // Create should output just the bead ID as text, not JSON
-    assert!(!trimmed.starts_with('{'), "create should not output JSON object");
-    assert!(!trimmed.starts_with('['), "create should not output JSON array");
+    assert!(
+        !trimmed.starts_with('{'),
+        "create should not output JSON object"
+    );
+    assert!(
+        !trimmed.starts_with('['),
+        "create should not output JSON array"
+    );
     assert!(trimmed.starts_with("bf-"), "create should output bead ID");
 }
 
@@ -1097,13 +1270,22 @@ fn test_update_outputs_text_only() {
 
     let bead_id = create_bead(&workspace, "Test");
 
-    let (out, err, ok) = run_bf(&workspace, &["update", &bead_id, "--description", "Updated"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["update", &bead_id, "--description", "Updated"],
+    );
     assert!(ok, "update failed: {err}");
 
     let trimmed = out.trim();
     // Update should output text message, not JSON
-    assert!(!trimmed.starts_with('{'), "update should not output JSON object");
-    assert!(!trimmed.starts_with('['), "update should not output JSON array");
+    assert!(
+        !trimmed.starts_with('{'),
+        "update should not output JSON object"
+    );
+    assert!(
+        !trimmed.starts_with('['),
+        "update should not output JSON array"
+    );
 }
 
 // ============================================================================
@@ -1148,9 +1330,21 @@ fn test_json_field_consistency_across_commands() {
     // Verify critical fields match across all commands
     for bead in [list_bead, show_bead, search_bead, recent_bead] {
         assert_eq!(get_string(bead, "id"), bead_id, "ID should match");
-        assert_eq!(get_string(bead, "title"), "Consistency test", "Title should match");
-        assert_eq!(get_string(bead, "description"), "Test description", "Description should match");
-        assert_eq!(get_string(bead, "assignee"), "worker-1", "Assignee should match");
+        assert_eq!(
+            get_string(bead, "title"),
+            "Consistency test",
+            "Title should match"
+        );
+        assert_eq!(
+            get_string(bead, "description"),
+            "Test description",
+            "Description should match"
+        );
+        assert_eq!(
+            get_string(bead, "assignee"),
+            "worker-1",
+            "Assignee should match"
+        );
     }
 }
 
@@ -1177,12 +1371,20 @@ fn test_json_valid_for_all_commands() {
         // Verify output is valid JSON (each line for JSONL commands, entire output for show)
         if cmd_name == "show" {
             let parsed = parse_json(&out);
-            assert!(parsed.is_array(), "{} should return valid JSON array", cmd_name);
+            assert!(
+                parsed.is_array(),
+                "{} should return valid JSON array",
+                cmd_name
+            );
         } else {
             for line in out.lines() {
                 if !line.trim().is_empty() && line.trim() != "[]" {
                     let parsed = parse_json(line);
-                    assert!(parsed.is_object(), "{} line should be valid JSON object", cmd_name);
+                    assert!(
+                        parsed.is_object(),
+                        "{} line should be valid JSON object",
+                        cmd_name
+                    );
                 }
             }
         }

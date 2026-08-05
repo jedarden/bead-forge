@@ -164,7 +164,9 @@ mod tests {
 
     #[test]
     fn envelope_kind_identifies_command() {
-        let commands = vec!["list", "ready", "show", "claim", "create", "update", "close", "stats", "search"];
+        let commands = vec![
+            "list", "ready", "show", "claim", "create", "update", "close", "stats", "search",
+        ];
         for cmd in commands {
             let env = JsonEnvelope::new(cmd, json!(null));
             assert_eq!(env.kind, cmd);
@@ -275,31 +277,28 @@ mod tests {
 
     #[test]
     fn envelope_with_warning_adds_message() {
-        let env = JsonEnvelope::new("create", json!({"id": "bf-test"}))
-            .with_warning("auto-flush failed");
+        let env =
+            JsonEnvelope::new("create", json!({"id": "bf-test"})).with_warning("auto-flush failed");
         assert_eq!(env.warning, Some("auto-flush failed".to_string()));
     }
 
     #[test]
     fn envelope_warning_can_be_empty_string() {
-        let env = JsonEnvelope::new("update", json!({}))
-            .with_warning("");
+        let env = JsonEnvelope::new("update", json!({})).with_warning("");
         assert_eq!(env.warning, Some("".to_string()));
     }
 
     #[test]
     fn envelope_warning_can_contain_any_text() {
         let warning = "Warning: multiple unflushed beads in workspace";
-        let env = JsonEnvelope::new("claim", json!({}))
-            .with_warning(warning);
+        let env = JsonEnvelope::new("claim", json!({})).with_warning(warning);
         assert_eq!(env.warning.unwrap(), warning);
     }
 
     #[test]
     fn envelope_with_warning_preserves_other_fields() {
         let data = json!({"id": "bf-456"});
-        let env = JsonEnvelope::new("close", data.clone())
-            .with_warning("partial flush failure");
+        let env = JsonEnvelope::new("close", data.clone()).with_warning("partial flush failure");
         assert_eq!(env.kind, "close");
         assert_eq!(env.data, data);
         assert_eq!(env.warning, Some("partial flush failure".to_string()));
@@ -307,8 +306,8 @@ mod tests {
 
     #[test]
     fn envelope_warning_serializes_when_present() {
-        let env = JsonEnvelope::new("delete", json!({"id": "bf-789"}))
-            .with_warning("archive failed");
+        let env =
+            JsonEnvelope::new("delete", json!({"id": "bf-789"})).with_warning("archive failed");
         let s = env.to_json().unwrap();
         let v: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(v["warning"], "archive failed");
@@ -378,8 +377,8 @@ mod tests {
 
     #[test]
     fn envelope_compact_roundtrip_with_warning() {
-        let env = JsonEnvelope::new("velocity", json!({"avg_days": 3.5}))
-            .with_warning("incomplete data");
+        let env =
+            JsonEnvelope::new("velocity", json!({"avg_days": 3.5})).with_warning("incomplete data");
         let compact = env.to_json_compact().unwrap();
         let parsed: JsonEnvelope = serde_json::from_str(&compact).unwrap();
         assert_eq!(parsed.kind, "velocity");
@@ -532,11 +531,13 @@ mod tests {
 
     #[test]
     fn envelope_with_unicode_warning() {
-        let env = JsonEnvelope::new("update", json!({}))
-            .with_warning("⚠️  Warning: café Münchën");
+        let env = JsonEnvelope::new("update", json!({})).with_warning("⚠️  Warning: café Münchën");
         let s = env.to_json().unwrap();
         let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
-        assert_eq!(parsed.warning, Some("⚠️  Warning: café Münchën".to_string()));
+        assert_eq!(
+            parsed.warning,
+            Some("⚠️  Warning: café Münchën".to_string())
+        );
     }
 
     #[test]
@@ -550,8 +551,7 @@ mod tests {
 
     #[test]
     fn envelope_with_newlines_in_warning() {
-        let env = JsonEnvelope::new("sync", json!({}))
-            .with_warning("Line 1\nLine 2\nLine 3");
+        let env = JsonEnvelope::new("sync", json!({})).with_warning("Line 1\nLine 2\nLine 3");
         let s = env.to_json().unwrap();
         let parsed: JsonEnvelope = serde_json::from_str(&s).unwrap();
         assert_eq!(parsed.warning, Some("Line 1\nLine 2\nLine 3".to_string()));
@@ -565,18 +565,14 @@ mod tests {
 #[cfg(test)]
 mod list_show {
     use super::*;
-    use crate::model::{Issue, Status, Priority, IssueType};
     use crate::format::json::JsonFormatter;
     use crate::format::Formatter;
+    use crate::model::{Issue, IssueType, Priority, Status};
     use serde_json::json;
 
     /// Helper to create a test issue
     fn create_test_issue(id: &str, title: &str) -> Issue {
-        let mut issue = Issue::new(
-            id.to_string(),
-            title.to_string(),
-            ".".to_string()
-        );
+        let mut issue = Issue::new(id.to_string(), title.to_string(), ".".to_string());
         issue.status = Status::Open;
         issue.priority = Priority(2);
         issue.issue_type = IssueType::Task;
@@ -585,8 +581,7 @@ mod list_show {
 
     /// Helper to parse envelope from JSON string
     fn parse_envelope(json_str: &str) -> JsonEnvelope {
-        serde_json::from_str(json_str)
-            .expect("Output must be valid JSON envelope")
+        serde_json::from_str(json_str).expect("Output must be valid JSON envelope")
     }
 
     #[test]
@@ -619,11 +614,17 @@ mod list_show {
 
         // Verify each line is valid JSON representing an issue
         for line in lines {
-            let issue_value: serde_json::Value = serde_json::from_str(line)
-                .expect("Each line must be valid JSON");
+            let issue_value: serde_json::Value =
+                serde_json::from_str(line).expect("Each line must be valid JSON");
             assert!(issue_value.is_object(), "Each line must be a JSON object");
-            assert!(issue_value.get("id").is_some(), "Each issue must have an id");
-            assert!(issue_value.get("title").is_some(), "Each issue must have a title");
+            assert!(
+                issue_value.get("id").is_some(),
+                "Each issue must have an id"
+            );
+            assert!(
+                issue_value.get("title").is_some(),
+                "Each issue must have a title"
+            );
         }
     }
 
@@ -660,11 +661,14 @@ mod list_show {
         let jsonl_output = Formatter::format_issues(&formatter, &issues);
         let envelope = JsonEnvelope::new("list", json!(jsonl_output));
         let envelope_json = envelope.to_json().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
-            .expect("Envelope must serialize to valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&envelope_json).expect("Envelope must serialize to valid JSON");
 
         // Verify all metadata fields are present
-        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(
+            parsed.get("version").is_some(),
+            "version field must be present"
+        );
         assert!(parsed.get("kind").is_some(), "kind field must be present");
         assert!(parsed.get("data").is_some(), "data field must be present");
 
@@ -674,7 +678,11 @@ mod list_show {
 
         // warning field is optional (absent when no warning)
         let warning_optional = parsed.get("warning");
-        assert!(warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string());
+        assert!(
+            warning_optional.is_none()
+                || warning_optional.unwrap().is_null()
+                || warning_optional.unwrap().is_string()
+        );
     }
 
     #[test]
@@ -699,8 +707,8 @@ mod list_show {
 
         // Parse the JSON string and verify it represents a single object
         let json_str = parsed.data.as_str().unwrap();
-        let issue_value: serde_json::Value = serde_json::from_str(json_str)
-            .expect("Data must be valid JSON");
+        let issue_value: serde_json::Value =
+            serde_json::from_str(json_str).expect("Data must be valid JSON");
 
         assert!(issue_value.is_object(), "Show data must be a JSON object");
         assert_eq!(issue_value["id"].as_str().unwrap(), "bf-123");
@@ -715,11 +723,14 @@ mod list_show {
         let json_output = Formatter::format_issue(&formatter, &issue);
         let envelope = JsonEnvelope::new("show", json!(json_output));
         let envelope_json = envelope.to_json().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
-            .expect("Envelope must serialize to valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&envelope_json).expect("Envelope must serialize to valid JSON");
 
         // Verify all metadata fields are present
-        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(
+            parsed.get("version").is_some(),
+            "version field must be present"
+        );
         assert!(parsed.get("kind").is_some(), "kind field must be present");
         assert!(parsed.get("data").is_some(), "data field must be present");
 
@@ -729,7 +740,11 @@ mod list_show {
 
         // warning field is optional
         let warning_optional = parsed.get("warning");
-        assert!(warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string());
+        assert!(
+            warning_optional.is_none()
+                || warning_optional.unwrap().is_null()
+                || warning_optional.unwrap().is_string()
+        );
     }
 
     #[test]
@@ -754,13 +769,19 @@ mod list_show {
 
         // Parse and verify issue fields are preserved
         let json_str = parsed.data.as_str().unwrap();
-        let issue_value: serde_json::Value = serde_json::from_str(json_str)
-            .expect("Data must be valid JSON");
+        let issue_value: serde_json::Value =
+            serde_json::from_str(json_str).expect("Data must be valid JSON");
 
         assert_eq!(issue_value["id"].as_str().unwrap(), "bf-full");
         assert_eq!(issue_value["title"].as_str().unwrap(), "Full issue test");
-        assert_eq!(issue_value["description"].as_str().unwrap(), "Test description");
-        assert_eq!(issue_value["acceptance_criteria"].as_str().unwrap(), "AC: Should work");
+        assert_eq!(
+            issue_value["description"].as_str().unwrap(),
+            "Test description"
+        );
+        assert_eq!(
+            issue_value["acceptance_criteria"].as_str().unwrap(),
+            "AC: Should work"
+        );
         assert_eq!(issue_value["assignee"].as_str().unwrap(), "test-worker");
         assert!(issue_value["labels"].is_array());
         assert_eq!(issue_value["labels"].as_array().unwrap().len(), 2);
@@ -791,11 +812,23 @@ mod list_show {
 
         // Verify each issue has required fields
         for (i, line) in lines.iter().enumerate() {
-            let issue_value: serde_json::Value = serde_json::from_str(line)
-                .expect(&format!("Line {} must be valid JSON", i));
-            assert!(issue_value.get("id").is_some(), "Line {} issue must have id", i);
-            assert!(issue_value.get("title").is_some(), "Line {} issue must have title", i);
-            assert!(issue_value.get("status").is_some(), "Line {} issue must have status", i);
+            let issue_value: serde_json::Value =
+                serde_json::from_str(line).expect(&format!("Line {} must be valid JSON", i));
+            assert!(
+                issue_value.get("id").is_some(),
+                "Line {} issue must have id",
+                i
+            );
+            assert!(
+                issue_value.get("title").is_some(),
+                "Line {} issue must have title",
+                i
+            );
+            assert!(
+                issue_value.get("status").is_some(),
+                "Line {} issue must have status",
+                i
+            );
         }
     }
 
@@ -858,18 +891,14 @@ mod list_show {
 #[cfg(test)]
 mod claim_stats {
     use super::*;
-    use crate::model::{Issue, Status, Priority, IssueType};
     use crate::format::json::JsonFormatter;
     use crate::format::Formatter;
+    use crate::model::{Issue, IssueType, Priority, Status};
     use serde_json::json;
 
     /// Helper to create a test issue
     fn create_test_issue(id: &str, title: &str) -> Issue {
-        let mut issue = Issue::new(
-            id.to_string(),
-            title.to_string(),
-            ".".to_string()
-        );
+        let mut issue = Issue::new(id.to_string(), title.to_string(), ".".to_string());
         issue.status = Status::Open;
         issue.priority = Priority(2);
         issue.issue_type = IssueType::Task;
@@ -878,8 +907,7 @@ mod claim_stats {
 
     /// Helper to parse envelope from JSON string
     fn parse_envelope(json_str: &str) -> JsonEnvelope {
-        serde_json::from_str(json_str)
-            .expect("Output must be valid JSON envelope")
+        serde_json::from_str(json_str).expect("Output must be valid JSON envelope")
     }
 
     // === Claim command envelope tests ===
@@ -903,8 +931,14 @@ mod claim_stats {
         assert!(parsed.data.is_object(), "Claim data must be an object");
 
         // Verify claim-specific fields are present in data
-        assert!(parsed.data.get("bead_id").is_some(), "Claim data must have 'bead_id'");
-        assert!(parsed.data.get("assignee").is_some(), "Claim data must have 'assignee'");
+        assert!(
+            parsed.data.get("bead_id").is_some(),
+            "Claim data must have 'bead_id'"
+        );
+        assert!(
+            parsed.data.get("assignee").is_some(),
+            "Claim data must have 'assignee'"
+        );
     }
 
     #[test]
@@ -916,22 +950,31 @@ mod claim_stats {
 
         let envelope = JsonEnvelope::new("claim", claim_data);
         let envelope_json = envelope.to_json().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
-            .expect("Envelope must serialize to valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&envelope_json).expect("Envelope must serialize to valid JSON");
 
         // Verify all metadata fields are present
-        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(
+            parsed.get("version").is_some(),
+            "version field must be present"
+        );
         assert!(parsed.get("kind").is_some(), "kind field must be present");
         assert!(parsed.get("data").is_some(), "data field must be present");
 
         // Verify metadata values
         assert_eq!(parsed["version"].as_u64().unwrap(), 1, "version must be 1");
-        assert_eq!(parsed["kind"].as_str().unwrap(), "claim", "kind must be 'claim'");
+        assert_eq!(
+            parsed["kind"].as_str().unwrap(),
+            "claim",
+            "kind must be 'claim'"
+        );
 
         // warning field is optional (absent when no warning)
         let warning_optional = parsed.get("warning");
         assert!(
-            warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string(),
+            warning_optional.is_none()
+                || warning_optional.unwrap().is_null()
+                || warning_optional.unwrap().is_string(),
             "warning field must be absent, null, or a string"
         );
     }
@@ -961,7 +1004,10 @@ mod claim_stats {
         assert_eq!(parsed.data["status"].as_str().unwrap(), "open");
 
         // Verify claimed_at timestamp is present
-        assert!(parsed.data.get("claimed_at").is_some(), "Claim result must have 'claimed_at' timestamp");
+        assert!(
+            parsed.data.get("claimed_at").is_some(),
+            "Claim result must have 'claimed_at' timestamp"
+        );
     }
 
     #[test]
@@ -977,7 +1023,10 @@ mod claim_stats {
         assert_eq!(parsed.version, 1);
         assert_eq!(parsed.kind, "claim");
         assert!(parsed.data.is_object(), "Claim data must be an object");
-        assert!(parsed.data.as_object().unwrap().is_empty(), "Claim data must be empty when no beads available");
+        assert!(
+            parsed.data.as_object().unwrap().is_empty(),
+            "Claim data must be empty when no beads available"
+        );
     }
 
     #[test]
@@ -1019,7 +1068,10 @@ mod claim_stats {
         assert!(parsed.data.is_object(), "Stats data must be an object");
 
         // Verify stats-specific fields
-        assert!(parsed.data.get("total").is_some(), "Stats must have 'total'");
+        assert!(
+            parsed.data.get("total").is_some(),
+            "Stats must have 'total'"
+        );
         assert!(parsed.data.get("open").is_some(), "Stats must have 'open'");
     }
 
@@ -1034,22 +1086,31 @@ mod claim_stats {
 
         let envelope = JsonEnvelope::new("stats", stats_data);
         let envelope_json = envelope.to_json().unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&envelope_json)
-            .expect("Envelope must serialize to valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&envelope_json).expect("Envelope must serialize to valid JSON");
 
         // Verify all metadata fields are present
-        assert!(parsed.get("version").is_some(), "version field must be present");
+        assert!(
+            parsed.get("version").is_some(),
+            "version field must be present"
+        );
         assert!(parsed.get("kind").is_some(), "kind field must be present");
         assert!(parsed.get("data").is_some(), "data field must be present");
 
         // Verify metadata values
         assert_eq!(parsed["version"].as_u64().unwrap(), 1, "version must be 1");
-        assert_eq!(parsed["kind"].as_str().unwrap(), "stats", "kind must be 'stats'");
+        assert_eq!(
+            parsed["kind"].as_str().unwrap(),
+            "stats",
+            "kind must be 'stats'"
+        );
 
         // warning field is optional
         let warning_optional = parsed.get("warning");
         assert!(
-            warning_optional.is_none() || warning_optional.unwrap().is_null() || warning_optional.unwrap().is_string(),
+            warning_optional.is_none()
+                || warning_optional.unwrap().is_null()
+                || warning_optional.unwrap().is_string(),
             "warning field must be absent, null, or a string"
         );
     }

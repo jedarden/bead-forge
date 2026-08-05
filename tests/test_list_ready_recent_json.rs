@@ -3,8 +3,8 @@
 //! These tests verify that `bf list/ready/recent --format json` outputs valid JSON
 //! with the correct structure and required fields.
 
-use std::process::Command;
 use serde_json::Value;
+use std::process::Command;
 
 /// Resolve the freshly-built bf binary — never the system-installed one.
 fn bf_binary() -> String {
@@ -80,12 +80,22 @@ fn close_test_bead(bead_id: &str) {
 
 /// Validate that a JSON object has all required issue fields
 fn assert_required_issue_fields(json: &Value, context: &str) {
-    let required_fields = ["id", "title", "status", "priority", "issue_type", "assignee", "labels"];
+    let required_fields = [
+        "id",
+        "title",
+        "status",
+        "priority",
+        "issue_type",
+        "assignee",
+        "labels",
+    ];
     for field in &required_fields {
         assert!(
             json.get(field).is_some(),
             "{}: Missing required field '{}', JSON: {}",
-            context, field, json
+            context,
+            field,
+            json
         );
     }
 
@@ -127,12 +137,16 @@ fn test_list_command_json_structure() {
     let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should have at least our 2 beads
-    assert!(lines.len() >= 2, "list should return at least 2 beads, got {}", lines.len());
+    assert!(
+        lines.len() >= 2,
+        "list should return at least 2 beads, got {}",
+        lines.len()
+    );
 
     // Each line should be valid JSON with required fields
     for line in lines.iter().take(2) {
-        let parsed: Value = serde_json::from_str(line)
-            .expect(&format!("Each line should be valid JSON: {}", line));
+        let parsed: Value =
+            serde_json::from_str(line).expect(&format!("Each line should be valid JSON: {}", line));
         assert_required_issue_fields(&parsed, "list command");
     }
 
@@ -164,7 +178,11 @@ fn test_list_command_json_empty_results() {
     let trimmed = stdout.trim();
 
     // Empty list should return empty string or "[]"
-    assert!(trimmed == "[]" || trimmed.is_empty(), "Empty list should return '[]' or empty string, got: {}", trimmed);
+    assert!(
+        trimmed == "[]" || trimmed.is_empty(),
+        "Empty list should return '[]' or empty string, got: {}",
+        trimmed
+    );
 }
 
 #[test]
@@ -187,8 +205,8 @@ fn test_list_command_json_valid_jsonl() {
     // Verify each line is valid JSON (JSONL format)
     for line in stdout.lines() {
         if !line.trim().is_empty() {
-            let parsed: Value = serde_json::from_str(line)
-                .expect(&format!("Line should be valid JSON: {}", line));
+            let parsed: Value =
+                serde_json::from_str(line).expect(&format!("Line should be valid JSON: {}", line));
             assert!(parsed.is_object(), "Each line should be a JSON object");
         }
     }
@@ -214,20 +232,35 @@ fn test_list_command_json_field_types() {
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
     // Find our bead in the output
-    let our_bead_line = stdout.lines()
+    let our_bead_line = stdout
+        .lines()
         .find(|line| line.contains(&bead_id))
         .expect("Should find our bead in list output");
 
-    let parsed: Value = serde_json::from_str(our_bead_line)
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(our_bead_line).expect("Should be valid JSON");
 
     // Verify field types
     assert!(parsed.get("id").unwrap().is_string(), "id should be string");
-    assert!(parsed.get("title").unwrap().is_string(), "title should be string");
-    assert!(parsed.get("status").unwrap().is_string(), "status should be string");
-    assert!(parsed.get("issue_type").unwrap().is_string(), "issue_type should be string");
-    assert!(parsed.get("priority").unwrap().is_number(), "priority should be number");
-    assert!(parsed.get("labels").unwrap().is_array(), "labels should be array");
+    assert!(
+        parsed.get("title").unwrap().is_string(),
+        "title should be string"
+    );
+    assert!(
+        parsed.get("status").unwrap().is_string(),
+        "status should be string"
+    );
+    assert!(
+        parsed.get("issue_type").unwrap().is_string(),
+        "issue_type should be string"
+    );
+    assert!(
+        parsed.get("priority").unwrap().is_number(),
+        "priority should be number"
+    );
+    assert!(
+        parsed.get("labels").unwrap().is_array(),
+        "labels should be array"
+    );
 
     // assignee can be null or string
     if let Some(assignee) = parsed.get("assignee") {
@@ -260,14 +293,16 @@ fn test_list_command_json_with_filters() {
         .expect("Failed to execute list command");
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty() && *l != "[]").collect();
+    let lines: Vec<&str> = stdout
+        .lines()
+        .filter(|l| !l.trim().is_empty() && *l != "[]")
+        .collect();
 
     // Should find at least the closed bead
     assert!(lines.len() >= 1, "Should find at least one closed bead");
 
     // Verify the filtered result has correct status
-    let parsed: Value = serde_json::from_str(lines[0])
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(lines[0]).expect("Should be valid JSON");
     assert_eq!(parsed.get("status").unwrap().as_str().unwrap(), "closed");
 
     close_test_bead(&active_bead);
@@ -307,8 +342,8 @@ fn test_ready_command_json_structure() {
 
         // Each line should be valid JSON with required fields
         for line in lines {
-            let parsed: Value = serde_json::from_str(line)
-                .expect(&format!("Line should be valid JSON: {}", line));
+            let parsed: Value =
+                serde_json::from_str(line).expect(&format!("Line should be valid JSON: {}", line));
             assert_required_issue_fields(&parsed, "ready command");
         }
     }
@@ -437,20 +472,35 @@ fn test_ready_command_json_field_types() {
 
     if trimmed != "[]" {
         // Find our bead in the output
-        let our_bead_line = trimmed.lines()
+        let our_bead_line = trimmed
+            .lines()
             .find(|line| line.contains(&bead_id))
             .expect("Should find our bead in ready output");
 
-        let parsed: Value = serde_json::from_str(our_bead_line)
-            .expect("Should be valid JSON");
+        let parsed: Value = serde_json::from_str(our_bead_line).expect("Should be valid JSON");
 
         // Verify field types
         assert!(parsed.get("id").unwrap().is_string(), "id should be string");
-        assert!(parsed.get("title").unwrap().is_string(), "title should be string");
-        assert!(parsed.get("status").unwrap().is_string(), "status should be string");
-        assert!(parsed.get("issue_type").unwrap().is_string(), "issue_type should be string");
-        assert!(parsed.get("priority").unwrap().is_number(), "priority should be number");
-        assert!(parsed.get("labels").unwrap().is_array(), "labels should be array");
+        assert!(
+            parsed.get("title").unwrap().is_string(),
+            "title should be string"
+        );
+        assert!(
+            parsed.get("status").unwrap().is_string(),
+            "status should be string"
+        );
+        assert!(
+            parsed.get("issue_type").unwrap().is_string(),
+            "issue_type should be string"
+        );
+        assert!(
+            parsed.get("priority").unwrap().is_number(),
+            "priority should be number"
+        );
+        assert!(
+            parsed.get("labels").unwrap().is_array(),
+            "labels should be array"
+        );
     }
 
     close_test_bead(&bead_id);
@@ -482,15 +532,26 @@ fn test_recent_command_json_structure() {
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
     // recent wraps output in envelope: {version: 1, kind: "recent", data: [...]}
-    let parsed: Value = serde_json::from_str(&stdout.trim())
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(&stdout.trim()).expect("Should be valid JSON");
 
-    assert!(parsed.is_object(), "recent should return an object (envelope)");
+    assert!(
+        parsed.is_object(),
+        "recent should return an object (envelope)"
+    );
 
     // Verify envelope structure
-    assert!(parsed.get("version").is_some(), "Envelope must have 'version' field");
-    assert!(parsed.get("kind").is_some(), "Envelope must have 'kind' field");
-    assert!(parsed.get("data").is_some(), "Envelope must have 'data' field");
+    assert!(
+        parsed.get("version").is_some(),
+        "Envelope must have 'version' field"
+    );
+    assert!(
+        parsed.get("kind").is_some(),
+        "Envelope must have 'kind' field"
+    );
+    assert!(
+        parsed.get("data").is_some(),
+        "Envelope must have 'data' field"
+    );
 
     // Verify kind is "recent"
     assert_eq!(parsed.get("kind").unwrap().as_str().unwrap(), "recent");
@@ -538,12 +599,19 @@ fn test_recent_command_json_envelope_fields() {
         .expect("Failed to execute recent command");
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    let parsed: Value = serde_json::from_str(stdout.trim())
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("Should be valid JSON");
 
     // Verify envelope structure
-    assert_eq!(parsed.get("version").unwrap().as_i64().unwrap(), 1, "version should be 1");
-    assert_eq!(parsed.get("kind").unwrap().as_str().unwrap(), "recent", "kind should be 'recent'");
+    assert_eq!(
+        parsed.get("version").unwrap().as_i64().unwrap(),
+        1,
+        "version should be 1"
+    );
+    assert_eq!(
+        parsed.get("kind").unwrap().as_str().unwrap(),
+        "recent",
+        "kind should be 'recent'"
+    );
     assert!(parsed.get("data").is_some(), "should have data field");
 
     // Cleanup
@@ -570,12 +638,14 @@ fn test_recent_command_json_empty_results() {
     );
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    let parsed: Value = serde_json::from_str(stdout.trim())
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("Should be valid JSON");
 
     // Even empty results are wrapped in envelope
     assert!(parsed.is_object(), "recent should return envelope object");
-    assert!(parsed.get("data").is_some(), "envelope should have data field");
+    assert!(
+        parsed.get("data").is_some(),
+        "envelope should have data field"
+    );
 
     let data = parsed.get("data").unwrap();
     // Data can be various types depending on implementation
@@ -601,12 +671,14 @@ fn test_recent_command_json_time_period_parameter() {
         .expect("Failed to execute recent command");
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    let parsed: Value = serde_json::from_str(stdout.trim())
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("Should be valid JSON");
 
     // Should still be wrapped in envelope
     assert!(parsed.is_object(), "recent should return envelope object");
-    assert!(parsed.get("data").is_some(), "envelope should have data field");
+    assert!(
+        parsed.get("data").is_some(),
+        "envelope should have data field"
+    );
 
     // Cleanup
     close_test_bead(&bead_id);
@@ -625,8 +697,7 @@ fn test_recent_command_json_data_field_types() {
         .expect("Failed to execute recent command");
 
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    let parsed: Value = serde_json::from_str(stdout.trim())
-        .expect("Should be valid JSON");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("Should be valid JSON");
 
     let data = parsed.get("data").unwrap();
 
@@ -636,13 +707,15 @@ fn test_recent_command_json_data_field_types() {
         Value::Object(obj.clone())
     } else if let Some(array) = data.as_array() {
         // Array case - find our bead
-        let our_bead = array.iter()
+        let our_bead = array
+            .iter()
             .find(|item| item.get("id").unwrap().as_str().unwrap() == bead_id)
             .expect("Should find our bead in recent output");
         our_bead.clone()
     } else if let Some(s) = data.as_str() {
         // JSONL string case - parse and find our bead
-        let our_bead_line = s.lines()
+        let our_bead_line = s
+            .lines()
             .find(|line| line.contains(&bead_id))
             .expect("Should find our bead in recent JSONL");
         serde_json::from_str(our_bead_line).expect("Should parse JSON")
@@ -651,12 +724,30 @@ fn test_recent_command_json_data_field_types() {
     };
 
     // Verify field types
-    assert!(bead_json.get("id").unwrap().is_string(), "id should be string");
-    assert!(bead_json.get("title").unwrap().is_string(), "title should be string");
-    assert!(bead_json.get("status").unwrap().is_string(), "status should be string");
-    assert!(bead_json.get("issue_type").unwrap().is_string(), "issue_type should be string");
-    assert!(bead_json.get("priority").unwrap().is_number(), "priority should be number");
-    assert!(bead_json.get("labels").unwrap().is_array(), "labels should be array");
+    assert!(
+        bead_json.get("id").unwrap().is_string(),
+        "id should be string"
+    );
+    assert!(
+        bead_json.get("title").unwrap().is_string(),
+        "title should be string"
+    );
+    assert!(
+        bead_json.get("status").unwrap().is_string(),
+        "status should be string"
+    );
+    assert!(
+        bead_json.get("issue_type").unwrap().is_string(),
+        "issue_type should be string"
+    );
+    assert!(
+        bead_json.get("priority").unwrap().is_number(),
+        "priority should be number"
+    );
+    assert!(
+        bead_json.get("labels").unwrap().is_array(),
+        "labels should be array"
+    );
 
     // Cleanup
     close_test_bead(&bead_id);
@@ -681,7 +772,10 @@ fn test_list_ready_recent_json_unicode_handling() {
         .expect("Failed to execute list command");
 
     let list_stdout = String::from_utf8(list_output.stdout).expect("Invalid UTF-8");
-    assert!(list_stdout.contains("🎉"), "List output should preserve Unicode emoji");
+    assert!(
+        list_stdout.contains("🎉"),
+        "List output should preserve Unicode emoji"
+    );
 
     // Test ready command
     let ready_output = bf()
@@ -695,7 +789,10 @@ fn test_list_ready_recent_json_unicode_handling() {
 
     let ready_stdout = String::from_utf8(ready_output.stdout).expect("Invalid UTF-8");
     if ready_stdout.trim() != "[]" {
-        assert!(ready_stdout.contains("🎉"), "Ready output should preserve Unicode emoji");
+        assert!(
+            ready_stdout.contains("🎉"),
+            "Ready output should preserve Unicode emoji"
+        );
     }
 
     // Test recent command
@@ -707,7 +804,10 @@ fn test_list_ready_recent_json_unicode_handling() {
         .expect("Failed to execute recent command");
 
     let recent_stdout = String::from_utf8(recent_output.stdout).expect("Invalid UTF-8");
-    assert!(recent_stdout.contains("🎉"), "Recent output should preserve Unicode emoji");
+    assert!(
+        recent_stdout.contains("🎉"),
+        "Recent output should preserve Unicode emoji"
+    );
 
     // Cleanup
     close_test_bead(&bead_id);
@@ -728,11 +828,15 @@ fn test_list_ready_recent_json_compact_format() {
 
     let list_stdout = String::from_utf8(list_output.stdout).expect("Invalid UTF-8");
     // Find the line with our bead
-    let our_bead_line = list_stdout.lines()
+    let our_bead_line = list_stdout
+        .lines()
         .find(|line| line.contains(&bead_id))
         .expect("Should find our bead in list output");
 
-    assert!(!our_bead_line.contains("\n"), "Compact JSON should not contain newlines within a line");
+    assert!(
+        !our_bead_line.contains("\n"),
+        "Compact JSON should not contain newlines within a line"
+    );
 
     // Test recent output is compact
     let recent_output = bf()

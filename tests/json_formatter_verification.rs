@@ -19,10 +19,10 @@
 //! so this test is also the runtime proof that "no custom `println!` JSON loops
 //! remain" in the issue-array commands.
 
+use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
-use serde_json::Value;
 use tempfile::TempDir;
 
 /// Resolve the `bf` binary under test. `CARGO_BIN_EXE_bf` is set automatically
@@ -60,7 +60,15 @@ fn init_workspace() -> TempDir {
 
 /// Create a bead; returns its printed id.
 fn create_bead(ws: &std::path::Path, title: &str, extra: &[&str]) -> String {
-    let mut args = vec!["create", "--title", title, "--type", "task", "--priority", "2"];
+    let mut args = vec![
+        "create",
+        "--title",
+        title,
+        "--type",
+        "task",
+        "--priority",
+        "2",
+    ];
     args.extend_from_slice(extra);
     run(ws, &args).trim().to_string()
 }
@@ -142,20 +150,14 @@ fn issue_arrays_are_jsonl_with_stable_fields() {
     );
 
     for cmd in &["list", "ready"] {
-        let out = run(
-            ws.path(),
-            &[cmd, "--limit", "0", "--format", "json"],
-        );
+        let out = run(ws.path(), &[cmd, "--limit", "0", "--format", "json"]);
         // Not a wrapped array: the whole stdout is not itself a JSON array.
         let trimmed = out.trim();
         assert!(
             !trimmed.starts_with('['),
             "{cmd} output must be JSONL, not a JSON array"
         );
-        assert!(
-            !trimmed.is_empty(),
-            "{cmd} should have >0 beads to inspect"
-        );
+        assert!(!trimmed.is_empty(), "{cmd} should have >0 beads to inspect");
         for line in out.lines() {
             let v: Value = serde_json::from_str(line).expect("each JSONL line is valid JSON");
             assert!(v.is_object(), "{cmd} line is not an object: {line}");
@@ -191,7 +193,10 @@ fn search_jsonl_is_consistent_with_list() {
     let needle = create_bead(ws.path(), "unique-needle-title", &[]);
     let _hay = create_bead(ws.path(), "unrelated-bead", &[]);
 
-    let search_map = jsonl_by_id(&run(ws.path(), &["search", "unique-needle", "--format", "json"]));
+    let search_map = jsonl_by_id(&run(
+        ws.path(),
+        &["search", "unique-needle", "--format", "json"],
+    ));
     let list_map = jsonl_by_id(&run(ws.path(), &["list", "--format", "json"]));
 
     // search returned exactly the needle.
@@ -215,11 +220,17 @@ fn claim_emits_single_object() {
     let ws = init_workspace();
     create_bead(ws.path(), "claimable", &[]);
 
-    let out = run(ws.path(), &["claim", "--assignee", "claimer-1", "--format", "json"]);
+    let out = run(
+        ws.path(),
+        &["claim", "--assignee", "claimer-1", "--format", "json"],
+    );
     let v: Value = serde_json::from_str(out.trim()).expect("claim output is one JSON object");
     assert!(v.is_object(), "claim must emit a single object, got: {out}");
     assert!(v.get("bead_id").is_and_some(), "claim missing bead_id");
-    assert_eq!(v.get("assignee").and_then(|a| a.as_str()), Some("claimer-1"));
+    assert_eq!(
+        v.get("assignee").and_then(|a| a.as_str()),
+        Some("claimer-1")
+    );
     // Not an Issue object (no status/priority/issue_type keys) and not an array.
     assert!(
         v.get("status").is_none(),
@@ -237,7 +248,14 @@ fn claim_dry_run_emits_preview_object() {
 
     let out = run(
         ws.path(),
-        &["claim", "--assignee", "previewer", "--dry-run", "--format", "json"],
+        &[
+            "claim",
+            "--assignee",
+            "previewer",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
     );
     let v: Value = serde_json::from_str(out.trim()).expect("dry-run output is one JSON object");
     assert_eq!(v.get("dry_run").and_then(|d| d.as_bool()), Some(true));
@@ -254,7 +272,10 @@ fn claim_dry_run_emits_preview_object() {
 #[test]
 fn claim_empty_emits_empty_object() {
     let ws = init_workspace(); // no beads
-    let out = run(ws.path(), &["claim", "--assignee", "lonely", "--format", "json"]);
+    let out = run(
+        ws.path(),
+        &["claim", "--assignee", "lonely", "--format", "json"],
+    );
     assert_eq!(out.trim(), "{}", "no-claim result must be {{}}");
 }
 
@@ -286,9 +307,11 @@ fn stats_emits_single_object_with_optional_breakdowns() {
     // With breakdowns folded in, still a single parseable object. Parsing the
     // RAW output as one Value also proves nothing is appended after the object
     // (the old bug class: serde_json::from_str rejects trailing non-JSON text).
-    let with_by = run(ws.path(), &["stats", "--by-type", "--by-priority", "--format", "json"]);
-    let v: Value =
-        serde_json::from_str(with_by.trim()).expect("stats --by-* is one JSON object");
+    let with_by = run(
+        ws.path(),
+        &["stats", "--by-type", "--by-priority", "--format", "json"],
+    );
+    let v: Value = serde_json::from_str(with_by.trim()).expect("stats --by-* is one JSON object");
     assert!(v.get("by_type").is_and_some(), "by_type folded in");
     assert!(v.get("by_priority").is_and_some(), "by_priority folded in");
 }
@@ -330,7 +353,11 @@ fn empty_result_behavior_is_as_documented() {
         search.is_empty(),
         "empty search emits nothing (JSONL: 0 lines)"
     );
-    assert_eq!(ready.trim(), "[]", "empty ready emits [] (bf-64zt contract)");
+    assert_eq!(
+        ready.trim(),
+        "[]",
+        "empty ready emits [] (bf-64zt contract)"
+    );
     assert_eq!(claim.trim(), "{}", "empty claim emits {{}}");
 }
 

@@ -28,7 +28,10 @@ fn main() -> Result<()> {
     // Verify NEEDLE has Cargo.toml
     let cargo_toml = needle_dir.join("Cargo.toml");
     if !cargo_toml.exists() {
-        anyhow::bail!("NEEDLE directory does not contain Cargo.toml: {}", needle_dir.display());
+        anyhow::bail!(
+            "NEEDLE directory does not contain Cargo.toml: {}",
+            needle_dir.display()
+        );
     }
 
     // Create trace manager for bead-forge workspace
@@ -48,15 +51,15 @@ fn main() -> Result<()> {
     println!("This may take several minutes...\n");
 
     // Run cargo test and capture output to bead trace directory
-    let result = trace_manager.run_cargo_test_to_bead_trace(
-        &needle_dir,
-        "bf-3ezlq4",
-        &metadata
-    )?;
+    let result = trace_manager.run_cargo_test_to_bead_trace(&needle_dir, "bf-3ezlq4", &metadata)?;
 
     println!("=== Test Execution Complete ===\n");
     println!("Exit code: {}", result.exit_code);
-    println!("Duration: {}ms ({:.2}s)", result.duration_ms, result.duration_ms as f64 / 1000.0);
+    println!(
+        "Duration: {}ms ({:.2}s)",
+        result.duration_ms,
+        result.duration_ms as f64 / 1000.0
+    );
     println!("Trace directory: {}", result.bead_trace_dir.display());
     println!("Start time: {}", result.start_time.unwrap_or_default());
     println!("End time: {}", result.end_time.unwrap_or_default());
@@ -94,9 +97,18 @@ fn main() -> Result<()> {
     }
 
     println!("\n=== Files Written ===");
-    println!("metadata.json: {}", result.bead_trace_dir.join("metadata.json").display());
-    println!("stdout.txt: {}", result.bead_trace_dir.join("stdout.txt").display());
-    println!("stderr.txt: {}", result.bead_trace_dir.join("stderr.txt").display());
+    println!(
+        "metadata.json: {}",
+        result.bead_trace_dir.join("metadata.json").display()
+    );
+    println!(
+        "stdout.txt: {}",
+        result.bead_trace_dir.join("stdout.txt").display()
+    );
+    println!(
+        "stderr.txt: {}",
+        result.bead_trace_dir.join("stderr.txt").display()
+    );
 
     if result.exit_code == 0 {
         println!("\n✓ All tests passed!");

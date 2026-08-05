@@ -14,10 +14,10 @@
 //! - All JSON outputs handle unusual bead IDs and titles
 //! - cargo test passes for all edge case tests
 
+use serde_json::{from_str, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-use serde_json::{Value, from_str};
 
 fn bf() -> Command {
     Command::new(env!("CARGO_BIN_EXE_bf"))
@@ -47,7 +47,18 @@ fn setup() -> (TempDir, PathBuf) {
 
 /// Create a test bead with the given title
 fn create_bead(workspace: &Path, title: &str) -> String {
-    let (out, err, ok) = run_bf(workspace, &["create", "--title", title, "--type", "task", "--priority", "2"]);
+    let (out, err, ok) = run_bf(
+        workspace,
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
+    );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
     assert!(!id.is_empty(), "create produced no id: {out}");
@@ -58,7 +69,17 @@ fn create_bead(workspace: &Path, title: &str) -> String {
 fn create_bead_with_description(workspace: &Path, title: &str, description: &str) -> String {
     let (out, err, ok) = run_bf(
         workspace,
-        &["create", "--title", title, "--type", "task", "--priority", "2", "--description", description],
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+            "--description",
+            description,
+        ],
     );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
@@ -68,7 +89,10 @@ fn create_bead_with_description(workspace: &Path, title: &str, description: &str
 
 /// Update a bead's description
 fn update_bead_description(workspace: &Path, bead_id: &str, description: &str) {
-    let (_out, err, ok) = run_bf(workspace, &["update", bead_id, "--description", description]);
+    let (_out, err, ok) = run_bf(
+        workspace,
+        &["update", bead_id, "--description", description],
+    );
     assert!(ok, "Failed to update bead description: {err}");
 }
 
@@ -80,9 +104,7 @@ fn close_bead(workspace: &Path, bead_id: &str, reason: &str) {
 
 /// Parse a JSON string and panic if invalid
 fn parse_json(json: &str) -> Value {
-    from_str(json).unwrap_or_else(|e| {
-        panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-    })
+    from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
 }
 
 /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -112,7 +134,10 @@ fn test_list_json_empty_results() {
     let (_temp, workspace) = setup();
 
     // List from empty workspace with status filter that yields no results
-    let (out, err, ok) = run_bf(&workspace, &["list", "--status", "closed", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["list", "--status", "closed", "--format", "json"],
+    );
     assert!(ok, "list with status filter failed: {err}");
 
     let trimmed = out.trim();
@@ -136,11 +161,18 @@ fn test_search_json_empty_results() {
     let (_temp, workspace) = setup();
 
     // Search with no matching beads
-    let (out, err, ok) = run_bf(&workspace, &["search", "nonexistent-query-xyz", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["search", "nonexistent-query-xyz", "--format", "json"],
+    );
     assert!(ok, "search failed: {err}");
 
     let parsed = parse_jsonl(&out);
-    assert_eq!(parsed.len(), 0, "Search with no matches should return empty JSONL");
+    assert_eq!(
+        parsed.len(),
+        0,
+        "Search with no matches should return empty JSONL"
+    );
 }
 
 #[test]
@@ -165,21 +197,38 @@ fn test_recent_json_empty_results() {
     let (_temp, workspace) = setup();
 
     // Recent with no beads in time period
-    let (out, err, ok) = run_bf(&workspace, &["recent", "--time-period", "1s", "--format", "json"]);
+    let (out, err, ok) = run_bf(
+        &workspace,
+        &["recent", "--time-period", "1s", "--format", "json"],
+    );
     assert!(ok, "recent failed: {err}");
 
     let parsed = parse_json(&out);
     assert!(parsed.is_object(), "recent should return envelope object");
-    assert_eq!(parsed["version"].as_u64().unwrap(), 1, "version should be 1");
-    assert_eq!(parsed["kind"].as_str().unwrap(), "recent", "kind should be 'recent'");
+    assert_eq!(
+        parsed["version"].as_u64().unwrap(),
+        1,
+        "version should be 1"
+    );
+    assert_eq!(
+        parsed["kind"].as_str().unwrap(),
+        "recent",
+        "kind should be 'recent'"
+    );
 
     // Data should be empty
     let data = &parsed["data"];
     if data.is_array() {
-        assert_eq!(data.as_array().unwrap().len(), 0, "data array should be empty");
+        assert_eq!(
+            data.as_array().unwrap().len(),
+            0,
+            "data array should be empty"
+        );
     } else if data.is_string() {
-        assert!(data.as_str().unwrap().is_empty() || data.as_str().unwrap() == "[]",
-                "data string should be empty or '[]'");
+        assert!(
+            data.as_str().unwrap().is_empty() || data.as_str().unwrap() == "[]",
+            "data string should be empty or '[]'"
+        );
     }
 }
 
@@ -199,10 +248,19 @@ fn test_json_handles_unicode_emoji() {
     assert!(ok, "list failed: {err}");
 
     let list_parsed = parse_jsonl(&list_out);
-    let bead = list_parsed.iter().find(|b| get_string(b, "id") == bead_id).unwrap();
+    let bead = list_parsed
+        .iter()
+        .find(|b| get_string(b, "id") == bead_id)
+        .unwrap();
     let title = get_string(bead, "title");
-    assert!(title.contains("🎉"), "Emoji should be preserved in list output");
-    assert!(title.contains("Ñ"), "Unicode should be preserved in list output");
+    assert!(
+        title.contains("🎉"),
+        "Emoji should be preserved in list output"
+    );
+    assert!(
+        title.contains("Ñ"),
+        "Unicode should be preserved in list output"
+    );
 
     // Test show command preserves emoji
     let (show_out, err, ok) = run_bf(&workspace, &["show", &bead_id, "--format", "json"]);
@@ -212,17 +270,29 @@ fn test_json_handles_unicode_emoji() {
     let show_array = show_parsed.as_array().unwrap();
     let show_bead = &show_array[0];
     let show_title = get_string(show_bead, "title");
-    assert!(show_title.contains("🎉"), "Emoji should be preserved in show output");
-    assert!(show_title.contains("café"), "Unicode should be preserved in show output");
+    assert!(
+        show_title.contains("🎉"),
+        "Emoji should be preserved in show output"
+    );
+    assert!(
+        show_title.contains("café"),
+        "Unicode should be preserved in show output"
+    );
 
     // Test search command preserves emoji
     let (search_out, err, ok) = run_bf(&workspace, &["search", "emoji", "--format", "json"]);
     assert!(ok, "search failed: {err}");
 
     let search_parsed = parse_jsonl(&search_out);
-    let search_bead = search_parsed.iter().find(|b| get_string(b, "id") == bead_id).unwrap();
+    let search_bead = search_parsed
+        .iter()
+        .find(|b| get_string(b, "id") == bead_id)
+        .unwrap();
     let search_title = get_string(search_bead, "title");
-    assert!(search_title.contains("🎉"), "Emoji should be preserved in search output");
+    assert!(
+        search_title.contains("🎉"),
+        "Emoji should be preserved in search output"
+    );
 }
 
 #[test]
@@ -241,8 +311,14 @@ fn test_json_handles_quotes_and_apostrophes() {
     let show_bead = &show_array[0];
     let title = get_string(show_bead, "title");
 
-    assert!(title.contains("\"double quotes\""), "Double quotes should be preserved");
-    assert!(title.contains("'single apostrophes'"), "Single quotes should be preserved");
+    assert!(
+        title.contains("\"double quotes\""),
+        "Double quotes should be preserved"
+    );
+    assert!(
+        title.contains("'single apostrophes'"),
+        "Single quotes should be preserved"
+    );
 
     // Verify JSON is valid (proper escaping)
     let recheck_json = parse_json(&show_out);
@@ -268,10 +344,22 @@ fn test_json_handles_newlines_and_tabs() {
     let show_bead = &show_array[0];
     let description = get_string(show_bead, "description");
 
-    assert!(description.contains("Line 1"), "First line should be preserved");
-    assert!(description.contains("Line 2"), "Second line should be preserved");
-    assert!(description.contains("\n"), "Newlines should be preserved (escaped in JSON)");
-    assert!(description.contains("\t"), "Tabs should be preserved (escaped in JSON)");
+    assert!(
+        description.contains("Line 1"),
+        "First line should be preserved"
+    );
+    assert!(
+        description.contains("Line 2"),
+        "Second line should be preserved"
+    );
+    assert!(
+        description.contains("\n"),
+        "Newlines should be preserved (escaped in JSON)"
+    );
+    assert!(
+        description.contains("\t"),
+        "Tabs should be preserved (escaped in JSON)"
+    );
 
     // Verify JSON is still valid despite special characters
     let recheck_json = parse_json(&show_out);
@@ -304,9 +392,18 @@ HTML: <tag>&amp;"#;
     let show_bead = &show_array[0];
     let description = get_string(show_bead, "description");
 
-    assert!(description.contains(r#"C:\Users\test"#), "Backslashes should be preserved");
-    assert!(description.contains(r#"{"key": "value"}"#), "JSON-like text should be preserved");
-    assert!(description.contains("<tag>"), "HTML tags should be preserved");
+    assert!(
+        description.contains(r#"C:\Users\test"#),
+        "Backslashes should be preserved"
+    );
+    assert!(
+        description.contains(r#"{"key": "value"}"#),
+        "JSON-like text should be preserved"
+    );
+    assert!(
+        description.contains("<tag>"),
+        "HTML tags should be preserved"
+    );
 }
 
 #[test]
@@ -342,7 +439,11 @@ Unicode: café, naïve, Zürich"#;
             assert!(parsed.is_array(), "{} should return valid JSON array", cmd);
         } else {
             let parsed = parse_jsonl(&out);
-            assert!(!parsed.is_empty() || cmd == "search", "{} should return valid JSONL", cmd);
+            assert!(
+                !parsed.is_empty() || cmd == "search",
+                "{} should return valid JSONL",
+                cmd
+            );
         }
     }
 }
@@ -364,10 +465,20 @@ fn test_json_handles_very_long_title() {
     assert!(ok, "list failed: {err}");
 
     let list_parsed = parse_jsonl(&list_out);
-    let bead = list_parsed.iter().find(|b| get_string(b, "id") == bead_id).unwrap();
+    let bead = list_parsed
+        .iter()
+        .find(|b| get_string(b, "id") == bead_id)
+        .unwrap();
     let title = get_string(bead, "title");
-    assert_eq!(title.len(), long_title.len(), "Title length should be preserved");
-    assert!(title.starts_with("AAAAA"), "Title content should be preserved");
+    assert_eq!(
+        title.len(),
+        long_title.len(),
+        "Title length should be preserved"
+    );
+    assert!(
+        title.starts_with("AAAAA"),
+        "Title content should be preserved"
+    );
 
     // Test show command handles long title
     let (show_out, err, ok) = run_bf(&workspace, &["show", &bead_id, "--format", "json"]);
@@ -377,7 +488,11 @@ fn test_json_handles_very_long_title() {
     let show_array = show_parsed.as_array().unwrap();
     let show_bead = &show_array[0];
     let show_title = get_string(show_bead, "title");
-    assert_eq!(show_title.len(), long_title.len(), "Title should be preserved in show");
+    assert_eq!(
+        show_title.len(),
+        long_title.len(),
+        "Title should be preserved in show"
+    );
 }
 
 #[test]
@@ -399,12 +514,21 @@ fn test_json_handles_very_long_description() {
     let show_bead = &show_array[0];
     let description = get_string(show_bead, "description");
 
-    assert!(description.len() > 1000, "Long description should be preserved");
-    assert!(description.contains("very long description"), "Content should be preserved");
+    assert!(
+        description.len() > 1000,
+        "Long description should be preserved"
+    );
+    assert!(
+        description.contains("very long description"),
+        "Content should be preserved"
+    );
 
     // Verify JSON is still valid
     let recheck = parse_json(&show_out);
-    assert!(recheck.is_array(), "Long description output should still be valid JSON");
+    assert!(
+        recheck.is_array(),
+        "Long description output should still be valid JSON"
+    );
 }
 
 #[test]
@@ -428,11 +552,17 @@ fn test_json_handles_many_fields_with_long_content() {
     let description = get_string(show_bead, "description");
 
     assert!(title.len() > 150, "Long title should be preserved");
-    assert!(description.len() > 500, "Long description should be preserved");
+    assert!(
+        description.len() > 500,
+        "Long description should be preserved"
+    );
 
     // Verify the JSON is valid (no truncation or corruption)
     let recheck = parse_json(&show_out);
-    assert!(recheck.is_array(), "Multiple long fields should still produce valid JSON");
+    assert!(
+        recheck.is_array(),
+        "Multiple long fields should still produce valid JSON"
+    );
 }
 
 // ============================================================================
@@ -485,22 +615,17 @@ fn test_json_handles_titles_with_leading_trailing_whitespace() {
     let title = get_string(show_bead, "title");
 
     // Title should either preserve spaces or trim them (implementation-dependent)
-    assert!(title.contains("Title with"), "Core title content should be present");
+    assert!(
+        title.contains("Title with"),
+        "Core title content should be present"
+    );
 }
 
 #[test]
 fn test_json_handles_titles_with_only_numbers_and_special_chars() {
     let (_temp, workspace) = setup();
 
-    let special_titles = vec![
-        "12345",
-        "!!!",
-        "@#$%",
-        "<>",
-        "[]",
-        "{}",
-        "((()))",
-    ];
+    let special_titles = vec!["12345", "!!!", "@#$%", "<>", "[]", "{}", "((()))"];
 
     for title in special_titles {
         let bead_id = create_bead(&workspace, title);
@@ -514,7 +639,11 @@ fn test_json_handles_titles_with_only_numbers_and_special_chars() {
         let show_bead = &show_array[0];
         let parsed_title = get_string(show_bead, "title");
 
-        assert_eq!(parsed_title, title, "Special title should be preserved: {}", title);
+        assert_eq!(
+            parsed_title, title,
+            "Special title should be preserved: {}",
+            title
+        );
     }
 }
 
@@ -544,11 +673,18 @@ fn test_json_handles_mixed_unicode_scripts() {
         let show_bead = &show_array[0];
         let parsed_title = get_string(show_bead, "title");
 
-        assert_eq!(parsed_title, title, "Mixed scripts should be preserved: {}", title);
+        assert_eq!(
+            parsed_title, title,
+            "Mixed scripts should be preserved: {}",
+            title
+        );
 
         // Verify JSON is valid
         let recheck = parse_json(&show_out);
-        assert!(recheck.is_array(), "Mixed script output should be valid JSON");
+        assert!(
+            recheck.is_array(),
+            "Mixed script output should be valid JSON"
+        );
     }
 }
 
@@ -583,7 +719,10 @@ fn test_json_consistency_across_commands() {
             get_string(&array[0], "title")
         } else {
             let parsed = parse_jsonl(&out);
-            let bead = parsed.iter().find(|b| get_string(b, "id") == bead_id).unwrap();
+            let bead = parsed
+                .iter()
+                .find(|b| get_string(b, "id") == bead_id)
+                .unwrap();
             get_string(bead, "title")
         };
 
@@ -592,7 +731,10 @@ fn test_json_consistency_across_commands() {
 
     // All commands should return the same title
     for title in &extracted_titles {
-        assert_eq!(title, &extracted_titles[0], "All commands should return consistent title");
+        assert_eq!(
+            title, &extracted_titles[0],
+            "All commands should return consistent title"
+        );
     }
 }
 
@@ -602,7 +744,11 @@ fn test_json_empty_results_consistency() {
 
     // Test that empty results are handled consistently across commands
     let empty_commands = vec![
-        ("list", vec!["list", "--status", "closed", "--format", "json"], "[]"),
+        (
+            "list",
+            vec!["list", "--status", "closed", "--format", "json"],
+            "[]",
+        ),
         ("ready", vec!["ready", "--format", "json"], "[]"),
     ];
 
@@ -617,12 +763,19 @@ fn test_json_empty_results_consistency() {
             continue; // Empty string is acceptable for empty results
         }
 
-        assert_eq!(trimmed, expected, "{} should return '{}' for empty results", cmd_name, expected);
+        assert_eq!(
+            trimmed, expected,
+            "{} should return '{}' for empty results",
+            cmd_name, expected
+        );
 
         // Verify it's valid JSON
         let parsed = parse_json(trimmed);
         if expected == "[]" {
-            assert!(parsed.is_array(), "Empty results should be valid JSON array");
+            assert!(
+                parsed.is_array(),
+                "Empty results should be valid JSON array"
+            );
             assert_eq!(parsed.as_array().unwrap().len(), 0, "Array should be empty");
         }
     }
@@ -672,7 +825,10 @@ fn test_list_json_required_field_types() {
     );
     let id_str = id_value.as_str().unwrap();
     assert!(!id_str.is_empty(), "id string should not be empty");
-    assert!(id_str.starts_with("bf-"), "id should start with 'bf-' prefix");
+    assert!(
+        id_str.starts_with("bf-"),
+        "id should start with 'bf-' prefix"
+    );
 
     // title field should be a string
     let title_value = our_bead.get("title").expect("title field must exist");
@@ -709,18 +865,29 @@ fn test_list_json_required_field_types() {
         "priority field should be a number, got: {}",
         priority_value
     );
-    let priority_num = priority_value.as_i64().expect("priority should be parseable as i64");
-    assert!(priority_num >= 0 && priority_num <= 5, "priority should be between 0 and 5, got: {}", priority_num);
+    let priority_num = priority_value
+        .as_i64()
+        .expect("priority should be parseable as i64");
+    assert!(
+        priority_num >= 0 && priority_num <= 5,
+        "priority should be between 0 and 5, got: {}",
+        priority_num
+    );
 
     // created_at field should be a string (ISO 8601 timestamp)
-    let created_at_value = our_bead.get("created_at").expect("created_at field must exist");
+    let created_at_value = our_bead
+        .get("created_at")
+        .expect("created_at field must exist");
     assert!(
         created_at_value.is_string(),
         "created_at field should be a string (timestamp), got: {}",
         created_at_value
     );
     let created_at_str = created_at_value.as_str().unwrap();
-    assert!(!created_at_str.is_empty(), "created_at string should not be empty");
+    assert!(
+        !created_at_str.is_empty(),
+        "created_at string should not be empty"
+    );
     // Verify ISO 8601 format (contains 'T' and has timezone indicator)
     assert!(
         created_at_str.contains('T'),
@@ -783,12 +950,24 @@ fn test_list_json_multiple_beads_all_required_fields() {
         assert!(status.is_string(), "Bead {}: status should be string", i);
 
         let priority = bead.get("priority").expect("priority must exist");
-        assert!(priority.is_number(), "Bead {}: priority should be number", i);
+        assert!(
+            priority.is_number(),
+            "Bead {}: priority should be number",
+            i
+        );
 
         let created_at = bead.get("created_at").expect("created_at must exist");
-        assert!(created_at.is_string(), "Bead {}: created_at should be string (timestamp)", i);
+        assert!(
+            created_at.is_string(),
+            "Bead {}: created_at should be string (timestamp)",
+            i
+        );
         let created_at_str = created_at.as_str().unwrap();
-        assert!(created_at_str.contains('T'), "Bead {}: created_at should be ISO 8601 format", i);
+        assert!(
+            created_at_str.contains('T'),
+            "Bead {}: created_at should be ISO 8601 format",
+            i
+        );
     }
 
     // Verify all our created beads are in the results
@@ -812,7 +991,11 @@ fn test_all_json_output_is_valid() {
 
     // Create various test beads
     let bead1 = create_bead(&workspace, "Validation test 1 🎉");
-    let bead2 = create_bead_with_description(&workspace, "Validation test 2", "Description with \"quotes\"");
+    let bead2 = create_bead_with_description(
+        &workspace,
+        "Validation test 2",
+        "Description with \"quotes\"",
+    );
     let bead3 = create_bead(&workspace, "Validation test 3");
     close_bead(&workspace, &bead3, "Test close");
 
@@ -834,16 +1017,20 @@ fn test_all_json_output_is_valid() {
             for line in out.lines() {
                 if !line.trim().is_empty() && line.trim() != "[]" {
                     let parsed = parse_json(line);
-                    assert!(parsed.is_object() || parsed.is_array(),
-                            "Each line should be valid JSON object or array");
+                    assert!(
+                        parsed.is_object() || parsed.is_array(),
+                        "Each line should be valid JSON object or array"
+                    );
                 }
             }
         } else {
             // For envelope commands, verify entire output is valid JSON
             if !out.trim().is_empty() && out.trim() != "[]" {
                 let parsed = parse_json(&out);
-                assert!(parsed.is_object() || parsed.is_array(),
-                        "Envelope output should be valid JSON");
+                assert!(
+                    parsed.is_object() || parsed.is_array(),
+                    "Envelope output should be valid JSON"
+                );
             }
         }
     }
@@ -870,7 +1057,16 @@ fn test_json_escape_sequences_are_correct() {
     let extracted_title = get_string(bead, "title");
 
     // The title should contain the escape sequences as literal text (not interpreted)
-    assert!(extracted_title.contains(r#"\n"#), "Backslash-n should be preserved as literal text");
-    assert!(extracted_title.contains(r#"\t"#), "Backslash-t should be preserved as literal text");
-    assert!(extracted_title.contains(r#"\""#), "Escaped quote should be preserved");
+    assert!(
+        extracted_title.contains(r#"\n"#),
+        "Backslash-n should be preserved as literal text"
+    );
+    assert!(
+        extracted_title.contains(r#"\t"#),
+        "Backslash-t should be preserved as literal text"
+    );
+    assert!(
+        extracted_title.contains(r#"\""#),
+        "Escaped quote should be preserved"
+    );
 }

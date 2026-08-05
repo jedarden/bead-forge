@@ -40,8 +40,8 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    test_workspace, bf_binary, bf_command, bf_command_with_workspace,
-    json_validation, format_detection, fixtures, capture, envelope,
+    bf_binary, bf_command, bf_command_with_workspace, capture, envelope, fixtures,
+    format_detection, json_validation, test_workspace,
 };
 
 // Import items made available in parent scope
@@ -57,8 +57,7 @@ fn create_isolated_workspace() -> TempDir {
     crate::config::init_workspace(&beads_dir, "bf-schema-test")
         .expect("Failed to initialize test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
@@ -84,8 +83,8 @@ const ISSUE_SCHEMA: IssueSchema = IssueSchema {
         "issue_type",
         "created_at",
         "updated_at",
-        "assignee",    // Always present (null or string)
-        "labels",      // Always present (array, may be empty)
+        "assignee", // Always present (null or string)
+        "labels",   // Always present (array, may be empty)
     ],
     optional_fields: &[
         "description",
@@ -129,77 +128,110 @@ fn validate_field_types(json: &serde_json::Value, context: &str) -> Result<(), S
     // title: string
     if let Some(title) = json.get("title") {
         if !title.is_string() {
-            return Err(format!("{}: 'title' must be string, got {:?}", context, title));
+            return Err(format!(
+                "{}: 'title' must be string, got {:?}",
+                context, title
+            ));
         }
     }
 
     // status: string
     if let Some(status) = json.get("status") {
         if !status.is_string() {
-            return Err(format!("{}: 'status' must be string, got {:?}", context, status));
+            return Err(format!(
+                "{}: 'status' must be string, got {:?}",
+                context, status
+            ));
         }
     }
 
     // priority: number
     if let Some(priority) = json.get("priority") {
         if !priority.is_number() {
-            return Err(format!("{}: 'priority' must be number, got {:?}", context, priority));
+            return Err(format!(
+                "{}: 'priority' must be number, got {:?}",
+                context, priority
+            ));
         }
     }
 
     // issue_type: string
     if let Some(issue_type) = json.get("issue_type") {
         if !issue_type.is_string() {
-            return Err(format!("{}: 'issue_type' must be string, got {:?}", context, issue_type));
+            return Err(format!(
+                "{}: 'issue_type' must be string, got {:?}",
+                context, issue_type
+            ));
         }
     }
 
     // assignee: string | null
     if let Some(assignee) = json.get("assignee") {
         if !assignee.is_string() && !assignee.is_null() {
-            return Err(format!("{}: 'assignee' must be string or null, got {:?}", context, assignee));
+            return Err(format!(
+                "{}: 'assignee' must be string or null, got {:?}",
+                context, assignee
+            ));
         }
     }
 
     // labels: array
     if let Some(labels) = json.get("labels") {
         if !labels.is_array() {
-            return Err(format!("{}: 'labels' must be array, got {:?}", context, labels));
+            return Err(format!(
+                "{}: 'labels' must be array, got {:?}",
+                context, labels
+            ));
         }
     }
 
     // created_at: string (ISO 8601)
     if let Some(created_at) = json.get("created_at") {
         if !created_at.is_string() {
-            return Err(format!("{}: 'created_at' must be string, got {:?}", context, created_at));
+            return Err(format!(
+                "{}: 'created_at' must be string, got {:?}",
+                context, created_at
+            ));
         }
     }
 
     // updated_at: string (ISO 8601)
     if let Some(updated_at) = json.get("updated_at") {
         if !updated_at.is_string() {
-            return Err(format!("{}: 'updated_at' must be string, got {:?}", context, updated_at));
+            return Err(format!(
+                "{}: 'updated_at' must be string, got {:?}",
+                context, updated_at
+            ));
         }
     }
 
     // description: string | null (optional)
     if let Some(description) = json.get("description") {
         if !description.is_string() && !description.is_null() {
-            return Err(format!("{}: 'description' must be string or null, got {:?}", context, description));
+            return Err(format!(
+                "{}: 'description' must be string or null, got {:?}",
+                context, description
+            ));
         }
     }
 
     // closed_at: string | null (optional)
     if let Some(closed_at) = json.get("closed_at") {
         if !closed_at.is_string() && !closed_at.is_null() {
-            return Err(format!("{}: 'closed_at' must be string or null, got {:?}", context, closed_at));
+            return Err(format!(
+                "{}: 'closed_at' must be string or null, got {:?}",
+                context, closed_at
+            ));
         }
     }
 
     // due_at: string | null (optional)
     if let Some(due_at) = json.get("due_at") {
         if !due_at.is_string() && !due_at.is_null() {
-            return Err(format!("{}: 'due_at' must be string or null, got {:?}", context, due_at));
+            return Err(format!(
+                "{}: 'due_at' must be string or null, got {:?}",
+                context, due_at
+            ));
         }
     }
 
@@ -230,7 +262,7 @@ fn test_show_json_schema_consistency_on_invalid_bead_id() {
                 .arg("show")
                 .arg(invalid_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Command should fail
@@ -287,17 +319,14 @@ fn test_update_json_schema_consistency_on_errors() {
                     .arg("update")
                     .arg("bf-invalid-999")
                     .arg("--description")
-                    .arg("test")
+                    .arg("test"),
             );
             stdout
         },
         // Missing required arguments (caught by clap)
         || {
             let (stdout, _, _) = capture::capture_failed_command(
-                &mut bf_command()
-                    .arg("update")
-                    .arg("--description")
-                    .arg("test")
+                &mut bf_command().arg("update").arg("--description").arg("test"),
             );
             stdout
         },
@@ -342,7 +371,7 @@ fn test_command_json_schema_consistency_various_errors() {
                     .arg("add")
                     .arg(&bead_id)
                     .arg("--blocks")
-                    .arg("bf-nonexistent-blocker")
+                    .arg("bf-nonexistent-blocker"),
             );
             fixtures::close_bead(&bead_id, "Cleanup dep error test");
             stdout
@@ -355,7 +384,7 @@ fn test_command_json_schema_consistency_various_errors() {
                     .arg("add")
                     .arg("bf-nonexistent-label")
                     .arg("--label")
-                    .arg("test-label")
+                    .arg("test-label"),
             );
             stdout
         },
@@ -366,7 +395,7 @@ fn test_command_json_schema_consistency_various_errors() {
                     .arg("comment")
                     .arg("bf-nonexistent-comment")
                     .arg("--text")
-                    .arg("test comment")
+                    .arg("test comment"),
             );
             stdout
         },
@@ -399,13 +428,16 @@ fn test_list_json_empty_results_maintains_schema() {
         bf_command_with_workspace(empty_workspace)
             .arg("list")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty result should be empty string (valid JSONL empty state)
     let trimmed = output.trim();
-    assert!(trimmed.is_empty() || trimmed == "[]",
-           "Empty list should be empty or '[], got: '{}'", trimmed);
+    assert!(
+        trimmed.is_empty() || trimmed == "[]",
+        "Empty list should be empty or '[], got: '{}'",
+        trimmed
+    );
 }
 
 #[test]
@@ -421,13 +453,16 @@ fn test_search_json_empty_results_maintains_schema() {
             .arg("search")
             .arg("nonexistent-term-xyz-123")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty search should be empty string (valid JSONL empty state)
     let trimmed = output.trim();
-    assert!(trimmed.is_empty() || trimmed == "[]",
-           "Empty search should be empty or [], got: '{}'", trimmed);
+    assert!(
+        trimmed.is_empty() || trimmed == "[]",
+        "Empty search should be empty or [], got: '{}'",
+        trimmed
+    );
 }
 
 #[test]
@@ -442,12 +477,16 @@ fn test_ready_json_empty_results_maintains_schema() {
         bf_command_with_workspace(empty_workspace)
             .arg("ready")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty ready should be [] (special case for ready command)
     let trimmed = output.trim();
-    assert_eq!(trimmed, "[]", "Empty ready should return '[]', got: '{}'", trimmed);
+    assert_eq!(
+        trimmed, "[]",
+        "Empty ready should return '[]', got: '{}'",
+        trimmed
+    );
 }
 
 #[test]
@@ -462,7 +501,7 @@ fn test_show_json_empty_workspace() {
             .arg("show")
             .arg("bf-nonexistent-empty")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     assert!(!success, "show should fail for non-existent bead");
@@ -490,11 +529,14 @@ fn test_empty_results_with_filters_maintain_schema() {
             .arg("--status")
             .arg("open")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
     let trimmed1 = output1.trim();
-    assert!(trimmed1.is_empty() || trimmed1 == "[]",
-           "Empty filtered results should be empty or [], got: '{}'", trimmed1);
+    assert!(
+        trimmed1.is_empty() || trimmed1 == "[]",
+        "Empty filtered results should be empty or [], got: '{}'",
+        trimmed1
+    );
 
     // Test 2: Type filter with no matches
     let output2 = capture::capture_stdout(
@@ -503,11 +545,14 @@ fn test_empty_results_with_filters_maintain_schema() {
             .arg("--type")
             .arg("genesis")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
     let trimmed2 = output2.trim();
-    assert!(trimmed2.is_empty() || trimmed2 == "[]",
-           "Empty filtered results should be empty or [], got: '{}'", trimmed2);
+    assert!(
+        trimmed2.is_empty() || trimmed2 == "[]",
+        "Empty filtered results should be empty or [], got: '{}'",
+        trimmed2
+    );
 
     // Test 3: Assignee filter with no matches
     let output3 = capture::capture_stdout(
@@ -516,11 +561,14 @@ fn test_empty_results_with_filters_maintain_schema() {
             .arg("--assignee")
             .arg("nonexistent-assignee")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
     let trimmed3 = output3.trim();
-    assert!(trimmed3.is_empty() || trimmed3 == "[]",
-           "Empty filtered results should be empty or [], got: '{}'", trimmed3);
+    assert!(
+        trimmed3.is_empty() || trimmed3 == "[]",
+        "Empty filtered results should be empty or [], got: '{}'",
+        trimmed3
+    );
 }
 
 // ============================================================================
@@ -536,7 +584,7 @@ fn test_show_json_all_required_fields_present() {
     // Create a bead with all possible fields
     let bead_id = fixtures::create_bead_with_labels(
         "Test bead with all fields",
-        &["test-label", "priority-high"]
+        &["test-label", "priority-high"],
     );
 
     // Add more fields
@@ -545,7 +593,7 @@ fn test_show_json_all_required_fields_present() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg("Test description with special chars: \"quotes\" & symbols")
+            .arg("Test description with special chars: \"quotes\" & symbols"),
     );
 
     // Get show output
@@ -554,7 +602,7 @@ fn test_show_json_all_required_fields_present() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Parse and validate against schema
@@ -566,21 +614,47 @@ fn test_show_json_all_required_fields_present() {
     let issue = &array[0];
 
     // Validate against Issue schema
-    validate_issue_schema(issue, "show command")
-        .expect("Issue should conform to schema");
+    validate_issue_schema(issue, "show command").expect("Issue should conform to schema");
 
     // Verify all required fields have correct types
-    assert!(issue.get("id").and_then(|v| v.as_str()).is_some(), "id must be string");
-    assert!(issue.get("title").and_then(|v| v.as_str()).is_some(), "title must be string");
-    assert!(issue.get("status").and_then(|v| v.as_str()).is_some(), "status must be string");
-    assert!(issue.get("priority").and_then(|v| v.as_i64()).is_some(), "priority must be integer");
-    assert!(issue.get("issue_type").and_then(|v| v.as_str()).is_some(), "issue_type must be string");
-    assert!(issue.get("created_at").and_then(|v| v.as_str()).is_some(), "created_at must be string");
-    assert!(issue.get("updated_at").and_then(|v| v.as_str()).is_some(), "updated_at must be string");
+    assert!(
+        issue.get("id").and_then(|v| v.as_str()).is_some(),
+        "id must be string"
+    );
+    assert!(
+        issue.get("title").and_then(|v| v.as_str()).is_some(),
+        "title must be string"
+    );
+    assert!(
+        issue.get("status").and_then(|v| v.as_str()).is_some(),
+        "status must be string"
+    );
+    assert!(
+        issue.get("priority").and_then(|v| v.as_i64()).is_some(),
+        "priority must be integer"
+    );
+    assert!(
+        issue.get("issue_type").and_then(|v| v.as_str()).is_some(),
+        "issue_type must be string"
+    );
+    assert!(
+        issue.get("created_at").and_then(|v| v.as_str()).is_some(),
+        "created_at must be string"
+    );
+    assert!(
+        issue.get("updated_at").and_then(|v| v.as_str()).is_some(),
+        "updated_at must be string"
+    );
 
     // assignee and labels should always be present
-    assert!(issue.get("assignee").is_some(), "assignee must be present (even if null)");
-    assert!(issue.get("labels").and_then(|v| v.as_array()).is_some(), "labels must be array");
+    assert!(
+        issue.get("assignee").is_some(),
+        "assignee must be present (even if null)"
+    );
+    assert!(
+        issue.get("labels").and_then(|v| v.as_array()).is_some(),
+        "labels must be array"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "All fields test cleanup");
@@ -598,12 +672,7 @@ fn test_list_json_all_items_conform_to_schema() {
     let bead3 = fixtures::create_bead("Bead 3");
 
     // Get list output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Validate each line conforms to schema
     let lines: Vec<&str> = output.lines().filter(|l| !l.trim().is_empty()).collect();
@@ -618,14 +687,26 @@ fn test_list_json_all_items_conform_to_schema() {
             .expect("Each list item must conform to Issue schema");
 
         // Verify critical field types
-        assert!(parsed.get("id").and_then(|v| v.as_str()).is_some(),
-                "Line {}: id must be string", i);
-        assert!(parsed.get("title").and_then(|v| v.as_str()).is_some(),
-                "Line {}: title must be string", i);
-        assert!(parsed.get("priority").and_then(|v| v.as_i64()).is_some(),
-                "Line {}: priority must be integer", i);
-        assert!(parsed.get("labels").and_then(|v| v.as_array()).is_some(),
-                "Line {}: labels must be array", i);
+        assert!(
+            parsed.get("id").and_then(|v| v.as_str()).is_some(),
+            "Line {}: id must be string",
+            i
+        );
+        assert!(
+            parsed.get("title").and_then(|v| v.as_str()).is_some(),
+            "Line {}: title must be string",
+            i
+        );
+        assert!(
+            parsed.get("priority").and_then(|v| v.as_i64()).is_some(),
+            "Line {}: priority must be integer",
+            i
+        );
+        assert!(
+            parsed.get("labels").and_then(|v| v.as_array()).is_some(),
+            "Line {}: labels must be array",
+            i
+        );
     }
 
     // Cleanup
@@ -650,7 +731,7 @@ fn test_search_json_results_conform_to_schema() {
             .arg("search")
             .arg("keyword")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Validate each search result conforms to schema
@@ -679,12 +760,7 @@ fn test_ready_json_results_conform_to_schema() {
     let bead2 = fixtures::create_bead("Ready bead 2");
 
     // Get ready output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("ready")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("ready").arg("--format").arg("json"));
 
     let trimmed = output.trim();
 
@@ -721,7 +797,7 @@ fn test_claim_json_schema_structure() {
             .arg("--assignee")
             .arg("test-worker")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Claim output should be a single object, not array or JSONL
@@ -733,12 +809,18 @@ fn test_claim_json_schema_structure() {
     json_validation::assert_required_fields(&parsed, &required_fields, "claim result");
 
     // Validate field types
-    assert!(parsed.get("bead_id").and_then(|v| v.as_str()).is_some(),
-            "bead_id must be string");
-    assert!(parsed.get("assignee").and_then(|v| v.as_str()).is_some(),
-            "assignee must be string");
-    assert!(parsed.get("reclaimed").and_then(|v| v.as_i64()).is_some(),
-            "reclaimed must be integer");
+    assert!(
+        parsed.get("bead_id").and_then(|v| v.as_str()).is_some(),
+        "bead_id must be string"
+    );
+    assert!(
+        parsed.get("assignee").and_then(|v| v.as_str()).is_some(),
+        "assignee must be string"
+    );
+    assert!(
+        parsed.get("reclaimed").and_then(|v| v.as_i64()).is_some(),
+        "reclaimed must be integer"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Claim schema cleanup");
@@ -760,7 +842,7 @@ fn test_create_json_envelope_schema() {
             .arg("task")
             .arg("--priority")
             .arg("2")
-            .arg("--json")
+            .arg("--json"),
     );
 
     // Parse envelope
@@ -799,12 +881,15 @@ fn test_show_json_structure_matches_expected() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Validate structure: [{...}] - single-element array
     let json_str = output.trim();
-    assert!(json_str.starts_with('['), "show output should start with '['");
+    assert!(
+        json_str.starts_with('['),
+        "show output should start with '['"
+    );
     assert!(json_str.ends_with(']'), "show output should end with ']'");
 
     let parsed = json_validation::parse_json(json_str);
@@ -828,12 +913,7 @@ fn test_list_json_structure_matches_expected() {
     let bead1 = fixtures::create_bead("List structure test 1");
     let bead2 = fixtures::create_bead("List structure test 2");
 
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Validate structure: JSONL (newline-delimited objects, not wrapped in array)
     let trimmed = output.trim();
@@ -844,7 +924,10 @@ fn test_list_json_structure_matches_expected() {
 
     // Should be multiple lines
     let lines: Vec<&str> = output.lines().filter(|l| !l.trim().is_empty()).collect();
-    assert!(lines.len() >= 2, "list should return multiple lines (JSONL)");
+    assert!(
+        lines.len() >= 2,
+        "list should return multiple lines (JSONL)"
+    );
 
     // Each line should be valid JSON object
     for line in lines {
@@ -870,7 +953,7 @@ fn test_search_json_structure_matches_expected() {
             .arg("search")
             .arg("search")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Validate structure: JSONL (same as list)
@@ -878,14 +961,20 @@ fn test_search_json_structure_matches_expected() {
 
     if !trimmed.is_empty() && trimmed != "[]" {
         // Should not be wrapped in array
-        assert!(!trimmed.starts_with('['), "search should not start with '['");
+        assert!(
+            !trimmed.starts_with('['),
+            "search should not start with '['"
+        );
         assert!(!trimmed.ends_with(']'), "search should not end with ']'");
 
         // Each line should be valid JSON
         for line in output.lines() {
             if !line.trim().is_empty() {
                 let parsed = json_validation::parse_json(line);
-                assert!(parsed.is_object(), "Each search result line should be object");
+                assert!(
+                    parsed.is_object(),
+                    "Each search result line should be object"
+                );
             }
         }
     }
@@ -915,7 +1004,7 @@ fn test_schema_maintained_with_special_characters() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(special_description)
+            .arg(special_description),
     );
 
     // Get show output and validate schema is maintained
@@ -924,7 +1013,7 @@ fn test_schema_maintained_with_special_characters() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Despite special characters, schema should be valid
@@ -937,10 +1026,14 @@ fn test_schema_maintained_with_special_characters() {
         .expect("Schema should be maintained despite special characters");
 
     // Verify field types are still correct
-    assert!(issue.get("title").and_then(|v| v.as_str()).is_some(),
-            "title must be string despite special chars");
-    assert!(issue.get("description").and_then(|v| v.as_str()).is_some(),
-            "description must be string despite special chars");
+    assert!(
+        issue.get("title").and_then(|v| v.as_str()).is_some(),
+        "title must be string despite special chars"
+    );
+    assert!(
+        issue.get("description").and_then(|v| v.as_str()).is_some(),
+        "description must be string despite special chars"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Special characters schema cleanup");
@@ -963,7 +1056,7 @@ fn test_schema_maintained_with_unicode() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(unicode_desc)
+            .arg(unicode_desc),
     );
 
     // Get output and validate schema
@@ -972,7 +1065,7 @@ fn test_schema_maintained_with_unicode() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Unicode should not break schema
@@ -985,8 +1078,10 @@ fn test_schema_maintained_with_unicode() {
 
     // Verify unicode is preserved in field values
     let title = json_validation::get_string(issue, "title");
-    assert!(title.contains("café") || title.contains("日本語") || title.contains("🎉"),
-            "Unicode should be preserved in title");
+    assert!(
+        title.contains("café") || title.contains("日本語") || title.contains("🎉"),
+        "Unicode should be preserved in title"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Unicode schema cleanup");
@@ -1012,7 +1107,7 @@ fn test_schema_with_very_long_values() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(&long_description)
+            .arg(&long_description),
     );
 
     // Get output and validate schema
@@ -1021,7 +1116,7 @@ fn test_schema_with_very_long_values() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Long values should not break schema
@@ -1034,7 +1129,11 @@ fn test_schema_with_very_long_values() {
 
     // Verify long value is preserved
     let description = json_validation::get_string(issue, "description");
-    assert_eq!(description.len(), 10000, "Long description should be preserved");
+    assert_eq!(
+        description.len(),
+        10000,
+        "Long description should be preserved"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Long values schema cleanup");
@@ -1055,7 +1154,7 @@ fn test_schema_with_minimal_fields() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Even minimal beads should conform to full schema
@@ -1068,7 +1167,11 @@ fn test_schema_with_minimal_fields() {
 
     // Verify required fields are present
     for field in ISSUE_SCHEMA.required_fields {
-        assert!(issue.get(field).is_some(), "Required field '{}' should be present", field);
+        assert!(
+            issue.get(field).is_some(),
+            "Required field '{}' should be present",
+            field
+        );
     }
 
     // Cleanup
@@ -1086,17 +1189,15 @@ fn test_same_bead_consistent_schema_across_commands() {
     let workspace = test_workspace();
 
     // Create a bead with all fields populated
-    let bead_id = fixtures::create_bead_with_labels(
-        "Consistency test bead",
-        &["test", "consistency"]
-    );
+    let bead_id =
+        fixtures::create_bead_with_labels("Consistency test bead", &["test", "consistency"]);
 
     capture::capture_stdout(
         bf_command()
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg("Test description")
+            .arg("Test description"),
     );
 
     // Get the bead from different commands
@@ -1105,15 +1206,10 @@ fn test_same_bead_consistent_schema_across_commands() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
-    let list_output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let list_output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Parse show output
     let show_json = json_validation::parse_json(&show_output.trim());
@@ -1121,7 +1217,10 @@ fn test_same_bead_consistent_schema_across_commands() {
     let show_bead = &show_array[0];
 
     // Parse list output and find our bead
-    let list_lines: Vec<&str> = list_output.lines().filter(|l| !l.trim().is_empty()).collect();
+    let list_lines: Vec<&str> = list_output
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
     let mut list_bead = None;
     for line in list_lines {
         let parsed = json_validation::parse_json(line);
@@ -1148,10 +1247,8 @@ fn test_same_bead_consistent_schema_across_commands() {
     assert_eq!(show_status, list_status, "Status should be consistent");
 
     // Both should conform to the same schema
-    validate_issue_schema(show_bead, "show command")
-        .expect("Show bead should conform to schema");
-    validate_issue_schema(&list_bead, "list command")
-        .expect("List bead should conform to schema");
+    validate_issue_schema(show_bead, "show command").expect("Show bead should conform to schema");
+    validate_issue_schema(&list_bead, "list command").expect("List bead should conform to schema");
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Consistency cleanup");
@@ -1173,7 +1270,7 @@ fn test_error_responses_consistent_schema() {
                     .arg("show")
                     .arg("bf-invalid-999")
                     .arg("--format")
-                    .arg("json")
+                    .arg("json"),
             );
             ("Invalid bead ID", stdout)
         },
@@ -1184,7 +1281,7 @@ fn test_error_responses_consistent_schema() {
                     .arg("comment")
                     .arg("bf-missing-888")
                     .arg("--text")
-                    .arg("test")
+                    .arg("test"),
             );
             ("Non-existent bead for comment", stdout)
         },
@@ -1196,7 +1293,7 @@ fn test_error_responses_consistent_schema() {
                     .arg("add")
                     .arg("bf-missing-777")
                     .arg("--blocks")
-                    .arg("bf-another-missing")
+                    .arg("bf-another-missing"),
             );
             ("Invalid dependency", stdout)
         },
@@ -1217,7 +1314,11 @@ fn test_error_responses_consistent_schema() {
             if parsed.is_object() && parsed.get("error").is_some() {
                 // Error objects should have string error field
                 let error_msg = json_validation::get_string(&parsed, "error");
-                assert!(!error_msg.is_empty(), "Error message should not be empty for: {}", description);
+                assert!(
+                    !error_msg.is_empty(),
+                    "Error message should not be empty for: {}",
+                    description
+                );
             }
         }
 

@@ -32,11 +32,20 @@ fn test_empty_label_is_rejected() {
     // Test that empty string label is rejected
     let result = storage.add_label("empty-label-test", "");
     assert!(result.is_err(), "Empty label should be rejected");
-    assert!(result.unwrap_err().to_string().contains("Label cannot be empty"), "Error should mention empty label");
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Label cannot be empty"),
+        "Error should mention empty label"
+    );
 
     // Verify no empty label was added
     let labels = storage.get_labels("empty-label-test").unwrap();
-    assert!(!labels.contains(&"".to_string()), "Empty label should not be present");
+    assert!(
+        !labels.contains(&"".to_string()),
+        "Empty label should not be present"
+    );
 }
 
 #[test]
@@ -56,13 +65,22 @@ fn test_multiple_empty_label_attempts_are_all_rejected() {
 
     // Try to add empty label multiple times - all should fail
     let result1 = storage.add_label("multi-empty-test", "");
-    assert!(result1.is_err(), "First empty label attempt should be rejected");
+    assert!(
+        result1.is_err(),
+        "First empty label attempt should be rejected"
+    );
 
     let result2 = storage.add_label("multi-empty-test", "");
-    assert!(result2.is_err(), "Second empty label attempt should be rejected");
+    assert!(
+        result2.is_err(),
+        "Second empty label attempt should be rejected"
+    );
 
     let result3 = storage.add_label("multi-empty-test", "");
-    assert!(result3.is_err(), "Third empty label attempt should be rejected");
+    assert!(
+        result3.is_err(),
+        "Third empty label attempt should be rejected"
+    );
 
     let labels = storage.get_labels("multi-empty-test").unwrap();
     let empty_count = labels.iter().filter(|l| l.is_empty()).count();
@@ -109,7 +127,11 @@ fn test_labels_with_punctuation() {
     assert_eq!(labels.len(), test_labels.len());
 
     for label in &test_labels {
-        assert!(labels.contains(&label.to_string()), "Label '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Label '{}' should be present",
+            label
+        );
     }
 }
 
@@ -147,7 +169,11 @@ fn test_labels_with_special_chars() {
     assert_eq!(labels.len(), test_labels.len());
 
     for label in &test_labels {
-        assert!(labels.contains(&label.to_string()), "Special char label '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Special char label '{}' should be present",
+            label
+        );
     }
 }
 
@@ -181,7 +207,11 @@ fn test_labels_with_quotes() {
     assert_eq!(labels.len(), test_labels.len());
 
     for label in &test_labels {
-        assert!(labels.contains(&label.to_string()), "Label with quotes '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Label with quotes '{}' should be present",
+            label
+        );
     }
 }
 
@@ -215,7 +245,11 @@ fn test_labels_with_unicode_emoji() {
     assert_eq!(labels.len(), test_labels.len());
 
     for label in &test_labels {
-        assert!(labels.contains(&label.to_string()), "Emoji label '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Emoji label '{}' should be present",
+            label
+        );
     }
 }
 
@@ -256,7 +290,11 @@ fn test_labels_with_international_characters() {
     assert_eq!(labels.len(), test_labels.len());
 
     for label in &test_labels {
-        assert!(labels.contains(&label.to_string()), "International label '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "International label '{}' should be present",
+            label
+        );
     }
 }
 
@@ -346,7 +384,11 @@ fn test_very_long_label_is_stored() {
 
     let labels = storage.get_labels("long-label-test").unwrap();
     assert_eq!(labels.len(), 1);
-    assert_eq!(labels[0].len(), 1000, "Long label should be stored completely");
+    assert_eq!(
+        labels[0].len(),
+        1000,
+        "Long label should be stored completely"
+    );
     assert_eq!(labels[0], long_label);
 }
 
@@ -372,7 +414,11 @@ fn test_very_long_label_deduplication() {
     storage.add_label("long-dedup-test", &long_label).unwrap();
 
     let labels = storage.get_labels("long-dedup-test").unwrap();
-    assert_eq!(labels.len(), 1, "Long duplicate labels should be deduplicated");
+    assert_eq!(
+        labels.len(),
+        1,
+        "Long duplicate labels should be deduplicated"
+    );
     assert_eq!(labels[0].len(), 5000);
 }
 
@@ -476,10 +522,15 @@ fn test_internal_whitespace_is_preserved() {
 
     // Test that internal whitespace is preserved
     let label_with_spaces = "high priority task";
-    storage.add_label("internal-space-test", label_with_spaces).unwrap();
+    storage
+        .add_label("internal-space-test", label_with_spaces)
+        .unwrap();
 
     let labels = storage.get_labels("internal-space-test").unwrap();
-    assert!(labels.contains(&label_with_spaces.to_string()), "Internal spaces should be preserved");
+    assert!(
+        labels.contains(&label_with_spaces.to_string()),
+        "Internal spaces should be preserved"
+    );
 }
 
 #[test]
@@ -524,10 +575,15 @@ fn test_newline_whitespace_is_preserved() {
 
     // Test that newlines are preserved
     let label_with_newline = "multi\nline";
-    storage.add_label("newline-test", label_with_newline).unwrap();
+    storage
+        .add_label("newline-test", label_with_newline)
+        .unwrap();
 
     let labels = storage.get_labels("newline-test").unwrap();
-    assert!(labels.contains(&label_with_newline.to_string()), "Newlines should be preserved");
+    assert!(
+        labels.contains(&label_with_newline.to_string()),
+        "Newlines should be preserved"
+    );
 }
 
 #[test]
@@ -547,26 +603,23 @@ fn test_mixed_whitespace_variations() {
 
     // Whitespace-only labels are rejected after trimming
     let whitespace_labels = vec![
-        " ",
-        "  ",
-        "\t",
-        "\n",
-        " \t",
-        "\t ",
-        " \n",
-        "\n ",
-        "\t\n",
-        "\n\t",
+        " ", "  ", "\t", "\n", " \t", "\t ", " \n", "\n ", "\t\n", "\n\t",
     ];
 
     for label in &whitespace_labels {
-        assert!(storage.add_label("mixed-space-test", label).is_err(),
-            "Whitespace-only label {:?} should be rejected", label);
+        assert!(
+            storage.add_label("mixed-space-test", label).is_err(),
+            "Whitespace-only label {:?} should be rejected",
+            label
+        );
     }
 
     let labels = storage.get_labels("mixed-space-test").unwrap();
     // All whitespace-only labels are rejected, so none are stored
-    assert!(labels.is_empty(), "No whitespace-only labels should be stored");
+    assert!(
+        labels.is_empty(),
+        "No whitespace-only labels should be stored"
+    );
 }
 
 //
@@ -599,7 +652,11 @@ fn test_numeric_labels() {
     assert_eq!(labels.len(), numeric_labels.len());
 
     for label in &numeric_labels {
-        assert!(labels.contains(&label.to_string()), "Numeric label '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Numeric label '{}' should be present",
+            label
+        );
     }
 }
 
@@ -629,7 +686,11 @@ fn test_single_character_labels() {
     assert_eq!(labels.len(), single_char_labels.len());
 
     for label in &single_char_labels {
-        assert!(labels.contains(&label.to_string()), "Single char label '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Single char label '{}' should be present",
+            label
+        );
     }
 }
 
@@ -655,33 +716,40 @@ fn test_mixed_edge_case_labels() {
     // Test a mix of edge cases together
     let long_label = "a".repeat(1000);
     let valid_labels = vec![
-        "a",                             // single char
-        "123",                           // numeric
-        "🔥",                            // single emoji
-        "won't-fix",                     // punctuation
-        "中文",                           // unicode
-        "label with spaces",              // internal spaces
-        long_label.as_str(),             // long label
+        "a",                 // single char
+        "123",               // numeric
+        "🔥",                // single emoji
+        "won't-fix",         // punctuation
+        "中文",              // unicode
+        "label with spaces", // internal spaces
+        long_label.as_str(), // long label
     ];
     // Empty and whitespace-only labels are rejected by add_label
     let invalid_labels = vec![
-        "",                              // empty
-        " ",                             // whitespace-only
+        "",  // empty
+        " ", // whitespace-only
     ];
 
     for label in &valid_labels {
         storage.add_label("mixed-test", label).unwrap();
     }
     for label in &invalid_labels {
-        assert!(storage.add_label("mixed-test", label).is_err(),
-            "Label {:?} should be rejected", label);
+        assert!(
+            storage.add_label("mixed-test", label).is_err(),
+            "Label {:?} should be rejected",
+            label
+        );
     }
 
     let labels = storage.get_labels("mixed-test").unwrap();
     assert_eq!(labels.len(), valid_labels.len());
 
     for label in &valid_labels {
-        assert!(labels.contains(&label.to_string()), "Mixed edge case label '{}' should be present", label);
+        assert!(
+            labels.contains(&label.to_string()),
+            "Mixed edge case label '{}' should be present",
+            label
+        );
     }
 }
 
@@ -705,15 +773,31 @@ fn test_deduplication_with_special_characters() {
     storage.create_issue(&bead).unwrap();
 
     // Add special character labels with duplicates
-    storage.add_label("special-dedup-test", "high-priority").unwrap();
-    storage.add_label("special-dedup-test", "high-priority").unwrap();
-    storage.add_label("special-dedup-test", "won't-fix").unwrap();
-    storage.add_label("special-dedup-test", "won't-fix").unwrap();
-    storage.add_label("special-dedup-test", "API:breaking").unwrap();
-    storage.add_label("special-dedup-test", "API:breaking").unwrap();
+    storage
+        .add_label("special-dedup-test", "high-priority")
+        .unwrap();
+    storage
+        .add_label("special-dedup-test", "high-priority")
+        .unwrap();
+    storage
+        .add_label("special-dedup-test", "won't-fix")
+        .unwrap();
+    storage
+        .add_label("special-dedup-test", "won't-fix")
+        .unwrap();
+    storage
+        .add_label("special-dedup-test", "API:breaking")
+        .unwrap();
+    storage
+        .add_label("special-dedup-test", "API:breaking")
+        .unwrap();
 
     let labels = storage.get_labels("special-dedup-test").unwrap();
-    assert_eq!(labels.len(), 3, "Special character labels should be deduplicated");
+    assert_eq!(
+        labels.len(),
+        3,
+        "Special character labels should be deduplicated"
+    );
     assert!(labels.contains(&"high-priority".to_string()));
     assert!(labels.contains(&"won't-fix".to_string()));
     assert!(labels.contains(&"API:breaking".to_string()));
@@ -766,11 +850,19 @@ fn test_deduplication_between_creation_and_add() {
     storage.create_issue(&bead).unwrap();
 
     // Try adding labels that already exist from creation
-    storage.add_label("create-add-dedup-test", "label1").unwrap();
-    storage.add_label("create-add-dedup-test", "label2").unwrap();
+    storage
+        .add_label("create-add-dedup-test", "label1")
+        .unwrap();
+    storage
+        .add_label("create-add-dedup-test", "label2")
+        .unwrap();
 
     let labels = storage.get_labels("create-add-dedup-test").unwrap();
-    assert_eq!(labels.len(), 2, "Labels from creation should deduplicate with added labels");
+    assert_eq!(
+        labels.len(),
+        2,
+        "Labels from creation should deduplicate with added labels"
+    );
 }
 
 //
@@ -796,12 +888,18 @@ fn test_whitespace_only_labels() {
     let whitespace_labels = vec![" ", "  ", "\t", "\n", " \t\n"];
 
     for label in &whitespace_labels {
-        assert!(storage.add_label("whitespace-only-test", label).is_err(),
-            "Whitespace-only label {:?} should be rejected", label);
+        assert!(
+            storage.add_label("whitespace-only-test", label).is_err(),
+            "Whitespace-only label {:?} should be rejected",
+            label
+        );
     }
 
     let labels = storage.get_labels("whitespace-only-test").unwrap();
-    assert!(labels.is_empty(), "No whitespace-only labels should be stored");
+    assert!(
+        labels.is_empty(),
+        "No whitespace-only labels should be stored"
+    );
 }
 
 #[test]
@@ -825,7 +923,10 @@ fn test_whitespace_only_label_deduplication() {
     assert!(storage.add_label("space-dedup-test", " ").is_err());
 
     let labels = storage.get_labels("space-dedup-test").unwrap();
-    assert!(labels.is_empty(), "Whitespace-only labels should never be stored");
+    assert!(
+        labels.is_empty(),
+        "Whitespace-only labels should never be stored"
+    );
 }
 
 //
@@ -859,7 +960,11 @@ fn test_large_number_of_labels() {
     assert_eq!(labels.len(), 50, "Should have 50 unique labels");
 
     for expected_label in &expected_labels {
-        assert!(labels.contains(expected_label), "Label '{}' should be present", expected_label);
+        assert!(
+            labels.contains(expected_label),
+            "Label '{}' should be present",
+            expected_label
+        );
     }
 }
 
@@ -885,10 +990,18 @@ fn test_create_bead_with_many_labels() {
     storage.create_issue(&bead).unwrap();
 
     let retrieved_labels = storage.get_labels("create-many-test").unwrap();
-    assert_eq!(retrieved_labels.len(), 50, "Should have 50 unique labels when created");
+    assert_eq!(
+        retrieved_labels.len(),
+        50,
+        "Should have 50 unique labels when created"
+    );
 
     for expected_label in &labels {
-        assert!(retrieved_labels.contains(expected_label), "Label '{}' should be present", expected_label);
+        assert!(
+            retrieved_labels.contains(expected_label),
+            "Label '{}' should be present",
+            expected_label
+        );
     }
 }
 
@@ -917,11 +1030,17 @@ fn test_remove_label_from_bead_with_no_labels() {
 
     // Removing a label from a bead with no labels should succeed (no-op)
     let result = storage.remove_label("no-labels-test", "nonexistent");
-    assert!(result.is_ok(), "Removing from empty label list should succeed");
+    assert!(
+        result.is_ok(),
+        "Removing from empty label list should succeed"
+    );
 
     // Verify still no labels
     let labels = storage.get_labels("no-labels-test").unwrap();
-    assert!(labels.is_empty(), "Bead should still have no labels after removal attempt");
+    assert!(
+        labels.is_empty(),
+        "Bead should still have no labels after removal attempt"
+    );
 }
 
 #[test]
@@ -955,11 +1074,17 @@ fn test_remove_all_labels_from_bead() {
 
     // Verify no labels remain
     let final_labels = storage.get_labels("remove-all-test").unwrap();
-    assert!(final_labels.is_empty(), "Should have no labels after removing all");
+    assert!(
+        final_labels.is_empty(),
+        "Should have no labels after removing all"
+    );
 
     // Try removing from empty list again (edge case: remove from already empty)
     let result = storage.remove_label("remove-all-test", "another-label");
-    assert!(result.is_ok(), "Removing from already empty label list should succeed");
+    assert!(
+        result.is_ok(),
+        "Removing from already empty label list should succeed"
+    );
 
     let labels = storage.get_labels("remove-all-test").unwrap();
     assert!(labels.is_empty(), "Should still have no labels");
@@ -990,14 +1115,29 @@ fn test_remove_specific_label_from_bead_with_many_labels() {
     assert_eq!(initial_labels.len(), 50, "Should start with 50 labels");
 
     // Remove a specific label
-    storage.remove_label("remove-specific-test", "label-25").unwrap();
+    storage
+        .remove_label("remove-specific-test", "label-25")
+        .unwrap();
 
     // Verify 49 labels remain and label-25 is gone
     let remaining_labels = storage.get_labels("remove-specific-test").unwrap();
-    assert_eq!(remaining_labels.len(), 49, "Should have 49 labels after removing one");
-    assert!(!remaining_labels.contains(&"label-25".to_string()), "Removed label should not be present");
-    assert!(remaining_labels.contains(&"label-1".to_string()), "Other labels should still be present");
-    assert!(remaining_labels.contains(&"label-50".to_string()), "Other labels should still be present");
+    assert_eq!(
+        remaining_labels.len(),
+        49,
+        "Should have 49 labels after removing one"
+    );
+    assert!(
+        !remaining_labels.contains(&"label-25".to_string()),
+        "Removed label should not be present"
+    );
+    assert!(
+        remaining_labels.contains(&"label-1".to_string()),
+        "Other labels should still be present"
+    );
+    assert!(
+        remaining_labels.contains(&"label-50".to_string()),
+        "Other labels should still be present"
+    );
 }
 
 //

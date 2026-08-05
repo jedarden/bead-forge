@@ -14,8 +14,8 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    test_workspace, bf_binary, bf_command, bf_command_with_workspace,
-    json_validation, format_detection, fixtures, capture, envelope,
+    bf_binary, bf_command, bf_command_with_workspace, capture, envelope, fixtures,
+    format_detection, json_validation, test_workspace,
 };
 
 // Import items made available in parent scope
@@ -31,8 +31,7 @@ fn create_isolated_workspace() -> TempDir {
     crate::config::init_workspace(&beads_dir, "bf-edge-test")
         .expect("Failed to initialize test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
@@ -60,7 +59,7 @@ fn test_show_json_extremely_long_description() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(&long_desc)
+            .arg(&long_desc),
     );
 
     // Get show JSON output
@@ -69,7 +68,7 @@ fn test_show_json_extremely_long_description() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify JSON is valid
@@ -78,13 +77,19 @@ fn test_show_json_extremely_long_description() {
     // Parse and verify description is present and preserved
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let description = json_validation::get_string_optional(bead, "description");
 
     assert!(description.is_some(), "Description should be present");
-    assert_eq!(description.unwrap(), long_desc, "Long description should be preserved exactly");
+    assert_eq!(
+        description.unwrap(),
+        long_desc,
+        "Long description should be preserved exactly"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Long description test cleanup");
@@ -109,7 +114,7 @@ fn test_show_json_long_description_with_special_characters() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(&special_chars)
+            .arg(&special_chars),
     );
 
     // Get show JSON output
@@ -118,22 +123,36 @@ fn test_show_json_long_description_with_special_characters() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify JSON is valid and special characters are preserved
     json_validation::assert_valid_json(&show_output);
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let description = json_validation::get_string(bead, "description");
 
-    assert!(description.contains("\"quotes\""), "Quotes should be preserved");
-    assert!(description.contains("'apostrophes'"), "Apostrophes should be preserved");
-    assert!(description.contains("& symbols"), "Ampersands should be preserved");
-    assert!(description.contains(r"\backslashes\"), "Backslashes should be preserved");
+    assert!(
+        description.contains("\"quotes\""),
+        "Quotes should be preserved"
+    );
+    assert!(
+        description.contains("'apostrophes'"),
+        "Apostrophes should be preserved"
+    );
+    assert!(
+        description.contains("& symbols"),
+        "Ampersands should be preserved"
+    );
+    assert!(
+        description.contains(r"\backslashes\"),
+        "Backslashes should be preserved"
+    );
     assert!(description.contains("🎉"), "Emoji should be preserved");
     assert!(description.contains("café"), "Unicode should be preserved");
 
@@ -158,7 +177,7 @@ fn test_list_json_with_long_descriptions() {
             .arg("update")
             .arg(&bead1_id)
             .arg("--description")
-            .arg("Short description")
+            .arg("Short description"),
     );
 
     capture::capture_stdout(
@@ -166,7 +185,7 @@ fn test_list_json_with_long_descriptions() {
             .arg("update")
             .arg(&bead2_id)
             .arg("--description")
-            .arg(&"A".repeat(500))
+            .arg(&"A".repeat(500)),
     );
 
     capture::capture_stdout(
@@ -174,16 +193,11 @@ fn test_list_json_with_long_descriptions() {
             .arg("update")
             .arg(&bead3_id)
             .arg("--description")
-            .arg(&"B".repeat(5000))
+            .arg(&"B".repeat(5000)),
     );
 
     // Get list JSON output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Verify JSONL format is valid even with very long descriptions
     json_validation::assert_valid_jsonl(&output);
@@ -198,7 +212,10 @@ fn test_list_json_with_long_descriptions() {
         let desc = json_validation::get_string_optional(&parsed, "description");
         // Verify descriptions are preserved (not truncated)
         if let Some(d) = desc {
-            assert!(d.len() <= 5000 || d.starts_with('B'), "Long descriptions should be preserved");
+            assert!(
+                d.len() <= 5000 || d.starts_with('B'),
+                "Long descriptions should be preserved"
+            );
         }
     }
 
@@ -221,7 +238,8 @@ fn test_show_json_unicode_in_all_fields() {
     // Test comprehensive unicode in multiple fields
     let unicode_title = "🎉 Unicode title 日本語 مرحبا היי 🚀";
     let unicode_assignee = "משתמש@example.com";
-    let unicode_desc = "Description with 你好, Bonjour, مرحبا by the user: testing@example.com <admin>";
+    let unicode_desc =
+        "Description with 你好, Bonjour, مرحبا by the user: testing@example.com <admin>";
     let bead_id = fixtures::create_bead_with_assignee(unicode_title, unicode_assignee);
 
     // Add unicode description
@@ -230,7 +248,7 @@ fn test_show_json_unicode_in_all_fields() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(unicode_desc)
+            .arg(unicode_desc),
     );
 
     // Add unicode labels
@@ -240,7 +258,7 @@ fn test_show_json_unicode_in_all_fields() {
             .arg("add")
             .arg(&bead_id)
             .arg("--label")
-            .arg("标签/تسمية")
+            .arg("标签/تسمية"),
     );
 
     // Get show JSON output
@@ -249,14 +267,16 @@ fn test_show_json_unicode_in_all_fields() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify all unicode is preserved
     json_validation::assert_valid_json(&show_output);
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let title = json_validation::get_string(bead, "title");
@@ -264,10 +284,22 @@ fn test_show_json_unicode_in_all_fields() {
     let description = json_validation::get_string(bead, "description");
 
     assert!(title.contains("🎉"), "Emoji in title should be preserved");
-    assert!(title.contains("日本語"), "Japanese in title should be preserved");
-    assert!(assignee.contains("משתמש"), "Hebrew in assignee should be preserved");
-    assert!(description.contains("你好"), "Chinese in description should be preserved");
-    assert!(description.contains("مرحبا"), "Arabic in description should be preserved");
+    assert!(
+        title.contains("日本語"),
+        "Japanese in title should be preserved"
+    );
+    assert!(
+        assignee.contains("משתמש"),
+        "Hebrew in assignee should be preserved"
+    );
+    assert!(
+        description.contains("你好"),
+        "Chinese in description should be preserved"
+    );
+    assert!(
+        description.contains("مرحبا"),
+        "Arabic in description should be preserved"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Unicode test cleanup");
@@ -280,16 +312,12 @@ fn test_list_json_with_unicode_labels() {
     let workspace = test_workspace();
 
     // Create beads with unicode labels
-    let bead1_id = fixtures::create_bead_with_labels("Unicode label test 1", &["标签", "تسمية", "label"]);
+    let bead1_id =
+        fixtures::create_bead_with_labels("Unicode label test 1", &["标签", "تسمية", "label"]);
     let bead2_id = fixtures::create_bead_with_labels("Unicode label test 2", &["étiquette", "तीर"]);
 
     // Get list JSON output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Verify JSONL is valid and unicode labels are preserved
     json_validation::assert_valid_jsonl(&output);
@@ -303,8 +331,11 @@ fn test_list_json_with_unicode_labels() {
 
         for label in labels {
             if let Some(label_str) = label.as_str() {
-                if label_str.contains("标签") || label_str.contains("تسمية") ||
-                   label_str.contains("étiquette") || label_str.contains("तीर") {
+                if label_str.contains("标签")
+                    || label_str.contains("تسمية")
+                    || label_str.contains("étiquette")
+                    || label_str.contains("तीर")
+                {
                     found_unicode_labels = true;
                     break;
                 }
@@ -315,7 +346,10 @@ fn test_list_json_with_unicode_labels() {
         }
     }
 
-    assert!(found_unicode_labels, "Should find unicode labels in list output");
+    assert!(
+        found_unicode_labels,
+        "Should find unicode labels in list output"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1_id, "Unicode labels cleanup");
@@ -335,14 +369,15 @@ fn test_show_json_trailing_and_leading_whitespace() {
     let bead_id = fixtures::create_bead("Trailing/leading whitespace test");
 
     // Add description with trailing and leading whitespace
-    let whitespace_desc = "   \n\n  Leading spaces and newlines\nDescription text here\n  Trailing spaces  \n\n   ";
+    let whitespace_desc =
+        "   \n\n  Leading spaces and newlines\nDescription text here\n  Trailing spaces  \n\n   ";
 
     capture::capture_stdout(
         bf_command()
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(whitespace_desc)
+            .arg(whitespace_desc),
     );
 
     // Get show JSON output
@@ -351,24 +386,33 @@ fn test_show_json_trailing_and_leading_whitespace() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify JSON is valid
     json_validation::assert_valid_json(&show_output);
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let description = json_validation::get_string(bead, "description");
 
     // Verify trailing and leading whitespace is preserved
-    assert!(description.starts_with("   \n\n  ") || description.starts_with("  "),
-            "Leading whitespace should be preserved or normalized consistently");
-    assert!(description.ends_with("  \n\n   ") || description.ends_with("  "),
-            "Trailing whitespace should be preserved or normalized consistently");
-    assert!(description.contains("Description text here"), "Content should be preserved");
+    assert!(
+        description.starts_with("   \n\n  ") || description.starts_with("  "),
+        "Leading whitespace should be preserved or normalized consistently"
+    );
+    assert!(
+        description.ends_with("  \n\n   ") || description.ends_with("  "),
+        "Trailing whitespace should be preserved or normalized consistently"
+    );
+    assert!(
+        description.contains("Description text here"),
+        "Content should be preserved"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Trailing/leading whitespace test cleanup");
@@ -390,7 +434,7 @@ fn test_show_json_newlines_and_tabs_preserved() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(complex_whitespace)
+            .arg(complex_whitespace),
     );
 
     // Get show JSON output
@@ -399,22 +443,33 @@ fn test_show_json_newlines_and_tabs_preserved() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify JSON is valid and whitespace is preserved
     json_validation::assert_valid_json(&show_output);
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let description = json_validation::get_string(bead, "description");
 
-    assert!(description.contains("\n\n"), "Double newlines should be preserved");
+    assert!(
+        description.contains("\n\n"),
+        "Double newlines should be preserved"
+    );
     assert!(description.contains("\t"), "Tabs should be preserved");
-    assert!(description.contains("  "), "Multiple spaces should be preserved");
-    assert!(description.contains("\n\n\n"), "Triple newlines should be preserved");
+    assert!(
+        description.contains("  "),
+        "Multiple spaces should be preserved"
+    );
+    assert!(
+        description.contains("\n\n\n"),
+        "Triple newlines should be preserved"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Whitespace test cleanup");
@@ -436,7 +491,7 @@ fn test_show_json_carriage_returns_and_mixed_line_endings() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(mixed_line_endings)
+            .arg(mixed_line_endings),
     );
 
     // Get show JSON output
@@ -445,7 +500,7 @@ fn test_show_json_carriage_returns_and_mixed_line_endings() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify JSON is valid
@@ -454,13 +509,21 @@ fn test_show_json_carriage_returns_and_mixed_line_endings() {
     // The description should be present (line ending normalization may vary)
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let description = json_validation::get_string(bead, "description");
 
-    assert!(description.contains("Line with"), "Content should be preserved");
-    assert!(description.contains("CRLF"), "Line ending markers should be preserved");
+    assert!(
+        description.contains("Line with"),
+        "Content should be preserved"
+    );
+    assert!(
+        description.contains("CRLF"),
+        "Line ending markers should be preserved"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Line ending test cleanup");
@@ -482,18 +545,25 @@ fn test_show_json_invalid_bead_id_error_format() {
             .arg("show")
             .arg("bf-nonexistent-12345")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify command failed as expected
     assert!(!success, "Command should fail for invalid bead ID");
 
     // Verify error output is present
-    assert!(!stderr.is_empty(), "Error message should be present in stderr");
+    assert!(
+        !stderr.is_empty(),
+        "Error message should be present in stderr"
+    );
 
     // Error message should mention the invalid ID or not found
-    assert!(stderr.contains("bf-nonexistent-12345") || stderr.contains("not found") || stderr.contains("invalid"),
-           "Error should reference the invalid bead ID or indicate not found");
+    assert!(
+        stderr.contains("bf-nonexistent-12345")
+            || stderr.contains("not found")
+            || stderr.contains("invalid"),
+        "Error should reference the invalid bead ID or indicate not found"
+    );
 }
 
 #[test]
@@ -508,14 +578,17 @@ fn test_update_json_invalid_bead_id_error_format() {
             .arg("update")
             .arg("bf-nonexistent-67890")
             .arg("--description")
-            .arg("This should fail")
+            .arg("This should fail"),
     );
 
     // Verify command failed as expected
     assert!(!success, "Command should fail for invalid bead ID");
 
     // Verify error output is present
-    assert!(!stderr.is_empty(), "Error message should be present in stderr");
+    assert!(
+        !stderr.is_empty(),
+        "Error message should be present in stderr"
+    );
 
     // Error message should be informative
     assert!(stderr.len() > 10, "Error message should be meaningful");
@@ -537,7 +610,7 @@ fn test_claim_json_no_ready_beads_error_format() {
             .arg("--assignee")
             .arg("test-worker")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // The command might succeed with no beads (returning empty) or fail with error
@@ -546,10 +619,15 @@ fn test_claim_json_no_ready_beads_error_format() {
         json_validation::assert_valid_json(&stdout);
     } else {
         // If it fails, verify error format
-        assert!(!stderr.is_empty(), "Error message should be present when no beads available");
+        assert!(
+            !stderr.is_empty(),
+            "Error message should be present when no beads available"
+        );
         // Error should mention no beads or nothing to claim
-        assert!(stderr.contains("no") || stderr.contains("available") || stderr.contains("nothing"),
-               "Error should indicate no beads available");
+        assert!(
+            stderr.contains("no") || stderr.contains("available") || stderr.contains("nothing"),
+            "Error should indicate no beads available"
+        );
     }
 }
 
@@ -566,14 +644,17 @@ fn test_label_add_json_invalid_bead_id_error_format() {
             .arg("add")
             .arg("bf-nonexistent-label-test")
             .arg("--label")
-            .arg("test-label")
+            .arg("test-label"),
     );
 
     // Verify command failed as expected
     assert!(!success, "Command should fail for invalid bead ID");
 
     // Verify error output is present
-    assert!(!stderr.is_empty(), "Error message should be present in stderr");
+    assert!(
+        !stderr.is_empty(),
+        "Error message should be present in stderr"
+    );
 }
 
 // ============================================================================
@@ -592,7 +673,7 @@ fn test_show_json_empty_workspace() {
             .arg("show")
             .arg("bf-some-id")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should fail gracefully
@@ -610,7 +691,7 @@ fn test_list_json_empty_workspace() {
         bf_command_with_workspace(empty_workspace)
             .arg("list")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty output is valid JSONL (empty string or only whitespace)
@@ -629,12 +710,15 @@ fn test_ready_json_empty_workspace() {
         bf_command_with_workspace(empty_workspace)
             .arg("ready")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty output is valid JSONL
     let trimmed = output.trim();
-    assert!(trimmed.is_empty() || trimmed == "[]", "Empty ready should return empty JSONL");
+    assert!(
+        trimmed.is_empty() || trimmed == "[]",
+        "Empty ready should return empty JSONL"
+    );
 }
 
 #[test]
@@ -649,12 +733,15 @@ fn test_search_json_empty_workspace() {
             .arg("search")
             .arg("test")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty output is valid JSONL
     let trimmed = output.trim();
-    assert!(trimmed.is_empty() || trimmed == "[]", "Empty search should return empty JSONL");
+    assert!(
+        trimmed.is_empty() || trimmed == "[]",
+        "Empty search should return empty JSONL"
+    );
 }
 
 #[test]
@@ -668,7 +755,7 @@ fn test_recent_json_empty_workspace() {
         bf_command_with_workspace(empty_workspace)
             .arg("recent")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // recent command ALWAYS uses envelope format
@@ -679,7 +766,10 @@ fn test_recent_json_empty_workspace() {
     assert!(data.is_string(), "recent envelope data should be a string");
 
     let jsonl_str = data.as_str().expect("data should be string");
-    assert_eq!(jsonl_str, "", "recent data should be empty string for empty workspace");
+    assert_eq!(
+        jsonl_str, "",
+        "recent data should be empty string for empty workspace"
+    );
 }
 
 #[test]
@@ -698,7 +788,7 @@ fn test_list_json_no_open_beads() {
         bf_command_with_workspace(workspace)
             .arg("list")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return valid JSONL
@@ -739,7 +829,7 @@ fn test_ready_json_all_blocked_beads() {
         bf_command_with_workspace(workspace)
             .arg("ready")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Ready with all blocked/closed beads should return empty output
@@ -776,7 +866,7 @@ fn test_create_json_minimal_fields() {
             .arg("task")
             .arg("--priority")
             .arg("2") // default priority
-            .arg("--json")
+            .arg("--json"),
     );
 
     // Verify JSON output is valid
@@ -786,7 +876,11 @@ fn test_create_json_minimal_fields() {
     let parsed = json_validation::parse_json(&output);
 
     // Verify envelope has required fields
-    json_validation::assert_required_fields(&parsed, &["kind", "version", "data"], "create envelope");
+    json_validation::assert_required_fields(
+        &parsed,
+        &["kind", "version", "data"],
+        "create envelope",
+    );
 
     // Verify it's a create envelope
     let kind = json_validation::get_string(&parsed, "kind");
@@ -806,28 +900,44 @@ fn test_create_json_minimal_fields() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let show_json_str = show_output.trim();
     let show_parsed = json_validation::parse_json(show_json_str);
-    let show_array = show_parsed.as_array().expect("show output should be a JSON array");
+    let show_array = show_parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let show_bead = &show_array[0];
 
     // Verify all required fields are present with proper defaults
     json_validation::assert_required_fields(
         show_bead,
-        &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-        "show minimal bead"
+        &[
+            "id",
+            "title",
+            "status",
+            "priority",
+            "issue_type",
+            "created_at",
+            "updated_at",
+        ],
+        "show minimal bead",
     );
 
     // Verify optional fields have proper null/empty defaults
     let assignee = json_validation::get_string_optional(show_bead, "assignee");
-    assert!(assignee == Some("".to_string()) || assignee.is_none(),
-              "Assignee should be empty string or null for minimal bead");
+    assert!(
+        assignee == Some("".to_string()) || assignee.is_none(),
+        "Assignee should be empty string or null for minimal bead"
+    );
 
     let labels = json_validation::get_array(show_bead, "labels");
-    assert_eq!(labels.len(), 0, "Labels should be empty array for minimal bead");
+    assert_eq!(
+        labels.len(),
+        0,
+        "Labels should be empty array for minimal bead"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Minimal test cleanup");
@@ -848,25 +958,46 @@ fn test_show_json_minimal_bead_structure() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify minimal required fields
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     // These are the absolute minimum required fields for any bead JSON output
     let minimal_required_fields = ["id", "title", "status", "priority", "issue_type"];
-    json_validation::assert_required_fields(bead, &minimal_required_fields, "minimal bead structure");
+    json_validation::assert_required_fields(
+        bead,
+        &minimal_required_fields,
+        "minimal bead structure",
+    );
 
     // Verify field types
-    assert!(bead.get("id").and_then(|v| v.as_str()).is_some(), "id must be string");
-    assert!(bead.get("title").and_then(|v| v.as_str()).is_some(), "title must be string");
-    assert!(bead.get("status").and_then(|v| v.as_str()).is_some(), "status must be string");
-    assert!(bead.get("priority").and_then(|v| v.as_i64()).is_some(), "priority must be integer");
-    assert!(bead.get("issue_type").and_then(|v| v.as_str()).is_some(), "issue_type must be string");
+    assert!(
+        bead.get("id").and_then(|v| v.as_str()).is_some(),
+        "id must be string"
+    );
+    assert!(
+        bead.get("title").and_then(|v| v.as_str()).is_some(),
+        "title must be string"
+    );
+    assert!(
+        bead.get("status").and_then(|v| v.as_str()).is_some(),
+        "status must be string"
+    );
+    assert!(
+        bead.get("priority").and_then(|v| v.as_i64()).is_some(),
+        "priority must be integer"
+    );
+    assert!(
+        bead.get("issue_type").and_then(|v| v.as_str()).is_some(),
+        "issue_type must be string"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Minimal structure cleanup");
@@ -883,12 +1014,7 @@ fn test_list_json_minimal_beads() {
     let bead2_id = fixtures::create_bead("Minimal list bead 2");
 
     // Get list JSON output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Verify JSONL is valid and each bead has minimal fields
     json_validation::assert_valid_jsonl(&output);
@@ -900,7 +1026,11 @@ fn test_list_json_minimal_beads() {
 
         // Verify minimal required fields
         let minimal_required_fields = ["id", "title", "status", "priority", "issue_type"];
-        json_validation::assert_required_fields(&parsed, &minimal_required_fields, "list minimal bead");
+        json_validation::assert_required_fields(
+            &parsed,
+            &minimal_required_fields,
+            "list minimal bead",
+        );
     }
 
     // Cleanup
@@ -936,7 +1066,7 @@ fn test_show_json_long_description_with_special_chars_and_unicode() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(&complex_desc)
+            .arg(&complex_desc),
     );
 
     // Get show JSON output
@@ -945,21 +1075,29 @@ fn test_show_json_long_description_with_special_chars_and_unicode() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify JSON is valid even with this complex input
     json_validation::assert_valid_json(&show_output);
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let description = json_validation::get_string(bead, "description");
 
     // Verify all special components are present
-    assert!(description.len() > 5000, "Long description should be preserved");
-    assert!(description.contains("\"'&<>\\"), "Special chars should be preserved");
+    assert!(
+        description.len() > 5000,
+        "Long description should be preserved"
+    );
+    assert!(
+        description.contains("\"'&<>\\"),
+        "Special chars should be preserved"
+    );
     assert!(description.contains("🎉"), "Emoji should be preserved");
     assert!(description.contains("café"), "Unicode should be preserved");
     assert!(description.contains("\n"), "Newlines should be preserved");
@@ -977,14 +1115,14 @@ fn test_show_json_edge_case_title_combinations() {
 
     // Test various edge case title combinations
     let edge_titles: Vec<String> = vec![
-        "".to_string(), // Empty title (if allowed)
-        "A".to_string(), // Single character
-        " ".to_string(), // Single space
-        "A\nB".to_string(), // Title with newline
-        "🎉".to_string(), // Single emoji
+        "".to_string(),              // Empty title (if allowed)
+        "A".to_string(),             // Single character
+        " ".to_string(),             // Single space
+        "A\nB".to_string(),          // Title with newline
+        "🎉".to_string(),            // Single emoji
         "&amp;&lt;&gt;".to_string(), // HTML entities
-        "'\"`".to_string(), // Quote variants
-        "x".repeat(500), // Very long title
+        "'\"`".to_string(),          // Quote variants
+        "x".repeat(500),             // Very long title
     ];
 
     for title in &edge_titles {
@@ -1000,18 +1138,23 @@ fn test_show_json_edge_case_title_combinations() {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Verify JSON is valid for each edge case
         json_validation::assert_valid_json(&show_output);
         let json_str = show_output.trim();
         let parsed = json_validation::parse_json(json_str);
-        let array = parsed.as_array().expect("show output should be a JSON array");
+        let array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
         let bead = &array[0];
 
         let retrieved_title = json_validation::get_string(bead, "title");
-        assert_eq!(retrieved_title, *title, "Edge case title should be preserved exactly");
+        assert_eq!(
+            retrieved_title, *title,
+            "Edge case title should be preserved exactly"
+        );
 
         // Cleanup
         fixtures::close_bead(&bead_id, "Edge case title cleanup");
@@ -1035,7 +1178,7 @@ fn test_list_json_mixed_content_types() {
             .arg("update")
             .arg(&bead1_id)
             .arg("--description")
-            .arg("Description with unicode: 🎉 café 日本語")
+            .arg("Description with unicode: 🎉 café 日本語"),
     );
 
     capture::capture_stdout(
@@ -1043,7 +1186,7 @@ fn test_list_json_mixed_content_types() {
             .arg("update")
             .arg(&bead2_id)
             .arg("--description")
-            .arg("Multi-line\ndescription\nwith\ttabs")
+            .arg("Multi-line\ndescription\nwith\ttabs"),
     );
 
     capture::capture_stdout(
@@ -1052,16 +1195,11 @@ fn test_list_json_mixed_content_types() {
             .arg("add")
             .arg(&bead3_id)
             .arg("--label")
-            .arg("feature/需求")
+            .arg("feature/需求"),
     );
 
     // Get list JSON output
-    let output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Verify JSONL is valid with all the mixed content
     json_validation::assert_valid_jsonl(&output);
@@ -1072,8 +1210,16 @@ fn test_list_json_mixed_content_types() {
         let parsed = json_validation::parse_json(line);
         json_validation::assert_required_fields(
             &parsed,
-            &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-            "list mixed content"
+            &[
+                "id",
+                "title",
+                "status",
+                "priority",
+                "issue_type",
+                "created_at",
+                "updated_at",
+            ],
+            "list mixed content",
         );
     }
 
@@ -1103,7 +1249,7 @@ fn test_show_json_partial_unicode_sequence() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(partial_unicode)
+            .arg(partial_unicode),
     );
 
     // System should either accept it (and preserve it) or reject it with clear error
@@ -1114,16 +1260,21 @@ fn test_show_json_partial_unicode_sequence() {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
         json_validation::assert_valid_json(&show_output);
         // For show command, verify it's valid JSON array format
         let json_str = show_output.trim();
         let parsed = json_validation::parse_json(json_str);
-        let _array = parsed.as_array().expect("show output should be a JSON array");
+        let _array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
     } else {
         // If rejected, verify error is clear
-        assert!(!update_result.1.is_empty(), "Error should be clear for invalid unicode");
+        assert!(
+            !update_result.1.is_empty(),
+            "Error should be clear for invalid unicode"
+        );
     }
 
     // Cleanup
@@ -1146,7 +1297,7 @@ fn test_show_json_very_long_single_line() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(&single_long_line)
+            .arg(&single_long_line),
     );
 
     // Get show JSON output
@@ -1155,19 +1306,25 @@ fn test_show_json_very_long_single_line() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify JSON is valid even with very long single line
     json_validation::assert_valid_json(&show_output);
     let json_str = show_output.trim();
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let bead = &array[0];
 
     let description = json_validation::get_string(bead, "description");
 
-    assert_eq!(description.len(), 50000, "Very long single line should be preserved");
+    assert_eq!(
+        description.len(),
+        50000,
+        "Very long single line should be preserved"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Very long single line cleanup");
@@ -1188,7 +1345,7 @@ fn test_json_output_consistency_across_commands() {
             .arg("update")
             .arg(&bead_id)
             .arg("--description")
-            .arg(complex_desc)
+            .arg(complex_desc),
     );
 
     // Get the bead from different commands and verify consistency
@@ -1197,22 +1354,22 @@ fn test_json_output_consistency_across_commands() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
-    let list_output = capture::capture_stdout(
-        bf_command()
-            .arg("list")
-            .arg("--format")
-            .arg("json")
-    );
+    let list_output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
     // Parse both outputs
     let show_json_str = show_output.trim();
     let show_parsed = json_validation::parse_json(show_json_str);
-    let show_array = show_parsed.as_array().expect("show output should be a JSON array");
+    let show_array = show_parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     let show_bead = &show_array[0];
-    let list_lines: Vec<&str> = list_output.lines().filter(|l| !l.trim().is_empty()).collect();
+    let list_lines: Vec<&str> = list_output
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
 
     // Find the bead in list output
     let mut list_parsed = None;
@@ -1230,15 +1387,24 @@ fn test_json_output_consistency_across_commands() {
     // Verify key fields are consistent between commands
     let show_title = json_validation::get_string(show_bead, "title");
     let list_title = json_validation::get_string(&list_parsed, "title");
-    assert_eq!(show_title, list_title, "Title should be consistent across commands");
+    assert_eq!(
+        show_title, list_title,
+        "Title should be consistent across commands"
+    );
 
     let show_desc = json_validation::get_string(show_bead, "description");
     let list_desc = json_validation::get_string(&list_parsed, "description");
-    assert_eq!(show_desc, list_desc, "Description should be consistent across commands");
+    assert_eq!(
+        show_desc, list_desc,
+        "Description should be consistent across commands"
+    );
 
     let show_status = json_validation::get_string(show_bead, "status");
     let list_status = json_validation::get_string(&list_parsed, "status");
-    assert_eq!(show_status, list_status, "Status should be consistent across commands");
+    assert_eq!(
+        show_status, list_status,
+        "Status should be consistent across commands"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead_id, "Consistency test cleanup");

@@ -358,14 +358,8 @@ fn test_show_complex_dependency_chain() {
     );
 
     // Verify the relationships
-    assert!(
-        output.contains(&bead_c),
-        "Should show bead C as blocker"
-    );
-    assert!(
-        output.contains(&bead_a),
-        "Should show bead A as blocked"
-    );
+    assert!(output.contains(&bead_c), "Should show bead C as blocker");
+    assert!(output.contains(&bead_a), "Should show bead A as blocked");
 }
 
 #[test]
@@ -383,20 +377,24 @@ fn test_show_multiple_dependency_types() {
     let storage = bead_forge::storage::Storage::open(&beads_dir.join("beads.db")).unwrap();
 
     // Add blocking dependency
-    storage.add_dependency(
-        &main_id,
-        &blocker_id,
-        &bead_forge::model::DependencyType::Blocks,
-        "test",
-    ).unwrap();
+    storage
+        .add_dependency(
+            &main_id,
+            &blocker_id,
+            &bead_forge::model::DependencyType::Blocks,
+            "test",
+        )
+        .unwrap();
 
     // Add related dependency
-    storage.add_dependency(
-        &main_id,
-        &related_id,
-        &bead_forge::model::DependencyType::RelatesTo,
-        "test",
-    ).unwrap();
+    storage
+        .add_dependency(
+            &main_id,
+            &related_id,
+            &bead_forge::model::DependencyType::RelatesTo,
+            "test",
+        )
+        .unwrap();
 
     // Show the main bead
     let show_result = std::process::Command::new(&bf_path)
@@ -630,10 +628,7 @@ fn test_circular_dependencies_handling() {
     }
 
     if output_a.contains("Blocks:") {
-        assert!(
-            output_a.contains(&bead_b),
-            "Should show bead B in blocks"
-        );
+        assert!(output_a.contains(&bead_b), "Should show bead B in blocks");
     }
 
     // Show bead B - should also work
@@ -698,10 +693,7 @@ fn test_show_dependency_link_formatting() {
         output.contains("->"),
         "Dependency links should use arrow format"
     );
-    assert!(
-        output.contains(&blocker_id),
-        "Should show blocker ID"
-    );
+    assert!(output.contains(&blocker_id), "Should show blocker ID");
     assert!(
         output.contains("(blocks)"),
         "Should show dependency type in parentheses"
@@ -764,10 +756,7 @@ fn test_show_blocks_and_blocked_by_both_present() {
         output.contains("Blocked by:"),
         "Should show 'Blocked by:' section"
     );
-    assert!(
-        output.contains("Blocks:"),
-        "Should show 'Blocks:' section"
-    );
+    assert!(output.contains("Blocks:"), "Should show 'Blocks:' section");
 
     // Verify correct IDs in each section
     let blocked_by_idx = output.find("Blocked by:").unwrap();

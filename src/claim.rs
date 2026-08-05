@@ -1175,29 +1175,77 @@ mod tests {
 
         // Two standalone open beads with NO dependencies — the bug report's worry was
         // that these would disappear from ready output.
-        let standalone_a = Issue::new("bf-standalone-a".to_string(), "Standalone A".to_string(), ".".to_string());
-        let standalone_b = Issue::new("bf-standalone-b".to_string(), "Standalone B".to_string(), ".".to_string());
+        let standalone_a = Issue::new(
+            "bf-standalone-a".to_string(),
+            "Standalone A".to_string(),
+            ".".to_string(),
+        );
+        let standalone_b = Issue::new(
+            "bf-standalone-b".to_string(),
+            "Standalone B".to_string(),
+            ".".to_string(),
+        );
         storage.create_issue(&standalone_a).unwrap();
         storage.create_issue(&standalone_b).unwrap();
 
         // A dependent blocked by a still-OPEN blocker -> not ready.
-        storage.create_issue(&Issue::new("bf-blocker-open".to_string(), "Open blocker".to_string(), ".".to_string())).unwrap();
-        storage.create_issue(&Issue::new("bf-dep-open".to_string(), "Dep of open blocker".to_string(), ".".to_string())).unwrap();
-        storage.add_dependency("bf-dep-open", "bf-blocker-open", &crate::model::DependencyType::Blocks, "test").unwrap();
+        storage
+            .create_issue(&Issue::new(
+                "bf-blocker-open".to_string(),
+                "Open blocker".to_string(),
+                ".".to_string(),
+            ))
+            .unwrap();
+        storage
+            .create_issue(&Issue::new(
+                "bf-dep-open".to_string(),
+                "Dep of open blocker".to_string(),
+                ".".to_string(),
+            ))
+            .unwrap();
+        storage
+            .add_dependency(
+                "bf-dep-open",
+                "bf-blocker-open",
+                &crate::model::DependencyType::Blocks,
+                "test",
+            )
+            .unwrap();
 
         // A dependent blocked transitively by a status=blocked blocker (the bf-127ow
         // -> bf-ncms2 pattern). "blocked" is not a terminal status, so this must stay
         // unready.
-        storage.create_issue(&Issue::new("bf-blocker-blocked".to_string(), "Blocked blocker".to_string(), ".".to_string())).unwrap();
-        storage.update_issue(
-            "bf-blocker-blocked",
-            &crate::model::IssueChanges {
-                status: Some(Status::Blocked),
-                ..Default::default()
-            },
-        ).unwrap();
-        storage.create_issue(&Issue::new("bf-dep-blocked".to_string(), "Dep of blocked blocker".to_string(), ".".to_string())).unwrap();
-        storage.add_dependency("bf-dep-blocked", "bf-blocker-blocked", &crate::model::DependencyType::Blocks, "test").unwrap();
+        storage
+            .create_issue(&Issue::new(
+                "bf-blocker-blocked".to_string(),
+                "Blocked blocker".to_string(),
+                ".".to_string(),
+            ))
+            .unwrap();
+        storage
+            .update_issue(
+                "bf-blocker-blocked",
+                &crate::model::IssueChanges {
+                    status: Some(Status::Blocked),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        storage
+            .create_issue(&Issue::new(
+                "bf-dep-blocked".to_string(),
+                "Dep of blocked blocker".to_string(),
+                ".".to_string(),
+            ))
+            .unwrap();
+        storage
+            .add_dependency(
+                "bf-dep-blocked",
+                "bf-blocker-blocked",
+                &crate::model::DependencyType::Blocks,
+                "test",
+            )
+            .unwrap();
 
         let candidates = storage
             .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None))

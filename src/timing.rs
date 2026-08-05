@@ -151,23 +151,16 @@ impl ExecutionTimer {
         if let Some(parent) = state_path.parent() {
             if !parent.exists() {
                 fs::create_dir_all(parent).with_context(|| {
-                    format!(
-                        "Failed to create timing directory: {}",
-                        parent.display()
-                    )
+                    format!("Failed to create timing directory: {}", parent.display())
                 })?;
             }
         }
 
         // Persist state immediately
-        let state_json = serde_json::to_string_pretty(&state)
-            .context("Failed to serialize timer state")?;
-        fs::write(state_path, state_json).with_context(|| {
-            format!(
-                "Failed to write timer state to: {}",
-                state_path.display()
-            )
-        })?;
+        let state_json =
+            serde_json::to_string_pretty(&state).context("Failed to serialize timer state")?;
+        fs::write(state_path, state_json)
+            .with_context(|| format!("Failed to write timer state to: {}", state_path.display()))?;
 
         Ok(Self {
             local_start: Instant::now(),
@@ -197,22 +190,16 @@ impl ExecutionTimer {
     /// ```
     pub fn resume(state_path: &Path) -> Result<Self> {
         if !state_path.exists() {
-            anyhow::bail!(
-                "Timer state file does not exist: {}",
-                state_path.display()
-            );
+            anyhow::bail!("Timer state file does not exist: {}", state_path.display());
         }
 
         // Read and deserialize state
         let state_json = fs::read_to_string(state_path).with_context(|| {
-            format!(
-                "Failed to read timer state from: {}",
-                state_path.display()
-            )
+            format!("Failed to read timer state from: {}", state_path.display())
         })?;
 
-        let mut state: TimerState = serde_json::from_str(&state_json)
-            .context("Failed to deserialize timer state")?;
+        let mut state: TimerState =
+            serde_json::from_str(&state_json).context("Failed to deserialize timer state")?;
 
         // Update the state to reflect that we're resuming
         state.updated_at = Utc::now().to_rfc3339();
@@ -257,17 +244,11 @@ impl ExecutionTimer {
     /// * `Result<TimerState>` - The timer state
     pub fn load_state(state_path: &Path) -> Result<TimerState> {
         if !state_path.exists() {
-            anyhow::bail!(
-                "Timer state file does not exist: {}",
-                state_path.display()
-            );
+            anyhow::bail!("Timer state file does not exist: {}", state_path.display());
         }
 
         let state_json = fs::read_to_string(state_path).with_context(|| {
-            format!(
-                "Failed to read timer state from: {}",
-                state_path.display()
-            )
+            format!("Failed to read timer state from: {}", state_path.display())
         })?;
 
         serde_json::from_str(&state_json).context("Failed to deserialize timer state")
@@ -285,8 +266,8 @@ impl ExecutionTimer {
         let current_timestamp_ms = now.timestamp_millis();
 
         // Calculate elapsed time from the persisted start timestamp
-        let elapsed_from_start = (current_timestamp_ms - self.state.start_timestamp_ms)
-            .max(0) as u64;
+        let elapsed_from_start =
+            (current_timestamp_ms - self.state.start_timestamp_ms).max(0) as u64;
 
         // Add any previously accumulated time
         Ok(elapsed_from_start + self.state.accumulated_ms)
@@ -456,10 +437,7 @@ pub fn record_start_time(start_file: &Path) -> Result<i64> {
     if let Some(parent) = start_file.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "Failed to create timing directory: {}",
-                    parent.display()
-                )
+                format!("Failed to create timing directory: {}", parent.display())
             })?;
         }
     }
@@ -473,12 +451,8 @@ pub fn record_start_time(start_file: &Path) -> Result<i64> {
         "recorded_at": Utc::now().to_rfc3339(),
     });
 
-    fs::write(start_file, serde_json::to_string_pretty(&start_data)?).with_context(|| {
-        format!(
-            "Failed to write start time to: {}",
-            start_file.display()
-        )
-    })?;
+    fs::write(start_file, serde_json::to_string_pretty(&start_data)?)
+        .with_context(|| format!("Failed to write start time to: {}", start_file.display()))?;
 
     Ok(start_timestamp_ms)
 }
@@ -494,21 +468,14 @@ pub fn record_start_time(start_file: &Path) -> Result<i64> {
 /// * `Result<i64>` - Start timestamp in milliseconds
 pub fn read_start_time(start_file: &Path) -> Result<i64> {
     if !start_file.exists() {
-        anyhow::bail!(
-            "Start time file does not exist: {}",
-            start_file.display()
-        );
+        anyhow::bail!("Start time file does not exist: {}", start_file.display());
     }
 
-    let content = fs::read_to_string(start_file).with_context(|| {
-        format!(
-            "Failed to read start time from: {}",
-            start_file.display()
-        )
-    })?;
+    let content = fs::read_to_string(start_file)
+        .with_context(|| format!("Failed to read start time from: {}", start_file.display()))?;
 
-    let data: serde_json::Value = serde_json::from_str(&content)
-        .context("Failed to parse start time file")?;
+    let data: serde_json::Value =
+        serde_json::from_str(&content).context("Failed to parse start time file")?;
 
     data.get("start_timestamp_ms")
         .and_then(|v| v.as_i64())
@@ -641,11 +608,7 @@ mod tests {
 
     #[test]
     fn test_timer_state_stop() {
-        let mut state = TimerState::new(
-            "test-timer".to_string(),
-            None,
-            None,
-        );
+        let mut state = TimerState::new("test-timer".to_string(), None, None);
 
         state.stop(5000);
         assert!(!state.running);
@@ -654,11 +617,7 @@ mod tests {
 
     #[test]
     fn test_timer_state_add_accumulated() {
-        let mut state = TimerState::new(
-            "test-timer".to_string(),
-            None,
-            None,
-        );
+        let mut state = TimerState::new("test-timer".to_string(), None, None);
 
         state.add_accumulated(1000);
         assert_eq!(state.accumulated_ms, 1000);
@@ -688,10 +647,14 @@ mod tests {
             &state_path,
             Some("Test operation".to_string()),
             Some("bf-456".to_string()),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(timer.state().bead_id, Some("bf-456".to_string()));
-        assert_eq!(timer.state().description, Some("Test operation".to_string()));
+        assert_eq!(
+            timer.state().description,
+            Some("Test operation".to_string())
+        );
     }
 
     #[test]
@@ -704,7 +667,8 @@ mod tests {
             &state_path,
             Some("Persist test".to_string()),
             None,
-        ).unwrap();
+        )
+        .unwrap();
         let id1 = timer1.id().to_string();
         let start_time1 = timer1.start_time().to_string();
 

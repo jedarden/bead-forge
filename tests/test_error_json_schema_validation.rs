@@ -11,10 +11,10 @@
 //! - Schema validation tests pass
 //! - Ensure backward compatibility with existing JSON format
 
+use serde_json::{from_str, Value};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-use serde_json::{Value, from_str};
 
 fn bf() -> Command {
     Command::new(env!("CARGO_BIN_EXE_bf"))
@@ -44,7 +44,18 @@ fn setup() -> (TempDir, PathBuf) {
 
 /// Create a test bead with the given title
 fn create_bead(workspace: &Path, title: &str) -> String {
-    let (out, err, ok) = run_bf(workspace, &["create", "--title", title, "--type", "task", "--priority", "2"]);
+    let (out, err, ok) = run_bf(
+        workspace,
+        &[
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ],
+    );
     assert!(ok, "bf create failed: {err}");
     let id = out.trim().to_string();
     assert!(!id.is_empty(), "create produced no id: {out}");
@@ -53,9 +64,7 @@ fn create_bead(workspace: &Path, title: &str) -> String {
 
 /// Parse a JSON string and panic if invalid
 fn parse_json(json: &str) -> Value {
-    from_str(json).unwrap_or_else(|e| {
-        panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-    })
+    from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
 }
 
 /// Parse a JSONL string (newline-delimited JSON) into a Vec of values
@@ -107,16 +116,16 @@ impl ErrorSchemaValidator {
                     Err("Error string should not be empty".to_string())
                 }
             }
-            _ => Err(format!("Invalid error JSON type: {:?}", self.json))
+            _ => Err(format!("Invalid error JSON type: {:?}", self.json)),
         }
     }
 
     fn validate_error_object(&self, obj: &serde_json::Map<String, Value>) -> Result<(), String> {
         // Check for common error fields
-        let has_error = obj.contains_key("error") ||
-                       obj.contains_key("err") ||
-                       obj.contains_key("message") ||
-                       obj.contains_key("msg");
+        let has_error = obj.contains_key("error")
+            || obj.contains_key("err")
+            || obj.contains_key("message")
+            || obj.contains_key("msg");
 
         // Objects are valid even without explicit error fields (could be empty result wrapper)
         Ok(())
@@ -150,12 +159,15 @@ impl ErrorSchemaValidator {
                 // Check for unescaped control characters (except common whitespace)
                 for (i, ch) in s.chars().enumerate() {
                     if ch <= '' && ch != '\t' && ch != '\n' && ch != '\r' {
-                        return Err(format!("Unescaped control character at position {}: \\u{:04x}", i, ch as u32));
+                        return Err(format!(
+                            "Unescaped control character at position {}: \\u{:04x}",
+                            i, ch as u32
+                        ));
                     }
                 }
                 Ok(())
             }
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 
@@ -176,12 +188,15 @@ impl ErrorSchemaValidator {
             Value::String(s) => {
                 for (i, ch) in s.chars().enumerate() {
                     if ch <= '' && ch != '\t' && ch != '\n' && ch != '\r' {
-                        return Err(format!("Unescaped control character at position {}: \\u{:04x}", i, ch as u32));
+                        return Err(format!(
+                            "Unescaped control character at position {}: \\u{:04x}",
+                            i, ch as u32
+                        ));
                     }
                 }
                 Ok(())
             }
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 
@@ -211,7 +226,10 @@ impl ErrorSchemaValidator {
                 Ok(())
             }
             Value::String(_) => Ok(()),
-            _ => Err(format!("Unexpected JSON type for command type {}", command_type))
+            _ => Err(format!(
+                "Unexpected JSON type for command type {}",
+                command_type
+            )),
         }
     }
 }
@@ -227,15 +245,28 @@ fn test_all_error_responses_have_consistent_structure() {
     // Test various error scenarios across different commands
     let error_scenarios = vec![
         // Invalid bead ID scenarios
-        ("show invalid id", vec!["show", "bf-invalid-id", "--format", "json"]),
-        ("update invalid id", vec!["update", "bf-invalid", "--description", "test"]),
-
+        (
+            "show invalid id",
+            vec!["show", "bf-invalid-id", "--format", "json"],
+        ),
+        (
+            "update invalid id",
+            vec!["update", "bf-invalid", "--description", "test"],
+        ),
         // Invalid filter scenarios
-        ("list invalid status", vec!["list", "--status", "invalid_status_xyz", "--format", "json"]),
-        ("list invalid type", vec!["list", "--type", "invalid_type_xyz", "--format", "json"]),
-
+        (
+            "list invalid status",
+            vec!["list", "--status", "invalid_status_xyz", "--format", "json"],
+        ),
+        (
+            "list invalid type",
+            vec!["list", "--type", "invalid_type_xyz", "--format", "json"],
+        ),
         // Empty result scenarios
-        ("search no results", vec!["search", "nonexistent_xyz_123", "--format", "json"]),
+        (
+            "search no results",
+            vec!["search", "nonexistent_xyz_123", "--format", "json"],
+        ),
     ];
 
     let mut consistent_count = 0;
@@ -264,8 +295,14 @@ fn test_all_error_responses_have_consistent_structure() {
     }
 
     // Verify we tested multiple scenarios
-    assert!(consistent_count >= 3, "Should test at least 3 error scenarios");
-    println!("Tested {} error scenarios with consistent structure", consistent_count);
+    assert!(
+        consistent_count >= 3,
+        "Should test at least 3 error scenarios"
+    );
+    println!(
+        "Tested {} error scenarios with consistent structure",
+        consistent_count
+    );
 }
 
 #[test]
@@ -278,8 +315,19 @@ fn test_error_json_is_wellformed() {
     // Test error scenarios that might produce malformed JSON
     // Only test commands that actually produce JSON output
     let edge_cases = vec![
-        ("description with newlines", vec!["update", &bead_id, "--description", "Line 1\nLine 2\nLine 3"]),
-        ("search with special chars", vec!["search", "\"quotes\"", "--format", "json"]),
+        (
+            "description with newlines",
+            vec![
+                "update",
+                &bead_id,
+                "--description",
+                "Line 1\nLine 2\nLine 3",
+            ],
+        ),
+        (
+            "search with special chars",
+            vec!["search", "\"quotes\"", "--format", "json"],
+        ),
         ("list with format json", vec!["list", "--format", "json"]),
     ];
 
@@ -289,10 +337,13 @@ fn test_error_json_is_wellformed() {
         let stdout_trimmed = stdout.trim();
         if !stdout_trimmed.is_empty() {
             // Handle both JSONL (multiple lines) and single JSON value
-            if stdout_trimmed.contains('\n') || stdout_trimmed.starts_with('{') || stdout_trimmed.starts_with('[') {
+            if stdout_trimmed.contains('\n')
+                || stdout_trimmed.starts_with('{')
+                || stdout_trimmed.starts_with('[')
+            {
                 if let Some(validator) = ErrorSchemaValidator::new(&stdout_trimmed) {
                     match validator.validate_json_wellformed() {
-                        Ok(()) => {},
+                        Ok(()) => {}
                         Err(e) => {
                             panic!("{}: Malformed JSON detected: {}", description, e);
                         }
@@ -324,10 +375,7 @@ fn test_error_responses_preserve_required_fields() {
     assert!(update_ok, "Update failed: {}", update_err);
 
     // Verify the bead still has all required fields
-    let (show_out, show_err, show_ok) = run_bf(
-        &workspace,
-        &["show", &bead_id, "--format", "json"],
-    );
+    let (show_out, show_err, show_ok) = run_bf(&workspace, &["show", &bead_id, "--format", "json"]);
     assert!(show_ok, "Show failed: {}", show_err);
 
     let parsed = parse_json(&show_out);
@@ -335,7 +383,14 @@ fn test_error_responses_preserve_required_fields() {
     let bead = &array[0];
 
     // Verify required fields are present
-    let required_fields = vec!["id", "title", "status", "priority", "created_at", "issue_type"];
+    let required_fields = vec![
+        "id",
+        "title",
+        "status",
+        "priority",
+        "created_at",
+        "issue_type",
+    ];
     for field in required_fields {
         assert!(
             bead.get(field).is_some(),
@@ -429,10 +484,8 @@ fn test_edge_case_unicode_in_errors() {
     let unicode_bead = create_bead(&workspace, "Test with emoji 🎉 and unicode café");
 
     // Search with Unicode query
-    let (search_out, search_err, search_ok) = run_bf(
-        &workspace,
-        &["search", "café", "--format", "json"],
-    );
+    let (search_out, search_err, search_ok) =
+        run_bf(&workspace, &["search", "café", "--format", "json"]);
     assert!(search_ok, "Search with unicode failed: {}", search_err);
 
     // Verify JSON is valid with Unicode
@@ -440,24 +493,31 @@ fn test_edge_case_unicode_in_errors() {
         for line in search_out.lines() {
             if !line.trim().is_empty() {
                 let parsed = parse_json(line);
-                assert!(parsed.is_object(), "Unicode search should return valid JSON objects");
+                assert!(
+                    parsed.is_object(),
+                    "Unicode search should return valid JSON objects"
+                );
             }
         }
     }
 
     // Show bead with Unicode
-    let (show_out, show_err, show_ok) = run_bf(
-        &workspace,
-        &["show", &unicode_bead, "--format", "json"],
-    );
+    let (show_out, show_err, show_ok) =
+        run_bf(&workspace, &["show", &unicode_bead, "--format", "json"]);
     assert!(show_ok, "Show with unicode failed: {}", show_err);
 
     let show_parsed = parse_json(&show_out);
     assert!(show_parsed.is_array(), "Show should return array");
-    assert!(show_parsed.as_array().unwrap()[0].is_object(), "Show element should be object");
+    assert!(
+        show_parsed.as_array().unwrap()[0].is_object(),
+        "Show element should be object"
+    );
 
     // Cleanup
-    run_bf(&workspace, &["close", &unicode_bead, "--reason", "test cleanup"]);
+    run_bf(
+        &workspace,
+        &["close", &unicode_bead, "--reason", "test cleanup"],
+    );
 }
 
 #[test]
@@ -469,10 +529,7 @@ fn test_edge_case_very_long_values_in_errors() {
     let bead_id = create_bead(&workspace, &long_title);
 
     // Show with long title
-    let (show_out, show_err, show_ok) = run_bf(
-        &workspace,
-        &["show", &bead_id, "--format", "json"],
-    );
+    let (show_out, show_err, show_ok) = run_bf(&workspace, &["show", &bead_id, "--format", "json"]);
     assert!(show_ok, "Show with long title failed: {}", show_err);
 
     // Verify JSON is valid despite long values
@@ -484,7 +541,11 @@ fn test_edge_case_very_long_values_in_errors() {
         .and_then(|v| v.as_str())
         .expect("title should be string");
 
-    assert_eq!(title.len(), long_title.len(), "Long title should be preserved");
+    assert_eq!(
+        title.len(),
+        long_title.len(),
+        "Long title should be preserved"
+    );
 
     // Cleanup
     run_bf(&workspace, &["close", &bead_id, "--reason", "test cleanup"]);
@@ -504,13 +565,14 @@ fn test_edge_case_all_special_characters_together() {
         &workspace,
         &["update", &bead_id, "--description", special_description],
     );
-    assert!(update_ok, "Update with special chars failed: {}", update_err);
+    assert!(
+        update_ok,
+        "Update with special chars failed: {}",
+        update_err
+    );
 
     // Show with all special characters
-    let (show_out, show_err, show_ok) = run_bf(
-        &workspace,
-        &["show", &bead_id, "--format", "json"],
-    );
+    let (show_out, show_err, show_ok) = run_bf(&workspace, &["show", &bead_id, "--format", "json"]);
     assert!(show_ok, "Show with special chars failed: {}", show_err);
 
     // Verify JSON is valid
@@ -537,17 +599,16 @@ fn test_edge_case_empty_and_null_values() {
     let bead_id = create_bead(&workspace, "Empty values test");
 
     // Clear description (set to empty)
-    let (_update_out, update_err, update_ok) = run_bf(
-        &workspace,
-        &["update", &bead_id, "--description", ""],
+    let (_update_out, update_err, update_ok) =
+        run_bf(&workspace, &["update", &bead_id, "--description", ""]);
+    assert!(
+        update_ok,
+        "Update with empty description failed: {}",
+        update_err
     );
-    assert!(update_ok, "Update with empty description failed: {}", update_err);
 
     // Show should still return valid JSON
-    let (show_out, show_err, show_ok) = run_bf(
-        &workspace,
-        &["show", &bead_id, "--format", "json"],
-    );
+    let (show_out, show_err, show_ok) = run_bf(&workspace, &["show", &bead_id, "--format", "json"]);
     assert!(show_ok, "Show failed: {}", show_err);
 
     // Verify JSON is valid with empty values
@@ -556,7 +617,10 @@ fn test_edge_case_empty_and_null_values() {
 
     // Description field should be present (even if empty)
     let bead = &show_parsed.as_array().unwrap()[0];
-    assert!(bead.get("description").is_some(), "description field should be present");
+    assert!(
+        bead.get("description").is_some(),
+        "description field should be present"
+    );
 
     // Cleanup
     run_bf(&workspace, &["close", &bead_id, "--reason", "test cleanup"]);
@@ -610,7 +674,10 @@ fn test_error_json_consistency_across_commands() {
     }
 
     // Cleanup
-    run_bf(&workspace, &["close", &bead1_id, "--reason", "test cleanup"]);
+    run_bf(
+        &workspace,
+        &["close", &bead1_id, "--reason", "test cleanup"],
+    );
 }
 
 #[test]

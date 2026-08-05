@@ -94,7 +94,15 @@ fn test_epic_create_single_label_cli() {
     // Create epic with single label
     let (stdout, stderr, success) = run_bf_command(
         workspace,
-        &["create", "--title", "Epic with Single Label", "--type", "epic", "--label", "feature"],
+        &[
+            "create",
+            "--title",
+            "Epic with Single Label",
+            "--type",
+            "epic",
+            "--label",
+            "feature",
+        ],
     );
     assert!(success, "bf create failed: {}", stderr);
     let bead_id = extract_bead_id(&stdout);
@@ -298,8 +306,10 @@ fn test_epic_search_by_label() {
     let epic2_id = extract_bead_id(&epic2_stdout);
 
     // Search for backend-labeled epics
-    let (search_stdout, search_stderr, search_success) =
-        run_bf_command(workspace, &["search", "--label", "backend", "--type", "epic"]);
+    let (search_stdout, search_stderr, search_success) = run_bf_command(
+        workspace,
+        &["search", "--label", "backend", "--type", "epic"],
+    );
     assert!(search_success, "bf search failed: {}", search_stderr);
 
     // Should find backend epic but not frontend
@@ -502,8 +512,7 @@ fn test_epic_priority_and_labels() {
     let bead_id = extract_bead_id(&stdout);
 
     // Show the epic and verify priority and labels
-    let (show_stdout, show_stderr, show_success) =
-        run_bf_command(workspace, &["show", &bead_id]);
+    let (show_stdout, show_stderr, show_success) = run_bf_command(workspace, &["show", &bead_id]);
     assert!(show_success, "bf show failed: {}", show_stderr);
 
     assert!(show_stdout.contains("Priority: P1"));
@@ -533,8 +542,10 @@ fn test_epic_label_add_remove() {
     let bead_id = extract_bead_id(&stdout);
 
     // Add a label
-    let (_, add_stderr, add_success) =
-        run_bf_command(workspace, &["label", "add", &bead_id, "--label", "new-label"]);
+    let (_, add_stderr, add_success) = run_bf_command(
+        workspace,
+        &["label", "add", &bead_id, "--label", "new-label"],
+    );
     assert!(add_success, "bf label add failed: {}", add_stderr);
 
     // Verify both labels exist
@@ -544,8 +555,10 @@ fn test_epic_label_add_remove() {
     assert!(labels.contains(&"new-label".to_string()));
 
     // Remove a label
-    let (_, rem_stderr, rem_success) =
-        run_bf_command(workspace, &["label", "remove", &bead_id, "--label", "initial"]);
+    let (_, rem_stderr, rem_success) = run_bf_command(
+        workspace,
+        &["label", "remove", &bead_id, "--label", "initial"],
+    );
     assert!(rem_success, "bf label remove failed: {}", rem_stderr);
 
     // Verify only new-label remains
@@ -579,8 +592,7 @@ fn test_epic_description_and_labels() {
     let bead_id = extract_bead_id(&stdout);
 
     // Show and verify both description and labels
-    let (show_stdout, show_stderr, show_success) =
-        run_bf_command(workspace, &["show", &bead_id]);
+    let (show_stdout, show_stderr, show_success) = run_bf_command(workspace, &["show", &bead_id]);
     assert!(show_success, "bf show failed: {}", show_stderr);
 
     assert!(show_stdout.contains("This is a test epic with description"));

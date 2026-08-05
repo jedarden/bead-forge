@@ -21,9 +21,21 @@ fn test_full_export_import_roundtrip_preserves_all_beads() {
     let ws1 = common::TempWorkspace::new().expect("Failed to create workspace 1");
 
     // Create test beads
-    let bead1 = Issue::new("bf-001".to_string(), "First bead".to_string(), ".".to_string());
-    let bead2 = Issue::new("bf-002".to_string(), "Second bead".to_string(), ".".to_string());
-    let bead3 = Issue::new("bf-003".to_string(), "Third bead".to_string(), ".".to_string());
+    let bead1 = Issue::new(
+        "bf-001".to_string(),
+        "First bead".to_string(),
+        ".".to_string(),
+    );
+    let bead2 = Issue::new(
+        "bf-002".to_string(),
+        "Second bead".to_string(),
+        ".".to_string(),
+    );
+    let bead3 = Issue::new(
+        "bf-003".to_string(),
+        "Third bead".to_string(),
+        ".".to_string(),
+    );
 
     ws1.create_issue(&bead1).expect("Failed to create bead1");
     ws1.create_issue(&bead2).expect("Failed to create bead2");
@@ -34,7 +46,8 @@ fn test_full_export_import_roundtrip_preserves_all_beads() {
     assert_eq!(export_count, 3, "Should export 3 beads");
 
     // Read exported JSONL
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
 
     // Create second workspace and import
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
@@ -71,27 +84,43 @@ fn test_roundtrip_preserves_labels() {
     let ws1 = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create beads with various label configurations
-    let mut bead_with_labels = Issue::new("bf-labels".to_string(), "Bead with labels".to_string(), ".".to_string());
+    let mut bead_with_labels = Issue::new(
+        "bf-labels".to_string(),
+        "Bead with labels".to_string(),
+        ".".to_string(),
+    );
     bead_with_labels.labels = vec![
         "phase-1".to_string(),
         "storage".to_string(),
         "critical".to_string(),
     ];
 
-    let bead_no_labels = Issue::new("bf-nolabels".to_string(), "Bead without labels".to_string(), ".".to_string());
+    let bead_no_labels = Issue::new(
+        "bf-nolabels".to_string(),
+        "Bead without labels".to_string(),
+        ".".to_string(),
+    );
 
-    let mut bead_single_label = Issue::new("bf-single".to_string(), "Single label".to_string(), ".".to_string());
+    let mut bead_single_label = Issue::new(
+        "bf-single".to_string(),
+        "Single label".to_string(),
+        ".".to_string(),
+    );
     bead_single_label.labels = vec!["bug".to_string()];
 
-    ws1.create_issue(&bead_with_labels).expect("Failed to create bead_with_labels");
-    ws1.create_issue(&bead_no_labels).expect("Failed to create bead_no_labels");
-    ws1.create_issue(&bead_single_label).expect("Failed to create bead_single_label");
+    ws1.create_issue(&bead_with_labels)
+        .expect("Failed to create bead_with_labels");
+    ws1.create_issue(&bead_no_labels)
+        .expect("Failed to create bead_no_labels");
+    ws1.create_issue(&bead_single_label)
+        .expect("Failed to create bead_single_label");
 
     // Export and import
     let export_count = ws1.export_jsonl(false).expect("Failed to export");
     assert_eq!(export_count, 3);
 
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
     fs::write(&ws2.jsonl_path, &exported_jsonl).expect("Failed to write JSONL");
 
@@ -101,12 +130,21 @@ fn test_roundtrip_preserves_labels() {
     let imported_beads = ws2.list_beads().expect("Failed to list beads");
 
     let imported_with_labels = imported_beads.iter().find(|b| b.id == "bf-labels").unwrap();
-    assert_eq!(imported_with_labels.labels.len(), 3, "Should preserve all labels");
+    assert_eq!(
+        imported_with_labels.labels.len(),
+        3,
+        "Should preserve all labels"
+    );
     assert!(imported_with_labels.labels.contains(&"phase-1".to_string()));
     assert!(imported_with_labels.labels.contains(&"storage".to_string()));
-    assert!(imported_with_labels.labels.contains(&"critical".to_string()));
+    assert!(imported_with_labels
+        .labels
+        .contains(&"critical".to_string()));
 
-    let imported_no_labels = imported_beads.iter().find(|b| b.id == "bf-nolabels").unwrap();
+    let imported_no_labels = imported_beads
+        .iter()
+        .find(|b| b.id == "bf-nolabels")
+        .unwrap();
     assert_eq!(imported_no_labels.labels.len(), 0, "Should have no labels");
 
     let imported_single = imported_beads.iter().find(|b| b.id == "bf-single").unwrap();
@@ -145,7 +183,8 @@ fn test_roundtrip_preserves_dependencies() {
     let export_count = ws1.export_jsonl(false).expect("Failed to export");
     assert_eq!(export_count, 3);
 
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
     fs::write(&ws2.jsonl_path, &exported_jsonl).expect("Failed to write JSONL");
 
@@ -155,12 +194,20 @@ fn test_roundtrip_preserves_dependencies() {
     let imported_beads = ws2.list_beads().expect("Failed to list beads");
 
     let imported_b = imported_beads.iter().find(|b| b.id == "bf-b").unwrap();
-    assert_eq!(imported_b.dependencies.len(), 1, "B should have 1 dependency");
+    assert_eq!(
+        imported_b.dependencies.len(),
+        1,
+        "B should have 1 dependency"
+    );
     assert_eq!(imported_b.dependencies[0].depends_on_id, "bf-a");
     assert_eq!(imported_b.dependencies[0].dep_type, DependencyType::Blocks);
 
     let imported_c = imported_beads.iter().find(|b| b.id == "bf-c").unwrap();
-    assert_eq!(imported_c.dependencies.len(), 1, "C should have 1 dependency");
+    assert_eq!(
+        imported_c.dependencies.len(),
+        1,
+        "C should have 1 dependency"
+    );
     assert_eq!(imported_c.dependencies[0].depends_on_id, "bf-b");
 }
 
@@ -169,7 +216,11 @@ fn test_roundtrip_preserves_dependencies() {
 fn test_roundtrip_preserves_comments() {
     let ws1 = common::TempWorkspace::new().expect("Failed to create workspace");
 
-    let bead = Issue::new("bf-comments".to_string(), "Bead with comments".to_string(), ".".to_string());
+    let bead = Issue::new(
+        "bf-comments".to_string(),
+        "Bead with comments".to_string(),
+        ".".to_string(),
+    );
     ws1.create_issue(&bead).expect("Failed to create bead");
 
     // Add comments
@@ -187,7 +238,8 @@ fn test_roundtrip_preserves_comments() {
     let export_count = ws1.export_jsonl(false).expect("Failed to export");
     assert_eq!(export_count, 1);
 
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
     fs::write(&ws2.jsonl_path, &exported_jsonl).expect("Failed to write JSONL");
 
@@ -213,12 +265,20 @@ fn test_roundtrip_with_complex_bead_configuration() {
     let ws1 = common::TempWorkspace::new().expect("Failed to create workspace");
 
     // Create a complex bead with everything
-    let mut parent = Issue::new("bf-parent".to_string(), "Parent epic".to_string(), ".".to_string());
+    let mut parent = Issue::new(
+        "bf-parent".to_string(),
+        "Parent epic".to_string(),
+        ".".to_string(),
+    );
     parent.labels = vec!["epic".to_string(), "phase-2".to_string()];
     parent.issue_type = IssueType::Epic;
     parent.priority = Priority(0); // P0
 
-    let mut child = Issue::new("bf-child".to_string(), "Child task".to_string(), ".".to_string());
+    let mut child = Issue::new(
+        "bf-child".to_string(),
+        "Child task".to_string(),
+        ".".to_string(),
+    );
     child.labels = vec!["task".to_string(), "frontend".to_string()];
     child.description = Some("Implement the feature".to_string());
     child.assignee = Some("developer".to_string());
@@ -230,7 +290,12 @@ fn test_roundtrip_with_complex_bead_configuration() {
 
     // Add dependency (child depends on parent)
     storage
-        .add_dependency("bf-child", "bf-parent", &DependencyType::ParentChild, "test")
+        .add_dependency(
+            "bf-child",
+            "bf-parent",
+            &DependencyType::ParentChild,
+            "test",
+        )
         .expect("Failed to add dependency");
 
     // Add comment to child
@@ -242,7 +307,8 @@ fn test_roundtrip_with_complex_bead_configuration() {
     let export_count = ws1.export_jsonl(false).expect("Failed to export");
     assert_eq!(export_count, 2);
 
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
     fs::write(&ws2.jsonl_path, &exported_jsonl).expect("Failed to write JSONL");
 
@@ -261,11 +327,17 @@ fn test_roundtrip_with_complex_bead_configuration() {
 
     let imported_child = imported_beads.iter().find(|b| b.id == "bf-child").unwrap();
     assert_eq!(imported_child.title, "Child task");
-    assert_eq!(imported_child.description, Some("Implement the feature".to_string()));
+    assert_eq!(
+        imported_child.description,
+        Some("Implement the feature".to_string())
+    );
     assert_eq!(imported_child.assignee, Some("developer".to_string()));
     assert_eq!(imported_child.labels.len(), 2);
     assert_eq!(imported_child.dependencies.len(), 1);
-    assert_eq!(imported_child.dependencies[0].dep_type, DependencyType::ParentChild);
+    assert_eq!(
+        imported_child.dependencies[0].dep_type,
+        DependencyType::ParentChild
+    );
     assert_eq!(imported_child.comments.len(), 1);
     assert_eq!(imported_child.comments[0].author, "pm");
 }
@@ -276,9 +348,21 @@ fn test_dirty_export_import_cycle_only_modifies_changed_beads() {
     let ws1 = common::TempWorkspace::new().expect("Failed to create workspace 1");
 
     // Create initial beads
-    let bead1 = Issue::new("bf-unchanged".to_string(), "Unchanged bead".to_string(), ".".to_string());
-    let bead2 = Issue::new("bf-modified".to_string(), "Original title".to_string(), ".".to_string());
-    let bead3 = Issue::new("bf-new".to_string(), "New bead".to_string(), ".".to_string());
+    let bead1 = Issue::new(
+        "bf-unchanged".to_string(),
+        "Unchanged bead".to_string(),
+        ".".to_string(),
+    );
+    let bead2 = Issue::new(
+        "bf-modified".to_string(),
+        "Original title".to_string(),
+        ".".to_string(),
+    );
+    let bead3 = Issue::new(
+        "bf-new".to_string(),
+        "New bead".to_string(),
+        ".".to_string(),
+    );
 
     ws1.create_issue(&bead1).expect("Failed to create bead1");
     ws1.create_issue(&bead2).expect("Failed to create bead2");
@@ -306,7 +390,10 @@ fn test_dirty_export_import_cycle_only_modifies_changed_beads() {
 
     // Dirty export: only modified and new beads
     let dirty_export_count = ws1.export_jsonl(true).expect("Failed to dirty export");
-    assert_eq!(dirty_export_count, 2, "Should export 2 dirty beads (modified + new)");
+    assert_eq!(
+        dirty_export_count, 2,
+        "Should export 2 dirty beads (modified + new)"
+    );
 
     // Verify JSONL still contains all 3 beads
     let final_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read final JSONL");
@@ -322,8 +409,14 @@ fn test_dirty_export_import_cycle_only_modifies_changed_beads() {
 
     // Verify modifications preserved
     let imported_beads = ws2.list_beads().expect("Failed to list beads");
-    let imported_modified = imported_beads.iter().find(|b| b.id == "bf-modified").unwrap();
-    assert_eq!(imported_modified.title, "Modified title", "Modified title should be preserved");
+    let imported_modified = imported_beads
+        .iter()
+        .find(|b| b.id == "bf-modified")
+        .unwrap();
+    assert_eq!(
+        imported_modified.title, "Modified title",
+        "Modified title should be preserved"
+    );
 }
 
 /// Test SQLite state verification after round-trip.
@@ -332,7 +425,11 @@ fn test_sqlite_state_matches_after_roundtrip() {
     let ws1 = common::TempWorkspace::new().expect("Failed to create workspace 1");
 
     // Create a bead with all fields populated
-    let mut bead = Issue::new("bf-full".to_string(), "Fully populated bead".to_string(), "test-repo".to_string());
+    let mut bead = Issue::new(
+        "bf-full".to_string(),
+        "Fully populated bead".to_string(),
+        "test-repo".to_string(),
+    );
     bead.description = Some("Detailed description".to_string());
     bead.design = Some("Technical design".to_string());
     bead.acceptance_criteria = Some("Criteria satisfied".to_string());
@@ -352,13 +449,17 @@ fn test_sqlite_state_matches_after_roundtrip() {
     ws1.create_issue(&bead).expect("Failed to create bead");
 
     // Get the bead from storage to capture all fields as stored
-    let stored_bead = ws1.get_bead("bf-full").expect("Failed to get stored bead").unwrap();
+    let stored_bead = ws1
+        .get_bead("bf-full")
+        .expect("Failed to get stored bead")
+        .unwrap();
 
     // Export and import
     let export_count = ws1.export_jsonl(false).expect("Failed to export");
     assert_eq!(export_count, 1);
 
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
     fs::write(&ws2.jsonl_path, &exported_jsonl).expect("Failed to write JSONL");
 
@@ -371,14 +472,20 @@ fn test_sqlite_state_matches_after_roundtrip() {
     let imported = &imported_beads[0];
 
     // Use sync_equals which handles all sync-relevant fields
-    assert!(stored_bead.sync_equals(imported), "Imported bead should match stored bead (sync_equals)");
+    assert!(
+        stored_bead.sync_equals(imported),
+        "Imported bead should match stored bead (sync_equals)"
+    );
 
     // Also verify individual critical fields
     assert_eq!(imported.id, stored_bead.id);
     assert_eq!(imported.title, stored_bead.title);
     assert_eq!(imported.description, stored_bead.description);
     assert_eq!(imported.design, stored_bead.design);
-    assert_eq!(imported.acceptance_criteria, stored_bead.acceptance_criteria);
+    assert_eq!(
+        imported.acceptance_criteria,
+        stored_bead.acceptance_criteria
+    );
     assert_eq!(imported.notes, stored_bead.notes);
     assert_eq!(imported.status, stored_bead.status);
     assert_eq!(imported.priority, stored_bead.priority);
@@ -403,7 +510,8 @@ fn test_roundtrip_with_empty_workspace() {
     let export_count = ws1.export_jsonl(false).expect("Failed to export empty");
     assert_eq!(export_count, 0);
 
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
 
     // Should create empty file
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
@@ -428,7 +536,11 @@ fn test_roundtrip_preserves_timestamps() {
     let updated_at = Utc::now() - Duration::hours(12);
     let closed_at = Utc::now() - Duration::hours(6);
 
-    let mut bead = Issue::new("bf-times".to_string(), "Timestamp test".to_string(), ".".to_string());
+    let mut bead = Issue::new(
+        "bf-times".to_string(),
+        "Timestamp test".to_string(),
+        ".".to_string(),
+    );
     bead.created_at = created_at;
     bead.updated_at = updated_at;
     bead.closed_at = Some(closed_at);
@@ -441,7 +553,8 @@ fn test_roundtrip_preserves_timestamps() {
     let export_count = ws1.export_jsonl(false).expect("Failed to export");
     assert_eq!(export_count, 1);
 
-    let exported_jsonl = fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
+    let exported_jsonl =
+        fs::read_to_string(&ws1.jsonl_path).expect("Failed to read exported JSONL");
     let ws2 = common::TempWorkspace::new().expect("Failed to create workspace 2");
     fs::write(&ws2.jsonl_path, &exported_jsonl).expect("Failed to write JSONL");
 
@@ -453,14 +566,26 @@ fn test_roundtrip_preserves_timestamps() {
 
     let imported = &imported_beads[0];
     let time_diff = imported.created_at - created_at;
-    assert!(time_diff.num_seconds().abs() < 1, "created_at should be preserved");
+    assert!(
+        time_diff.num_seconds().abs() < 1,
+        "created_at should be preserved"
+    );
 
     let time_diff = imported.updated_at - updated_at;
-    assert!(time_diff.num_seconds().abs() < 1, "updated_at should be preserved");
+    assert!(
+        time_diff.num_seconds().abs() < 1,
+        "updated_at should be preserved"
+    );
 
-    assert!(imported.closed_at.is_some(), "closed_at should be preserved");
+    assert!(
+        imported.closed_at.is_some(),
+        "closed_at should be preserved"
+    );
     let time_diff = imported.closed_at.unwrap() - closed_at;
-    assert!(time_diff.num_seconds().abs() < 1, "closed_at should be preserved");
+    assert!(
+        time_diff.num_seconds().abs() < 1,
+        "closed_at should be preserved"
+    );
 
     assert_eq!(imported.close_reason, Some("Completed".to_string()));
 }
@@ -498,7 +623,10 @@ fn test_multiple_export_import_cycles_stable() {
     ws3.import_jsonl().expect("Failed to import cycle 2");
 
     // Verify JSONL content is stable (same after multiple cycles)
-    assert_eq!(jsonl1, jsonl2, "JSONL should be stable across export/import cycles");
+    assert_eq!(
+        jsonl1, jsonl2,
+        "JSONL should be stable across export/import cycles"
+    );
 
     // Verify all workspaces have the same beads
     let beads1 = ws1.list_beads().expect("Failed to list ws1");

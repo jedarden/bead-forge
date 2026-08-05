@@ -13,8 +13,7 @@ use tempfile::TempDir;
 
 /// Resolve the freshly-built bf binary.
 fn bf_path() -> String {
-    std::env::var("CARGO_BIN_EXE_bf")
-        .unwrap_or_else(|_| "./target/debug/bf".to_string())
+    std::env::var("CARGO_BIN_EXE_bf").unwrap_or_else(|_| "./target/debug/bf".to_string())
 }
 
 /// Create an isolated workspace via `bf init`.
@@ -36,7 +35,15 @@ fn init_workspace() -> TempDir {
 /// Create a task bead via the CLI, returning its printed id.
 fn create_bead(workspace: &std::path::Path, title: &str) -> String {
     let out = Command::new(bf_path())
-        .args(["create", "--title", title, "--type", "task", "--priority", "2"])
+        .args([
+            "create",
+            "--title",
+            title,
+            "--type",
+            "task",
+            "--priority",
+            "2",
+        ])
         .current_dir(workspace)
         .output()
         .expect("Failed to run bf create");
@@ -63,7 +70,10 @@ fn run_with_envelope(workspace: &std::path::Path, args: &[&str]) -> String {
     let stderr = String::from_utf8(out.stderr).unwrap();
 
     if !out.status.success() {
-        panic!("Command failed: {:?}\nstdout: {}\nstderr: {}", full_args, stdout, stderr);
+        panic!(
+            "Command failed: {:?}\nstdout: {}\nstderr: {}",
+            full_args, stdout, stderr
+        );
     }
 
     stdout
@@ -81,11 +91,26 @@ fn text_stats_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["stats", "--format", "text"]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Text output should not start with JSON object");
-    assert!(!output.contains("\"version\":"), "Text output should not contain version field");
-    assert!(!output.contains("\"kind\":"), "Text output should not contain kind field");
-    assert!(!output.contains("\"data\":"), "Text output should not contain data field");
-    assert!(output.contains("Total beads:"), "Text output should contain 'Total beads:'");
+    assert!(
+        !output.starts_with('{'),
+        "Text output should not start with JSON object"
+    );
+    assert!(
+        !output.contains("\"version\":"),
+        "Text output should not contain version field"
+    );
+    assert!(
+        !output.contains("\"kind\":"),
+        "Text output should not contain kind field"
+    );
+    assert!(
+        !output.contains("\"data\":"),
+        "Text output should not contain data field"
+    );
+    assert!(
+        output.contains("Total beads:"),
+        "Text output should contain 'Total beads:'"
+    );
 }
 
 #[test]
@@ -93,13 +118,28 @@ fn text_claim_outputs_plain_text_not_json() {
     let ws = init_workspace();
     create_bead(ws.path(), "claim test");
 
-    let output = run_with_envelope(ws.path(), &["claim", "--assignee", "test-worker", "--format", "text"]);
+    let output = run_with_envelope(
+        ws.path(),
+        &["claim", "--assignee", "test-worker", "--format", "text"],
+    );
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Claim output should not be JSON envelope");
-    assert!(!output.contains("\"version\":"), "Claim output should not contain version field");
-    assert!(!output.contains("\"kind\":"), "Claim output should not contain kind field");
-    assert!(!output.trim().is_empty(), "Claim output should not be empty");
+    assert!(
+        !output.starts_with('{'),
+        "Claim output should not be JSON envelope"
+    );
+    assert!(
+        !output.contains("\"version\":"),
+        "Claim output should not contain version field"
+    );
+    assert!(
+        !output.contains("\"kind\":"),
+        "Claim output should not contain kind field"
+    );
+    assert!(
+        !output.trim().is_empty(),
+        "Claim output should not be empty"
+    );
 }
 
 #[test]
@@ -110,9 +150,18 @@ fn text_list_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["list", "--format", "text"]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "List output should not be JSON envelope");
-    assert!(!output.contains("\"version\":"), "List output should not contain version field");
-    assert!(!output.contains("\"kind\":"), "List output should not contain kind field");
+    assert!(
+        !output.starts_with('{'),
+        "List output should not be JSON envelope"
+    );
+    assert!(
+        !output.contains("\"version\":"),
+        "List output should not contain version field"
+    );
+    assert!(
+        !output.contains("\"kind\":"),
+        "List output should not contain kind field"
+    );
 }
 
 #[test]
@@ -123,8 +172,14 @@ fn text_show_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["show", &bead_id, "--format", "text"]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Show output should not be JSON envelope");
-    assert!(output.contains("ID:"), "Show output should contain 'ID:' field");
+    assert!(
+        !output.starts_with('{'),
+        "Show output should not be JSON envelope"
+    );
+    assert!(
+        output.contains("ID:"),
+        "Show output should contain 'ID:' field"
+    );
 }
 
 #[test]
@@ -135,7 +190,10 @@ fn text_ready_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["ready", "--format", "text"]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Ready output should not be JSON envelope");
+    assert!(
+        !output.starts_with('{'),
+        "Ready output should not be JSON envelope"
+    );
 }
 
 // ============================================================================
@@ -150,11 +208,26 @@ fn toon_stats_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["stats", "--format", "toon"]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Toon output should not start with JSON object");
-    assert!(!output.contains("\"version\":"), "Toon output should not contain version field");
-    assert!(!output.contains("\"kind\":"), "Toon output should not contain kind field");
-    assert!(!output.contains("\"data\":"), "Toon output should not contain data field");
-    assert!(output.contains("Total beads:"), "Toon output should contain 'Total beads:'");
+    assert!(
+        !output.starts_with('{'),
+        "Toon output should not start with JSON object"
+    );
+    assert!(
+        !output.contains("\"version\":"),
+        "Toon output should not contain version field"
+    );
+    assert!(
+        !output.contains("\"kind\":"),
+        "Toon output should not contain kind field"
+    );
+    assert!(
+        !output.contains("\"data\":"),
+        "Toon output should not contain data field"
+    );
+    assert!(
+        output.contains("Total beads:"),
+        "Toon output should contain 'Total beads:'"
+    );
 }
 
 #[test]
@@ -162,13 +235,28 @@ fn toon_claim_outputs_plain_text_not_json() {
     let ws = init_workspace();
     create_bead(ws.path(), "claim test");
 
-    let output = run_with_envelope(ws.path(), &["claim", "--assignee", "test-worker", "--format", "toon"]);
+    let output = run_with_envelope(
+        ws.path(),
+        &["claim", "--assignee", "test-worker", "--format", "toon"],
+    );
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Claim output should not be JSON envelope");
-    assert!(!output.contains("\"version\":"), "Claim output should not contain version field");
-    assert!(!output.contains("\"kind\":"), "Claim output should not contain kind field");
-    assert!(!output.trim().is_empty(), "Claim output should not be empty");
+    assert!(
+        !output.starts_with('{'),
+        "Claim output should not be JSON envelope"
+    );
+    assert!(
+        !output.contains("\"version\":"),
+        "Claim output should not contain version field"
+    );
+    assert!(
+        !output.contains("\"kind\":"),
+        "Claim output should not contain kind field"
+    );
+    assert!(
+        !output.trim().is_empty(),
+        "Claim output should not be empty"
+    );
 }
 
 #[test]
@@ -179,9 +267,18 @@ fn toon_list_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["list", "--format", "toon"]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "List output should not be JSON envelope");
-    assert!(!output.contains("\"version\":"), "List output should not contain version field");
-    assert!(!output.contains("\"kind\":"), "List output should not contain kind field");
+    assert!(
+        !output.starts_with('{'),
+        "List output should not be JSON envelope"
+    );
+    assert!(
+        !output.contains("\"version\":"),
+        "List output should not contain version field"
+    );
+    assert!(
+        !output.contains("\"kind\":"),
+        "List output should not contain kind field"
+    );
 }
 
 #[test]
@@ -192,8 +289,14 @@ fn toon_show_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["show", "--format", "toon", &bead_id]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Show output should not be JSON envelope");
-    assert!(output.contains("ID:"), "Show output should contain 'ID:' field");
+    assert!(
+        !output.starts_with('{'),
+        "Show output should not be JSON envelope"
+    );
+    assert!(
+        output.contains("ID:"),
+        "Show output should contain 'ID:' field"
+    );
 }
 
 #[test]
@@ -204,7 +307,10 @@ fn toon_ready_outputs_plain_text_not_json() {
     let output = run_with_envelope(ws.path(), &["ready", "--format", "toon"]);
 
     // Verify output is plain text, not JSON
-    assert!(!output.starts_with('{'), "Ready output should not be JSON envelope");
+    assert!(
+        !output.starts_with('{'),
+        "Ready output should not be JSON envelope"
+    );
 }
 
 // ============================================================================
@@ -225,8 +331,14 @@ fn non_json_formats_ignore_envelope_flag() {
     assert!(!toon_output.starts_with('{'), "Toon should ignore envelope");
 
     // Both should contain human-readable output
-    assert!(text_output.contains("Total beads:"), "Text should have total line");
-    assert!(toon_output.contains("Total beads:"), "Toon should have total line");
+    assert!(
+        text_output.contains("Total beads:"),
+        "Text should have total line"
+    );
+    assert!(
+        toon_output.contains("Total beads:"),
+        "Toon should have total line"
+    );
 }
 
 #[test]
@@ -239,6 +351,12 @@ fn non_json_formats_respect_format_config() {
     let toon_output = run_with_envelope(ws.path(), &["stats", "--format", "toon"]);
 
     // Both should have format-appropriate content
-    assert!(text_output.contains("Total beads:"), "Text format should work");
-    assert!(toon_output.contains("Total beads:"), "Toon format should work");
+    assert!(
+        text_output.contains("Total beads:"),
+        "Text format should work"
+    );
+    assert!(
+        toon_output.contains("Total beads:"),
+        "Toon format should work"
+    );
 }

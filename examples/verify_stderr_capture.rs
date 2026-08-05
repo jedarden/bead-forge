@@ -3,10 +3,10 @@
 //! This example demonstrates that stderr is correctly captured during
 //! cargo test execution and written to trace files.
 
+use bead_forge::trace::{TraceManager, TraceMetadata};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
-use bead_forge::trace::{TraceManager, TraceMetadata};
 
 fn main() -> anyhow::Result<()> {
     println!("=== Stderr Capture Verification ===\n");
@@ -17,20 +17,25 @@ fn main() -> anyhow::Result<()> {
 
     // Create Cargo.toml
     let cargo_toml = project_dir.join("Cargo.toml");
-    fs::write(&cargo_toml, r#"[package]
+    fs::write(
+        &cargo_toml,
+        r#"[package]
 name = "stderr-test-project"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-"#)?;
+"#,
+    )?;
 
     // Create src directory and lib.rs with stderr output
     let src_dir = project_dir.join("src");
     fs::create_dir(&src_dir)?;
 
     let lib_rs = src_dir.join("lib.rs");
-    fs::write(&lib_rs, r#"#[cfg(test)]
+    fs::write(
+        &lib_rs,
+        r#"#[cfg(test)]
 mod tests {
     #[test]
     fn test_with_stderr() {
@@ -46,7 +51,8 @@ mod tests {
         assert_eq!(1 + 1, 3, "This test fails intentionally");
     }
 }
-"#)?;
+"#,
+    )?;
 
     // Create trace manager in the temp directory
     let trace_manager = TraceManager::new(project_dir);
@@ -60,16 +66,16 @@ mod tests {
     };
 
     println!("Running cargo test with stderr output...");
-    let result = trace_manager.run_cargo_test_to_bead_trace(
-        project_dir,
-        "bf-stderr-verify",
-        &metadata
-    )?;
+    let result =
+        trace_manager.run_cargo_test_to_bead_trace(project_dir, "bf-stderr-verify", &metadata)?;
 
     println!("\n=== Verification Results ===\n");
 
     // Check exit code (should be non-zero due to failing test)
-    println!("Exit code: {} (expected non-zero due to failing test)", result.exit_code);
+    println!(
+        "Exit code: {} (expected non-zero due to failing test)",
+        result.exit_code
+    );
 
     // Verify stdout was captured
     let stdout_lines = result.stdout.lines().count();
@@ -79,13 +85,16 @@ mod tests {
     // Verify stderr was captured
     let stderr_lines = result.stderr.lines().count();
     println!("Stderr captured: {} lines", stderr_lines);
-    assert!(!result.stderr.is_empty(), "stderr should not be empty for failing tests");
+    assert!(
+        !result.stderr.is_empty(),
+        "stderr should not be empty for failing tests"
+    );
 
     // Verify stderr contains expected content
     let stderr_content = result.stderr.to_lowercase();
-    let has_error_content = stderr_content.contains("error") ||
-                           stderr_content.contains("fail") ||
-                           stderr_content.contains("test result:");
+    let has_error_content = stderr_content.contains("error")
+        || stderr_content.contains("fail")
+        || stderr_content.contains("test result:");
     println!("Stderr contains error output: {}", has_error_content);
 
     // Verify trace files exist
@@ -107,11 +116,23 @@ mod tests {
     let stderr_file_content = fs::read_to_string(&stderr_path)?;
 
     println!("\n=== Content Verification ===");
-    println!("stdout.txt matches captured stdout: {}", stdout_file_content == result.stdout);
-    println!("stderr.txt matches captured stderr: {}", stderr_file_content == result.stderr);
+    println!(
+        "stdout.txt matches captured stdout: {}",
+        stdout_file_content == result.stdout
+    );
+    println!(
+        "stderr.txt matches captured stderr: {}",
+        stderr_file_content == result.stderr
+    );
 
-    assert_eq!(stdout_file_content, result.stdout, "stdout file should match captured stdout");
-    assert_eq!(stderr_file_content, result.stderr, "stderr file should match captured stderr");
+    assert_eq!(
+        stdout_file_content, result.stdout,
+        "stdout file should match captured stdout"
+    );
+    assert_eq!(
+        stderr_file_content, result.stderr,
+        "stderr file should match captured stderr"
+    );
 
     // Show sample stderr content
     println!("\n=== Sample Stderr Content (first 5 lines) ===");

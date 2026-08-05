@@ -81,9 +81,7 @@ pub fn run(workspace_dir: &Path) -> anyhow::Result<usize> {
 /// retry without guessing. The leading reason prefix stays stable so existing
 /// assertions on `"auto-flush to JSONL failed"` keep matching.
 fn flush_failed_warning(err: &anyhow::Error) -> String {
-    format!(
-        "auto-flush to JSONL failed: {err}; run \"bf sync --flush-only\" to retry"
-    )
+    format!("auto-flush to JSONL failed: {err}; run \"bf sync --flush-only\" to retry")
 }
 
 /// Run auto-flush after a mutation, honoring a pre-resolved `enabled` decision,

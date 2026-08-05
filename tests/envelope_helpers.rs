@@ -97,9 +97,7 @@ pub fn validate_envelope_structure(envelope: &Value, expected_kind: &str) {
     );
 
     // Verify version field is present and equals 1
-    let version = envelope
-        .get("version")
-        .and_then(|v| v.as_u64());
+    let version = envelope.get("version").and_then(|v| v.as_u64());
     assert_eq!(
         version,
         Some(1),
@@ -108,9 +106,7 @@ pub fn validate_envelope_structure(envelope: &Value, expected_kind: &str) {
     );
 
     // Verify kind field matches expected
-    let kind = envelope
-        .get("kind")
-        .and_then(|k| k.as_str());
+    let kind = envelope.get("kind").and_then(|k| k.as_str());
     assert_eq!(
         kind,
         Some(expected_kind),
@@ -155,15 +151,9 @@ pub fn validate_envelope_structure(envelope: &Value, expected_kind: &str) {
 /// });
 /// validate_metadata_fields(&envelope, "stats", 1); // passes
 /// ```
-pub fn validate_metadata_fields(
-    envelope: &Value,
-    expected_kind: &str,
-    expected_version: u64,
-) {
+pub fn validate_metadata_fields(envelope: &Value, expected_kind: &str, expected_version: u64) {
     // Verify version field
-    let version = envelope
-        .get("version")
-        .and_then(|v| v.as_u64());
+    let version = envelope.get("version").and_then(|v| v.as_u64());
     assert_eq!(
         version,
         Some(expected_version),
@@ -173,9 +163,7 @@ pub fn validate_metadata_fields(
     );
 
     // Verify kind field
-    let kind = envelope
-        .get("kind")
-        .and_then(|k| k.as_str());
+    let kind = envelope.get("kind").and_then(|k| k.as_str());
     assert_eq!(
         kind,
         Some(expected_kind),
@@ -212,9 +200,7 @@ pub fn validate_metadata_fields(
 /// validate_warning_present(&envelope, "auto-flush failed"); // passes
 /// ```
 pub fn validate_warning_present(envelope: &Value, expected_warning: &str) {
-    let warning = envelope
-        .get("warning")
-        .and_then(|w| w.as_str());
+    let warning = envelope.get("warning").and_then(|w| w.as_str());
     assert!(
         warning.is_some(),
         "Envelope must have a 'warning' field when warning is expected"
@@ -290,8 +276,7 @@ pub fn parse_envelope(json_str: &str) -> Value {
     serde_json::from_str(json_str).unwrap_or_else(|e| {
         panic!(
             "Failed to parse envelope as valid JSON: {}\nInput: {}",
-            e,
-            json_str
+            e, json_str
         )
     })
 }
@@ -324,9 +309,9 @@ pub fn parse_envelope(json_str: &str) -> Value {
 /// assert_eq!(data["id"], "bf-1");
 /// ```
 pub fn get_data(envelope: &Value) -> &Value {
-    envelope.get("data").unwrap_or_else(|| {
-        panic!("Envelope must have a 'data' field")
-    })
+    envelope
+        .get("data")
+        .unwrap_or_else(|| panic!("Envelope must have a 'data' field"))
 }
 
 /// Extract the kind field from an envelope.
@@ -357,7 +342,8 @@ pub fn get_data(envelope: &Value) -> &Value {
 /// assert_eq!(kind, "stats");
 /// ```
 pub fn get_kind(envelope: &Value) -> &str {
-    envelope.get("kind")
+    envelope
+        .get("kind")
         .and_then(|k| k.as_str())
         .unwrap_or_else(|| panic!("Envelope must have a 'kind' field that is a string"))
 }
@@ -390,7 +376,8 @@ pub fn get_kind(envelope: &Value) -> &str {
 /// assert_eq!(version, 1);
 /// ```
 pub fn get_version(envelope: &Value) -> u64 {
-    envelope.get("version")
+    envelope
+        .get("version")
         .and_then(|v| v.as_u64())
         .unwrap_or_else(|| panic!("Envelope must have a 'version' field that is a number"))
 }
@@ -606,9 +593,7 @@ pub fn assert_data_is_object(data: &Value, context: Option<&str>) {
 /// assert_eq!(data_array_length(&data), 2);
 /// ```
 pub fn data_array_length(data: &Value) -> usize {
-    data.as_array()
-        .map(|arr| arr.len())
-        .unwrap_or(0)
+    data.as_array().map(|arr| arr.len()).unwrap_or(0)
 }
 
 /// Assert that an array data field has the expected length.
@@ -631,11 +616,7 @@ pub fn data_array_length(data: &Value) -> usize {
 /// ```
 pub fn assert_data_array_length(data: &Value, expected_len: usize, context: Option<&str>) {
     let ctx = context.unwrap_or("data array");
-    assert!(
-        data.is_array(),
-        "{} must be an array to check length",
-        ctx
-    );
+    assert!(data.is_array(), "{} must be an array to check length", ctx);
     let actual_len = data.as_array().unwrap().len();
     assert_eq!(
         actual_len, expected_len,
@@ -670,11 +651,7 @@ pub fn assert_data_array_empty(data: &Value, context: Option<&str>) {
         "{} must be an array to check emptiness",
         ctx
     );
-    assert!(
-        data.as_array().unwrap().is_empty(),
-        "{} must be empty",
-        ctx
-    );
+    assert!(data.as_array().unwrap().is_empty(), "{} must be empty", ctx);
 }
 
 /// Assert that an array data field is non-empty.
@@ -737,7 +714,8 @@ pub fn assert_data_object_has_key(data: &Value, key: &str, context: Option<&str>
     assert!(
         data.is_object(),
         "{} must be an object to check for key '{}'",
-        ctx, key
+        ctx,
+        key
     );
     assert!(
         data.get(key).is_some(),

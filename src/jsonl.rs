@@ -254,8 +254,12 @@ mod tests {
 
         // Seed three beads, then merge in only one changed bead: the other two
         // must survive byte-for-byte (surgical, not full rewrite).
-        export_jsonl_merge(&path, &[issue("bf-a", "A"), issue("bf-b", "B"), issue("bf-c", "C")], &[])
-            .unwrap();
+        export_jsonl_merge(
+            &path,
+            &[issue("bf-a", "A"), issue("bf-b", "B"), issue("bf-c", "C")],
+            &[],
+        )
+        .unwrap();
         let raw_before = std::fs::read_to_string(&path).unwrap();
 
         let mut changed = issue("bf-b", "B renamed");
@@ -263,11 +267,18 @@ mod tests {
         let result = export_jsonl_merge(&path, &[changed], &[]).unwrap();
         assert_eq!(result.count, 1, "count reports upserts applied");
 
-        assert_eq!(ids_in(&path), vec!["bf-a", "bf-b", "bf-c"], "all beads retained, sorted");
+        assert_eq!(
+            ids_in(&path),
+            vec!["bf-a", "bf-b", "bf-c"],
+            "all beads retained, sorted"
+        );
         // bf-a and bf-c lines are untouched relative to the seed write.
         let line_a_before = raw_before.lines().find(|l| l.contains("\"bf-a\"")).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
-        assert!(after.contains(line_a_before), "untouched bead line preserved verbatim");
+        assert!(
+            after.contains(line_a_before),
+            "untouched bead line preserved verbatim"
+        );
         assert!(after.contains("B renamed"), "dirty bead line replaced");
     }
 
@@ -275,13 +286,21 @@ mod tests {
     fn merge_removes_ids() {
         let tmp = tempfile::TempDir::new().unwrap();
         let path = tmp.path().join("issues.jsonl");
-        export_jsonl_merge(&path, &[issue("bf-a", "A"), issue("bf-b", "B"), issue("bf-c", "C")], &[])
-            .unwrap();
+        export_jsonl_merge(
+            &path,
+            &[issue("bf-a", "A"), issue("bf-b", "B"), issue("bf-c", "C")],
+            &[],
+        )
+        .unwrap();
 
         // Remove the middle bead; no upserts. count == 0 (no upserts).
         let result = export_jsonl_merge(&path, &[], &[String::from("bf-b")]).unwrap();
         assert_eq!(result.count, 0);
-        assert_eq!(ids_in(&path), vec!["bf-a", "bf-c"], "removed id's line pruned");
+        assert_eq!(
+            ids_in(&path),
+            vec!["bf-a", "bf-c"],
+            "removed id's line pruned"
+        );
     }
 
     #[test]
@@ -291,19 +310,29 @@ mod tests {
         // No upserts, no removals, no existing file → never create an empty file.
         let result = export_jsonl_merge(&path, &[], &[String::from("bf-x")]).unwrap();
         assert_eq!(result.count, 0);
-        assert!(!path.exists(), "a pure no-op must not create an empty JSONL file");
+        assert!(
+            !path.exists(),
+            "a pure no-op must not create an empty JSONL file"
+        );
     }
 
     #[test]
     fn merge_preserves_unparseable_orphan_lines() {
         let tmp = tempfile::TempDir::new().unwrap();
         let path = tmp.path().join("issues.jsonl");
-        std::fs::write(&path, "{\"id\":\"bf-a\",\"title\":\"A\"}\nnot json at all\n").unwrap();
+        std::fs::write(
+            &path,
+            "{\"id\":\"bf-a\",\"title\":\"A\"}\nnot json at all\n",
+        )
+        .unwrap();
 
         // Merge a new bead; the foreign/hand-edited line must not be dropped.
         export_jsonl_merge(&path, &[issue("bf-z", "Z")], &[]).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
-        assert!(after.contains("not json at all"), "orphan line must be preserved");
+        assert!(
+            after.contains("not json at all"),
+            "orphan line must be preserved"
+        );
         assert!(after.contains("\"bf-z\""), "new bead merged in");
     }
 
@@ -314,7 +343,11 @@ mod tests {
 
         // Create an issue with labels
         let mut issue = issue("bf-labels", "Test Labels");
-        issue.labels = vec!["phase-1".to_string(), "storage".to_string(), "critical".to_string()];
+        issue.labels = vec![
+            "phase-1".to_string(),
+            "storage".to_string(),
+            "critical".to_string(),
+        ];
 
         // Export to JSONL
         export_jsonl_merge(&path, &[issue.clone()], &[]).unwrap();
@@ -332,7 +365,11 @@ mod tests {
 
         // Create an issue with labels
         let mut issue = issue("bf-roundtrip", "Roundtrip Test");
-        issue.labels = vec!["label1".to_string(), "label2".to_string(), "label3".to_string()];
+        issue.labels = vec![
+            "label1".to_string(),
+            "label2".to_string(),
+            "label3".to_string(),
+        ];
 
         // Export to JSONL
         export_jsonl(&path, || Ok(vec![issue.clone()])).unwrap();
@@ -359,7 +396,10 @@ mod tests {
         // Read back and verify empty labels array is skipped
         let contents = std::fs::read_to_string(&path).unwrap();
         // Empty arrays should be skipped due to skip_serializing_if
-        assert!(!contents.contains("\"labels\""), "empty labels should be skipped in JSON");
+        assert!(
+            !contents.contains("\"labels\""),
+            "empty labels should be skipped in JSON"
+        );
     }
 
     #[test]
@@ -386,8 +426,14 @@ mod tests {
 
         // Verify labels are preserved
         assert_eq!(parsed.labels.len(), 2, "Should have 2 labels");
-        assert!(parsed.labels.contains(&"auto-flushed".to_string()), "Should contain 'auto-flushed' label");
-        assert!(parsed.labels.contains(&"test-label".to_string()), "Should contain 'test-label' label");
+        assert!(
+            parsed.labels.contains(&"auto-flushed".to_string()),
+            "Should contain 'auto-flushed' label"
+        );
+        assert!(
+            parsed.labels.contains(&"test-label".to_string()),
+            "Should contain 'test-label' label"
+        );
     }
 
     #[test]
@@ -412,7 +458,11 @@ mod tests {
 
         // Verify output is sorted by ID (alphabetically)
         let ids = ids_in(&path);
-        assert_eq!(ids, vec!["bf-a", "bf-m", "bf-z"], "output should be sorted by ID");
+        assert_eq!(
+            ids,
+            vec!["bf-a", "bf-m", "bf-z"],
+            "output should be sorted by ID"
+        );
 
         // Verify all beads are present and valid JSON
         let lines: Vec<&str> = contents.lines().filter(|l| !l.trim().is_empty()).collect();
@@ -437,14 +487,20 @@ mod tests {
 
         // Verify atomic behavior: temp file should not exist after successful export
         let temp_path = path.with_extension("jsonl.tmp");
-        assert!(!temp_path.exists(), "temp file should be cleaned up after atomic rename");
+        assert!(
+            !temp_path.exists(),
+            "temp file should be cleaned up after atomic rename"
+        );
 
         // Verify final file exists
         assert!(path.exists(), "final file should exist");
 
         // Verify content is correct
         let contents = std::fs::read_to_string(&path).unwrap();
-        assert!(contents.contains("bf-test"), "final file should contain the bead");
+        assert!(
+            contents.contains("bf-test"),
+            "final file should contain the bead"
+        );
     }
 
     #[test]
@@ -475,14 +531,27 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.count, 1, "should report 1 dirty bead exported");
-        assert!(clear_called, "clear_dirty should be called after successful export");
+        assert!(
+            clear_called,
+            "clear_dirty should be called after successful export"
+        );
 
         // Verify final state: all beads present, only bf-2 modified
         let after_export = std::fs::read_to_string(&path).unwrap();
         let ids = ids_in(&path);
-        assert_eq!(ids, vec!["bf-1", "bf-2", "bf-3"], "all beads should be present");
-        assert!(after_export.contains("Second Modified"), "modified bead should be updated");
-        assert!(!after_export.contains("Second\n"), "old version should be replaced");
+        assert_eq!(
+            ids,
+            vec!["bf-1", "bf-2", "bf-3"],
+            "all beads should be present"
+        );
+        assert!(
+            after_export.contains("Second Modified"),
+            "modified bead should be updated"
+        );
+        assert!(
+            !after_export.contains("Second\n"),
+            "old version should be replaced"
+        );
 
         // Verify other beads preserved byte-for-byte (surgical update)
         assert!(after_export.contains("First"), "bf-1 should be preserved");
@@ -512,11 +581,17 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.count, 0, "should report 0 beads exported");
-        assert!(!clear_called, "clear_dirty should NOT be called when no dirty beads");
+        assert!(
+            !clear_called,
+            "clear_dirty should NOT be called when no dirty beads"
+        );
 
         // Verify file unchanged
         let after = std::fs::read_to_string(&path).unwrap();
-        assert_eq!(before, after, "file should be unchanged when no dirty beads");
+        assert_eq!(
+            before, after,
+            "file should be unchanged when no dirty beads"
+        );
     }
 
     #[test]
@@ -526,16 +601,14 @@ mod tests {
 
         // Export dirty beads
         let dirty_beads = vec![issue("bf-dirty", "Dirty Bead")];
-        export_jsonl_dirty(
-            &path,
-            || Ok(dirty_beads.clone()),
-            || Ok(()),
-        )
-        .unwrap();
+        export_jsonl_dirty(&path, || Ok(dirty_beads.clone()), || Ok(())).unwrap();
 
         // Verify atomic behavior: temp file should not exist after successful export
         let temp_path = path.with_extension("jsonl.tmp");
-        assert!(!temp_path.exists(), "temp file should be cleaned up after atomic rename");
+        assert!(
+            !temp_path.exists(),
+            "temp file should be cleaned up after atomic rename"
+        );
 
         // Verify final file exists
         assert!(path.exists(), "final file should exist");
@@ -556,7 +629,11 @@ mod tests {
 
         // Verify sorted order after first export
         let ids = ids_in(&path);
-        assert_eq!(ids, vec!["bf-1", "bf-2", "bf-3"], "beads should be sorted by ID");
+        assert_eq!(
+            ids,
+            vec!["bf-1", "bf-2", "bf-3"],
+            "beads should be sorted by ID"
+        );
 
         // Export again in different order
         let beads_forward = vec![
@@ -568,7 +645,11 @@ mod tests {
 
         // Verify sorted order after second export (regardless of input order, output is sorted)
         let ids = ids_in(&path);
-        assert_eq!(ids, vec!["bf-1", "bf-2", "bf-3"], "beads should be sorted by ID");
+        assert_eq!(
+            ids,
+            vec!["bf-1", "bf-2", "bf-3"],
+            "beads should be sorted by ID"
+        );
 
         // Verify both exports contain the same IDs (regardless of timestamps)
         let contents = std::fs::read_to_string(&path).unwrap();
@@ -649,7 +730,10 @@ not json at all
         });
 
         // Import should fail on malformed JSON
-        assert!(result.is_err(), "import_jsonl should return error for malformed JSON");
+        assert!(
+            result.is_err(),
+            "import_jsonl should return error for malformed JSON"
+        );
 
         // Even though it failed, some valid beads might have been processed before the error
         // This is the expected behavior - the function stops at the first error
@@ -677,7 +761,9 @@ not json at all
             Err(e) => {
                 let err_msg = e.to_string();
                 assert!(
-                    err_msg.contains("created_at") || err_msg.contains("missing field") || err_msg.contains("missing"),
+                    err_msg.contains("created_at")
+                        || err_msg.contains("missing field")
+                        || err_msg.contains("missing"),
                     "error should mention the missing field: {}",
                     err_msg
                 );
@@ -793,7 +879,10 @@ not json at all
             Err::<UpsertResult, anyhow::Error>(anyhow::anyhow!("Database error"))
         });
 
-        assert!(result.is_err(), "import_jsonl should propagate upsert errors");
+        assert!(
+            result.is_err(),
+            "import_jsonl should propagate upsert errors"
+        );
         match result {
             Err(e) => {
                 let err_msg = e.to_string();
@@ -863,7 +952,10 @@ not json at all
         let result = import_jsonl(&path, |_issue| Ok(UpsertResult::New));
 
         // Should fail - import_jsonl doesn't skip blank lines, it tries to parse them
-        assert!(result.is_err(), "import_jsonl should fail on whitespace-only lines (no valid JSON)");
+        assert!(
+            result.is_err(),
+            "import_jsonl should fail on whitespace-only lines (no valid JSON)"
+        );
     }
 
     #[test]
@@ -885,7 +977,10 @@ not json at all
         });
 
         // Should fail - blank lines cause parse errors
-        assert!(result.is_err(), "import_jsonl should fail on blank lines (tries to parse them as JSON)");
+        assert!(
+            result.is_err(),
+            "import_jsonl should fail on blank lines (tries to parse them as JSON)"
+        );
     }
 
     #[test]
@@ -901,12 +996,13 @@ not json at all
 {"id":"bf-003","title":"Third","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
         std::fs::write(&path, jsonl_content).unwrap();
 
-        let result = import_jsonl(&path, |issue| {
-            Ok(UpsertResult::New)
-        });
+        let result = import_jsonl(&path, |issue| Ok(UpsertResult::New));
 
         // Comment-like lines will cause parse errors - this is expected behavior
-        assert!(result.is_err(), "import_jsonl should fail on non-JSON comment-like lines");
+        assert!(
+            result.is_err(),
+            "import_jsonl should fail on non-JSON comment-like lines"
+        );
     }
 
     #[test]
@@ -993,7 +1089,10 @@ not json at all
         })
         .unwrap();
 
-        assert_eq!(result.imported, 4, "should import all 4 special character beads");
+        assert_eq!(
+            result.imported, 4,
+            "should import all 4 special character beads"
+        );
     }
 
     #[test]
@@ -1016,7 +1115,10 @@ not json at all
         })
         .unwrap();
 
-        assert_eq!(result.imported, 1, "should import bead with very long description");
+        assert_eq!(
+            result.imported, 1,
+            "should import bead with very long description"
+        );
     }
 
     #[test]
@@ -1039,7 +1141,10 @@ not json at all
         })
         .unwrap();
 
-        assert_eq!(result.imported, 1, "should import bead with very long title");
+        assert_eq!(
+            result.imported, 1,
+            "should import bead with very long title"
+        );
     }
 
     #[test]
@@ -1085,7 +1190,10 @@ not json at all
         })
         .unwrap();
 
-        assert_eq!(reimport_result.imported, 2, "should re-import both Unicode beads");
+        assert_eq!(
+            reimport_result.imported, 2,
+            "should re-import both Unicode beads"
+        );
     }
 
     #[test]
@@ -1129,7 +1237,10 @@ not json at all
         })
         .unwrap();
 
-        assert_eq!(reimport_result.imported, 2, "should re-import both special character beads");
+        assert_eq!(
+            reimport_result.imported, 2,
+            "should re-import both special character beads"
+        );
     }
 
     #[test]
@@ -1163,7 +1274,10 @@ not json at all
         })
         .unwrap();
 
-        assert_eq!(reimport_result.imported, 1, "should re-import bead with long fields");
+        assert_eq!(
+            reimport_result.imported, 1,
+            "should re-import bead with long fields"
+        );
     }
 
     #[test]
@@ -1186,7 +1300,10 @@ not json at all
             let errors_clone = Arc::clone(&errors);
 
             let handle = thread::spawn(move || {
-                let bead = issue(&format!("bf-concurrent-{}", i), &format!("Concurrent bead {}", i));
+                let bead = issue(
+                    &format!("bf-concurrent-{}", i),
+                    &format!("Concurrent bead {}", i),
+                );
                 let beads = vec![bead];
 
                 match export_jsonl(&path_clone, || Ok(beads.clone())) {
@@ -1223,11 +1340,18 @@ not json at all
             if has_content {
                 let reimport_result = import_jsonl(&path, |_issue| Ok(UpsertResult::New)).unwrap();
                 // Should have at least one valid bead
-                assert!(reimport_result.imported >= 1, "final file should contain at least one valid bead");
+                assert!(
+                    reimport_result.imported >= 1,
+                    "final file should contain at least one valid bead"
+                );
             }
         }
 
-        println!("Concurrent exports: {} succeeded, {} failed", success_count, error_list.len());
+        println!(
+            "Concurrent exports: {} succeeded, {} failed",
+            success_count,
+            error_list.len()
+        );
         if !error_list.is_empty() {
             println!("Errors: {:?}", error_list);
         }
@@ -1284,7 +1408,10 @@ not json at all
         }
 
         // Should fail with permission error
-        assert!(result.is_err(), "export should fail when directory is read-only");
+        assert!(
+            result.is_err(),
+            "export should fail when directory is read-only"
+        );
     }
 
     #[test]
@@ -1302,7 +1429,10 @@ not json at all
         let result = export_jsonl(&dir_path, || Ok(beads.clone()));
 
         // Should fail - can't write to a directory
-        assert!(result.is_err(), "export should fail when path is a directory");
+        assert!(
+            result.is_err(),
+            "export should fail when path is a directory"
+        );
     }
 
     #[test]
@@ -1315,9 +1445,7 @@ not json at all
 {"id":"bf-002","title":"Truncated","status":"open""#; // Missing closing brace and other fields
         std::fs::write(&path, jsonl_content).unwrap();
 
-        let result = import_jsonl(&path, |issue| {
-            Ok(UpsertResult::New)
-        });
+        let result = import_jsonl(&path, |issue| Ok(UpsertResult::New));
 
         // Should fail on truncated line
         assert!(result.is_err(), "import should fail on truncated JSON");
@@ -1343,7 +1471,11 @@ not json at all
         // The BOM might cause parsing issues depending on how serde handles it
         // This test documents current behavior
         if result.is_ok() {
-            assert_eq!(result.unwrap().imported, 1, "should handle BOM and import bead");
+            assert_eq!(
+                result.unwrap().imported,
+                1,
+                "should handle BOM and import bead"
+            );
         } else {
             // If it fails, that's also acceptable behavior - BOM is not standard in JSONL
             println!("BOM handling: import failed (this is acceptable)");
@@ -1373,10 +1505,22 @@ not json at all
         // Verify both beads and the comment line are preserved
         let final_contents = std::fs::read_to_string(&path).unwrap();
         assert!(final_contents.contains("bf-1"), "should contain first bead");
-        assert!(final_contents.contains("bf-2"), "should contain second bead");
-        assert!(final_contents.contains("中文"), "should preserve Unicode in comment");
-        assert!(final_contents.contains("🚀"), "should preserve emoji in comment");
-        assert!(final_contents.contains("🔥"), "should preserve emoji in description");
+        assert!(
+            final_contents.contains("bf-2"),
+            "should contain second bead"
+        );
+        assert!(
+            final_contents.contains("中文"),
+            "should preserve Unicode in comment"
+        );
+        assert!(
+            final_contents.contains("🚀"),
+            "should preserve emoji in comment"
+        );
+        assert!(
+            final_contents.contains("🔥"),
+            "should preserve emoji in description"
+        );
     }
 
     #[test]
@@ -1389,9 +1533,16 @@ not json at all
         assert_eq!(result.count, 0, "should report 0 beads from empty database");
 
         // File should still exist but be empty
-        assert!(path.exists(), "file should exist even when database is empty");
+        assert!(
+            path.exists(),
+            "file should exist even when database is empty"
+        );
         let contents = std::fs::read_to_string(&path).unwrap();
-        assert_eq!(contents.trim(), "", "file should be empty when database is empty");
+        assert_eq!(
+            contents.trim(),
+            "",
+            "file should be empty when database is empty"
+        );
     }
 
     #[test]
@@ -1402,6 +1553,9 @@ not json at all
         // Merge with no upserts and no existing file
         let result = export_jsonl_merge(&path, &[], &[]).unwrap();
         assert_eq!(result.count, 0, "should report 0 upserts");
-        assert!(!path.exists(), "should not create file when there's nothing to merge");
+        assert!(
+            !path.exists(),
+            "should not create file when there's nothing to merge"
+        );
     }
 }

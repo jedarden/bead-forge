@@ -168,7 +168,12 @@ pub fn merge_maps(
                         // deterministic winner, flagged as a conflict.
                         _ => {
                             let winner = resolve_conflict(o.clone(), t.clone());
-                            Some((winner, Decision::Conflict { existed: b.is_some() }))
+                            Some((
+                                winner,
+                                Decision::Conflict {
+                                    existed: b.is_some(),
+                                },
+                            ))
                         }
                     }
                 }
@@ -328,8 +333,14 @@ mod tests {
     fn merge_disjoint_adds_from_both_sides() {
         // Classic lab/ex44 divergence: each box created its own beads.
         let base = to_map(vec![issue("bf-1", "shared", 0)]);
-        let ours = to_map(vec![issue("bf-1", "shared", 0), issue("bf-2", "ours-only", 0)]);
-        let theirs = to_map(vec![issue("bf-1", "shared", 0), issue("bf-3", "theirs-only", 0)]);
+        let ours = to_map(vec![
+            issue("bf-1", "shared", 0),
+            issue("bf-2", "ours-only", 0),
+        ]);
+        let theirs = to_map(vec![
+            issue("bf-1", "shared", 0),
+            issue("bf-3", "theirs-only", 0),
+        ]);
 
         let (merged, report) = merge_maps(&base, &ours, &theirs);
         let ids: Vec<&str> = merged.iter().map(|i| i.id.as_str()).collect();
@@ -374,7 +385,10 @@ mod tests {
 
         let (ab, _) = merge_maps(&base, &ours, &theirs);
         let (ba, _) = merge_maps(&base, &theirs, &ours);
-        assert_eq!(ab[0].title, ba[0].title, "winner must not depend on side order");
+        assert_eq!(
+            ab[0].title, ba[0].title,
+            "winner must not depend on side order"
+        );
     }
 
     #[test]
@@ -436,8 +450,16 @@ mod tests {
         let theirs_p = dir.path().join("theirs.jsonl");
 
         write_jsonl(&base_p, &[issue("bf-1", "shared", 0)]).unwrap();
-        write_jsonl(&ours_p, &[issue("bf-1", "shared", 0), issue("bf-2", "ours", 0)]).unwrap();
-        write_jsonl(&theirs_p, &[issue("bf-1", "shared", 0), issue("bf-3", "theirs", 0)]).unwrap();
+        write_jsonl(
+            &ours_p,
+            &[issue("bf-1", "shared", 0), issue("bf-2", "ours", 0)],
+        )
+        .unwrap();
+        write_jsonl(
+            &theirs_p,
+            &[issue("bf-1", "shared", 0), issue("bf-3", "theirs", 0)],
+        )
+        .unwrap();
 
         // git merge driver style: write result back over "ours".
         let report = merge_jsonl_files(&base_p, &ours_p, &theirs_p, &ours_p).unwrap();

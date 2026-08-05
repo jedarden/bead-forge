@@ -149,9 +149,15 @@ fn test_stress_50_workers_concurrent_claim() {
     let avg_time = total_time / num_workers as u32;
 
     println!("✓ 50-worker stress test passed");
-    println!("  Claim times: min={:?} max={:?} avg={:?}", min_time, max_time, avg_time);
+    println!(
+        "  Claim times: min={:?} max={:?} avg={:?}",
+        min_time, max_time, avg_time
+    );
     println!("  Total time: {:?}", total_time);
-    println!("  Throughput: {:.2} claims/sec", num_beads as f64 / total_time.as_secs_f64());
+    println!(
+        "  Throughput: {:.2} claims/sec",
+        num_beads as f64 / total_time.as_secs_f64()
+    );
 }
 
 /// Test: Verify BEGIN IMMEDIATE prevents race conditions.
@@ -182,7 +188,9 @@ fn test_begin_immediate_prevents_races() {
             let handle = thread::spawn(move || {
                 thread::sleep(Duration::from_micros(rand::random::<u64>() % 100));
 
-                if let Some(claimed) = claim_bead(&storage_clone, &format!("w{}-{}", iteration, worker_id)) {
+                if let Some(claimed) =
+                    claim_bead(&storage_clone, &format!("w{}-{}", iteration, worker_id))
+                {
                     let mut ids = claimed_ids_clone.lock().unwrap();
                     ids.push(claimed.bead_id);
                 }
@@ -330,7 +338,11 @@ fn test_single_claim_per_bead_high_contention() {
     let successful_claims = successful_claims.lock().unwrap();
 
     // Verify all workers attempted
-    assert_eq!(claim_attempts.len(), num_workers, "All workers should attempt");
+    assert_eq!(
+        claim_attempts.len(),
+        num_workers,
+        "All workers should attempt"
+    );
 
     // Verify only 5 successful claims (one per bead)
     assert_eq!(
@@ -341,7 +353,10 @@ fn test_single_claim_per_bead_high_contention() {
     );
 
     // Verify no bead was claimed twice
-    let claimed_beads: Vec<_> = successful_claims.iter().map(|(_, bead_id)| bead_id).collect();
+    let claimed_beads: Vec<_> = successful_claims
+        .iter()
+        .map(|(_, bead_id)| bead_id)
+        .collect();
     let unique_beads: HashSet<_> = claimed_beads.iter().collect();
     assert_eq!(
         unique_beads.len(),
@@ -365,7 +380,8 @@ fn test_single_claim_per_bead_high_contention() {
 
     println!("✓ Single claim per bead test passed");
     println!("  {} workers competed for {} beads", num_workers, num_beads);
-    println!("  {} workers succeeded, {} workers failed with None",
+    println!(
+        "  {} workers succeeded, {} workers failed with None",
         successful_claims.len(),
         num_workers - successful_claims.len()
     );
@@ -422,10 +438,12 @@ fn test_claim_retry_logic() {
 
     let retry_stats = retry_stats.lock().unwrap();
 
-    let successful_workers: Vec<_> = retry_stats.iter()
+    let successful_workers: Vec<_> = retry_stats
+        .iter()
         .filter(|(_, _, success)| *success)
         .collect();
-    let failed_workers: Vec<_> = retry_stats.iter()
+    let failed_workers: Vec<_> = retry_stats
+        .iter()
         .filter(|(_, _, success)| !success)
         .collect();
 
@@ -441,16 +459,20 @@ fn test_claim_retry_logic() {
     let total_attempts: u32 = retry_stats.iter().map(|(_, attempts, _)| attempts).sum();
     let avg_attempts = total_attempts as f64 / retry_stats.len() as f64;
 
-    let retries_by_successful: u32 = successful_workers.iter()
-        .map(|(_, attempts, _)| attempts - 1).sum();
-    let retries_by_failed: u32 = failed_workers.iter()
-        .map(|(_, attempts, _)| attempts).sum();
+    let retries_by_successful: u32 = successful_workers
+        .iter()
+        .map(|(_, attempts, _)| attempts - 1)
+        .sum();
+    let retries_by_failed: u32 = failed_workers.iter().map(|(_, attempts, _)| attempts).sum();
 
     println!("✓ Claim retry logic test passed");
     println!("  Successful workers: {}", successful_workers.len());
     println!("  Failed workers: {}", failed_workers.len());
     println!("  Average attempts per worker: {:.2}", avg_attempts);
-    println!("  Total retries by successful workers: {}", retries_by_successful);
+    println!(
+        "  Total retries by successful workers: {}",
+        retries_by_successful
+    );
     println!("  Total retries by failed workers: {}", retries_by_failed);
 }
 
@@ -501,7 +523,10 @@ fn test_benchmark_claim_throughput() {
 
     // Basic sanity checks
     assert!(throughput > 10.0, "Throughput should be > 10 claims/sec");
-    assert!(avg_latency_ms < 1000.0, "Average latency should be < 1 second");
+    assert!(
+        avg_latency_ms < 1000.0,
+        "Average latency should be < 1 second"
+    );
 }
 
 /// Test: Claim behavior when workspace is nearly exhausted.

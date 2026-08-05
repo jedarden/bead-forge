@@ -40,8 +40,15 @@ fn main() -> Result<()> {
     println!("✓ Generated trace name: {}", trace_name);
     println!("  Format: bf-8-char-random");
     println!("  Length: {} characters", trace_name.len());
-    assert!(trace_name.starts_with("bf-"), "Trace name must start with 'bf-'");
-    assert_eq!(trace_name.len(), 11, "Trace name must be 11 characters (bf- + 8 chars)");
+    assert!(
+        trace_name.starts_with("bf-"),
+        "Trace name must start with 'bf-'"
+    );
+    assert_eq!(
+        trace_name.len(),
+        11,
+        "Trace name must be 11 characters (bf- + 8 chars)"
+    );
 
     // Test bead trace directory creation
     let bead_dir = trace_manager.unique_bead_trace_dir("bf-3ezlq4")?;
@@ -63,12 +70,7 @@ fn main() -> Result<()> {
     let test_stdout = "Test stdout output from NEEDLE cargo test execution";
     let test_stderr = "Test stderr output from NEEDLE cargo test execution";
 
-    trace_manager.write_bead_trace_to_path(
-        &bead_dir,
-        &metadata,
-        test_stdout,
-        test_stderr,
-    )?;
+    trace_manager.write_bead_trace_to_path(&bead_dir, &metadata, test_stdout, test_stderr)?;
 
     println!("✓ Trace write mechanism verified");
     println!("✓ Files created:");

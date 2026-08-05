@@ -131,7 +131,13 @@ fn execute_batch_performs_no_jsonl_write() {
             labels: vec![],
         },
     ];
-    let results = execute_batch(&storage, ops, ws.path(), true /* no-auto-flush: batch writes SQLite only **/).unwrap();
+    let results = execute_batch(
+        &storage,
+        ops,
+        ws.path(),
+        true, /* no-auto-flush: batch writes SQLite only **/
+    )
+    .unwrap();
     assert_eq!(results.len(), 2);
 
     // execute_batch wrote to SQLite only — issues.jsonl is byte-identical.
@@ -142,7 +148,11 @@ fn execute_batch_performs_no_jsonl_write() {
     );
     // But it DID mark the new beads dirty, so one flush exports them.
     let dirty = storage.list_dirty_issues().unwrap();
-    assert_eq!(dirty.len(), 2, "batch ops must mark every touched bead dirty");
+    assert_eq!(
+        dirty.len(),
+        2,
+        "batch ops must mark every touched bead dirty"
+    );
     assert!(find(&read_jsonl(ws.path()), &seed).is_some());
 }
 
@@ -157,8 +167,14 @@ fn batch_flushes_all_ops_and_preserves_existing() {
 
     let beads = read_jsonl(ws.path());
     // Pre-existing beads survive (surgical merge, not full replace).
-    assert!(find(&beads, &s1).is_some(), "seed1 must survive the batch flush");
-    assert!(find(&beads, &s2).is_some(), "seed2 must survive the batch flush");
+    assert!(
+        find(&beads, &s1).is_some(),
+        "seed1 must survive the batch flush"
+    );
+    assert!(
+        find(&beads, &s2).is_some(),
+        "seed2 must survive the batch flush"
+    );
     // All three created beads landed in a single flush.
     let created: Vec<_> = beads
         .iter()
@@ -167,7 +183,11 @@ fn batch_flushes_all_ops_and_preserves_existing() {
             t == "c1" || t == "c2" || t == "c3"
         })
         .collect();
-    assert_eq!(created.len(), 3, "all batch-created beads must be flushed, got {beads:?}");
+    assert_eq!(
+        created.len(),
+        3,
+        "all batch-created beads must be flushed, got {beads:?}"
+    );
 }
 
 #[test]
@@ -180,7 +200,10 @@ fn batch_no_auto_flush_leaves_jsonl_untouched() {
     ok(ws.path(), &["--no-auto-flush", "batch", "--json", ops]);
 
     let after = std::fs::read_to_string(jsonl_path(ws.path())).unwrap();
-    assert_eq!(before, after, "--no-auto-flush batch must not rewrite issues.jsonl");
+    assert_eq!(
+        before, after,
+        "--no-auto-flush batch must not rewrite issues.jsonl"
+    );
     // The seed remains; the ghosts never reached JSONL.
     let beads = read_jsonl(ws.path());
     assert!(find(&beads, &seed).is_some());
@@ -198,13 +221,23 @@ fn mitosis_flushes_once_children_and_closed_parent() {
     let children = r#"[{"title":"ch1","type":"task","priority":2},{"title":"ch2","type":"task","priority":2}]"#;
     ok(
         ws.path(),
-        &["mitosis", &parent, "--children", children, "--reason", "split"],
+        &[
+            "mitosis",
+            &parent,
+            "--children",
+            children,
+            "--reason",
+            "split",
+        ],
     );
 
     let beads = read_jsonl(ws.path());
     // Parent closed and flushed.
     assert_eq!(
-        field(find(&beads, &parent).expect("parent must be present"), "status"),
+        field(
+            find(&beads, &parent).expect("parent must be present"),
+            "status"
+        ),
         "closed",
         "mitosis must flush the closed parent"
     );
@@ -215,7 +248,10 @@ fn mitosis_flushes_once_children_and_closed_parent() {
         .collect();
     assert_eq!(kids.len(), 2, "both mitosis children must be flushed");
     // Untouched seed preserved.
-    assert!(find(&beads, &seed).is_some(), "seed must survive the mitosis flush");
+    assert!(
+        find(&beads, &seed).is_some(),
+        "seed must survive the mitosis flush"
+    );
 }
 
 // ==================== claim ====================
@@ -270,9 +306,17 @@ fn claim_flush_failure_warns_without_failing() {
     let metadata = bead_forge::config::load_metadata(&beads_dir).unwrap();
     let storage = Storage::open(&beads_dir.join(&metadata.database)).unwrap();
     let issue = storage.get_issue(&id).unwrap().unwrap();
-    assert_eq!(issue.assignee.as_deref(), Some("worker-1"), "claim must persist");
+    assert_eq!(
+        issue.assignee.as_deref(),
+        Some("worker-1"),
+        "claim must persist"
+    );
     assert!(
-        storage.list_dirty_issues().unwrap().iter().any(|i| i.id == id),
+        storage
+            .list_dirty_issues()
+            .unwrap()
+            .iter()
+            .any(|i| i.id == id),
         "claimed bead must stay dirty after a failed flush so recovery is possible"
     );
 }
@@ -294,8 +338,14 @@ fn delete_removes_line_and_preserves_others() {
         find(&beads, &b).is_none(),
         "deleted bead's line must be pruned from JSONL (no orphan)"
     );
-    assert!(find(&beads, &a).is_some(), "alpha must remain after deleting beta");
-    assert!(find(&beads, &c).is_some(), "gamma must remain after deleting beta");
+    assert!(
+        find(&beads, &a).is_some(),
+        "alpha must remain after deleting beta"
+    );
+    assert!(
+        find(&beads, &c).is_some(),
+        "gamma must remain after deleting beta"
+    );
     assert_eq!(beads.len(), 2, "exactly one line removed");
 }
 
@@ -311,7 +361,10 @@ fn delete_no_auto_flush_leaves_jsonl_untouched() {
     // With auto-flush off, the JSONL is not touched: the orphan line remains
     // until the next explicit `bf sync --flush-only`.
     let after = std::fs::read_to_string(jsonl_path(ws.path())).unwrap();
-    assert_eq!(before, after, "--no-auto-flush delete must not rewrite issues.jsonl");
+    assert_eq!(
+        before, after,
+        "--no-auto-flush delete must not rewrite issues.jsonl"
+    );
     let beads = read_jsonl(ws.path());
     assert!(find(&beads, &a).is_some());
     assert!(

@@ -16,8 +16,7 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    test_workspace, bf_binary, bf_command,
-    json_validation, format_detection, fixtures, capture,
+    bf_binary, bf_command, capture, fixtures, format_detection, json_validation, test_workspace,
 };
 
 // Import items made available in parent scope
@@ -33,8 +32,7 @@ fn create_isolated_workspace() -> TempDir {
     crate::config::init_workspace(&beads_dir, "bf-search-test")
         .expect("Failed to initialize test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
@@ -118,7 +116,12 @@ fn create_bead_with_type_and_priority(title: &str, issue_type: &str, priority: i
 }
 
 /// Create a test bead with type, labels, and priority
-fn create_bead_with_type_and_labels_and_priority(title: &str, issue_type: &str, labels: &[&str], priority: i64) -> String {
+fn create_bead_with_type_and_labels_and_priority(
+    title: &str,
+    issue_type: &str,
+    labels: &[&str],
+    priority: i64,
+) -> String {
     let bead_id = create_bead_with_type_and_priority(title, issue_type, priority);
 
     for label in labels {
@@ -163,7 +166,7 @@ fn test_search_json_structure_validity() {
             .arg("search")
             .arg("test")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify it's valid JSONL (multiple lines, each a valid JSON object)
@@ -181,8 +184,16 @@ fn test_search_json_structure_validity() {
         // Verify required fields
         json_validation::assert_required_fields(
             &parsed,
-            &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-            "search command"
+            &[
+                "id",
+                "title",
+                "status",
+                "priority",
+                "issue_type",
+                "created_at",
+                "updated_at",
+            ],
+            "search command",
         );
     }
 
@@ -208,7 +219,7 @@ fn test_search_json_jsonl_format_structure() {
             .arg("search")
             .arg("JSONL")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -226,7 +237,11 @@ fn test_search_json_jsonl_format_structure() {
 
         // Each line must be a JSON object
         let parsed = json_validation::parse_json(line);
-        assert!(parsed.is_object(), "JSONL line {} should be a JSON object", i);
+        assert!(
+            parsed.is_object(),
+            "JSONL line {} should be a JSON object",
+            i
+        );
     }
 
     // Test 3: Verify output is NOT a JSON array
@@ -253,7 +268,7 @@ fn test_search_json_empty_result() {
             .arg("search")
             .arg("nonexistent")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Empty search should produce no output (empty string)
@@ -273,7 +288,7 @@ fn test_search_json_empty_result_valid_format() {
             .arg("search")
             .arg("completely nonexistent search term 12345")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -301,14 +316,14 @@ fn test_search_json_empty_database() {
     crate::config::init_workspace(&beads_dir, "bf-empty-db-test")
         .expect("Failed to initialize empty test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
     // Search in the completely empty database
     let mut cmd = std::process::Command::new(bf_binary());
-    cmd.arg("-w").arg(&beads_dir)
+    cmd.arg("-w")
+        .arg(&beads_dir)
         .arg("search")
         .arg("anything")
         .arg("--format")
@@ -318,7 +333,10 @@ fn test_search_json_empty_database() {
 
     // Should return empty string
     let json_str = stdout.trim();
-    assert_eq!(json_str, "", "search in empty database should return empty string");
+    assert_eq!(
+        json_str, "",
+        "search in empty database should return empty string"
+    );
 }
 
 #[test]
@@ -334,10 +352,7 @@ fn test_search_json_filter_excludes_all_beads() {
     // Update both to open status (they should be open by default, but let's be sure)
     for bead_id in [&bead1_id, &bead2_id].iter() {
         let mut cmd = bf_command();
-        cmd.arg("update")
-            .arg(bead_id)
-            .arg("--status")
-            .arg("open");
+        cmd.arg("update").arg(bead_id).arg("--status").arg("open");
         let update_output = cmd.output().expect("Failed to update");
         assert!(update_output.status.success(), "Update should succeed");
     }
@@ -350,16 +365,23 @@ fn test_search_json_filter_excludes_all_beads() {
             .arg("--status")
             .arg("closed")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return empty string since no beads match the filter
     let json_str = output.trim();
-    assert_eq!(json_str, "", "search with filter that excludes all beads should return empty string");
+    assert_eq!(
+        json_str, "",
+        "search with filter that excludes all beads should return empty string"
+    );
 
     // Verify by counting lines
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    assert_eq!(lines.len(), 0, "should have zero results when filter excludes all beads");
+    assert_eq!(
+        lines.len(),
+        0,
+        "should have zero results when filter excludes all beads"
+    );
 
     fixtures::close_bead(&bead1_id, "Filter exclude cleanup 1");
     fixtures::close_bead(&bead2_id, "Filter exclude cleanup 2");
@@ -378,10 +400,7 @@ fn test_search_json_priority_filter_excludes_all() {
     // Update both to priority 2 (normal)
     for bead_id in [&bead1_id, &bead2_id].iter() {
         let mut cmd = bf_command();
-        cmd.arg("update")
-            .arg(bead_id)
-            .arg("--priority")
-            .arg("2");
+        cmd.arg("update").arg(bead_id).arg("--priority").arg("2");
         let update_output = cmd.output().expect("Failed to update");
         assert!(update_output.status.success(), "Update should succeed");
     }
@@ -394,12 +413,15 @@ fn test_search_json_priority_filter_excludes_all() {
             .arg("--priority-max")
             .arg("0")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return empty string
     let json_str = output.trim();
-    assert_eq!(json_str, "", "search with priority filter that excludes all beads should return empty string");
+    assert_eq!(
+        json_str, "",
+        "search with priority filter that excludes all beads should return empty string"
+    );
 
     fixtures::close_bead(&bead1_id, "Priority filter exclude cleanup 1");
     fixtures::close_bead(&bead2_id, "Priority filter exclude cleanup 2");
@@ -423,12 +445,15 @@ fn test_search_json_label_filter_excludes_all() {
             .arg("--label")
             .arg("nonexistent-label-xyz")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return empty string
     let json_str = output.trim();
-    assert_eq!(json_str, "", "search with label filter that excludes all beads should return empty string");
+    assert_eq!(
+        json_str, "",
+        "search with label filter that excludes all beads should return empty string"
+    );
 
     fixtures::close_bead(&bead1_id, "Label exclude cleanup 1");
     fixtures::close_bead(&bead2_id, "Label exclude cleanup 2");
@@ -452,12 +477,15 @@ fn test_search_json_type_filter_excludes_all() {
             .arg("--type")
             .arg("bug")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return empty string
     let json_str = output.trim();
-    assert_eq!(json_str, "", "search with type filter that excludes all beads should return empty string");
+    assert_eq!(
+        json_str, "",
+        "search with type filter that excludes all beads should return empty string"
+    );
 
     fixtures::close_bead(&bead1_id, "Type exclude cleanup 1");
     fixtures::close_bead(&bead2_id, "Type exclude cleanup 2");
@@ -481,12 +509,15 @@ fn test_search_json_assignee_filter_excludes_all() {
             .arg("--assignee")
             .arg("bob")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return empty string
     let json_str = output.trim();
-    assert_eq!(json_str, "", "search with assignee filter that excludes all beads should return empty string");
+    assert_eq!(
+        json_str, "",
+        "search with assignee filter that excludes all beads should return empty string"
+    );
 
     fixtures::close_bead(&bead1_id, "Assignee exclude cleanup 1");
     fixtures::close_bead(&bead2_id, "Assignee exclude cleanup 2");
@@ -505,14 +536,15 @@ fn test_search_json_required_fields_types() {
             .arg("search")
             .arg("field types")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Find our bead in the output
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in search output");
 
@@ -528,18 +560,27 @@ fn test_search_json_required_fields_types() {
 
     // status must be a string with valid value
     let status = json_validation::get_string(&parsed, "status");
-    assert!(matches!(status.as_str(), "open" | "in_progress" | "blocked" | "closed"));
+    assert!(matches!(
+        status.as_str(),
+        "open" | "in_progress" | "blocked" | "closed"
+    ));
 
     // priority must be a number (0-4)
     let priority = json_validation::get_int(&parsed, "priority");
-    assert!((0..=4).contains(&priority), "priority must be between 0 and 4");
+    assert!(
+        (0..=4).contains(&priority),
+        "priority must be between 0 and 4"
+    );
 
     // issue_type must be a string
     let issue_type = json_validation::get_string(&parsed, "issue_type");
     assert!(!issue_type.is_empty(), "issue_type must not be empty");
 
     // assignee must be present (null or string)
-    assert!(parsed.get("assignee").is_some(), "assignee field must be present");
+    assert!(
+        parsed.get("assignee").is_some(),
+        "assignee field must be present"
+    );
 
     // labels must be an array
     let labels = json_validation::get_array(&parsed, "labels");
@@ -565,15 +606,17 @@ fn test_search_json_query_in_title() {
             .arg("search")
             .arg("Unique search term")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find our bead
-    assert!(lines.iter().any(|line| line.contains(&bead_id)),
-            "search should find bead with matching title");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead_id)),
+        "search should find bead with matching title"
+    );
 
     fixtures::close_bead(&bead_id, "Query title cleanup");
 }
@@ -601,15 +644,17 @@ fn test_search_json_query_in_description() {
             .arg("search")
             .arg("UniqueDescriptionContentXYZ")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find our bead via description
-    assert!(lines.iter().any(|line| line.contains(&bead_id)),
-            "search should find bead with matching description");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead_id)),
+        "search should find bead with matching description"
+    );
 
     fixtures::close_bead(&bead_id, "Query description cleanup");
 }
@@ -626,17 +671,19 @@ fn test_search_json_query_case_sensitive() {
     let output = capture::capture_stdout(
         bf_command()
             .arg("search")
-            .arg("casesensivesearchterm")  // lowercase
+            .arg("casesensivesearchterm") // lowercase
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should NOT find our bead (case-sensitive search)
-    assert!(!lines.iter().any(|line| line.contains(&bead_id)),
-            "search should be case-sensitive and not find lowercase query");
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead_id)),
+        "search should be case-sensitive and not find lowercase query"
+    );
 
     // Search with exact case (should match)
     let output = capture::capture_stdout(
@@ -644,15 +691,17 @@ fn test_search_json_query_case_sensitive() {
             .arg("search")
             .arg("CaseSensitiveSearchTerm")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find our bead with exact case
-    assert!(lines.iter().any(|line| line.contains(&bead_id)),
-            "search should find bead with exact case match");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead_id)),
+        "search should find bead with exact case match"
+    );
 
     fixtures::close_bead(&bead_id, "Case sensitive cleanup");
 }
@@ -670,12 +719,15 @@ fn test_search_json_query_no_match() {
             .arg("search")
             .arg("NonExistentSearchTerm12345")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should return no results
     let json_str = output.trim();
-    assert_eq!(json_str, "", "search with no matches should return empty output");
+    assert_eq!(
+        json_str, "",
+        "search with no matches should return empty output"
+    );
 
     fixtures::close_bead(&bead_id, "No match cleanup");
 }
@@ -704,17 +756,21 @@ fn test_search_json_status_filter() {
             .arg("--status")
             .arg("closed")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead2 (closed) but not bead1 (open)
-    assert!(lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should find closed bead");
-    assert!(!lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should not find open bead with closed filter");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should find closed bead"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should not find open bead with closed filter"
+    );
 
     fixtures::close_bead(&bead1_id, "Status filter cleanup 1");
 }
@@ -751,19 +807,25 @@ fn test_search_json_multiple_status_filters() {
             .arg("--status")
             .arg("closed")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1 (open) and bead3 (closed) but not bead2 (in_progress)
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should find open bead");
-    assert!(lines.iter().any(|line| line.contains(&bead3_id)),
-            "search should find closed bead");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should not find in_progress bead with open/closed filter");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should find open bead"
+    );
+    assert!(
+        lines.iter().any(|line| line.contains(&bead3_id)),
+        "search should find closed bead"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should not find in_progress bead with open/closed filter"
+    );
 
     fixtures::close_bead(&bead1_id, "Multi status cleanup 1");
     fixtures::close_bead(&bead2_id, "Multi status cleanup 2");
@@ -787,17 +849,21 @@ fn test_search_json_type_filter() {
             .arg("--type")
             .arg("bug")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1 (bug) but not bead2 (feature)
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should find bug bead");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should not find feature bead with bug filter");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should find bug bead"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should not find feature bead with bug filter"
+    );
 
     fixtures::close_bead(&bead1_id, "Type filter cleanup 1");
     fixtures::close_bead(&bead2_id, "Type filter cleanup 2");
@@ -820,17 +886,21 @@ fn test_search_json_assignee_filter() {
             .arg("--assignee")
             .arg("alice")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1 (alice) but not bead2 (bob)
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should find alice's bead");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should not find bob's bead with alice filter");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should find alice's bead"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should not find bob's bead with alice filter"
+    );
 
     fixtures::close_bead(&bead1_id, "Assignee filter cleanup 1");
     fixtures::close_bead(&bead2_id, "Assignee filter cleanup 2");
@@ -853,17 +923,21 @@ fn test_search_json_label_filter() {
             .arg("--label")
             .arg("urgent")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1 (has urgent label) but not bead2
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should find bead with urgent label");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should not find bead without urgent label");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should find bead with urgent label"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should not find bead without urgent label"
+    );
 
     fixtures::close_bead(&bead1_id, "Label filter cleanup 1");
     fixtures::close_bead(&bead2_id, "Label filter cleanup 2");
@@ -900,19 +974,25 @@ fn test_search_json_priority_range_filter() {
             .arg("--priority-max")
             .arg("3")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead2 (priority 2) but not bead1 (priority 0) or bead3 (priority 4)
-    assert!(lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should find bead with priority in range");
-    assert!(!lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should not find bead with priority below range");
-    assert!(!lines.iter().any(|line| line.contains(&bead3_id)),
-            "search should not find bead with priority above range");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should find bead with priority in range"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should not find bead with priority below range"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead3_id)),
+        "search should not find bead with priority above range"
+    );
 
     fixtures::close_bead(&bead1_id, "Priority range cleanup 1");
     fixtures::close_bead(&bead2_id, "Priority range cleanup 2");
@@ -947,17 +1027,21 @@ fn test_search_json_priority_min_only() {
             .arg("--priority-min")
             .arg("2")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead2 (priority 3) but not bead1 (priority 0)
-    assert!(lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should find bead with priority >= min");
-    assert!(!lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should not find bead with priority below min");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should find bead with priority >= min"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should not find bead with priority below min"
+    );
 
     fixtures::close_bead(&bead1_id, "Priority min cleanup 1");
     fixtures::close_bead(&bead2_id, "Priority min cleanup 2");
@@ -991,17 +1075,21 @@ fn test_search_json_priority_max_only() {
             .arg("--priority-max")
             .arg("2")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1 (priority 1) but not bead2 (priority 4)
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should find bead with priority <= max");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should not find bead with priority above max");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should find bead with priority <= max"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should not find bead with priority above max"
+    );
 
     fixtures::close_bead(&bead1_id, "Priority max cleanup 1");
     fixtures::close_bead(&bead2_id, "Priority max cleanup 2");
@@ -1030,13 +1118,17 @@ fn test_search_json_limit() {
             .arg("--limit")
             .arg("2")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
-    assert_eq!(lines.len(), 2, "limited search should return exactly 2 beads");
+    assert_eq!(
+        lines.len(),
+        2,
+        "limited search should return exactly 2 beads"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1, "Search limit cleanup 1");
@@ -1063,14 +1155,18 @@ fn test_search_json_default_limit() {
             .arg("search")
             .arg("Default limit test")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should return at most 50 results (default limit)
-    assert_eq!(lines.len(), 50, "search should return at most 50 beads by default");
+    assert_eq!(
+        lines.len(),
+        50,
+        "search should return at most 50 beads by default"
+    );
 
     // Cleanup
     for bead_id in bead_ids {
@@ -1096,7 +1192,7 @@ fn test_search_json_special_characters_in_query() {
             .arg("search")
             .arg("quotes")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify it's valid JSON (proper escaping)
@@ -1105,7 +1201,8 @@ fn test_search_json_special_characters_in_query() {
 
     // Find our bead
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in search output");
 
@@ -1114,7 +1211,10 @@ fn test_search_json_special_characters_in_query() {
 
     // Verify special characters are preserved
     assert!(title.contains("quotes"), "title should contain 'quotes'");
-    assert!(title.contains("apostrophes"), "title should contain 'apostrophes'");
+    assert!(
+        title.contains("apostrophes"),
+        "title should contain 'apostrophes'"
+    );
 
     fixtures::close_bead(&bead_id, "Search special chars cleanup");
 }
@@ -1133,15 +1233,17 @@ fn test_search_json_unicode_in_query() {
             .arg("search")
             .arg("日本語")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead with Japanese characters
-    assert!(lines.iter().any(|line| line.contains(&bead_id)),
-            "search should handle unicode in query");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead_id)),
+        "search should handle unicode in query"
+    );
 
     fixtures::close_bead(&bead_id, "Search unicode cleanup");
 }
@@ -1159,12 +1261,13 @@ fn test_search_json_special_characters_in_result() {
             .arg("search")
             .arg("quotes")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in search output");
 
@@ -1176,7 +1279,10 @@ fn test_search_json_special_characters_in_result() {
 
     // Verify special characters are preserved
     assert!(title.contains("quotes"), "title should contain 'quotes'");
-    assert!(title.contains("apostrophes"), "title should contain 'apostrophes'");
+    assert!(
+        title.contains("apostrophes"),
+        "title should contain 'apostrophes'"
+    );
     assert!(title.contains("&"), "title should contain '&'");
     assert!(title.contains("<"), "title should contain '<'");
     assert!(title.contains(">"), "title should contain '>'");
@@ -1195,8 +1301,18 @@ fn test_search_json_combined_filters() {
     let workspace = test_workspace();
 
     // Create beads with different types using --type flag in create
-    let bead1_id = create_bead_with_type_and_labels_and_priority("Combined urgent bug", "bug", &["urgent", "bug"], 0);
-    let bead2_id = create_bead_with_type_and_labels_and_priority("Combined urgent feature", "feature", &["urgent", "feature"], 2);
+    let bead1_id = create_bead_with_type_and_labels_and_priority(
+        "Combined urgent bug",
+        "bug",
+        &["urgent", "bug"],
+        0,
+    );
+    let bead2_id = create_bead_with_type_and_labels_and_priority(
+        "Combined urgent feature",
+        "feature",
+        &["urgent", "feature"],
+        2,
+    );
 
     // Search with combined filters
     let output = capture::capture_stdout(
@@ -1210,17 +1326,21 @@ fn test_search_json_combined_filters() {
             .arg("--priority-max")
             .arg("1")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find only bead1 (matches all filters: urgent label, bug type, priority <= 1)
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should find bead matching all filters");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should not find bead that doesn't match all filters");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should find bead matching all filters"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should not find bead that doesn't match all filters"
+    );
 
     fixtures::close_bead(&bead1_id, "Combined filter cleanup 1");
     fixtures::close_bead(&bead2_id, "Combined filter cleanup 2");
@@ -1243,17 +1363,21 @@ fn test_search_json_query_with_filters() {
             .arg("--label")
             .arg("bug")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1 (matches query "fix" and label "bug")
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should find bead matching both query and label filter");
-    assert!(!lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should not find bead that doesn't match label filter");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should find bead matching both query and label filter"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should not find bead that doesn't match label filter"
+    );
 
     fixtures::close_bead(&bead1_id, "Query filter cleanup 1");
     fixtures::close_bead(&bead2_id, "Query filter cleanup 2");
@@ -1277,15 +1401,17 @@ fn test_search_json_whitespace_in_query() {
             .arg("search")
             .arg("Search   with")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead (exact substring match with correct spacing)
-    assert!(lines.iter().any(|line| line.contains(&bead_id)),
-            "search should find bead with exact substring including spaces");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead_id)),
+        "search should find bead with exact substring including spaces"
+    );
 
     // Search for different spacing (should NOT match - LIKE requires exact spacing)
     let output = capture::capture_stdout(
@@ -1293,15 +1419,17 @@ fn test_search_json_whitespace_in_query() {
             .arg("search")
             .arg("Search with")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should NOT find bead (spacing doesn't match)
-    assert!(!lines.iter().any(|line| line.contains(&bead_id)),
-            "search should not find bead when spacing doesn't match");
+    assert!(
+        !lines.iter().any(|line| line.contains(&bead_id)),
+        "search should not find bead when spacing doesn't match"
+    );
 
     // Search for single word (should match)
     let output = capture::capture_stdout(
@@ -1309,15 +1437,17 @@ fn test_search_json_whitespace_in_query() {
             .arg("search")
             .arg("Search")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead (single word match)
-    assert!(lines.iter().any(|line| line.contains(&bead_id)),
-            "search should find bead with single word from title");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead_id)),
+        "search should find bead with single word from title"
+    );
 
     fixtures::close_bead(&bead_id, "Whitespace cleanup");
 }
@@ -1338,15 +1468,17 @@ fn test_search_json_empty_query_with_filters() {
             .arg("--label")
             .arg("special")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Should find bead1 by label even without query
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should work with empty query and filters");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should work with empty query and filters"
+    );
 
     fixtures::close_bead(&bead1_id, "Empty query cleanup 1");
     fixtures::close_bead(&bead2_id, "Empty query cleanup 2");
@@ -1368,19 +1500,25 @@ fn test_search_json_result_ordering() {
             .arg("search")
             .arg("Order test")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // All beads should be present
-    assert!(lines.iter().any(|line| line.contains(&bead1_id)),
-            "search should include bead1");
-    assert!(lines.iter().any(|line| line.contains(&bead2_id)),
-            "search should include bead2");
-    assert!(lines.iter().any(|line| line.contains(&bead3_id)),
-            "search should include bead3");
+    assert!(
+        lines.iter().any(|line| line.contains(&bead1_id)),
+        "search should include bead1"
+    );
+    assert!(
+        lines.iter().any(|line| line.contains(&bead2_id)),
+        "search should include bead2"
+    );
+    assert!(
+        lines.iter().any(|line| line.contains(&bead3_id)),
+        "search should include bead3"
+    );
 
     // Cleanup
     fixtures::close_bead(&bead1_id, "Order test cleanup 1");
@@ -1405,14 +1543,15 @@ fn test_search_json_timestamp_fields_valid() {
             .arg("search")
             .arg("Timestamp validation")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Find our bead in the output
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in search output");
 
@@ -1476,7 +1615,7 @@ fn test_search_json_timestamp_fields_present_all_results() {
             .arg("search")
             .arg("Timestamp presence")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -1490,7 +1629,7 @@ fn test_search_json_timestamp_fields_present_all_results() {
         json_validation::assert_required_fields(
             &parsed,
             &["created_at", "updated_at"],
-            "search command timestamp fields"
+            "search command timestamp fields",
         );
 
         // Verify they are strings containing 'T' (ISO 8601 format indicator)
@@ -1530,14 +1669,15 @@ fn test_search_json_description_field_presence() {
             .arg("search")
             .arg("Description field")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Find our bead in the output
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in search output");
 
@@ -1585,14 +1725,15 @@ fn test_search_json_description_with_content() {
             .arg("search")
             .arg("Description content")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
     let lines: Vec<&str> = json_str.lines().filter(|l| !l.trim().is_empty()).collect();
 
     // Find our bead in the output
-    let bead_json = lines.iter()
+    let bead_json = lines
+        .iter()
         .find(|line| line.contains(&bead_id))
         .expect("created bead should be in search output");
 
@@ -1632,7 +1773,7 @@ fn test_search_json_description_field_all_results() {
             .arg("search")
             .arg("Desc all")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();

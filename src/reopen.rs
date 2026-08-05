@@ -75,7 +75,9 @@ mod tests {
             ..Default::default()
         };
 
-        storage.create_issue(&bead).expect("Failed to create test bead");
+        storage
+            .create_issue(&bead)
+            .expect("Failed to create test bead");
 
         (temp_dir, db_path, bead_id)
     }
@@ -99,7 +101,9 @@ mod tests {
             ..Default::default()
         };
 
-        storage.create_issue(&bead).expect("Failed to create test bead");
+        storage
+            .create_issue(&bead)
+            .expect("Failed to create test bead");
 
         (temp_dir, db_path, bead_id)
     }
@@ -116,7 +120,11 @@ mod tests {
         let storage = Storage::open(&db_path).expect("Failed to open storage");
         let bead = storage.get_issue(&bead_id).expect("Failed to get bead");
         assert!(bead.is_some(), "Bead should still exist");
-        assert_eq!(bead.unwrap().status, Status::Open, "Bead status should be open");
+        assert_eq!(
+            bead.unwrap().status,
+            Status::Open,
+            "Bead status should be open"
+        );
     }
 
     #[test]
@@ -175,7 +183,9 @@ mod tests {
             ..Default::default()
         };
 
-        storage.create_issue(&bead).expect("Failed to create test bead");
+        storage
+            .create_issue(&bead)
+            .expect("Failed to create test bead");
 
         // Try to reopen an in_progress bead
         let result = reopen_bead(&db_path, &bead_id);
@@ -209,7 +219,9 @@ mod tests {
             ..Default::default()
         };
 
-        storage.create_issue(&bead).expect("Failed to create test bead");
+        storage
+            .create_issue(&bead)
+            .expect("Failed to create test bead");
 
         // Try to reopen a blocked bead
         let result = reopen_bead(&db_path, &bead_id);
@@ -246,14 +258,19 @@ mod tests {
             ..Default::default()
         };
 
-        storage.create_issue(&bead).expect("Failed to create test bead");
+        storage
+            .create_issue(&bead)
+            .expect("Failed to create test bead");
 
         // Reopen the bead
         reopen_bead(&db_path, &bead_id).expect("Reopen should succeed");
 
         // Verify assignee is cleared
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert!(
             bead.assignee.is_none(),
@@ -270,7 +287,10 @@ mod tests {
 
         // Verify closed_at and close_reason are cleared
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert!(
             bead.closed_at.is_none(),
@@ -291,7 +311,9 @@ mod tests {
 
         // Verify bead is marked as dirty
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let dirty_issues = storage.list_dirty_issues().expect("Failed to list dirty issues");
+        let dirty_issues = storage
+            .list_dirty_issues()
+            .expect("Failed to list dirty issues");
 
         assert!(
             dirty_issues.iter().any(|b| b.id == bead_id),
@@ -308,10 +330,14 @@ mod tests {
 
         // Verify a 'reopened' event was created
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let events = storage.list_events(&bead_id).expect("Failed to list events");
+        let events = storage
+            .list_events(&bead_id)
+            .expect("Failed to list events");
 
         assert!(
-            events.iter().any(|e| e.event_type == crate::model::EventType::Reopened),
+            events
+                .iter()
+                .any(|e| e.event_type == crate::model::EventType::Reopened),
             "Should have a 'reopened' event after reopening"
         );
     }
@@ -370,26 +396,37 @@ mod tests {
             ..Default::default()
         };
 
-        storage.create_issue(&bead).expect("Failed to create test bead");
+        storage
+            .create_issue(&bead)
+            .expect("Failed to create test bead");
 
         // Reopen the bead
         reopen_bead(&db_path, &bead_id).expect("Reopen should succeed");
 
         // Verify other fields are preserved
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead_after = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead_after = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert_eq!(bead_after.title, bead.title, "Title should be preserved");
         assert_eq!(
             bead_after.description, bead.description,
             "Description should be preserved"
         );
-        assert_eq!(bead_after.priority, bead.priority, "Priority should be preserved");
+        assert_eq!(
+            bead_after.priority, bead.priority,
+            "Priority should be preserved"
+        );
         assert_eq!(
             bead_after.issue_type, bead.issue_type,
             "Issue type should be preserved"
         );
-        assert_eq!(bead_after.created_at, bead.created_at, "Created_at should be preserved");
+        assert_eq!(
+            bead_after.created_at, bead.created_at,
+            "Created_at should be preserved"
+        );
     }
 
     #[test]
@@ -401,18 +438,35 @@ mod tests {
 
         // Verify event details
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let events = storage.list_events(&bead_id).expect("Failed to list events");
+        let events = storage
+            .list_events(&bead_id)
+            .expect("Failed to list events");
 
         let reopened_events: Vec<_> = events
             .iter()
             .filter(|e| e.event_type == crate::model::EventType::Reopened)
             .collect();
 
-        assert_eq!(reopened_events.len(), 1, "Should have exactly one reopened event");
+        assert_eq!(
+            reopened_events.len(),
+            1,
+            "Should have exactly one reopened event"
+        );
 
         let reopened_event = reopened_events[0];
-        assert_eq!(reopened_event.issue_id, bead_id, "Event should have correct issue_id");
-        assert_eq!(reopened_event.new_value.as_deref(), Some("open"), "Event should show new status as 'open'");
-        assert_eq!(reopened_event.old_value.as_deref(), Some("closed"), "Event should show old status as 'closed'");
+        assert_eq!(
+            reopened_event.issue_id, bead_id,
+            "Event should have correct issue_id"
+        );
+        assert_eq!(
+            reopened_event.new_value.as_deref(),
+            Some("open"),
+            "Event should show new status as 'open'"
+        );
+        assert_eq!(
+            reopened_event.old_value.as_deref(),
+            Some("closed"),
+            "Event should show old status as 'closed'"
+        );
     }
 }

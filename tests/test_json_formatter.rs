@@ -193,7 +193,8 @@ fn test_json_formatter_multiple_issues() {
     assert_eq!(lines.len(), 2, "Should output 2 lines for 2 issues");
 
     // Verify first issue
-    let first: serde_json::Value = serde_json::from_str(lines[0]).expect("First line must be valid JSON");
+    let first: serde_json::Value =
+        serde_json::from_str(lines[0]).expect("First line must be valid JSON");
     assert_eq!(first["id"], "bf-test1");
     assert_eq!(first["status"], "open");
     assert_eq!(first["priority"], 0);
@@ -201,7 +202,8 @@ fn test_json_formatter_multiple_issues() {
     assert!(first.get("labels").is_some());
 
     // Verify second issue
-    let second: serde_json::Value = serde_json::from_str(lines[1]).expect("Second line must be valid JSON");
+    let second: serde_json::Value =
+        serde_json::from_str(lines[1]).expect("Second line must be valid JSON");
     assert_eq!(second["id"], "bf-test2");
     assert_eq!(second["status"], "in_progress");
     assert_eq!(second["priority"], 1);
@@ -217,7 +219,10 @@ fn test_json_formatter_empty_issues() {
     let output = formatter.format_issues(&issues);
 
     // Empty result should be an empty string (JSONL: 0 lines)
-    assert!(output.is_empty() || output.trim().is_empty(), "Empty input should produce empty output");
+    assert!(
+        output.is_empty() || output.trim().is_empty(),
+        "Empty input should produce empty output"
+    );
 }
 
 #[test]
@@ -466,7 +471,8 @@ fn test_format_with_envelope_single_issue() {
     // Then wrap it in an envelope
     let envelope_output = formatter.format_with_envelope("show", &raw_json);
 
-    let parsed: serde_json::Value = serde_json::from_str(&envelope_output).expect("Invalid envelope JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&envelope_output).expect("Invalid envelope JSON");
 
     // Verify envelope structure
     assert_eq!(parsed["version"], 1);
@@ -588,7 +594,8 @@ fn test_format_with_envelope_multiple_issues() {
     // Wrap in envelope - JSONL will fail to parse as JSON and fall back to string
     let envelope_output = formatter.format_with_envelope("list", &jsonl);
 
-    let parsed: serde_json::Value = serde_json::from_str(&envelope_output).expect("Invalid envelope JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&envelope_output).expect("Invalid envelope JSON");
 
     // Verify envelope structure
     assert_eq!(parsed["version"], 1);
@@ -604,7 +611,8 @@ fn test_format_with_envelope_multiple_issues() {
 
     // Verify each line is valid JSON
     for line in lines {
-        let issue: serde_json::Value = serde_json::from_str(line).expect("Each line should be valid JSON");
+        let issue: serde_json::Value =
+            serde_json::from_str(line).expect("Each line should be valid JSON");
         assert!(issue.get("id").is_some());
         assert!(issue.get("title").is_some());
     }
@@ -662,9 +670,11 @@ fn test_format_with_envelope_and_warning() {
     };
 
     let raw_json = formatter.format_issue(&issue);
-    let envelope_output = formatter.format_with_envelope_and_warning("show", &raw_json, Some("auto-flush failed"));
+    let envelope_output =
+        formatter.format_with_envelope_and_warning("show", &raw_json, Some("auto-flush failed"));
 
-    let parsed: serde_json::Value = serde_json::from_str(&envelope_output).expect("Invalid envelope JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&envelope_output).expect("Invalid envelope JSON");
 
     // Verify envelope structure
     assert_eq!(parsed["version"], 1);

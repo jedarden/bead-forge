@@ -423,11 +423,8 @@ pub fn execute_batch(
     // transaction, so one flush exports them all to JSONL. If auto-flush fails,
     // dirty marks are retained and the next mutation or explicit `bf sync --flush-only`
     // will retry - the transaction itself is not affected.
-    let flush_outcome = autoflush::after_mutation_with_config(
-        workspace_dir,
-        &config,
-        no_auto_flush,
-    );
+    let flush_outcome =
+        autoflush::after_mutation_with_config(workspace_dir, &config, no_auto_flush);
 
     // Surface flush failures as warnings (non-fatal - the batch succeeded in SQLite)
     if let Some(warning) = flush_outcome.warning() {
@@ -681,11 +678,9 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
 
     // Check if already closed for idempotence
     let current_status: Option<String> = tx
-        .query_row(
-            "SELECT status FROM issues WHERE id = ?1",
-            &[id],
-            |row| row.get(0),
-        )
+        .query_row("SELECT status FROM issues WHERE id = ?1", &[id], |row| {
+            row.get(0)
+        })
         .ok();
 
     if current_status.as_deref() == Some("closed") {
@@ -799,12 +794,11 @@ fn execute_update(
     issue_type: &Option<String>,
 ) -> Result<()> {
     // Verify bead exists
-    let exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-            &[id],
-            |row| row.get(0),
-        )?;
+    let exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+        &[id],
+        |row| row.get(0),
+    )?;
 
     if !exists {
         return Err(anyhow!("Bead not found: {}", id));
@@ -865,8 +859,7 @@ fn execute_update(
         let query = format!("UPDATE issues SET {} WHERE id = ?", updates.join(", "));
         let mut all_params: Vec<Box<dyn rusqlite::ToSql>> = params.into_iter().collect();
         all_params.push(Box::new(id.to_string()));
-        let param_refs: Vec<&dyn rusqlite::ToSql> =
-            all_params.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::ToSql> = all_params.iter().map(|p| p.as_ref()).collect();
 
         tx.execute(&query, param_refs.as_slice())?;
 
@@ -886,19 +879,17 @@ fn execute_update(
 /// Execute a dep_remove operation
 fn execute_dep_remove(tx: &Connection, id: &str, depends_on: &str) -> Result<()> {
     // Verify both beads exist
-    let id_exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-            &[id],
-            |row| row.get(0),
-        )?;
+    let id_exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+        &[id],
+        |row| row.get(0),
+    )?;
 
-    let depends_on_exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-            &[depends_on],
-            |row| row.get(0),
-        )?;
+    let depends_on_exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+        &[depends_on],
+        |row| row.get(0),
+    )?;
 
     if !id_exists {
         return Err(anyhow!("Bead not found: {}", id));
@@ -908,12 +899,11 @@ fn execute_dep_remove(tx: &Connection, id: &str, depends_on: &str) -> Result<()>
     }
 
     // Check if dependency exists
-    let exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2)",
-            &[id, depends_on],
-            |row| row.get(0),
-        )?;
+    let exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2)",
+        &[id, depends_on],
+        |row| row.get(0),
+    )?;
 
     if !exists {
         return Err(anyhow!(
@@ -955,12 +945,11 @@ fn execute_dep_remove(tx: &Connection, id: &str, depends_on: &str) -> Result<()>
 /// Execute a label_add operation
 fn execute_label_add(tx: &Connection, id: &str, labels: &[String]) -> Result<()> {
     // Verify bead exists
-    let exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-            &[id],
-            |row| row.get(0),
-        )?;
+    let exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+        &[id],
+        |row| row.get(0),
+    )?;
 
     if !exists {
         return Err(anyhow!("Bead not found: {}", id));
@@ -983,12 +972,11 @@ fn execute_label_add(tx: &Connection, id: &str, labels: &[String]) -> Result<()>
 /// Execute a label_remove operation
 fn execute_label_remove(tx: &Connection, id: &str, labels: &[String]) -> Result<()> {
     // Verify bead exists
-    let exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-            &[id],
-            |row| row.get(0),
-        )?;
+    let exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+        &[id],
+        |row| row.get(0),
+    )?;
 
     if !exists {
         return Err(anyhow!("Bead not found: {}", id));
@@ -1011,12 +999,11 @@ fn execute_label_remove(tx: &Connection, id: &str, labels: &[String]) -> Result<
 /// Execute a comment operation
 fn execute_comment(tx: &Connection, id: &str, author: &str, text: &str) -> Result<()> {
     // Verify bead exists
-    let exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
-            &[id],
-            |row| row.get(0),
-        )?;
+    let exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",
+        &[id],
+        |row| row.get(0),
+    )?;
 
     if !exists {
         return Err(anyhow!("Bead not found: {}", id));
@@ -1799,7 +1786,13 @@ mod tests {
         ];
 
         // Execute the batch
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        )
+        .unwrap();
 
         // Verify all operations succeeded
         assert_eq!(results.len(), 5);
@@ -1994,7 +1987,13 @@ mod tests {
             issue_type: Some("bug".to_string()),
         }];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        )
+        .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, "ok");
 
@@ -2057,7 +2056,13 @@ mod tests {
             labels: vec!["urgent".to_string(), "backend".to_string()],
         }];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        )
+        .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, "ok");
 
@@ -2120,7 +2125,13 @@ mod tests {
             labels: vec!["urgent".to_string(), "bug".to_string()],
         }];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        )
+        .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, "ok");
 
@@ -2196,7 +2207,12 @@ mod tests {
         ];
 
         // execute_batch should fail on first error
-        let result = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */);
+        let result = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Bead not found"));
     }
@@ -2267,7 +2283,13 @@ mod tests {
             },
         ];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        )
+        .unwrap();
         assert_eq!(results.len(), 3);
 
         // All operations should succeed
@@ -2389,12 +2411,22 @@ mod tests {
         ];
 
         // Execute the batch - all operations should succeed atomically
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        )
+        .unwrap();
         assert_eq!(results.len(), 7);
 
         // Verify all operations succeeded
         for result in &results {
-            assert_eq!(result.status, "ok", "Operation {} should succeed", result.op);
+            assert_eq!(
+                result.status, "ok",
+                "Operation {} should succeed",
+                result.op
+            );
         }
 
         // Verify each operation's effect:
@@ -2403,7 +2435,10 @@ mod tests {
         let created_id = results[0].id.as_ref().unwrap();
         let created_bead = storage.get_issue(created_id).unwrap().unwrap();
         assert_eq!(created_bead.title, "New bead from batch");
-        assert_eq!(created_bead.description.as_deref(), Some("Created in mixed batch"));
+        assert_eq!(
+            created_bead.description.as_deref(),
+            Some("Created in mixed batch")
+        );
         assert_eq!(created_bead.assignee.as_deref(), Some("worker-1"));
         assert_eq!(created_bead.labels.len(), 1);
         assert!(created_bead.labels.contains(&"batch-created".to_string()));
@@ -2444,9 +2479,7 @@ mod tests {
                     .prepare("SELECT author, text FROM comments WHERE issue_id = ?1")
                     .unwrap();
                 let comments: Vec<(String, String)> = stmt
-                    .query_map(["bf-target"], |row| {
-                        Ok((row.get(0)?, row.get(1)?))
-                    })
+                    .query_map(["bf-target"], |row| Ok((row.get(0)?, row.get(1)?)))
                     .unwrap()
                     .filter_map(|r| r.ok())
                     .collect();
@@ -2553,7 +2586,12 @@ mod tests {
         ];
 
         // Execute the batch - should fail on the 3rd operation
-        let result = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */);
+        let result = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        );
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
@@ -2585,7 +2623,11 @@ mod tests {
             "Description should be unchanged (empty string per schema default)"
         );
         assert_eq!(existing.status, Status::Open, "Status should be unchanged");
-        assert_eq!(existing.priority, Priority(2), "Priority should be unchanged");
+        assert_eq!(
+            existing.priority,
+            Priority(2),
+            "Priority should be unchanged"
+        );
 
         // 3. Verify label was NOT added (4th op didn't execute)
         assert!(!existing.labels.contains(&"should-not-be-added".to_string()));
@@ -2651,7 +2693,13 @@ mod tests {
         }];
 
         // Execute the batch - should succeed in a single transaction
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        )
+        .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, "ok");
 
@@ -2750,7 +2798,13 @@ mod tests {
             },
         ];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path(), true /* no-auto-flush: keep dirty marks for test */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            true, /* no-auto-flush: keep dirty marks for test */
+        )
+        .unwrap();
         assert_eq!(results.len(), 3);
         for result in &results {
             assert_eq!(result.status, "ok");
@@ -2816,7 +2870,11 @@ mod tests {
 
         // Verify no dirty beads before batch
         let dirty_before = storage.list_dirty_issues().unwrap();
-        assert_eq!(dirty_before.len(), 0, "No beads should be dirty before batch");
+        assert_eq!(
+            dirty_before.len(),
+            0,
+            "No beads should be dirty before batch"
+        );
 
         // Execute a batch that affects 4 beads:
         // - bf-update: updated (direct mark_dirty)
@@ -2847,7 +2905,13 @@ mod tests {
             },
         ];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path(), true /* no-auto-flush: verify dirty marks first */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            true, /* no-auto-flush: verify dirty marks first */
+        )
+        .unwrap();
         assert_eq!(results.len(), 3);
         for result in &results {
             assert_eq!(result.status, "ok");
@@ -2855,7 +2919,11 @@ mod tests {
 
         // Verify exactly 4 beads are dirty after batch (update, label, 2x dep endpoints)
         let dirty_after = storage.list_dirty_issues().unwrap();
-        assert_eq!(dirty_after.len(), 4, "Exactly 4 beads should be dirty after batch");
+        assert_eq!(
+            dirty_after.len(),
+            4,
+            "Exactly 4 beads should be dirty after batch"
+        );
         let dirty_ids: Vec<&str> = dirty_after.iter().map(|i| i.id.as_str()).collect();
         assert!(dirty_ids.contains(&"bf-update"));
         assert!(dirty_ids.contains(&"bf-label"));
@@ -2865,7 +2933,10 @@ mod tests {
 
         // Perform the flush (simulating the auto-flush that happens after batch commit)
         let flushed_count = flush_dirty(&temp_dir.path()).unwrap();
-        assert_eq!(flushed_count, 4, "Flush should export exactly 4 dirty beads");
+        assert_eq!(
+            flushed_count, 4,
+            "Flush should export exactly 4 dirty beads"
+        );
 
         // Verify all dirty beads were cleared after flush
         let dirty_after_flush = storage.list_dirty_issues().unwrap();
@@ -2944,7 +3015,11 @@ mod tests {
 
         // Verify no dirty beads before batch
         let dirty_before = storage.list_dirty_issues().unwrap();
-        assert_eq!(dirty_before.len(), 0, "No beads should be dirty before batch");
+        assert_eq!(
+            dirty_before.len(),
+            0,
+            "No beads should be dirty before batch"
+        );
 
         // Get JSONL mtime before batch (to verify it was updated)
         let jsonl_path = beads_dir.join("issues.jsonl");
@@ -2976,7 +3051,13 @@ mod tests {
             },
         ];
 
-        let results = execute_batch(&storage, ops, &temp_dir.path(), false /* AUTO-FLUSH ENABLED */).unwrap();
+        let results = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* AUTO-FLUSH ENABLED */
+        )
+        .unwrap();
         assert_eq!(results.len(), 3);
         for result in &results {
             assert_eq!(result.status, "ok");
@@ -2984,7 +3065,10 @@ mod tests {
 
         // Verify auto-flush happened: JSONL file was updated (mtime changed)
         let mtime_after = fs::metadata(&jsonl_path).unwrap().modified().unwrap();
-        assert!(mtime_after > mtime_before, "JSONL file should have been updated by auto-flush");
+        assert!(
+            mtime_after > mtime_before,
+            "JSONL file should have been updated by auto-flush"
+        );
 
         // Verify all dirty beads were cleared by auto-flush (no manual flush needed)
         let dirty_after = storage.list_dirty_issues().unwrap();
@@ -3084,12 +3168,21 @@ mod tests {
         ];
 
         // Batch should fail
-        let result = execute_batch(&storage, ops, &temp_dir.path(), false /* enable auto-flush */);
+        let result = execute_batch(
+            &storage,
+            ops,
+            &temp_dir.path(),
+            false, /* enable auto-flush */
+        );
         assert!(result.is_err());
 
         // Verify NO dirty marks persist (rollback cleared them)
         let dirty = storage.list_dirty_issues().unwrap();
-        assert_eq!(dirty.len(), 0, "No dirty marks should persist after failed batch");
+        assert_eq!(
+            dirty.len(),
+            0,
+            "No dirty marks should persist after failed batch"
+        );
 
         // Transaction rollback ensures clean state
     }

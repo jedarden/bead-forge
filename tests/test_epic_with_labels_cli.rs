@@ -9,10 +9,10 @@
 //! - JSON output format validation
 //! - Epic type preservation through label operations
 
-use std::process::Command;
-use std::path::{Path, PathBuf};
-use std::fs;
 use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// Helper to run bf commands and capture output
 fn bf_cmd(args: &[&str], dir: &Path) -> (String, String, bool) {
@@ -38,7 +38,11 @@ fn create_test_workspace(name: &str) -> tempfile::TempDir {
 
     // Initialize beads workspace
     let (stdout, stderr, success) = bf_cmd(&["init", "--prefix", "test"], dir.path());
-    assert!(success, "bf init failed: stdout: {}, stderr: {}", stdout, stderr);
+    assert!(
+        success,
+        "bf init failed: stdout: {}, stderr: {}",
+        stdout, stderr
+    );
 
     dir
 }
@@ -67,16 +71,31 @@ mod epic_label_cli_tests {
 
         // Create epic with a single label
         let (stdout, stderr, success) = bf_cmd(
-            &["create", "--type", "epic", "--label", "epic-label", "Test Epic with Label"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "epic-label",
+                "Test Epic with Label",
+            ],
+            dir,
         );
-        assert!(success, "Create epic failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Create epic failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         let id = extract_id(&stdout);
 
         // Verify the epic was created with correct type and label
         let (stdout, stderr, success) = bf_cmd(&["show", &id, "--format", "json"], dir);
-        assert!(success, "Show epic failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Show epic failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         if let Some(line) = stdout.lines().next() {
             let data: serde_json::Value = serde_json::from_str(line).expect("Failed to parse JSON");
@@ -95,28 +114,42 @@ mod epic_label_cli_tests {
         // Create epic with multiple labels
         let (stdout, stderr, success) = bf_cmd(
             &[
-                "create", "--type", "epic",
-                "--label", "phase-1",
-                "--label", "backend",
-                "--label", "high-priority",
-                "Multi-label Epic"
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "phase-1",
+                "--label",
+                "backend",
+                "--label",
+                "high-priority",
+                "Multi-label Epic",
             ],
-            dir
+            dir,
         );
-        assert!(success, "Create epic failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Create epic failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         let id = extract_id(&stdout);
 
         // Verify all labels are present
         let (stdout, stderr, success) = bf_cmd(&["show", &id, "--format", "json"], dir);
-        assert!(success, "Show epic failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Show epic failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         if let Some(line) = stdout.lines().next() {
             let data: serde_json::Value = serde_json::from_str(line).expect("Failed to parse JSON");
             let labels = data["labels"].as_array().unwrap();
             assert_eq!(labels.len(), 3);
 
-            let label_values: Vec<String> = labels.iter()
+            let label_values: Vec<String> = labels
+                .iter()
                 .filter_map(|v| v.as_str())
                 .map(String::from)
                 .collect();
@@ -134,18 +167,17 @@ mod epic_label_cli_tests {
         let dir = workspace.path();
 
         // Create epic without labels
-        let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "Epic for label add"],
-            dir
-        );
+        let (stdout, _, _) = bf_cmd(&["create", "--type", "epic", "Epic for label add"], dir);
         let id = extract_id(&stdout);
 
         // Add a label using `bf label add`
-        let (stdout, stderr, success) = bf_cmd(
-            &["label", "add", "--label", "added-label", &id],
-            dir
+        let (stdout, stderr, success) =
+            bf_cmd(&["label", "add", "--label", "added-label", &id], dir);
+        assert!(
+            success,
+            "Label add failed: stdout: {}, stderr: {}",
+            stdout, stderr
         );
-        assert!(success, "Label add failed: stdout: {}, stderr: {}", stdout, stderr);
         assert!(stdout.contains("Added label 'added-label'"));
 
         // Verify label was added
@@ -168,17 +200,18 @@ mod epic_label_cli_tests {
         // Create epic
         let (stdout, _, _) = bf_cmd(
             &["create", "--type", "epic", "Epic for multiple labels"],
-            dir
+            dir,
         );
         let id = extract_id(&stdout);
 
         // Add multiple labels
         for label in &["label-1", "label-2", "label-3"] {
-            let (stdout, stderr, success) = bf_cmd(
-                &["label", "add", "--label", label, &id],
-                dir
+            let (stdout, stderr, success) = bf_cmd(&["label", "add", "--label", label, &id], dir);
+            assert!(
+                success,
+                "Label add failed for {}: stdout: {}, stderr: {}",
+                label, stdout, stderr
             );
-            assert!(success, "Label add failed for {}: stdout: {}, stderr: {}", label, stdout, stderr);
         }
 
         // Verify all labels are present
@@ -198,17 +231,27 @@ mod epic_label_cli_tests {
 
         // Create epic with labels
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "keep", "--label", "remove", "Epic for label remove"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "keep",
+                "--label",
+                "remove",
+                "Epic for label remove",
+            ],
+            dir,
         );
         let id = extract_id(&stdout);
 
         // Remove one label
-        let (stdout, stderr, success) = bf_cmd(
-            &["label", "remove", "--label", "remove", &id],
-            dir
+        let (stdout, stderr, success) = bf_cmd(&["label", "remove", "--label", "remove", &id], dir);
+        assert!(
+            success,
+            "Label remove failed: stdout: {}, stderr: {}",
+            stdout, stderr
         );
-        assert!(success, "Label remove failed: stdout: {}, stderr: {}", stdout, stderr);
         assert!(stdout.contains("Removed label 'remove'"));
 
         // Verify only 'keep' label remains
@@ -230,14 +273,27 @@ mod epic_label_cli_tests {
 
         // Create epic with labels
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "alpha", "--label", "beta", "Label List Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "alpha",
+                "--label",
+                "beta",
+                "Label List Epic",
+            ],
+            dir,
         );
         let id = extract_id(&stdout);
 
         // List labels for the epic
         let (stdout, stderr, success) = bf_cmd(&["labels", &id], dir);
-        assert!(success, "Labels command failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Labels command failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
         assert!(stdout.contains("Labels for"));
         assert!(stdout.contains("alpha"));
         assert!(stdout.contains("beta"));
@@ -251,26 +307,34 @@ mod epic_label_cli_tests {
 
         // Create multiple epics with overlapping labels
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "common", "--label", "epic1", "Epic 1"],
-            dir
+            &[
+                "create", "--type", "epic", "--label", "common", "--label", "epic1", "Epic 1",
+            ],
+            dir,
         );
         let id1 = extract_id(&stdout);
 
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "common", "--label", "epic2", "Epic 2"],
-            dir
+            &[
+                "create", "--type", "epic", "--label", "common", "--label", "epic2", "Epic 2",
+            ],
+            dir,
         );
         let id2 = extract_id(&stdout);
 
         let (stdout, _, _) = bf_cmd(
             &["create", "--type", "epic", "--label", "unique", "Epic 3"],
-            dir
+            dir,
         );
         let id3 = extract_id(&stdout);
 
         // List all labels (no specific ID)
         let (stdout, stderr, success) = bf_cmd(&["label", "list"], dir);
-        assert!(success, "Label list failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Label list failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
         assert!(stdout.contains("common"));
         assert!(stdout.contains("unique"));
         // Should show counts
@@ -285,29 +349,56 @@ mod epic_label_cli_tests {
 
         // Create epics with different labels
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "backend", "Backend Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "backend",
+                "Backend Epic",
+            ],
+            dir,
         );
         let backend_id = extract_id(&stdout);
 
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "frontend", "Frontend Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "frontend",
+                "Frontend Epic",
+            ],
+            dir,
         );
         let frontend_id = extract_id(&stdout);
 
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "backend", "Another Backend Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "backend",
+                "Another Backend Epic",
+            ],
+            dir,
         );
         let another_backend_id = extract_id(&stdout);
 
         // Search for backend epics
         let (stdout, stderr, success) = bf_cmd(
-            &["search", "--label", "backend", "--type", "epic", "--format", "json"],
-            dir
+            &[
+                "search", "--label", "backend", "--type", "epic", "--format", "json",
+            ],
+            dir,
         );
-        assert!(success, "Search failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Search failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         // Should find 2 backend epics
         let results: Vec<serde_json::Value> = stdout
@@ -316,7 +407,8 @@ mod epic_label_cli_tests {
             .collect();
 
         assert_eq!(results.len(), 2);
-        let ids: Vec<String> = results.iter()
+        let ids: Vec<String> = results
+            .iter()
             .filter_map(|v| v.get("id").and_then(|i| i.as_str()).map(String::from))
             .collect();
         assert!(ids.contains(&backend_id));
@@ -332,26 +424,60 @@ mod epic_label_cli_tests {
 
         // Create epics
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "backend", "--label", "phase-1", "Backend P1"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "backend",
+                "--label",
+                "phase-1",
+                "Backend P1",
+            ],
+            dir,
         );
 
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "frontend", "--label", "phase-1", "Frontend P1"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "frontend",
+                "--label",
+                "phase-1",
+                "Frontend P1",
+            ],
+            dir,
         );
 
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "backend", "--label", "phase-2", "Backend P2"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "backend",
+                "--label",
+                "phase-2",
+                "Backend P2",
+            ],
+            dir,
         );
 
         // Search with multiple labels (OR logic)
         let (stdout, stderr, success) = bf_cmd(
-            &["search", "--label", "backend", "--label", "phase-1", "--type", "epic", "--format", "json"],
-            dir
+            &[
+                "search", "--label", "backend", "--label", "phase-1", "--type", "epic", "--format",
+                "json",
+            ],
+            dir,
         );
-        assert!(success, "Search failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Search failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         let results: Vec<serde_json::Value> = stdout
             .lines()
@@ -370,8 +496,15 @@ mod epic_label_cli_tests {
 
         // Create epic
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "initial", "Type Preservation Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "initial",
+                "Type Preservation Epic",
+            ],
+            dir,
         );
         let id = extract_id(&stdout);
 
@@ -399,8 +532,17 @@ mod epic_label_cli_tests {
 
         // Create epic with labels
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "json-test", "--label", "format", "JSON Format Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "json-test",
+                "--label",
+                "format",
+                "JSON Format Epic",
+            ],
+            dir,
         );
         let id = extract_id(&stdout);
 
@@ -437,10 +579,23 @@ mod epic_label_cli_tests {
 
         // Create epic with special character labels
         let (stdout, stderr, success) = bf_cmd(
-            &["create", "--type", "epic", "--label", "label-with-dash", "--label", "label_with_underscore", "Special Chars Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "label-with-dash",
+                "--label",
+                "label_with_underscore",
+                "Special Chars Epic",
+            ],
+            dir,
         );
-        assert!(success, "Create failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Create failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         let id = extract_id(&stdout);
 
@@ -461,10 +616,7 @@ mod epic_label_cli_tests {
         let dir = workspace.path();
 
         // Create epic without labels
-        let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "No Labels Epic"],
-            dir
-        );
+        let (stdout, _, _) = bf_cmd(&["create", "--type", "epic", "No Labels Epic"], dir);
         let id = extract_id(&stdout);
 
         // List labels should show empty
@@ -484,18 +636,27 @@ mod epic_label_cli_tests {
 
         // Create epic
         let (stdout, _, _) = bf_cmd(
-            &["create", "--type", "epic", "--label", "test-label", "Duplicate Test Epic"],
-            dir
+            &[
+                "create",
+                "--type",
+                "epic",
+                "--label",
+                "test-label",
+                "Duplicate Test Epic",
+            ],
+            dir,
         );
         let id = extract_id(&stdout);
 
         // Try adding the same label again
-        let (stdout, stderr, success) = bf_cmd(
-            &["label", "add", "--label", "test-label", &id],
-            dir
-        );
+        let (stdout, stderr, success) =
+            bf_cmd(&["label", "add", "--label", "test-label", &id], dir);
         // Should succeed but not duplicate
-        assert!(success, "Add duplicate label failed: stdout: {}, stderr: {}", stdout, stderr);
+        assert!(
+            success,
+            "Add duplicate label failed: stdout: {}, stderr: {}",
+            stdout, stderr
+        );
 
         // Verify only one instance exists
         let (stdout, _, _) = bf_cmd(&["labels", &id, "--format", "json"], dir);

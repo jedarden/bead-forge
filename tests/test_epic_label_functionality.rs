@@ -8,11 +8,11 @@
 //! - Label persistence and integrity
 //! - Batch operations with labels on epics
 
-use bead_forge::model::{Issue, IssueType, Status, Priority};
+use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
-use tempfile::TempDir;
-use std::path::PathBuf;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
+use tempfile::TempDir;
 
 /// Helper function to create a temporary workspace with storage
 fn create_test_workspace() -> (TempDir, PathBuf, Storage) {
@@ -116,9 +116,12 @@ mod epic_label_tests {
         let (_dir, _beads_dir, storage) = create_test_workspace();
         let epic = create_epic_with_labels(&storage, "Add Label Test", &["initial-label"]);
 
-        storage.add_label(&epic.id, "new-label").expect("Failed to add label");
+        storage
+            .add_label(&epic.id, "new-label")
+            .expect("Failed to add label");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -133,11 +136,18 @@ mod epic_label_tests {
         let (_dir, _beads_dir, storage) = create_test_workspace();
         let epic = create_epic_with_labels(&storage, "Multi Add Test", &["base-label"]);
 
-        storage.add_label(&epic.id, "label-1").expect("Failed to add label 1");
-        storage.add_label(&epic.id, "label-2").expect("Failed to add label 2");
-        storage.add_label(&epic.id, "label-3").expect("Failed to add label 3");
+        storage
+            .add_label(&epic.id, "label-1")
+            .expect("Failed to add label 1");
+        storage
+            .add_label(&epic.id, "label-2")
+            .expect("Failed to add label 2");
+        storage
+            .add_label(&epic.id, "label-3")
+            .expect("Failed to add label 3");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -154,9 +164,12 @@ mod epic_label_tests {
         let epic = create_epic_with_labels(&storage, "Duplicate Test", &["test-label"]);
 
         // Adding the same label twice should result in only one instance (set semantics)
-        storage.add_label(&epic.id, "test-label").expect("Failed to add duplicate");
+        storage
+            .add_label(&epic.id, "test-label")
+            .expect("Failed to add duplicate");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -169,11 +182,15 @@ mod epic_label_tests {
     #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
     fn test_remove_label_from_epic() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
-        let epic = create_epic_with_labels(&storage, "Remove Test", &["label-keep", "label-remove"]);
+        let epic =
+            create_epic_with_labels(&storage, "Remove Test", &["label-keep", "label-remove"]);
 
-        storage.remove_label(&epic.id, "label-remove").expect("Failed to remove label");
+        storage
+            .remove_label(&epic.id, "label-remove")
+            .expect("Failed to remove label");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -184,13 +201,21 @@ mod epic_label_tests {
     #[test]
     fn test_remove_multiple_labels_from_epic() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
-        let epic = create_epic_with_labels(&storage, "Multi Remove Test",
-            &["keep-1", "remove-1", "keep-2", "remove-2"]);
+        let epic = create_epic_with_labels(
+            &storage,
+            "Multi Remove Test",
+            &["keep-1", "remove-1", "keep-2", "remove-2"],
+        );
 
-        storage.remove_label(&epic.id, "remove-1").expect("Failed to remove label 1");
-        storage.remove_label(&epic.id, "remove-2").expect("Failed to remove label 2");
+        storage
+            .remove_label(&epic.id, "remove-1")
+            .expect("Failed to remove label 1");
+        storage
+            .remove_label(&epic.id, "remove-2")
+            .expect("Failed to remove label 2");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -204,12 +229,16 @@ mod epic_label_tests {
     #[test]
     fn test_remove_nonexistent_label_from_epic() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
-        let epic = create_epic_with_labels(&storage, "Nonexistent Remove Test", &["existing-label"]);
+        let epic =
+            create_epic_with_labels(&storage, "Nonexistent Remove Test", &["existing-label"]);
 
         // Removing a label that doesn't exist should not cause an error
-        storage.remove_label(&epic.id, "nonexistent-label").expect("Failed to remove nonexistent");
+        storage
+            .remove_label(&epic.id, "nonexistent-label")
+            .expect("Failed to remove nonexistent");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -221,8 +250,11 @@ mod epic_label_tests {
     #[test]
     fn test_get_labels_for_epic() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
-        let epic = create_epic_with_labels(&storage, "Get Labels Test",
-            &["alpha", "beta", "gamma", "delta"]);
+        let epic = create_epic_with_labels(
+            &storage,
+            "Get Labels Test",
+            &["alpha", "beta", "gamma", "delta"],
+        );
 
         let labels = storage.get_labels(&epic.id).expect("Failed to get labels");
 
@@ -252,7 +284,9 @@ mod epic_label_tests {
         let epic2 = create_epic_with_labels(&storage, "Epic 2", &["common", "epic-2-only"]);
         let epic3 = create_epic_with_labels(&storage, "Epic 3", &["common"]);
 
-        let all_labels = storage.list_all_labels().expect("Failed to list all labels");
+        let all_labels = storage
+            .list_all_labels()
+            .expect("Failed to list all labels");
 
         // Should have 5 unique labels: common, epic-1-only, epic-2-only
         // common appears in 3 epics, epic-1-only in 1, epic-2-only in 1
@@ -276,9 +310,12 @@ mod epic_label_tests {
             ..Default::default()
         };
 
-        storage.update_issue(&epic.id, &changes).expect("Failed to update epic");
+        storage
+            .update_issue(&epic.id, &changes)
+            .expect("Failed to update epic");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -294,10 +331,15 @@ mod epic_label_tests {
         let (_dir, _beads_dir, storage) = create_test_workspace();
         let epic = create_epic_with_labels(&storage, "Type Preservation", &["test-label"]);
 
-        storage.add_label(&epic.id, "another-label").expect("Failed to add label");
-        storage.remove_label(&epic.id, "test-label").expect("Failed to remove label");
+        storage
+            .add_label(&epic.id, "another-label")
+            .expect("Failed to add label");
+        storage
+            .remove_label(&epic.id, "test-label")
+            .expect("Failed to remove label");
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -308,8 +350,11 @@ mod epic_label_tests {
     #[test]
     fn test_label_ordering_on_epic() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
-        let epic = create_epic_with_labels(&storage, "Ordering Test",
-            &["zebra", "alpha", "middle", "beta"]);
+        let epic = create_epic_with_labels(
+            &storage,
+            "Ordering Test",
+            &["zebra", "alpha", "middle", "beta"],
+        );
 
         let labels = storage.get_labels(&epic.id).expect("Failed to get labels");
 
@@ -333,9 +378,14 @@ mod epic_label_tests {
             "label:with:colons",
             "label with spaces",
         ];
-        let epic = create_epic_with_labels(&storage, "Special Chars Test", &special_labels.iter().copied().collect::<Vec<&str>>());
+        let epic = create_epic_with_labels(
+            &storage,
+            "Special Chars Test",
+            &special_labels.iter().copied().collect::<Vec<&str>>(),
+        );
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -360,7 +410,8 @@ mod epic_label_tests {
         assert!(result.is_ok() || result.is_err());
 
         // Verify normal label is still there
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -370,8 +421,8 @@ mod epic_label_tests {
     #[test]
     fn test_case_sensitive_labels() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
-        let epic = create_epic_with_labels(&storage, "Case Test",
-            &["Label", "label", "LABEL", "LaBeL"]);
+        let epic =
+            create_epic_with_labels(&storage, "Case Test", &["Label", "label", "LABEL", "LaBeL"]);
 
         let labels = storage.get_labels(&epic.id).expect("Failed to get labels");
 
@@ -386,17 +437,15 @@ mod epic_label_tests {
     #[test]
     fn test_unicode_labels() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
-        let unicode_labels = vec![
-            "日本語",
-            "العربية",
-            "한국어",
-            "🎯priority",
-            "épic",
-        ];
-        let epic = create_epic_with_labels(&storage, "Unicode Test",
-            &unicode_labels.iter().copied().collect::<Vec<&str>>());
+        let unicode_labels = vec!["日本語", "العربية", "한국어", "🎯priority", "épic"];
+        let epic = create_epic_with_labels(
+            &storage,
+            "Unicode Test",
+            &unicode_labels.iter().copied().collect::<Vec<&str>>(),
+        );
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -421,17 +470,22 @@ mod epic_label_tests {
             ..Default::default()
         };
 
-        let filtered = storage.list_issues(&filter).expect("Failed to filter epics");
+        let filtered = storage
+            .list_issues(&filter)
+            .expect("Failed to filter epics");
 
         assert_eq!(filtered.len(), 2);
-        assert!(filtered.iter().all(|epic| epic.labels.contains(&"backend".to_string())));
+        assert!(filtered
+            .iter()
+            .all(|epic| epic.labels.contains(&"backend".to_string())));
     }
 
     #[test]
     fn test_filter_epics_by_multiple_labels() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
 
-        let _epic1 = create_epic_with_labels(&storage, "Epic 1", &["backend", "phase-1", "high-priority"]);
+        let _epic1 =
+            create_epic_with_labels(&storage, "Epic 1", &["backend", "phase-1", "high-priority"]);
         let _epic2 = create_epic_with_labels(&storage, "Epic 2", &["frontend", "phase-1"]);
         let _epic3 = create_epic_with_labels(&storage, "Epic 3", &["backend", "phase-2"]);
         let _epic4 = create_epic_with_labels(&storage, "Epic 4", &["backend", "phase-1"]);
@@ -442,13 +496,15 @@ mod epic_label_tests {
             ..Default::default()
         };
 
-        let filtered = storage.list_issues(&filter).expect("Failed to filter epics");
+        let filtered = storage
+            .list_issues(&filter)
+            .expect("Failed to filter epics");
 
         // Should return epics with EITHER backend OR phase-1 (OR logic)
         assert!(filtered.len() >= 3);
         assert!(filtered.iter().all(|epic| {
-            epic.labels.contains(&"backend".to_string()) ||
-            epic.labels.contains(&"phase-1".to_string())
+            epic.labels.contains(&"backend".to_string())
+                || epic.labels.contains(&"phase-1".to_string())
         }));
     }
 
@@ -465,22 +521,17 @@ mod epic_label_tests {
         // Add dependencies (task1 blocks epic, task2 blocks epic)
         use bead_forge::model::DependencyType;
 
-        storage.add_dependency(
-            &epic.id,
-            &task1.id,
-            &DependencyType::Blocks,
-            "test",
-        ).expect("Failed to add dep 1");
+        storage
+            .add_dependency(&epic.id, &task1.id, &DependencyType::Blocks, "test")
+            .expect("Failed to add dep 1");
 
-        storage.add_dependency(
-            &epic.id,
-            &task2.id,
-            &DependencyType::Blocks,
-            "test",
-        ).expect("Failed to add dep 2");
+        storage
+            .add_dependency(&epic.id, &task2.id, &DependencyType::Blocks, "test")
+            .expect("Failed to add dep 2");
 
         // Verify epic still has its labels after dependency operations
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -495,10 +546,13 @@ mod epic_label_tests {
         let epic = create_epic_with_labels(&storage, "Close Test", &["before-close"]);
 
         // Close the epic
-        storage.close_issue(&epic.id, "Testing label ops on closed", "test").expect("Failed to close epic");
+        storage
+            .close_issue(&epic.id, "Testing label ops on closed", "test")
+            .expect("Failed to close epic");
 
         // Verify it's closed
-        let closed_epic = storage.get_issue(&epic.id)
+        let closed_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
         assert!(matches!(closed_epic.status, Status::Closed));
@@ -509,9 +563,12 @@ mod epic_label_tests {
         assert_eq!(labels[0], "before-close");
 
         // Adding labels to closed epics should work
-        storage.add_label(&epic.id, "after-close").expect("Failed to add label to closed epic");
+        storage
+            .add_label(&epic.id, "after-close")
+            .expect("Failed to add label to closed epic");
 
-        let updated_epic = storage.get_issue(&epic.id)
+        let updated_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 
@@ -527,11 +584,13 @@ mod epic_label_tests {
 
         // Sequential add operations (changed from concurrent due to Storage not implementing Clone)
         for i in 0..10 {
-            storage.add_label(&epic.id, &format!("label-{}", i))
+            storage
+                .add_label(&epic.id, &format!("label-{}", i))
                 .expect("Failed to add label");
         }
 
-        let retrieved_epic = storage.get_issue(&epic.id)
+        let retrieved_epic = storage
+            .get_issue(&epic.id)
             .expect("Failed to get epic")
             .expect("Epic not found");
 

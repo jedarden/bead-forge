@@ -12,7 +12,9 @@
 //! - JSON roundtrip serialization
 //! - sync_equals semantics (ignores timestamps, compares description/priority)
 
-use bead_forge::model::{DependencyType, EpicStatus, Issue, IssueChanges, IssueType, Priority, Status};
+use bead_forge::model::{
+    DependencyType, EpicStatus, Issue, IssueChanges, IssueType, Priority, Status,
+};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 use std::thread;
@@ -133,10 +135,7 @@ fn test_p1_epic_storage_retrieval() {
     assert_eq!(retrieved.status, Status::Open);
 
     // Verify description is preserved exactly
-    assert_eq!(
-        retrieved.description,
-        Some(description.to_string())
-    );
+    assert_eq!(retrieved.description, Some(description.to_string()));
     assert_eq!(retrieved.description.as_deref(), Some(description));
 
     // Verify other expected defaults
@@ -152,7 +151,8 @@ fn test_p1_epic_with_children() {
     let (_dir, storage) = temp_storage();
 
     // Create P1 epic with description
-    let epic_description = "P1 epic with children of varying priorities to test parent-child rollup.";
+    let epic_description =
+        "P1 epic with children of varying priorities to test parent-child rollup.";
     create_p1_epic(
         &storage,
         "epic-p1-children",
@@ -191,8 +191,8 @@ fn test_p1_epic_with_children() {
     // Verify each child has distinct priority
     let priorities: Vec<_> = children.iter().map(|c| c.priority).collect();
     assert!(priorities.contains(&Priority::CRITICAL)); // P0
-    assert!(priorities.contains(&Priority::HIGH));    // P1
-    assert!(priorities.contains(&Priority::MEDIUM));  // P2
+    assert!(priorities.contains(&Priority::HIGH)); // P1
+    assert!(priorities.contains(&Priority::MEDIUM)); // P2
 
     // Verify epic itself remains P1
     let epic = storage.get_issue("epic-p1-children").unwrap().unwrap();
@@ -200,15 +200,14 @@ fn test_p1_epic_with_children() {
     assert_eq!(epic.issue_type, IssueType::Epic);
 
     // Verify epic description is preserved
-    assert_eq!(
-        epic.description.as_deref(),
-        Some(epic_description)
-    );
+    assert_eq!(epic.description.as_deref(), Some(epic_description));
 
     // Verify all dependencies are ParentChild type
     let deps = storage.get_dependencies("epic-p1-children").unwrap();
     assert_eq!(deps.len(), 3);
-    assert!(deps.iter().all(|d| d.dep_type == DependencyType::ParentChild));
+    assert!(deps
+        .iter()
+        .all(|d| d.dep_type == DependencyType::ParentChild));
 }
 
 #[test]
@@ -226,7 +225,8 @@ fn test_p1_epic_update() {
     );
 
     // Update description via IssueChanges
-    let updated_description = "Updated description: P1 priority must be preserved across description changes.";
+    let updated_description =
+        "Updated description: P1 priority must be preserved across description changes.";
     let changes = IssueChanges {
         description: Some(updated_description.to_string()),
         actor: Some("test-worker".to_string()),
@@ -243,10 +243,7 @@ fn test_p1_epic_update() {
     assert_eq!(updated.priority.0, 1);
 
     // Verify description was updated
-    assert_eq!(
-        updated.description.as_deref(),
-        Some(updated_description)
-    );
+    assert_eq!(updated.description.as_deref(), Some(updated_description));
 
     // Verify epic type is preserved
     assert_eq!(updated.issue_type, IssueType::Epic);
@@ -255,10 +252,7 @@ fn test_p1_epic_update() {
     assert_eq!(updated.status, Status::Open);
 
     // Verify timestamps differ (updated_at should be newer)
-    let original = storage
-        .get_issue("epic-p1-update")
-        .unwrap()
-        .unwrap();
+    let original = storage.get_issue("epic-p1-update").unwrap().unwrap();
     assert!(updated.updated_at > original.created_at);
 }
 
@@ -325,10 +319,7 @@ fn test_p1_epic_status_computation() {
         .iter()
         .filter(|c| c.status == Status::Closed)
         .count();
-    let open_count = children
-        .iter()
-        .filter(|c| c.status == Status::Open)
-        .count();
+    let open_count = children.iter().filter(|c| c.status == Status::Open).count();
     assert_eq!(closed_count, 2);
     assert_eq!(open_count, 1);
 }
@@ -377,10 +368,7 @@ fn test_p1_epic_all_statuses() {
         assert_eq!(retrieved.status, *status);
 
         // Description must be preserved
-        assert_eq!(
-            retrieved.description.as_deref(),
-            Some(description.as_str())
-        );
+        assert_eq!(retrieved.description.as_deref(), Some(description.as_str()));
 
         // Display formatting must be P1
         assert_eq!(format!("{}", retrieved.priority), "P1");
@@ -390,12 +378,14 @@ fn test_p1_epic_all_statuses() {
     let all_issues = storage.list_issues(&Default::default()).unwrap();
     let p1_epics: Vec<_> = all_issues
         .iter()
-        .filter(|i| {
-            i.issue_type == IssueType::Epic && i.priority == Priority::HIGH
-        })
+        .filter(|i| i.issue_type == IssueType::Epic && i.priority == Priority::HIGH)
         .collect();
 
-    assert_eq!(p1_epics.len(), 5, "Should have 5 P1 epics, one for each status");
+    assert_eq!(
+        p1_epics.len(),
+        5,
+        "Should have 5 P1 epics, one for each status"
+    );
 }
 
 #[test]
@@ -474,11 +464,17 @@ fn test_p1_epic_sync_equals() {
     let retrieved = storage.get_issue("epic-p1-sync").unwrap().unwrap();
 
     // Test 1: An issue should sync_equal with itself (sanity check)
-    assert!(retrieved.sync_equals(&retrieved), "Issue should sync_equal with itself");
+    assert!(
+        retrieved.sync_equals(&retrieved),
+        "Issue should sync_equal with itself"
+    );
 
     // Test 2: Create an exact clone - should be sync_equal
     let same_content = retrieved.clone();
-    assert!(retrieved.sync_equals(&same_content), "P1 epic should sync_equal with its clone");
+    assert!(
+        retrieved.sync_equals(&same_content),
+        "P1 epic should sync_equal with its clone"
+    );
 
     // Verify P1 priority comparison works
     assert_eq!(retrieved.priority, same_content.priority);
@@ -499,7 +495,10 @@ fn test_p1_epic_sync_equals() {
         ..Default::default()
     };
 
-    assert!(!retrieved.sync_equals(&different_desc), "Different descriptions should not be sync_equal");
+    assert!(
+        !retrieved.sync_equals(&different_desc),
+        "Different descriptions should not be sync_equal"
+    );
 
     // Create a version with different priority (P0 instead of P1)
     let different_priority = Issue {
@@ -513,7 +512,10 @@ fn test_p1_epic_sync_equals() {
         ..Default::default()
     };
 
-    assert!(!retrieved.sync_equals(&different_priority), "Different priorities should not be sync_equal");
+    assert!(
+        !retrieved.sync_equals(&different_priority),
+        "Different priorities should not be sync_equal"
+    );
     assert_eq!(different_priority.priority, Priority::CRITICAL);
     assert_eq!(different_priority.priority.0, 0);
 
@@ -529,7 +531,10 @@ fn test_p1_epic_sync_equals() {
         ..Default::default()
     };
 
-    assert!(!retrieved.sync_equals(&different_title), "Different titles should not be sync_equal");
+    assert!(
+        !retrieved.sync_equals(&different_title),
+        "Different titles should not be sync_equal"
+    );
 
     // Verify sync_equals requires same ID
     let different_id = Issue {
@@ -543,5 +548,8 @@ fn test_p1_epic_sync_equals() {
         ..Default::default()
     };
 
-    assert!(!retrieved.sync_equals(&different_id), "Different IDs should not be sync_equal");
+    assert!(
+        !retrieved.sync_equals(&different_id),
+        "Different IDs should not be sync_equal"
+    );
 }

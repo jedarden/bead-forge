@@ -80,9 +80,9 @@
 //! | `claim` | Object | Single object with bead_id field |
 //! | `create` | String | Bead ID only (plain text) |
 
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
-use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 /// Test workspace isolation - ensures tests don't share state
@@ -90,23 +90,25 @@ static TEST_WORKSPACE: OnceLock<TempDir> = OnceLock::new();
 
 /// Get or create the shared test workspace
 pub fn test_workspace() -> &'static Path {
-    TEST_WORKSPACE.get_or_init(|| {
-        let dir = tempfile::tempdir().expect("Failed to create temp dir for tests");
-        let beads_dir = dir.path().join(".beads");
-        std::fs::create_dir(&beads_dir).expect("Failed to create .beads directory");
+    TEST_WORKSPACE
+        .get_or_init(|| {
+            let dir = tempfile::tempdir().expect("Failed to create temp dir for tests");
+            let beads_dir = dir.path().join(".beads");
+            std::fs::create_dir(&beads_dir).expect("Failed to create .beads directory");
 
-        // Initialize workspace with default config
-        crate::config::init_workspace(&beads_dir, "bf-test")
-            .expect("Failed to initialize test workspace");
+            // Initialize workspace with default config
+            crate::config::init_workspace(&beads_dir, "bf-test")
+                .expect("Failed to initialize test workspace");
 
-        // Create database upfront to avoid race conditions in parallel tests
-        let metadata = crate::config::load_metadata(&beads_dir)
-            .expect("Failed to load metadata");
-        let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
-            .expect("Failed to create database");
+            // Create database upfront to avoid race conditions in parallel tests
+            let metadata =
+                crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
+            let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
+                .expect("Failed to create database");
 
-        dir
-    }).path()
+            dir
+        })
+        .path()
 }
 
 /// Get the path to the bf binary, preferring CARGO_BIN_EXE for test consistency
@@ -126,7 +128,10 @@ pub fn bf_binary() -> String {
     // Second try relative to this file's location (for cargo test runs from workspace root)
     let this_file = std::file!();
     let this_dir = std::path::Path::new(this_file).parent().unwrap();
-    let cargo_toml_dir = this_dir.ancestors().find(|d| d.join("Cargo.toml").exists()).unwrap_or(this_dir);
+    let cargo_toml_dir = this_dir
+        .ancestors()
+        .find(|d| d.join("Cargo.toml").exists())
+        .unwrap_or(this_dir);
     let bin_path = cargo_toml_dir.join("target").join("debug").join("bf");
 
     if let Ok(abs_path) = std::fs::canonicalize(&bin_path) {
@@ -160,13 +165,11 @@ pub fn bf_command_with_workspace(workspace: &Path) -> Command {
 
 /// JSON validation helpers
 pub mod json_validation {
-    use serde_json::{Value, from_str};
+    use serde_json::{from_str, Value};
 
     /// Parse a JSON string and panic if invalid
     pub fn parse_json(json: &str) -> Value {
-        from_str(json).unwrap_or_else(|e| {
-            panic!("Failed to parse JSON: {}\nJSON was: {}", e, json)
-        })
+        from_str(json).unwrap_or_else(|e| panic!("Failed to parse JSON: {}\nJSON was: {}", e, json))
     }
 
     /// Try to parse a JSON string, returning a Result
@@ -235,9 +238,12 @@ pub mod json_validation {
 
     /// Get an integer field from JSON, panic if missing or not an integer
     pub fn get_int(json: &Value, field: &str) -> i64 {
-        json.get(field)
-            .and_then(|v| v.as_i64())
-            .unwrap_or_else(|| panic!("Field '{}' is not an integer or is missing: {}", field, json))
+        json.get(field).and_then(|v| v.as_i64()).unwrap_or_else(|| {
+            panic!(
+                "Field '{}' is not an integer or is missing: {}",
+                field, json
+            )
+        })
     }
 
     /// Get a boolean field from JSON, panic if missing or not a boolean
@@ -272,8 +278,7 @@ pub mod json_validation {
 
     /// Get an optional integer field from JSON, returning None if missing or not an integer
     pub fn get_int_optional(json: &Value, field: &str) -> Option<i64> {
-        json.get(field)
-            .and_then(|v| v.as_i64())
+        json.get(field).and_then(|v| v.as_i64())
     }
 }
 
@@ -589,13 +594,15 @@ pub mod envelope {
         let envelope = parse_json(json);
 
         // Check version field
-        let version = envelope.get("version")
+        let version = envelope
+            .get("version")
             .and_then(|v| v.as_i64())
             .expect("Envelope must have numeric 'version' field");
         assert_eq!(version, 1, "Envelope version must be 1");
 
         // Check kind field
-        let kind = envelope.get("kind")
+        let kind = envelope
+            .get("kind")
             .and_then(|k| k.as_str())
             .expect("Envelope must have string 'kind' field");
         assert_eq!(kind, expected_kind, "Envelope kind mismatch");
@@ -611,7 +618,8 @@ pub mod envelope {
 
     /// Get the data field from an envelope
     pub fn get_envelope_data(envelope: &Value) -> Value {
-        envelope.get("data")
+        envelope
+            .get("data")
             .cloned()
             .unwrap_or_else(|| panic!("Envelope missing 'data' field"))
     }
@@ -623,7 +631,8 @@ pub mod envelope {
 
     /// Get warning from envelope if present
     pub fn get_warning(envelope: &Value) -> Option<String> {
-        envelope.get("warning")
+        envelope
+            .get("warning")
             .and_then(|w| w.as_str())
             .map(|s| s.to_string())
     }
@@ -682,8 +691,8 @@ pub mod capture {
 
 #[cfg(test)]
 mod infrastructure_tests {
-    use super::*;
     use super::json_validation::*;
+    use super::*;
 
     #[test]
     #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
@@ -714,7 +723,10 @@ mod infrastructure_tests {
 
         let bead_id = fixtures::create_bead("Test bead for infrastructure");
         assert!(!bead_id.is_empty(), "Bead ID should not be empty");
-        assert!(bead_id.starts_with("bf-test-"), "Bead ID should have correct prefix");
+        assert!(
+            bead_id.starts_with("bf-test-"),
+            "Bead ID should have correct prefix"
+        );
 
         // Cleanup
         fixtures::close_bead(&bead_id, "Infrastructure test cleanup");
@@ -781,7 +793,10 @@ mod infrastructure_tests {
         let result = std::panic::catch_unwind(|| {
             assert_required_fields(&parsed, &["id", "title", "missing_field"], "test context");
         });
-        assert!(result.is_err(), "Should panic when required field is missing");
+        assert!(
+            result.is_err(),
+            "Should panic when required field is missing"
+        );
     }
 
     #[test]
@@ -858,7 +873,10 @@ mod infrastructure_tests {
         let json_str = r#"{"id": "bf-test", "description": null, "title": "Test"}"#;
         let parsed = parse_json(json_str);
 
-        assert_eq!(get_string_optional(&parsed, "id"), Some("bf-test".to_string()));
+        assert_eq!(
+            get_string_optional(&parsed, "id"),
+            Some("bf-test".to_string())
+        );
         assert_eq!(get_string_optional(&parsed, "description"), None);
         assert_eq!(get_string_optional(&parsed, "missing"), None);
     }
@@ -929,18 +947,15 @@ mod format_detection_tests {
     fn test_assert_format() {
         format_detection::assert_format(
             r#"{"id": "test"}"#,
-            format_detection::JsonFormat::SingleObject
+            format_detection::JsonFormat::SingleObject,
         );
 
-        format_detection::assert_format(
-            r#"[]"#,
-            format_detection::JsonFormat::EmptyArray
-        );
+        format_detection::assert_format(r#"[]"#, format_detection::JsonFormat::EmptyArray);
 
         let result = std::panic::catch_unwind(|| {
             format_detection::assert_format(
                 r#"{"id": "test"}"#,
-                format_detection::JsonFormat::Array
+                format_detection::JsonFormat::Array,
             );
         });
         assert!(result.is_err(), "Should panic when format doesn't match");
@@ -969,7 +984,9 @@ invalid json
     #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
     fn test_is_valid_json_object() {
         assert!(format_detection::is_valid_json_object(r#"{"id": "test"}"#));
-        assert!(!format_detection::is_valid_json_object(r#"[{"id": "test"}]"#));
+        assert!(!format_detection::is_valid_json_object(
+            r#"[{"id": "test"}]"#
+        ));
         assert!(!format_detection::is_valid_json_object(r#"[]"#));
         assert!(!format_detection::is_valid_json_object(""));
     }
@@ -1000,7 +1017,10 @@ mod command_json_output_tests {
     fn require_binary() {
         let binary = bf_binary();
         if !std::path::Path::new(&binary).exists() {
-            eprintln!("Skipping test - binary not found at: {}. Run 'cargo build' first.", binary);
+            eprintln!(
+                "Skipping test - binary not found at: {}. Run 'cargo build' first.",
+                binary
+            );
             panic!("Binary not found");
         }
     }
@@ -1008,13 +1028,37 @@ mod command_json_output_tests {
     /// Helper to check required issue fields in JSON
     fn assert_issue_fields_present(json: &serde_json::Value, context: &str) {
         assert!(json.get("id").is_some(), "{}: Missing 'id' field", context);
-        assert!(json.get("title").is_some(), "{}: Missing 'title' field", context);
-        assert!(json.get("status").is_some(), "{}: Missing 'status' field", context);
-        assert!(json.get("priority").is_some(), "{}: Missing 'priority' field", context);
-        assert!(json.get("issue_type").is_some(), "{}: Missing 'issue_type' field", context);
+        assert!(
+            json.get("title").is_some(),
+            "{}: Missing 'title' field",
+            context
+        );
+        assert!(
+            json.get("status").is_some(),
+            "{}: Missing 'status' field",
+            context
+        );
+        assert!(
+            json.get("priority").is_some(),
+            "{}: Missing 'priority' field",
+            context
+        );
+        assert!(
+            json.get("issue_type").is_some(),
+            "{}: Missing 'issue_type' field",
+            context
+        );
         // These should always be present even if null/empty (display normalization)
-        assert!(json.get("assignee").is_some(), "{}: Missing 'assignee' field", context);
-        assert!(json.get("labels").is_some(), "{}: Missing 'labels' field", context);
+        assert!(
+            json.get("assignee").is_some(),
+            "{}: Missing 'assignee' field",
+            context
+        );
+        assert!(
+            json.get("labels").is_some(),
+            "{}: Missing 'labels' field",
+            context
+        );
     }
 
     #[test]
@@ -1031,17 +1075,22 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // show command wraps output in array for NEEDLE compatibility: [{...}]
         let json_str = output.trim();
-        assert!(json_str.starts_with('['), "show output should start with '['");
+        assert!(
+            json_str.starts_with('['),
+            "show output should start with '['"
+        );
         assert!(json_str.ends_with(']'), "show output should end with ']'");
 
         // Parse as array
         let parsed = json_validation::parse_json(json_str);
-        let array = parsed.as_array().expect("show output should be a JSON array");
+        let array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
         assert_eq!(array.len(), 1, "show should return exactly one issue");
 
         let issue_json = &array[0];
@@ -1067,17 +1116,22 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Parse and verify special characters are properly escaped
         let json_str = output.trim();
         let parsed = json_validation::parse_json(json_str);
-        let array = parsed.as_array().expect("show output should be a JSON array");
+        let array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
         let issue_json = &array[0];
 
         let title = json_validation::get_string(issue_json, "title");
-        assert!(title.contains("quotes"), "Title should contain escaped quotes");
+        assert!(
+            title.contains("quotes"),
+            "Title should contain escaped quotes"
+        );
 
         // Cleanup
         fixtures::close_bead(&bead_id, "Special characters test cleanup");
@@ -1115,7 +1169,7 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Validate JSON is properly formatted and escaped
@@ -1125,13 +1179,18 @@ mod command_json_output_tests {
         json_validation::assert_valid_json(json_str);
 
         let parsed = json_validation::parse_json(json_str);
-        let array = parsed.as_array().expect("show output should be a JSON array");
+        let array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
         let issue_json = &array[0];
 
         // Verify title contains special characters properly preserved
         let title = json_validation::get_string(issue_json, "title");
         assert!(title.contains("\"quotes\""), "Title should preserve quotes");
-        assert!(title.contains("'apostrophes'"), "Title should preserve apostrophes");
+        assert!(
+            title.contains("'apostrophes'"),
+            "Title should preserve apostrophes"
+        );
         assert!(title.contains("&"), "Title should preserve ampersands");
         assert!(title.contains("<"), "Title should preserve less-than");
         assert!(title.contains(">"), "Title should preserve greater-than");
@@ -1141,16 +1200,28 @@ mod command_json_output_tests {
         let description = json_validation::get_string_optional(issue_json, "description");
         assert!(description.is_some(), "Description should be present");
         let desc = description.unwrap();
-        assert!(desc.contains("quotes"), "Description should preserve quotes");
-        assert!(desc.contains("apostrophes"), "Description should preserve apostrophes");
+        assert!(
+            desc.contains("quotes"),
+            "Description should preserve quotes"
+        );
+        assert!(
+            desc.contains("apostrophes"),
+            "Description should preserve apostrophes"
+        );
         assert!(desc.contains("&"), "Description should preserve ampersands");
         assert!(desc.contains("tags"), "Description should preserve tags");
-        assert!(desc.contains("json"), "Description should preserve json-like content");
+        assert!(
+            desc.contains("json"),
+            "Description should preserve json-like content"
+        );
 
         // Verify the entire JSON output is properly escaped by re-parsing
         // If serde_json can parse it, the escaping is correct
         let reparsed = json_validation::parse_json(json_str);
-        assert_eq!(parsed, reparsed, "JSON should be consistent after re-parsing");
+        assert_eq!(
+            parsed, reparsed,
+            "JSON should be consistent after re-parsing"
+        );
 
         // Cleanup
         fixtures::close_bead(&bead_id, "Comprehensive special characters test cleanup");
@@ -1168,17 +1239,25 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let json_str = output.trim();
         let parsed = json_validation::parse_json(json_str);
-        let array = parsed.as_array().expect("show output should be a JSON array");
+        let array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
         let issue_json = &array[0];
 
         // Verify dependencies and comments are stripped/empty
-        assert!(issue_json.get("dependencies").is_none(), "dependencies should be stripped from JSON output");
-        assert!(issue_json.get("comments").is_none(), "comments should be stripped from JSON output");
+        assert!(
+            issue_json.get("dependencies").is_none(),
+            "dependencies should be stripped from JSON output"
+        );
+        assert!(
+            issue_json.get("comments").is_none(),
+            "comments should be stripped from JSON output"
+        );
 
         fixtures::close_bead(&bead_id, "Empty deps test cleanup");
     }
@@ -1194,12 +1273,7 @@ mod command_json_output_tests {
         let bead3 = fixtures::create_bead("Third bead for list test");
 
         // Get JSON output
-        let output = capture::capture_stdout(
-            bf_command()
-                .arg("list")
-                .arg("--format")
-                .arg("json")
-        );
+        let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
         // list returns JSONL (one JSON object per line)
         let lines: Vec<&str> = output.lines().collect();
@@ -1232,14 +1306,14 @@ mod command_json_output_tests {
         crate::config::init_workspace(&beads_dir, "bf-test-empty-list")
             .expect("Failed to initialize test workspace");
 
-        let metadata = crate::config::load_metadata(&beads_dir)
-            .expect("Failed to load metadata");
+        let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
         let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
             .expect("Failed to create database");
 
         // Test 1: Empty workspace with no beads
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("list")
             .arg("--format")
             .arg("json");
@@ -1252,67 +1326,92 @@ mod command_json_output_tests {
 
         // Test 2: Filter that returns no results (status filter)
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("list")
             .arg("--status")
             .arg("closed")
             .arg("--format")
             .arg("json");
-        let output = cmd.output().expect("Failed to execute bf list with status filter");
+        let output = cmd
+            .output()
+            .expect("Failed to execute bf list with status filter");
         let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
         // Filter with no matches also returns nothing
         let trimmed = stdout.trim();
-        assert_eq!(trimmed, "", "List with no matching beads should return nothing");
+        assert_eq!(
+            trimmed, "",
+            "List with no matching beads should return nothing"
+        );
 
         // Test 3: Type filter that returns no results
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("list")
             .arg("--type")
             .arg("genesis")
             .arg("--format")
             .arg("json");
-        let output = cmd.output().expect("Failed to execute bf list with type filter");
+        let output = cmd
+            .output()
+            .expect("Failed to execute bf list with type filter");
         let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
         // Type filter with no matches also returns nothing
         let trimmed = stdout.trim();
-        assert_eq!(trimmed, "", "List with no matching types should return nothing");
+        assert_eq!(
+            trimmed, "",
+            "List with no matching types should return nothing"
+        );
 
         // Test 4: Assignee filter that returns no results
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("list")
             .arg("--assignee")
             .arg("nonexistent-assignee-xyz")
             .arg("--format")
             .arg("json");
-        let output = cmd.output().expect("Failed to execute bf list with assignee filter");
+        let output = cmd
+            .output()
+            .expect("Failed to execute bf list with assignee filter");
         let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
         // Assignee filter with no matches also returns nothing
         let trimmed = stdout.trim();
-        assert_eq!(trimmed, "", "List with no matching assignees should return nothing");
+        assert_eq!(
+            trimmed, "",
+            "List with no matching assignees should return nothing"
+        );
 
         // Test 5: Label filter that returns no results
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("list")
             .arg("--label")
             .arg("nonexistent-label-xyz")
             .arg("--format")
             .arg("json");
-        let output = cmd.output().expect("Failed to execute bf list with label filter");
+        let output = cmd
+            .output()
+            .expect("Failed to execute bf list with label filter");
         let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
         // Label filter with no matches also returns nothing
         let trimmed = stdout.trim();
-        assert_eq!(trimmed, "", "List with no matching labels should return nothing");
+        assert_eq!(
+            trimmed, "",
+            "List with no matching labels should return nothing"
+        );
 
         // Test 6: Priority filter that returns no results
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("list")
             .arg("--priority-min")
             .arg("100")
@@ -1320,12 +1419,17 @@ mod command_json_output_tests {
             .arg("200")
             .arg("--format")
             .arg("json");
-        let output = cmd.output().expect("Failed to execute bf list with priority filter");
+        let output = cmd
+            .output()
+            .expect("Failed to execute bf list with priority filter");
         let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
         // Priority filter with no matches also returns nothing
         let trimmed = stdout.trim();
-        assert_eq!(trimmed, "", "List with no matching priorities should return nothing");
+        assert_eq!(
+            trimmed, "",
+            "List with no matching priorities should return nothing"
+        );
     }
 
     #[test]
@@ -1346,10 +1450,13 @@ mod command_json_output_tests {
                 .arg("--status")
                 .arg("closed")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
-        let lines: Vec<&str> = output.lines().filter(|l| !l.is_empty() && *l != "[]").collect();
+        let lines: Vec<&str> = output
+            .lines()
+            .filter(|l| !l.is_empty() && *l != "[]")
+            .collect();
         assert!(lines.len() >= 1, "Should find at least one closed bead");
 
         // Verify the filtered result has correct status
@@ -1366,16 +1473,12 @@ mod command_json_output_tests {
 
         let bead_id = fixtures::create_bead("Test bead for field presence");
 
-        let output = capture::capture_stdout(
-            bf_command()
-                .arg("list")
-                .arg("--format")
-                .arg("json")
-        );
+        let output = capture::capture_stdout(bf_command().arg("list").arg("--format").arg("json"));
 
         // Find our bead in the output
         let lines: Vec<&str> = output.lines().collect();
-        let our_bead = lines.iter()
+        let our_bead = lines
+            .iter()
             .find(|line| line.contains(&bead_id))
             .expect("Should find our bead in list output");
 
@@ -1384,7 +1487,10 @@ mod command_json_output_tests {
         // Verify display normalization: assignee and labels always present
         assert!(parsed.get("assignee").is_some(), "assignee must be present");
         assert!(parsed.get("labels").is_some(), "labels must be present");
-        assert!(parsed.get("labels").unwrap().is_array(), "labels must be an array");
+        assert!(
+            parsed.get("labels").unwrap().is_array(),
+            "labels must be an array"
+        );
 
         fixtures::close_bead(&bead_id, "Field presence test cleanup");
     }
@@ -1404,7 +1510,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("keyword")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // search returns JSONL (one JSON object per line)
@@ -1433,7 +1539,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("nonexistent")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Empty search produces no output (different from list!)
@@ -1460,7 +1566,7 @@ mod command_json_output_tests {
                 .arg("--priority-max")
                 .arg("1")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines: Vec<&str> = output.lines().collect();
@@ -1468,7 +1574,10 @@ mod command_json_output_tests {
         for line in lines {
             let parsed = json_validation::parse_json(line);
             if let Some(priority) = parsed.get("priority").and_then(|p| p.as_i64()) {
-                assert!(priority >= 0 && priority <= 1, "Priority should be in range 0-1");
+                assert!(
+                    priority >= 0 && priority <= 1,
+                    "Priority should be in range 0-1"
+                );
             }
         }
 
@@ -1483,9 +1592,13 @@ mod command_json_output_tests {
 
         // Create beads with special characters in titles
         // Use unique prefixes to avoid conflicts with other tests
-        let bead1 = fixtures::create_bead("bf-2to9f2-special-1: Test with \"quotes\" and 'apostrophes'");
-        let bead2 = fixtures::create_bead("bf-2to9f2-special-2: Bead with & symbols < > and \\backslashes");
-        let bead3 = fixtures::create_bead("bf-2to9f2-special-3: Item with brackets [parentheses] and {braces}");
+        let bead1 =
+            fixtures::create_bead("bf-2to9f2-special-1: Test with \"quotes\" and 'apostrophes'");
+        let bead2 =
+            fixtures::create_bead("bf-2to9f2-special-2: Bead with & symbols < > and \\backslashes");
+        let bead3 = fixtures::create_bead(
+            "bf-2to9f2-special-3: Item with brackets [parentheses] and {braces}",
+        );
 
         // Search for beads with our unique prefix to ensure we only get our test beads
         let output = capture::capture_stdout(
@@ -1493,11 +1606,14 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("bf-2to9f2-special")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines: Vec<&str> = output.lines().collect();
-        assert!(lines.len() >= 3, "search should find all three beads with 'bf-2to9f2-special' prefix");
+        assert!(
+            lines.len() >= 3,
+            "search should find all three beads with 'bf-2to9f2-special' prefix"
+        );
 
         // Verify the found beads contain special characters properly escaped
         let mut found_quotes = false;
@@ -1519,8 +1635,10 @@ mod command_json_output_tests {
             }
         }
 
-        assert!(found_quotes && found_symbols && found_brackets,
-               "Search should find beads with quotes, symbols, and brackets");
+        assert!(
+            found_quotes && found_symbols && found_brackets,
+            "Search should find beads with quotes, symbols, and brackets"
+        );
 
         // Cleanup
         fixtures::close_bead(&bead1, "Special chars test cleanup 1");
@@ -1535,9 +1653,11 @@ mod command_json_output_tests {
 
         // Create beads with unicode and emoji characters
         // Use unique prefixes to avoid conflicts with other tests
-        let bead1 = fixtures::create_bead("bf-2to9f2-unicode-1: Test with unicode: café and 日本語");
+        let bead1 =
+            fixtures::create_bead("bf-2to9f2-unicode-1: Test with unicode: café and 日本語");
         let bead2 = fixtures::create_bead("bf-2to9f2-unicode-2: Emoji test: 🎉 🔥 🚀 💻");
-        let bead3 = fixtures::create_bead("bf-2to9f2-unicode-3: Mixed unicode: Ñ, ü, and emojis 🌟");
+        let bead3 =
+            fixtures::create_bead("bf-2to9f2-unicode-3: Mixed unicode: Ñ, ü, and emojis 🌟");
 
         // Search for unicode content with our unique prefix
         let output = capture::capture_stdout(
@@ -1545,11 +1665,14 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("bf-2to9f2-unicode")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines: Vec<&str> = output.lines().collect();
-        assert!(lines.len() >= 3, "search should find all three beads with 'bf-2to9f2-unicode' prefix");
+        assert!(
+            lines.len() >= 3,
+            "search should find all three beads with 'bf-2to9f2-unicode' prefix"
+        );
 
         // Verify unicode is preserved in results
         let mut found_cafe = false;
@@ -1572,8 +1695,10 @@ mod command_json_output_tests {
             }
         }
 
-        assert!(found_cafe && found_emoji && found_mixed,
-               "Search should find beads with café, emoji, and mixed unicode");
+        assert!(
+            found_cafe && found_emoji && found_mixed,
+            "Search should find beads with café, emoji, and mixed unicode"
+        );
 
         // Search for emoji content
         let emoji_output = capture::capture_stdout(
@@ -1581,18 +1706,27 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("emoji")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let emoji_lines: Vec<&str> = emoji_output.lines().collect();
-        assert!(emoji_lines.len() >= 1, "search should find beads with 'emoji'");
+        assert!(
+            emoji_lines.len() >= 1,
+            "search should find beads with 'emoji'"
+        );
 
         // Verify emojis are preserved
         for line in emoji_lines {
             let parsed = json_validation::parse_json(line);
             let title = json_validation::get_string(&parsed, "title");
-            assert!(title.contains("🎉") || title.contains("🔥") || title.contains("🚀") || title.contains("💻") || title.contains("🌟"),
-                   "Emoji characters should be preserved in search results");
+            assert!(
+                title.contains("🎉")
+                    || title.contains("🔥")
+                    || title.contains("🚀")
+                    || title.contains("💻")
+                    || title.contains("🌟"),
+                "Emoji characters should be preserved in search results"
+            );
         }
 
         // Cleanup
@@ -1619,31 +1753,40 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("dots")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines: Vec<&str> = output.lines().collect();
-        assert!(lines.len() >= 1, "search should handle regex special characters in query");
+        assert!(
+            lines.len() >= 1,
+            "search should handle regex special characters in query"
+        );
 
         // Verify JSON is valid despite regex special chars in content
         for line in lines {
             let parsed = json_validation::parse_json(line);
             let title = json_validation::get_string(&parsed, "title");
             // The search should work correctly even with special chars
-            assert!(title.contains("dots") || title.contains("asterisks") ||
-                   title.contains("Plus") || title.contains("question") ||
-                   title.contains("Caret") || title.contains("dollar") ||
-                   title.contains("Pipe") || title.contains("vertical"),
-                   "Search should work with regex special characters in content");
+            assert!(
+                title.contains("dots")
+                    || title.contains("asterisks")
+                    || title.contains("Plus")
+                    || title.contains("question")
+                    || title.contains("Caret")
+                    || title.contains("dollar")
+                    || title.contains("Pipe")
+                    || title.contains("vertical"),
+                "Search should work with regex special characters in content"
+            );
         }
 
         // Search for a term with regex special character
         let special_output = capture::capture_stdout(
             bf_command()
                 .arg("search")
-                .arg("dots")  // "." is special in regex but should work as literal in search
+                .arg("dots") // "." is special in regex but should work as literal in search
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let special_lines: Vec<&str> = special_output.lines().collect();
@@ -1666,7 +1809,8 @@ mod command_json_output_tests {
         require_binary();
 
         // Create a bead with a moderately long title (within 500 char limit)
-        let long_title = "This is a moderately long title containing many repeated phrases for testing ";
+        let long_title =
+            "This is a moderately long title containing many repeated phrases for testing ";
         let bead_id = fixtures::create_bead(&long_title);
 
         // Create another bead for comparison
@@ -1679,7 +1823,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg(&long_query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSONL output
@@ -1697,7 +1841,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg(&another_long_query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let another_lines: Vec<&str> = another_output.lines().collect();
@@ -1714,7 +1858,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg(&extreme_query)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should still return valid JSON (even if empty)
@@ -1743,7 +1887,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg(" ")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should return valid JSON (empty or not)
@@ -1758,7 +1902,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("    ")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines2: Vec<&str> = output2.lines().collect();
@@ -1772,7 +1916,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("\t")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines3: Vec<&str> = output3.lines().collect();
@@ -1786,7 +1930,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg(" \t \t ")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines4: Vec<&str> = output4.lines().collect();
@@ -1800,7 +1944,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("\n")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines5: Vec<&str> = output5.lines().collect();
@@ -1830,7 +1974,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("[test]")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines1: Vec<&str> = output1.lines().collect();
@@ -1844,7 +1988,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("(parentheses)")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines2: Vec<&str> = output2.lines().collect();
@@ -1858,7 +2002,7 @@ mod command_json_output_tests {
                 .arg("search")
                 .arg("{curly}")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let lines3: Vec<&str> = output3.lines().collect();
@@ -1882,12 +2026,7 @@ mod command_json_output_tests {
         let bead2 = fixtures::create_bead("Ready bead 2");
 
         // Get ready beads
-        let output = capture::capture_stdout(
-            bf_command()
-                .arg("ready")
-                .arg("--format")
-                .arg("json")
-        );
+        let output = capture::capture_stdout(bf_command().arg("ready").arg("--format").arg("json"));
 
         // ready returns JSONL, empty returns "[]"
         let trimmed = output.trim();
@@ -1921,14 +2060,14 @@ mod command_json_output_tests {
         crate::config::init_workspace(&beads_dir, "bf-test-empty")
             .expect("Failed to initialize test workspace");
 
-        let metadata = crate::config::load_metadata(&beads_dir)
-            .expect("Failed to load metadata");
+        let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
         let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
             .expect("Failed to create database");
 
         // Create and close a bead so there are no ready candidates
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("create")
             .arg("--title")
             .arg("Bead to close")
@@ -1937,11 +2076,15 @@ mod command_json_output_tests {
             .arg("--priority")
             .arg("2");
         let output = cmd.output().expect("Failed to execute bf create");
-        let bead_id = String::from_utf8(output.stdout).expect("Invalid UTF-8").trim().to_string();
+        let bead_id = String::from_utf8(output.stdout)
+            .expect("Invalid UTF-8")
+            .trim()
+            .to_string();
 
         // Close the bead
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("close")
             .arg(&bead_id)
             .arg("--reason")
@@ -1950,7 +2093,8 @@ mod command_json_output_tests {
 
         // With all beads closed, ready should return []
         let mut cmd = Command::new(bf_binary());
-        cmd.arg("-w").arg(&beads_dir)
+        cmd.arg("-w")
+            .arg(&beads_dir)
             .arg("ready")
             .arg("--format")
             .arg("json");
@@ -1980,13 +2124,16 @@ mod command_json_output_tests {
                 .arg("--limit")
                 .arg("2")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         let trimmed = output.trim();
         if trimmed != "[]" && !trimmed.is_empty() {
             let lines: Vec<&str> = trimmed.lines().collect();
-            assert!(lines.len() <= 2, "ready with --limit 2 should return at most 2 beads");
+            assert!(
+                lines.len() <= 2,
+                "ready with --limit 2 should return at most 2 beads"
+            );
         }
     }
 
@@ -1999,12 +2146,8 @@ mod command_json_output_tests {
         let bead_id = fixtures::create_bead("Recent bead for test");
 
         // Get recent beads (always uses envelope)
-        let output = capture::capture_stdout(
-            bf_command()
-                .arg("recent")
-                .arg("--format")
-                .arg("json")
-        );
+        let output =
+            capture::capture_stdout(bf_command().arg("recent").arg("--format").arg("json"));
 
         // recent always wraps output in envelope
         let envelope = envelope::validate_envelope(&output, "recent");
@@ -2036,7 +2179,7 @@ mod command_json_output_tests {
                 .arg("--time-period")
                 .arg("1h")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should still be wrapped in envelope
@@ -2044,7 +2187,10 @@ mod command_json_output_tests {
         let data = envelope::get_envelope_data(&envelope);
 
         // Data should be present (even if empty array)
-        assert!(data.is_array() || data.is_string(), "recent data should be array or string");
+        assert!(
+            data.is_array() || data.is_string(),
+            "recent data should be array or string"
+        );
 
         fixtures::close_bead(&bead_id, "Time period test cleanup");
     }
@@ -2061,7 +2207,7 @@ mod command_json_output_tests {
                 .arg("--time-period")
                 .arg("1s")
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Even empty results are wrapped in envelope
@@ -2088,7 +2234,7 @@ mod command_json_output_tests {
                 .arg(&bead_id)
                 .arg("--format")
                 .arg("json")
-                .arg("--envelope")
+                .arg("--envelope"),
         );
 
         // Should be wrapped in envelope
@@ -2119,7 +2265,7 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(fake_bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Command should fail
@@ -2148,7 +2294,7 @@ mod command_json_output_tests {
         // Create a bead with various fields populated
         let bead_id = fixtures::create_bead_with_labels(
             "Test bead for all fields verification",
-            &["test-label", "priority-high"]
+            &["test-label", "priority-high"],
         );
 
         // Get JSON output
@@ -2157,35 +2303,55 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Parse JSON
         let json_str = output.trim();
         let parsed = json_validation::parse_json(json_str);
-        let array = parsed.as_array().expect("show output should be a JSON array");
+        let array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
         let issue_json = &array[0];
 
         // Verify all standard required fields are present
         json_validation::assert_required_fields(
             issue_json,
-            &["id", "title", "status", "priority", "issue_type", "assignee", "labels"],
-            "show command"
+            &[
+                "id",
+                "title",
+                "status",
+                "priority",
+                "issue_type",
+                "assignee",
+                "labels",
+            ],
+            "show command",
         );
 
         // Verify specific field values
         assert_eq!(json_validation::get_string(issue_json, "id"), bead_id);
-        assert_eq!(json_validation::get_string(issue_json, "title"), "Test bead for all fields verification");
+        assert_eq!(
+            json_validation::get_string(issue_json, "title"),
+            "Test bead for all fields verification"
+        );
 
         // Verify labels array
-        let labels = issue_json.get("labels")
+        let labels = issue_json
+            .get("labels")
             .and_then(|v| v.as_array())
             .expect("labels should be an array");
         assert!(labels.len() >= 2, "should have at least 2 labels");
 
         // Verify dependencies and comments are stripped (as per NEEDLE compatibility)
-        assert!(issue_json.get("dependencies").is_none(), "dependencies should be stripped from JSON output");
-        assert!(issue_json.get("comments").is_none(), "comments should be stripped from JSON output");
+        assert!(
+            issue_json.get("dependencies").is_none(),
+            "dependencies should be stripped from JSON output"
+        );
+        assert!(
+            issue_json.get("comments").is_none(),
+            "comments should be stripped from JSON output"
+        );
 
         // Cleanup
         fixtures::close_bead(&bead_id, "All fields test cleanup");
@@ -2204,7 +2370,7 @@ mod command_json_output_tests {
                 .arg("list")
                 .arg("--format")
                 .arg("json")
-                .arg("--envelope")
+                .arg("--envelope"),
         );
 
         // Should be wrapped in envelope
@@ -2233,7 +2399,7 @@ mod command_json_output_tests {
                 .arg("ready")
                 .arg("--format")
                 .arg("json")
-                .arg("--envelope")
+                .arg("--envelope"),
         );
 
         // Should be wrapped in envelope
@@ -2263,7 +2429,7 @@ mod command_json_output_tests {
                 .arg("envelope")
                 .arg("--format")
                 .arg("json")
-                .arg("--envelope")
+                .arg("--envelope"),
         );
 
         // Should be wrapped in envelope
@@ -2295,7 +2461,7 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should be valid JSON
@@ -2304,7 +2470,9 @@ mod command_json_output_tests {
         // Parse and verify Unicode is preserved
         let json_str = output.trim();
         let parsed = json_validation::parse_json(json_str);
-        let array = parsed.as_array().expect("show output should be a JSON array");
+        let array = parsed
+            .as_array()
+            .expect("show output should be a JSON array");
         let issue_json = &array[0];
 
         let title = json_validation::get_string(issue_json, "title");
@@ -2323,7 +2491,8 @@ mod command_json_output_tests {
 
         // Update with description containing newlines
         let mut update_cmd = bf_command();
-        update_cmd.arg("update")
+        update_cmd
+            .arg("update")
             .arg(&bead_id)
             .arg("--description")
             .arg("Line 1\nLine 2\nLine 3");
@@ -2336,7 +2505,7 @@ mod command_json_output_tests {
                 .arg("show")
                 .arg(&bead_id)
                 .arg("--format")
-                .arg("json")
+                .arg("json"),
         );
 
         // Should be valid JSON despite newlines

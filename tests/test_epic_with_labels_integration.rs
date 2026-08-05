@@ -24,7 +24,11 @@ fn test_epic_creation_with_multiple_labels() {
         issue_type: IssueType::Epic,
         status: Status::Open,
         priority: Priority::HIGH,
-        labels: vec!["phase-1".to_string(), "backend".to_string(), "critical".to_string()],
+        labels: vec![
+            "phase-1".to_string(),
+            "backend".to_string(),
+            "critical".to_string(),
+        ],
         description: Some("Multi-label epic test".to_string()),
         ..Default::default()
     };
@@ -101,7 +105,12 @@ fn test_epic_with_children_and_independent_labels() {
         };
         storage.create_issue(&child).unwrap();
         storage
-            .add_dependency("parent-epic", &format!("child-{}", i), &DependencyType::ParentChild, "test")
+            .add_dependency(
+                "parent-epic",
+                &format!("child-{}", i),
+                &DependencyType::ParentChild,
+                "test",
+            )
             .unwrap();
     }
 
@@ -128,7 +137,10 @@ fn test_list_epics_by_label() {
     let epics: Vec<(&str, Vec<String>)> = vec![
         ("epic-1", vec!["frontend".to_string(), "urgent".to_string()]),
         ("epic-2", vec!["backend".to_string()]),
-        ("epic-3", vec!["frontend".to_string(), "feature".to_string()]),
+        (
+            "epic-3",
+            vec!["frontend".to_string(), "feature".to_string()],
+        ),
         ("epic-4", vec!["urgent".to_string()]),
     ];
 
@@ -199,10 +211,22 @@ fn test_get_all_labels_in_workspace_with_epics() {
 
     // Create epics and regular tasks with various labels
     let issues: Vec<(&str, IssueType, Vec<String>)> = vec![
-        ("epic-a", IssueType::Epic, vec!["epic-label".to_string(), "shared".to_string()]),
-        ("epic-b", IssueType::Epic, vec!["backend".to_string(), "shared".to_string()]),
+        (
+            "epic-a",
+            IssueType::Epic,
+            vec!["epic-label".to_string(), "shared".to_string()],
+        ),
+        (
+            "epic-b",
+            IssueType::Epic,
+            vec!["backend".to_string(), "shared".to_string()],
+        ),
         ("task-1", IssueType::Task, vec!["shared".to_string()]),
-        ("task-2", IssueType::Bug, vec!["urgent".to_string(), "shared".to_string()]),
+        (
+            "task-2",
+            IssueType::Bug,
+            vec!["urgent".to_string(), "shared".to_string()],
+        ),
     ];
 
     for (id, issue_type, labels) in issues {
@@ -386,10 +410,26 @@ fn test_multiple_epics_with_common_labels() {
 
     // Create epics sharing some labels
     let epics = vec![
-        ("epic-frontend-1", vec!["frontend".to_string(), "feature".to_string()]),
-        ("epic-frontend-2", vec!["frontend".to_string(), "bugfix".to_string()]),
-        ("epic-backend-1", vec!["backend".to_string(), "feature".to_string()]),
-        ("epic-shared", vec!["frontend".to_string(), "backend".to_string(), "feature".to_string()]),
+        (
+            "epic-frontend-1",
+            vec!["frontend".to_string(), "feature".to_string()],
+        ),
+        (
+            "epic-frontend-2",
+            vec!["frontend".to_string(), "bugfix".to_string()],
+        ),
+        (
+            "epic-backend-1",
+            vec!["backend".to_string(), "feature".to_string()],
+        ),
+        (
+            "epic-shared",
+            vec![
+                "frontend".to_string(),
+                "backend".to_string(),
+                "feature".to_string(),
+            ],
+        ),
     ];
 
     for (id, labels) in epics {
@@ -437,7 +477,9 @@ fn test_epic_label_removal_nonexistent() {
     storage.create_issue(&epic).unwrap();
 
     // Try to remove non-existent label - should succeed but be a no-op
-    storage.remove_label("epic-remove-test", "does-not-exist").unwrap();
+    storage
+        .remove_label("epic-remove-test", "does-not-exist")
+        .unwrap();
 
     // Verify existing label is still present
     let retrieved = storage.get_issue("epic-remove-test").unwrap().unwrap();

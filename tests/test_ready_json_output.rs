@@ -152,8 +152,7 @@ fn parse_jsonl(stdout: &str) -> Vec<serde_json::Value> {
         .map(str::trim)
         .filter(|line| !line.is_empty() && *line != "[]")
         .map(|line| {
-            serde_json::from_str(line)
-                .unwrap_or_else(|e| panic!("invalid JSON line {line:?}: {e}"))
+            serde_json::from_str(line).unwrap_or_else(|e| panic!("invalid JSON line {line:?}: {e}"))
         })
         .collect()
 }
@@ -187,15 +186,30 @@ fn test_ready_json_output_structure_validity() {
         // Must have status fields
         assert!(bead.get("status").is_some(), "status field is required");
         assert!(bead.get("priority").is_some(), "priority field is required");
-        assert!(bead.get("issue_type").is_some(), "issue_type field is required");
+        assert!(
+            bead.get("issue_type").is_some(),
+            "issue_type field is required"
+        );
 
         // Must have timestamp fields
-        assert!(bead.get("created_at").is_some(), "created_at field is required");
-        assert!(bead.get("updated_at").is_some(), "updated_at field is required");
+        assert!(
+            bead.get("created_at").is_some(),
+            "created_at field is required"
+        );
+        assert!(
+            bead.get("updated_at").is_some(),
+            "updated_at field is required"
+        );
 
         // Optional fields should at least be present (even if null/empty)
-        assert!(bead.get("description").is_some(), "description field must be present");
-        assert!(bead.get("assignee").is_some(), "assignee field must be present");
+        assert!(
+            bead.get("description").is_some(),
+            "description field must be present"
+        );
+        assert!(
+            bead.get("assignee").is_some(),
+            "assignee field must be present"
+        );
         assert!(bead.get("labels").is_some(), "labels field must be present");
     }
 }
@@ -217,8 +231,8 @@ fn test_ready_json_output_is_parseable() {
     for line in stdout.lines() {
         let line = line.trim();
         if !line.is_empty() && line != "[]" {
-            let parsed: serde_json::Value = serde_json::from_str(line)
-                .expect("Each line must be valid JSON");
+            let parsed: serde_json::Value =
+                serde_json::from_str(line).expect("Each line must be valid JSON");
             assert!(parsed.is_object(), "Each line must be a JSON object");
         }
     }
@@ -240,8 +254,14 @@ fn test_ready_json_uses_jsonl_format_not_array() {
 
     // Should be JSONL (one object per line), NOT a single JSON array
     let trimmed = stdout.trim();
-    assert!(!trimmed.starts_with('['), "ready should not output JSON array");
-    assert!(!trimmed.ends_with(']'), "ready should not output JSON array");
+    assert!(
+        !trimmed.starts_with('['),
+        "ready should not output JSON array"
+    );
+    assert!(
+        !trimmed.ends_with(']'),
+        "ready should not output JSON array"
+    );
 
     // Should have multiple lines for multiple beads
     let line_count = stdout.lines().filter(|l| !l.trim().is_empty()).count();
@@ -259,7 +279,8 @@ fn test_ready_json_required_fields_types() {
     let id = create_bead_with_type(ws.path(), "Field types ready test", "bug", "Bug desc");
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("created bead not found in ready output");
 
@@ -269,7 +290,10 @@ fn test_ready_json_required_fields_types() {
     assert!(id.as_str().len() > 0, "id must not be empty");
 
     // title must be a string
-    assert!(bead.get("title").and_then(|v| v.as_str()).is_some(), "title must be a string");
+    assert!(
+        bead.get("title").and_then(|v| v.as_str()).is_some(),
+        "title must be a string"
+    );
 
     // status must be "open" for ready beads
     let status = bead.get("status").and_then(|v| v.as_str());
@@ -278,8 +302,10 @@ fn test_ready_json_required_fields_types() {
     // priority must be a number (0-4)
     let priority = bead.get("priority").and_then(|v| v.as_i64());
     assert!(priority.is_some(), "priority must be a number");
-    assert!(priority.map(|p| (0..=4).contains(&p)).unwrap_or(false),
-            "priority must be between 0 and 4");
+    assert!(
+        priority.map(|p| (0..=4).contains(&p)).unwrap_or(false),
+        "priority must be between 0 and 4"
+    );
 
     // issue_type must be a string
     let bead_type = bead.get("issue_type").and_then(|v| v.as_str());
@@ -288,21 +314,29 @@ fn test_ready_json_required_fields_types() {
     // created_at must be a string in ISO 8601 format
     let created_at = bead.get("created_at").and_then(|v| v.as_str());
     assert!(created_at.is_some(), "created_at must be a string");
-    assert!(created_at.unwrap().contains('T'), "created_at must be in ISO 8601 format");
+    assert!(
+        created_at.unwrap().contains('T'),
+        "created_at must be in ISO 8601 format"
+    );
 
     // updated_at must be a string in ISO 8601 format
     let updated_at = bead.get("updated_at").and_then(|v| v.as_str());
     assert!(updated_at.is_some(), "updated_at must be a string");
-    assert!(updated_at.unwrap().contains('T'), "updated_at must be in ISO 8601 format");
+    assert!(
+        updated_at.unwrap().contains('T'),
+        "updated_at must be in ISO 8601 format"
+    );
 
     // labels must be an array
-    assert!(bead.get("labels").and_then(|v| v.as_array()).is_some(),
-            "labels must be an array");
+    assert!(
+        bead.get("labels").and_then(|v| v.as_array()).is_some(),
+        "labels must be an array"
+    );
 
     // assignee can be null or string
     match bead.get("assignee") {
-        Some(serde_json::Value::Null) => {}, // OK
-        Some(serde_json::Value::String(_)) => {}, // OK
+        Some(serde_json::Value::Null) => {}      // OK
+        Some(serde_json::Value::String(_)) => {} // OK
         Some(other) => panic!("assignee must be null or string, got: {:?}", other),
         None => panic!("assignee field must be present"),
     }
@@ -314,7 +348,8 @@ fn test_ready_json_all_optional_fields_present() {
     let id = create_bead_with_type(ws.path(), "Optional fields ready test", "task", "Desc");
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("created bead not found in ready output");
 
@@ -329,21 +364,27 @@ fn test_ready_json_all_optional_fields_present() {
     ];
 
     for field in &optional_fields {
-        assert!(bead.get(*field).is_some(),
-                "Optional field '{}' must be present in output", field);
+        assert!(
+            bead.get(*field).is_some(),
+            "Optional field '{}' must be present in output",
+            field
+        );
     }
 
     // dependencies and comments should be stripped for NEEDLE compatibility
     // They should either be absent or empty arrays
     match bead.get("dependencies") {
-        None => {}, // Ok if absent
-        Some(serde_json::Value::Array(arr)) if arr.is_empty() => {}, // Ok if empty
-        Some(other) => panic!("dependencies should be absent or empty array, got: {:?}", other),
+        None => {}                                                  // Ok if absent
+        Some(serde_json::Value::Array(arr)) if arr.is_empty() => {} // Ok if empty
+        Some(other) => panic!(
+            "dependencies should be absent or empty array, got: {:?}",
+            other
+        ),
     }
 
     match bead.get("comments") {
-        None => {}, // Ok if absent
-        Some(serde_json::Value::Array(arr)) if arr.is_empty() => {}, // Ok if empty
+        None => {}                                                  // Ok if absent
+        Some(serde_json::Value::Array(arr)) if arr.is_empty() => {} // Ok if empty
         Some(other) => panic!("comments should be absent or empty array, got: {:?}", other),
     }
 }
@@ -364,7 +405,8 @@ fn test_ready_json_assignee_and_labels_always_present() {
     let beads = ready_json(ws.path());
 
     // Check bead WITH assignee and labels
-    let bead1 = beads.iter()
+    let bead1 = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id1.as_str()))
         .expect("bead with fields not found");
 
@@ -380,16 +422,30 @@ fn test_ready_json_assignee_and_labels_always_present() {
     assert_eq!(labels1.len(), 2, "labels should contain 2 items");
 
     // Check bead WITHOUT assignee and labels
-    let bead2 = beads.iter()
+    let bead2 = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id2.as_str()))
         .expect("bead without fields not found");
 
-    assert!(bead2.get("assignee").is_some(), "assignee must be present even when null");
-    assert!(bead2.get("assignee").unwrap().is_null(), "assignee should be null when not set");
+    assert!(
+        bead2.get("assignee").is_some(),
+        "assignee must be present even when null"
+    );
+    assert!(
+        bead2.get("assignee").unwrap().is_null(),
+        "assignee should be null when not set"
+    );
 
-    assert!(bead2.get("labels").is_some(), "labels must be present even when empty");
+    assert!(
+        bead2.get("labels").is_some(),
+        "labels must be present even when empty"
+    );
     let labels2 = bead2.get("labels").and_then(|v| v.as_array()).unwrap();
-    assert_eq!(labels2.len(), 0, "labels should be empty array when none set");
+    assert_eq!(
+        labels2.len(),
+        0,
+        "labels should be empty array when none set"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -411,16 +467,23 @@ fn test_ready_json_special_characters_in_title() {
 
     // Verify special characters are properly escaped/unescaped
     assert!(title.contains("quotes"), "title should contain 'quotes'");
-    assert!(title.contains("apostrophes"), "title should contain 'apostrophes'");
+    assert!(
+        title.contains("apostrophes"),
+        "title should contain 'apostrophes'"
+    );
     assert!(title.contains("&"), "title should contain '&'");
-    assert!(title.contains("<symbols>"), "title should contain '<symbols>'");
+    assert!(
+        title.contains("<symbols>"),
+        "title should contain '<symbols>'"
+    );
 }
 
 #[test]
 fn test_ready_json_special_characters_in_description() {
     let ws = init_workspace();
 
-    let special_desc = "Multi-line\ndescription\nwith\ttabs\nUnicode: 你好 🎉 🚀\nEscape: \\\" \\n \\t";
+    let special_desc =
+        "Multi-line\ndescription\nwith\ttabs\nUnicode: 你好 🎉 🚀\nEscape: \\\" \\n \\t";
     let _id = create_bead_with_type(ws.path(), "Desc special chars ready", "task", special_desc);
 
     let beads = ready_json(ws.path());
@@ -429,10 +492,19 @@ fn test_ready_json_special_characters_in_description() {
     let desc = bead.get("description").and_then(|v| v.as_str()).unwrap();
 
     // Verify line breaks and special characters are preserved
-    assert!(desc.contains("Multi-line"), "description should contain multi-line text");
-    assert!(desc.contains("你好"), "description should contain Chinese characters");
+    assert!(
+        desc.contains("Multi-line"),
+        "description should contain multi-line text"
+    );
+    assert!(
+        desc.contains("你好"),
+        "description should contain Chinese characters"
+    );
     assert!(desc.contains("🎉"), "description should contain emoji");
-    assert!(desc.contains("🚀"), "description should contain another emoji");
+    assert!(
+        desc.contains("🚀"),
+        "description should contain another emoji"
+    );
 }
 
 #[test]
@@ -450,13 +522,20 @@ fn test_ready_json_special_characters_in_assignee() {
     assert!(out.status.success());
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("updated bead not found");
 
     let assignee = bead.get("assignee").and_then(|v| v.as_str()).unwrap();
-    assert!(assignee.contains("user+test"), "assignee should preserve special characters");
-    assert!(assignee.contains("<admin>"), "assignee should preserve angle brackets");
+    assert!(
+        assignee.contains("user+test"),
+        "assignee should preserve special characters"
+    );
+    assert!(
+        assignee.contains("<admin>"),
+        "assignee should preserve angle brackets"
+    );
 }
 
 #[test]
@@ -471,11 +550,12 @@ fn test_ready_json_unicode_emoji_in_all_text_fields() {
         "task",
         unicode_desc,
         None,
-        &["unicode-label-测试"]
+        &["unicode-label-测试"],
     );
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("unicode bead not found");
 
@@ -491,7 +571,10 @@ fn test_ready_json_unicode_emoji_in_all_text_fields() {
 
     let labels = bead.get("labels").and_then(|v| v.as_array()).unwrap();
     let label_strs: Vec<&str> = labels.iter().filter_map(|l| l.as_str()).collect();
-    assert!(label_strs.contains(&"unicode-label-测试"), "labels should contain unicode characters");
+    assert!(
+        label_strs.contains(&"unicode-label-测试"),
+        "labels should contain unicode characters"
+    );
 }
 
 #[test]
@@ -503,23 +586,39 @@ fn test_ready_json_special_characters_in_labels() {
         "task",
         "Desc",
         None,
-        &["special/label", "label-with-dash", "label_with_underscore", "label.with.dots"]
+        &[
+            "special/label",
+            "label-with-dash",
+            "label_with_underscore",
+            "label.with.dots",
+        ],
     );
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("labeled bead not found");
 
     let labels = bead.get("labels").and_then(|v| v.as_array()).unwrap();
-    let label_strs: Vec<&str> = labels.iter()
-        .filter_map(|l| l.as_str())
-        .collect();
+    let label_strs: Vec<&str> = labels.iter().filter_map(|l| l.as_str()).collect();
 
-    assert!(label_strs.contains(&"special/label"), "labels should contain slashes");
-    assert!(label_strs.contains(&"label-with-dash"), "labels should contain dashes");
-    assert!(label_strs.contains(&"label_with_underscore"), "labels should contain underscores");
-    assert!(label_strs.contains(&"label.with.dots"), "labels should contain dots");
+    assert!(
+        label_strs.contains(&"special/label"),
+        "labels should contain slashes"
+    );
+    assert!(
+        label_strs.contains(&"label-with-dash"),
+        "labels should contain dashes"
+    );
+    assert!(
+        label_strs.contains(&"label_with_underscore"),
+        "labels should contain underscores"
+    );
+    assert!(
+        label_strs.contains(&"label.with.dots"),
+        "labels should contain dots"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -558,17 +657,27 @@ fn test_ready_json_excludes_closed_beads() {
     assert!(close_out.status.success());
 
     let beads = ready_json(ws.path());
-    let ids: Vec<&str> = beads.iter()
+    let ids: Vec<&str> = beads
+        .iter()
         .filter_map(|b| b.get("id").and_then(|i| i.as_str()))
         .collect();
 
-    assert!(ids.contains(&open_id.as_str()), "open bead should be in ready list");
-    assert!(!ids.contains(&closed_id.as_str()), "closed bead should not be in ready list");
+    assert!(
+        ids.contains(&open_id.as_str()),
+        "open bead should be in ready list"
+    );
+    assert!(
+        !ids.contains(&closed_id.as_str()),
+        "closed bead should not be in ready list"
+    );
 
     // Verify all returned beads have status='open'
     for bead in &beads {
-        assert_eq!(bead.get("status").and_then(|s| s.as_str()), Some("open"),
-                   "ready should only return open beads");
+        assert_eq!(
+            bead.get("status").and_then(|s| s.as_str()),
+            Some("open"),
+            "ready should only return open beads"
+        );
     }
 }
 
@@ -588,12 +697,19 @@ fn test_ready_json_excludes_blocked_beads() {
     assert!(dep_out.status.success());
 
     let beads = ready_json(ws.path());
-    let ids: Vec<&str> = beads.iter()
+    let ids: Vec<&str> = beads
+        .iter()
         .filter_map(|b| b.get("id").and_then(|i| i.as_str()))
         .collect();
 
-    assert!(ids.contains(&blocker_id.as_str()), "blocker should be in ready list");
-    assert!(!ids.contains(&blocked_id.as_str()), "blocked bead should not be in ready list");
+    assert!(
+        ids.contains(&blocker_id.as_str()),
+        "blocker should be in ready list"
+    );
+    assert!(
+        !ids.contains(&blocked_id.as_str()),
+        "blocked bead should not be in ready list"
+    );
 }
 
 #[test]
@@ -620,15 +736,25 @@ fn test_ready_json_excludes_blocked_and_closed_beads() {
     assert!(close_out.status.success());
 
     let beads = ready_json(ws.path());
-    let ids: Vec<&str> = beads.iter()
+    let ids: Vec<&str> = beads
+        .iter()
         .filter_map(|b| b.get("id").and_then(|i| i.as_str()))
         .collect();
 
     // Should only include the blocker (not blocked or closed beads)
     assert_eq!(beads.len(), 1, "ready should only return one bead");
-    assert!(ids.contains(&blocker_id.as_str()), "blocker should be in ready list");
-    assert!(!ids.contains(&blocked_id.as_str()), "blocked bead should not be in ready list");
-    assert!(!ids.contains(&closed_id.as_str()), "closed bead should not be in ready list");
+    assert!(
+        ids.contains(&blocker_id.as_str()),
+        "blocker should be in ready list"
+    );
+    assert!(
+        !ids.contains(&blocked_id.as_str()),
+        "blocked bead should not be in ready list"
+    );
+    assert!(
+        !ids.contains(&closed_id.as_str()),
+        "closed bead should not be in ready list"
+    );
 }
 
 #[test]
@@ -640,11 +766,18 @@ fn test_ready_json_limit_parameter_works() {
 
     // Without limit, should return all beads
     let all_beads = ready_json(ws.path());
-    assert!(all_beads.len() >= 3, "ready should return all beads without limit");
+    assert!(
+        all_beads.len() >= 3,
+        "ready should return all beads without limit"
+    );
 
     // With limit=2, should return only 2 beads
     let limited_beads = ready_json_with_limit(ws.path(), 2);
-    assert_eq!(limited_beads.len(), 2, "ready with --limit=2 should return 2 beads");
+    assert_eq!(
+        limited_beads.len(),
+        2,
+        "ready with --limit=2 should return 2 beads"
+    );
 }
 
 #[test]
@@ -655,7 +788,10 @@ fn test_ready_json_with_zero_limit() {
 
     // Limit=0 should return all beads (no limit applied)
     let beads = ready_json_with_limit(ws.path(), 0);
-    assert!(beads.len() >= 2, "ready with --limit=0 should return all beads");
+    assert!(
+        beads.len() >= 2,
+        "ready with --limit=0 should return all beads"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -672,24 +808,45 @@ fn test_ready_json_for_different_types() {
     let beads = ready_json(ws.path());
 
     // Find each bead by type
-    let task_bead = beads.iter()
+    let task_bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(task_id.as_str()))
         .expect("task bead not found in ready output");
-    let bug_bead = beads.iter()
+    let bug_bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(bug_id.as_str()))
         .expect("bug bead not found in ready output");
-    let feature_bead = beads.iter()
+    let feature_bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(feature_id.as_str()))
         .expect("feature bead not found in ready output");
 
-    assert_eq!(task_bead.get("issue_type").and_then(|v| v.as_str()), Some("task"));
-    assert_eq!(bug_bead.get("issue_type").and_then(|v| v.as_str()), Some("bug"));
-    assert_eq!(feature_bead.get("issue_type").and_then(|v| v.as_str()), Some("feature"));
+    assert_eq!(
+        task_bead.get("issue_type").and_then(|v| v.as_str()),
+        Some("task")
+    );
+    assert_eq!(
+        bug_bead.get("issue_type").and_then(|v| v.as_str()),
+        Some("bug")
+    );
+    assert_eq!(
+        feature_bead.get("issue_type").and_then(|v| v.as_str()),
+        Some("feature")
+    );
 
     // All should be open (ready)
-    assert_eq!(task_bead.get("status").and_then(|v| v.as_str()), Some("open"));
-    assert_eq!(bug_bead.get("status").and_then(|v| v.as_str()), Some("open"));
-    assert_eq!(feature_bead.get("status").and_then(|v| v.as_str()), Some("open"));
+    assert_eq!(
+        task_bead.get("status").and_then(|v| v.as_str()),
+        Some("open")
+    );
+    assert_eq!(
+        bug_bead.get("status").and_then(|v| v.as_str()),
+        Some("open")
+    );
+    assert_eq!(
+        feature_bead.get("status").and_then(|v| v.as_str()),
+        Some("open")
+    );
 }
 
 #[test]
@@ -707,15 +864,20 @@ fn test_ready_json_type_field_preserves_case() {
         );
 
         let beads = ready_json(ws.path());
-        let bead = beads.iter()
+        let bead = beads
+            .iter()
             .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
             .expect("bead not found in ready output");
 
         // Type should be normalized to lowercase
         let returned_type = bead.get("issue_type").and_then(|v| v.as_str());
-        assert_eq!(returned_type, Some(*type_name),
-                   "Type field should match: expected {}, got {:?}",
-                   type_name, returned_type);
+        assert_eq!(
+            returned_type,
+            Some(*type_name),
+            "Type field should match: expected {}, got {:?}",
+            type_name,
+            returned_type
+        );
     }
 }
 
@@ -737,12 +899,16 @@ fn test_ready_json_with_in_progress_status_excluded() {
     assert!(update_out.status.success());
 
     let beads = ready_json(ws.path());
-    let ids: Vec<&str> = beads.iter()
+    let ids: Vec<&str> = beads
+        .iter()
         .filter_map(|b| b.get("id").and_then(|i| i.as_str()))
         .collect();
 
     // in_progress beads should NOT appear in ready output
-    assert!(!ids.contains(&id.as_str()), "in_progress bead should not be in ready list");
+    assert!(
+        !ids.contains(&id.as_str()),
+        "in_progress bead should not be in ready list"
+    );
 }
 
 #[test]
@@ -751,23 +917,34 @@ fn test_ready_json_timestamps_are_valid_rfc3339() {
     let id = create_bead_with_type(ws.path(), "Timestamp ready test", "task", "Test");
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("bead not found in ready output");
 
     // Check created_at
     let created_at = bead.get("created_at").and_then(|v| v.as_str()).unwrap();
     let parsed_created = chrono::DateTime::parse_from_rfc3339(created_at);
-    assert!(parsed_created.is_ok(), "created_at should be valid RFC3339: {}", created_at);
+    assert!(
+        parsed_created.is_ok(),
+        "created_at should be valid RFC3339: {}",
+        created_at
+    );
 
     // Check updated_at
     let updated_at = bead.get("updated_at").and_then(|v| v.as_str()).unwrap();
     let parsed_updated = chrono::DateTime::parse_from_rfc3339(updated_at);
-    assert!(parsed_updated.is_ok(), "updated_at should be valid RFC3339: {}", updated_at);
+    assert!(
+        parsed_updated.is_ok(),
+        "updated_at should be valid RFC3339: {}",
+        updated_at
+    );
 
     // updated_at should be >= created_at
-    assert!(parsed_updated.unwrap() >= parsed_created.unwrap(),
-            "updated_at should be after or equal to created_at");
+    assert!(
+        parsed_updated.unwrap() >= parsed_created.unwrap(),
+        "updated_at should be after or equal to created_at"
+    );
 }
 
 #[test]
@@ -776,7 +953,8 @@ fn test_ready_json_empty_fields_serialize_correctly() {
     let id = create_bead_with_type(ws.path(), "Empty fields ready", "task", "");
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("bead not found in ready output");
 
@@ -790,7 +968,10 @@ fn test_ready_json_empty_fields_serialize_correctly() {
             // Null is also fine
         }
         Some(other) => {
-            panic!("description should be null or empty string, got: {:?}", other);
+            panic!(
+                "description should be null or empty string, got: {:?}",
+                other
+            );
         }
         None => {
             panic!("description field must be present");
@@ -798,15 +979,28 @@ fn test_ready_json_empty_fields_serialize_correctly() {
     }
 
     // Assignee should be null when not set
-    assert!(bead.get("assignee").is_some(), "assignee field must be present");
-    assert!(bead.get("assignee").unwrap().is_null() ||
-            bead.get("assignee").and_then(|v| v.as_str()).map(|s| s.is_empty()).unwrap_or(false),
-            "assignee should be null or empty string when not set");
+    assert!(
+        bead.get("assignee").is_some(),
+        "assignee field must be present"
+    );
+    assert!(
+        bead.get("assignee").unwrap().is_null()
+            || bead
+                .get("assignee")
+                .and_then(|v| v.as_str())
+                .map(|s| s.is_empty())
+                .unwrap_or(false),
+        "assignee should be null or empty string when not set"
+    );
 
     // Labels should be empty array when none set
     assert!(bead.get("labels").is_some(), "labels field must be present");
     let labels = bead.get("labels").and_then(|v| v.as_array()).unwrap();
-    assert_eq!(labels.len(), 0, "labels should be empty array when none set");
+    assert_eq!(
+        labels.len(),
+        0,
+        "labels should be empty array when none set"
+    );
 }
 
 #[test]
@@ -821,9 +1015,13 @@ fn test_ready_json_all_ready_beads_have_open_status() {
     // All beads in ready output should have status='open'
     for bead in &beads {
         let status = bead.get("status").and_then(|v| v.as_str());
-        assert_eq!(status, Some("open"),
-                   "All ready beads must have status='open', got {:?} for bead {:?}",
-                   status, bead.get("id"));
+        assert_eq!(
+            status,
+            Some("open"),
+            "All ready beads must have status='open', got {:?} for bead {:?}",
+            status,
+            bead.get("id")
+        );
     }
 }
 
@@ -836,17 +1034,22 @@ fn test_ready_json_bead_with_all_fields_populated() {
         "task",
         "Base description",
         Some("test-user"),
-        &["label1", "label2"]
+        &["label1", "label2"],
     );
 
     // Populate remaining optional fields
     let update_out = Command::new(bf_path())
         .args([
-            "update", &id,
-            "--description", "Updated description",
-            "--acceptance-criteria", "AC 1: Should pass",
-            "--notes", "Test notes",
-            "--design", "Design reference",
+            "update",
+            &id,
+            "--description",
+            "Updated description",
+            "--acceptance-criteria",
+            "AC 1: Should pass",
+            "--notes",
+            "Test notes",
+            "--design",
+            "Design reference",
         ])
         .current_dir(ws.path())
         .output()
@@ -854,15 +1057,31 @@ fn test_ready_json_bead_with_all_fields_populated() {
     assert!(update_out.status.success());
 
     let beads = ready_json(ws.path());
-    let bead = beads.iter()
+    let bead = beads
+        .iter()
         .find(|b| b.get("id").and_then(|i| i.as_str()) == Some(id.as_str()))
         .expect("bead not found in ready output");
 
-    assert_eq!(bead.get("description").and_then(|v| v.as_str()), Some("Updated description"));
-    assert_eq!(bead.get("acceptance_criteria").and_then(|v| v.as_str()), Some("AC 1: Should pass"));
-    assert_eq!(bead.get("notes").and_then(|v| v.as_str()), Some("Test notes"));
-    assert_eq!(bead.get("design").and_then(|v| v.as_str()), Some("Design reference"));
-    assert_eq!(bead.get("assignee").and_then(|v| v.as_str()), Some("test-user"));
+    assert_eq!(
+        bead.get("description").and_then(|v| v.as_str()),
+        Some("Updated description")
+    );
+    assert_eq!(
+        bead.get("acceptance_criteria").and_then(|v| v.as_str()),
+        Some("AC 1: Should pass")
+    );
+    assert_eq!(
+        bead.get("notes").and_then(|v| v.as_str()),
+        Some("Test notes")
+    );
+    assert_eq!(
+        bead.get("design").and_then(|v| v.as_str()),
+        Some("Design reference")
+    );
+    assert_eq!(
+        bead.get("assignee").and_then(|v| v.as_str()),
+        Some("test-user")
+    );
 
     let labels = bead.get("labels").and_then(|v| v.as_array()).unwrap();
     let label_strs: Vec<&str> = labels.iter().filter_map(|l| l.as_str()).collect();
@@ -880,7 +1099,7 @@ fn test_ready_json_priority_sorting() {
         "task",
         "Low priority bead",
         None,
-        &[]
+        &[],
     );
 
     // Manually set priorities by updating
@@ -904,7 +1123,10 @@ fn test_ready_json_priority_sorting() {
     for bead in &beads {
         let priority = bead.get("priority").and_then(|v| v.as_i64());
         assert!(priority.is_some(), "priority must be present");
-        assert!(priority.map(|p| (0..=4).contains(&p)).unwrap_or(false),
-                "priority must be between 0 and 4, got: {:?}", priority);
+        assert!(
+            priority.map(|p| (0..=4).contains(&p)).unwrap_or(false),
+            "priority must be between 0 and 4, got: {:?}",
+            priority
+        );
     }
 }

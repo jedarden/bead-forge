@@ -45,10 +45,7 @@ fn test_bug_default_priority_storage() {
     storage.create_issue(&bug).unwrap();
 
     // Retrieve and verify the default priority was preserved
-    let retrieved = storage
-        .get_issue("bug-storage-default")
-        .unwrap()
-        .unwrap();
+    let retrieved = storage.get_issue("bug-storage-default").unwrap().unwrap();
 
     assert_eq!(
         retrieved.issue_type,
@@ -260,11 +257,7 @@ fn test_bug_vs_feature_default_priority() {
         bug.priority, feature.priority,
         "Bugs and features should have the same default priority"
     );
-    assert_eq!(
-        bug.priority,
-        Priority::MEDIUM,
-        "Both should default to P2"
-    );
+    assert_eq!(bug.priority, Priority::MEDIUM, "Both should default to P2");
 }
 
 #[test]
@@ -337,11 +330,7 @@ fn test_bug_vs_task_default_priority() {
         bug.priority, task.priority,
         "Bugs and tasks should have the same default priority"
     );
-    assert_eq!(
-        bug.priority,
-        Priority::MEDIUM,
-        "Both should default to P2"
-    );
+    assert_eq!(bug.priority, Priority::MEDIUM, "Both should default to P2");
 }
 
 #[test]

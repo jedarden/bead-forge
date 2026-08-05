@@ -69,7 +69,10 @@ fn search_matches_title_and_description() {
     let (out, err, ok) = run_bf(&ws, &["search", "Alpha"]);
     assert!(ok, "search failed: {err}");
     assert!(out.contains(&alpha), "alpha missing: {out}");
-    assert!(!out.contains(&beta) && !out.contains(&gamma), "over-matched: {out}");
+    assert!(
+        !out.contains(&beta) && !out.contains(&gamma),
+        "over-matched: {out}"
+    );
 
     // Description-only match: "needle" appears only in beta's description.
     let (out, err, ok) = run_bf(&ws, &["search", "needle"]);
@@ -92,7 +95,10 @@ fn search_filters_by_type() {
     let (out, err, ok) = run_bf(&ws, &["search", "--type", "epic"]);
     assert!(ok, "search failed: {err}");
     assert!(out.contains(&epic), "epic missing: {out}");
-    assert!(!out.contains(&t1) && !out.contains(&t2), "tasks leaked in: {out}");
+    assert!(
+        !out.contains(&t1) && !out.contains(&t2),
+        "tasks leaked in: {out}"
+    );
 }
 
 #[test]
@@ -107,12 +113,18 @@ fn search_filters_by_status() {
     let (out, err, ok) = run_bf(&ws, &["search", "--status", "closed"]);
     assert!(ok, "search failed: {err}");
     assert!(out.contains(&closed_bead), "closed bead missing: {out}");
-    assert!(!out.contains(&open_bead), "open bead leaked into closed: {out}");
+    assert!(
+        !out.contains(&open_bead),
+        "open bead leaked into closed: {out}"
+    );
 
     let (out, err, ok) = run_bf(&ws, &["search", "--status", "open"]);
     assert!(ok, "search failed: {err}");
     assert!(out.contains(&open_bead), "open bead missing: {out}");
-    assert!(!out.contains(&closed_bead), "closed bead leaked into open: {out}");
+    assert!(
+        !out.contains(&closed_bead),
+        "closed bead leaked into open: {out}"
+    );
 }
 
 #[test]

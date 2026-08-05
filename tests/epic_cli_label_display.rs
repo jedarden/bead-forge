@@ -202,8 +202,7 @@ fn test_labels_returns_exactly_the_labels_one_per_line() {
         labels
     );
     // And exactly the expected set — ordering is a sibling scope, compare as a set.
-    let label_set: std::collections::HashSet<&str> =
-        labels.iter().map(|s| s.as_str()).collect();
+    let label_set: std::collections::HashSet<&str> = labels.iter().map(|s| s.as_str()).collect();
     for label in &expected {
         assert!(
             label_set.contains(label),

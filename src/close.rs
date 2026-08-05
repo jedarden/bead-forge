@@ -57,7 +57,9 @@ mod tests {
             ..Default::default()
         };
 
-        storage.create_issue(&bead).expect("Failed to create test bead");
+        storage
+            .create_issue(&bead)
+            .expect("Failed to create test bead");
 
         (temp_dir, db_path, bead_id)
     }
@@ -84,7 +86,11 @@ mod tests {
         let storage = Storage::open(&db_path).expect("Failed to open storage");
         let bead = storage.get_issue(&bead_id).expect("Failed to get bead");
         assert!(bead.is_some(), "Bead should still exist");
-        assert_eq!(bead.unwrap().status, Status::Closed, "Bead status should be closed");
+        assert_eq!(
+            bead.unwrap().status,
+            Status::Closed,
+            "Bead status should be closed"
+        );
     }
 
     #[test]
@@ -99,7 +105,10 @@ mod tests {
 
         // Verify the close reason is set
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
         assert_eq!(
             bead.close_reason.as_deref(),
             Some(custom_reason),
@@ -117,7 +126,10 @@ mod tests {
 
         // Close the bead second time - should be idempotent (not fail)
         let result = close_bead(&db_path, &bead_id, "Second close", "test-actor");
-        assert!(result.is_ok(), "Closing an already-closed bead should be idempotent (return Ok)");
+        assert!(
+            result.is_ok(),
+            "Closing an already-closed bead should be idempotent (return Ok)"
+        );
     }
 
     #[test]
@@ -146,14 +158,16 @@ mod tests {
         let before_close = Utc::now();
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
         let after_close = Utc::now();
 
         // Verify closed_at is set
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert!(
             bead.closed_at.is_some(),
@@ -174,12 +188,14 @@ mod tests {
         let close_reason = "Implementation complete and verified";
 
         // Close the bead
-        close_bead(&db_path, &bead_id, close_reason, "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, close_reason, "test-actor").expect("Close should succeed");
 
         // Verify close_reason is set correctly
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert_eq!(
             bead.close_reason.as_deref(),
@@ -193,12 +209,13 @@ mod tests {
         let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
         // Verify bead is marked as dirty
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let dirty_issues = storage.list_dirty_issues().expect("Failed to list dirty issues");
+        let dirty_issues = storage
+            .list_dirty_issues()
+            .expect("Failed to list dirty issues");
 
         assert!(
             dirty_issues.iter().any(|b| b.id == bead_id),
@@ -211,15 +228,18 @@ mod tests {
         let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test reason", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test reason", "test-actor").expect("Close should succeed");
 
         // Verify a 'closed' event was created
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let events = storage.list_events(&bead_id).expect("Failed to list events");
+        let events = storage
+            .list_events(&bead_id)
+            .expect("Failed to list events");
 
         assert!(
-            events.iter().any(|e| e.event_type == crate::model::EventType::Closed),
+            events
+                .iter()
+                .any(|e| e.event_type == crate::model::EventType::Closed),
             "Should have a 'closed' event after closing"
         );
     }
@@ -231,12 +251,14 @@ mod tests {
         let actor = "test-worker-session-123";
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test", actor)
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test", actor).expect("Close should succeed");
 
         // Verify closed_by_session is set
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert_eq!(
             bead.closed_by_session.as_deref(),
@@ -250,12 +272,14 @@ mod tests {
         let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
         // Close with empty reason
-        close_bead(&db_path, &bead_id, "", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "", "test-actor").expect("Close should succeed");
 
         // Verify close_reason is set (even if empty)
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         // The storage layer should store the reason as provided
         assert_eq!(
@@ -280,8 +304,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
         // Verify updated_at changed
         let storage_after = Storage::open(&db_path).expect("Failed to open storage");
@@ -325,7 +348,10 @@ mod tests {
 
         // Verify it's closed
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
         assert_eq!(bead.status, Status::Closed, "Blocked bead should be closed");
     }
 
@@ -358,8 +384,15 @@ mod tests {
 
         // Verify it's closed
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
-        assert_eq!(bead.status, Status::Closed, "In-progress bead should be closed");
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
+        assert_eq!(
+            bead.status,
+            Status::Closed,
+            "In-progress bead should be closed"
+        );
     }
 
     #[test]
@@ -400,8 +433,16 @@ mod tests {
         // Verify all are closed
         let storage = Storage::open(&db_path).expect("Failed to open storage");
         for bead_id in &bead_ids {
-            let bead = storage.get_issue(bead_id).expect("Failed to get bead").unwrap();
-            assert_eq!(bead.status, Status::Closed, "Bead {} should be closed", bead_id);
+            let bead = storage
+                .get_issue(bead_id)
+                .expect("Failed to get bead")
+                .unwrap();
+            assert_eq!(
+                bead.status,
+                Status::Closed,
+                "Bead {} should be closed",
+                bead_id
+            );
         }
     }
 
@@ -417,7 +458,10 @@ mod tests {
 
         // Verify the full reason is stored
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert_eq!(
             bead.close_reason.as_deref(),
@@ -430,15 +474,22 @@ mod tests {
     fn test_close_with_special_characters_in_reason() {
         let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
-        let special_reason = "Closed with \"quotes\", 'apostrophes', & symbols <>, and \\backslashes";
+        let special_reason =
+            "Closed with \"quotes\", 'apostrophes', & symbols <>, and \\backslashes";
 
         // Close with special characters
         let result = close_bead(&db_path, &bead_id, special_reason, "test-actor");
-        assert!(result.is_ok(), "Closing with special characters should succeed");
+        assert!(
+            result.is_ok(),
+            "Closing with special characters should succeed"
+        );
 
         // Verify reason is stored correctly
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert_eq!(
             bead.close_reason.as_deref(),
@@ -452,15 +503,25 @@ mod tests {
         let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
         // Verify status is exactly 'closed'
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
-        assert_eq!(bead.status, Status::Closed, "Status should be exactly Status::Closed");
-        assert_eq!(bead.status.as_str(), "closed", "Status string should be 'closed'");
+        assert_eq!(
+            bead.status,
+            Status::Closed,
+            "Status should be exactly Status::Closed"
+        );
+        assert_eq!(
+            bead.status.as_str(),
+            "closed",
+            "Status string should be 'closed'"
+        );
     }
 
     #[test]
@@ -490,19 +551,24 @@ mod tests {
             .expect("Failed to create test bead");
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
         // Verify other fields are preserved
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let bead_after = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead_after = storage
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
         assert_eq!(bead_after.title, bead.title, "Title should be preserved");
         assert_eq!(
             bead_after.description, bead.description,
             "Description should be preserved"
         );
-        assert_eq!(bead_after.priority, bead.priority, "Priority should be preserved");
+        assert_eq!(
+            bead_after.priority, bead.priority,
+            "Priority should be preserved"
+        );
         assert_eq!(
             bead_after.issue_type, bead.issue_type,
             "Issue type should be preserved"
@@ -511,7 +577,10 @@ mod tests {
             bead_after.assignee, bead.assignee,
             "Assignee should be preserved"
         );
-        assert_eq!(bead_after.created_at, bead.created_at, "Created_at should be preserved");
+        assert_eq!(
+            bead_after.created_at, bead.created_at,
+            "Created_at should be preserved"
+        );
     }
 
     #[test]
@@ -522,29 +591,40 @@ mod tests {
         let reason = "Test close reason";
 
         // Close the bead
-        close_bead(&db_path, &bead_id, reason, actor)
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, reason, actor).expect("Close should succeed");
 
         // Verify event details
         let storage = Storage::open(&db_path).expect("Failed to open storage");
-        let events = storage.list_events(&bead_id).expect("Failed to list events");
+        let events = storage
+            .list_events(&bead_id)
+            .expect("Failed to list events");
 
         let closed_events: Vec<_> = events
             .iter()
             .filter(|e| e.event_type == crate::model::EventType::Closed)
             .collect();
 
-        assert_eq!(closed_events.len(), 1, "Should have exactly one closed event");
+        assert_eq!(
+            closed_events.len(),
+            1,
+            "Should have exactly one closed event"
+        );
 
         let closed_event = closed_events[0];
-        assert_eq!(closed_event.issue_id, bead_id, "Event should have correct issue_id");
+        assert_eq!(
+            closed_event.issue_id, bead_id,
+            "Event should have correct issue_id"
+        );
         assert_eq!(closed_event.actor, actor, "Event should have correct actor");
         assert_eq!(
             closed_event.new_value.as_deref(),
             Some(reason),
             "Event should have correct new_value (reason)"
         );
-        assert!(closed_event.old_value.is_none(), "Event old_value should be None for close");
+        assert!(
+            closed_event.old_value.is_none(),
+            "Event old_value should be None for close"
+        );
     }
 
     #[test]
@@ -552,15 +632,24 @@ mod tests {
         let (_temp_dir, db_path, bead_id) = setup_test_db_with_bead();
 
         // Close the bead
-        close_bead(&db_path, &bead_id, "Test", "test-actor")
-            .expect("Close should succeed");
+        close_bead(&db_path, &bead_id, "Test", "test-actor").expect("Close should succeed");
 
         // Reopen the database (simulating a new connection)
         let storage2 = Storage::open(&db_path).expect("Failed to reopen storage");
-        let bead = storage2.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let bead = storage2
+            .get_issue(&bead_id)
+            .expect("Failed to get bead")
+            .unwrap();
 
-        assert_eq!(bead.status, Status::Closed, "Status should persist after database reopen");
-        assert!(bead.closed_at.is_some(), "closed_at should persist after database reopen");
+        assert_eq!(
+            bead.status,
+            Status::Closed,
+            "Status should persist after database reopen"
+        );
+        assert!(
+            bead.closed_at.is_some(),
+            "closed_at should persist after database reopen"
+        );
         assert_eq!(
             bead.close_reason.as_deref(),
             Some("Test"),

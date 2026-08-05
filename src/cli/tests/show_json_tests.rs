@@ -12,8 +12,7 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    test_workspace, bf_binary, bf_command,
-    json_validation, format_detection, fixtures, capture,
+    bf_binary, bf_command, capture, fixtures, format_detection, json_validation, test_workspace,
 };
 
 // Import items made available in parent scope
@@ -29,8 +28,7 @@ fn create_isolated_workspace() -> TempDir {
     crate::config::init_workspace(&beads_dir, "bf-show-test")
         .expect("Failed to initialize test workspace");
 
-    let metadata = crate::config::load_metadata(&beads_dir)
-        .expect("Failed to load metadata");
+    let metadata = crate::config::load_metadata(&beads_dir).expect("Failed to load metadata");
     let _ = crate::Storage::open(&beads_dir.join(&metadata.database))
         .expect("Failed to create database");
 
@@ -56,16 +54,21 @@ fn test_show_json_structure_validity() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Verify it's an array with one element (NEEDLE contract)
     let json_str = output.trim();
-    assert!(json_str.starts_with('['), "show output should start with '['");
+    assert!(
+        json_str.starts_with('['),
+        "show output should start with '['"
+    );
     assert!(json_str.ends_with(']'), "show output should end with ']'");
 
     let parsed = json_validation::parse_json(json_str);
-    let array = parsed.as_array().expect("show output should be a JSON array");
+    let array = parsed
+        .as_array()
+        .expect("show output should be a JSON array");
     assert_eq!(array.len(), 1, "show should return exactly one bead");
 
     let bead = &array[0];
@@ -74,8 +77,16 @@ fn test_show_json_structure_validity() {
     // Verify required fields are present
     json_validation::assert_required_fields(
         bead,
-        &["id", "title", "status", "priority", "issue_type", "created_at", "updated_at"],
-        "show command"
+        &[
+            "id",
+            "title",
+            "status",
+            "priority",
+            "issue_type",
+            "created_at",
+            "updated_at",
+        ],
+        "show command",
     );
 
     // Cleanup
@@ -95,7 +106,7 @@ fn test_show_json_is_parseable() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should parse as valid JSON
@@ -128,7 +139,7 @@ fn test_show_json_required_fields_types() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -147,11 +158,17 @@ fn test_show_json_required_fields_types() {
 
     // status must be a string with valid value
     let status = json_validation::get_string(bead, "status");
-    assert!(matches!(status.as_str(), "open" | "in_progress" | "blocked" | "closed"));
+    assert!(matches!(
+        status.as_str(),
+        "open" | "in_progress" | "blocked" | "closed"
+    ));
 
     // priority must be a number (0-4)
     let priority = json_validation::get_int(bead, "priority");
-    assert!((0..=4).contains(&priority), "priority must be between 0 and 4");
+    assert!(
+        (0..=4).contains(&priority),
+        "priority must be between 0 and 4"
+    );
 
     // issue_type must be a string
     let issue_type = json_validation::get_string(bead, "issue_type");
@@ -159,11 +176,17 @@ fn test_show_json_required_fields_types() {
 
     // created_at must be ISO 8601 format
     let created_at = json_validation::get_string(bead, "created_at");
-    assert!(created_at.contains('T'), "created_at must be in ISO 8601 format");
+    assert!(
+        created_at.contains('T'),
+        "created_at must be in ISO 8601 format"
+    );
 
     // updated_at must be ISO 8601 format
     let updated_at = json_validation::get_string(bead, "updated_at");
-    assert!(updated_at.contains('T'), "updated_at must be in ISO 8601 format");
+    assert!(
+        updated_at.contains('T'),
+        "updated_at must be in ISO 8601 format"
+    );
 
     // labels must be an array (get_array already validates this)
     let labels = json_validation::get_array(bead, "labels");
@@ -185,7 +208,7 @@ fn test_show_json_all_optional_fields_present() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -242,7 +265,7 @@ fn test_show_json_special_characters_in_title() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // First verify it's valid JSON (proper escaping)
@@ -257,9 +280,15 @@ fn test_show_json_special_characters_in_title() {
 
     // Verify special characters are preserved
     assert!(title.contains("quotes"), "title should contain 'quotes'");
-    assert!(title.contains("apostrophes"), "title should contain 'apostrophes'");
+    assert!(
+        title.contains("apostrophes"),
+        "title should contain 'apostrophes'"
+    );
     assert!(title.contains("&"), "title should contain '&'");
-    assert!(title.contains("<symbols>"), "title should contain '<symbols>'");
+    assert!(
+        title.contains("<symbols>"),
+        "title should contain '<symbols>'"
+    );
 
     fixtures::close_bead(&bead_id, "Special chars title cleanup");
 }
@@ -273,7 +302,8 @@ fn test_show_json_special_characters_in_description() {
     let bead_id = fixtures::create_bead("Desc special chars");
 
     // Update with special description
-    let special_desc = "Multi-line\ndescription\nwith\ttabs\nUnicode: 你好 🎉 🚀\nEscape: \\\" \\n \\t";
+    let special_desc =
+        "Multi-line\ndescription\nwith\ttabs\nUnicode: 你好 🎉 🚀\nEscape: \\\" \\n \\t";
     let mut cmd = bf_command();
     cmd.arg("update")
         .arg(&bead_id)
@@ -287,7 +317,7 @@ fn test_show_json_special_characters_in_description() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -300,10 +330,19 @@ fn test_show_json_special_characters_in_description() {
     let desc = json_validation::get_string(bead, "description");
 
     // Verify special characters are preserved
-    assert!(desc.contains("Multi-line"), "description should contain multi-line text");
-    assert!(desc.contains("你好"), "description should contain Chinese characters");
+    assert!(
+        desc.contains("Multi-line"),
+        "description should contain multi-line text"
+    );
+    assert!(
+        desc.contains("你好"),
+        "description should contain Chinese characters"
+    );
     assert!(desc.contains("🎉"), "description should contain emoji");
-    assert!(desc.contains("🚀"), "description should contain another emoji");
+    assert!(
+        desc.contains("🚀"),
+        "description should contain another emoji"
+    );
 
     fixtures::close_bead(&bead_id, "Special chars description cleanup");
 }
@@ -331,7 +370,7 @@ fn test_show_json_special_characters_in_assignee() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -342,8 +381,14 @@ fn test_show_json_special_characters_in_assignee() {
     let bead = &array[0];
 
     let assignee = json_validation::get_string(bead, "assignee");
-    assert!(assignee.contains("user+test"), "assignee should preserve special characters");
-    assert!(assignee.contains("<admin>"), "assignee should preserve angle brackets");
+    assert!(
+        assignee.contains("user+test"),
+        "assignee should preserve special characters"
+    );
+    assert!(
+        assignee.contains("<admin>"),
+        "assignee should preserve angle brackets"
+    );
 
     fixtures::close_bead(&bead_id, "Special chars assignee cleanup");
 }
@@ -372,7 +417,7 @@ fn test_show_json_unicode_emoji_in_all_text_fields() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -403,7 +448,12 @@ fn test_show_json_special_characters_in_labels() {
 
     let bead_id = fixtures::create_bead_with_labels(
         "Label test",
-        &["special/label", "label-with-dash", "label_with_underscore", "label.with.dots"]
+        &[
+            "special/label",
+            "label-with-dash",
+            "label_with_underscore",
+            "label.with.dots",
+        ],
     );
 
     let output = capture::capture_stdout(
@@ -411,7 +461,7 @@ fn test_show_json_special_characters_in_labels() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -422,14 +472,24 @@ fn test_show_json_special_characters_in_labels() {
     let bead = &array[0];
 
     let labels = json_validation::get_array(bead, "labels");
-    let label_strs: Vec<&str> = labels.iter()
-        .filter_map(|l| l.as_str())
-        .collect();
+    let label_strs: Vec<&str> = labels.iter().filter_map(|l| l.as_str()).collect();
 
-    assert!(label_strs.contains(&"special/label"), "labels should contain slashes");
-    assert!(label_strs.contains(&"label-with-dash"), "labels should contain dashes");
-    assert!(label_strs.contains(&"label_with_underscore"), "labels should contain underscores");
-    assert!(label_strs.contains(&"label.with.dots"), "labels should contain dots");
+    assert!(
+        label_strs.contains(&"special/label"),
+        "labels should contain slashes"
+    );
+    assert!(
+        label_strs.contains(&"label-with-dash"),
+        "labels should contain dashes"
+    );
+    assert!(
+        label_strs.contains(&"label_with_underscore"),
+        "labels should contain underscores"
+    );
+    assert!(
+        label_strs.contains(&"label.with.dots"),
+        "labels should contain dots"
+    );
 
     fixtures::close_bead(&bead_id, "Special chars labels cleanup");
 }
@@ -449,7 +509,7 @@ fn test_show_json_nonexistent_bead_errors() {
             .arg("show")
             .arg("bf-nonexistent-12345")
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     // Should fail
@@ -488,7 +548,7 @@ fn test_show_json_with_closed_bead() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -497,11 +557,17 @@ fn test_show_json_with_closed_bead() {
     let bead = &array[0];
 
     assert_eq!(json_validation::get_string(bead, "status"), "closed");
-    assert_eq!(json_validation::get_string(bead, "close_reason"), "Test close reason");
+    assert_eq!(
+        json_validation::get_string(bead, "close_reason"),
+        "Test close reason"
+    );
 
     // closed_at should be present and valid
     let closed_at = json_validation::get_string(bead, "closed_at");
-    assert!(closed_at.contains('T'), "closed_at should be in ISO 8601 format");
+    assert!(
+        closed_at.contains('T'),
+        "closed_at should be in ISO 8601 format"
+    );
 }
 
 #[test]
@@ -517,7 +583,7 @@ fn test_show_json_timestamps_are_valid_rfc3339() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -528,12 +594,20 @@ fn test_show_json_timestamps_are_valid_rfc3339() {
     // Check created_at is valid RFC3339
     let created_at = json_validation::get_string(bead, "created_at");
     let parsed_created = chrono::DateTime::parse_from_rfc3339(&created_at);
-    assert!(parsed_created.is_ok(), "created_at should be valid RFC3339: {}", created_at);
+    assert!(
+        parsed_created.is_ok(),
+        "created_at should be valid RFC3339: {}",
+        created_at
+    );
 
     // Check updated_at is valid RFC3339
     let updated_at = json_validation::get_string(bead, "updated_at");
     let parsed_updated = chrono::DateTime::parse_from_rfc3339(&updated_at);
-    assert!(parsed_updated.is_ok(), "updated_at should be valid RFC3339: {}", updated_at);
+    assert!(
+        parsed_updated.is_ok(),
+        "updated_at should be valid RFC3339: {}",
+        updated_at
+    );
 
     // updated_at should be >= created_at
     assert!(
@@ -557,7 +631,7 @@ fn test_show_json_empty_fields_serialize_correctly() {
             .arg("show")
             .arg(&bead_id)
             .arg("--format")
-            .arg("json")
+            .arg("json"),
     );
 
     let json_str = output.trim();
@@ -574,7 +648,10 @@ fn test_show_json_empty_fields_serialize_correctly() {
             // Null is also fine
         }
         Some(other) => {
-            panic!("description should be null or empty string, got: {:?}", other);
+            panic!(
+                "description should be null or empty string, got: {:?}",
+                other
+            );
         }
         None => {
             panic!("description field must be present");
@@ -582,10 +659,17 @@ fn test_show_json_empty_fields_serialize_correctly() {
     }
 
     // Assignee should be null when not set
-    assert!(bead.get("assignee").is_some(), "assignee field must be present");
     assert!(
-        bead.get("assignee").unwrap().is_null() ||
-        bead.get("assignee").and_then(|v| v.as_str()).map(|s| s.is_empty()).unwrap_or(false),
+        bead.get("assignee").is_some(),
+        "assignee field must be present"
+    );
+    assert!(
+        bead.get("assignee").unwrap().is_null()
+            || bead
+                .get("assignee")
+                .and_then(|v| v.as_str())
+                .map(|s| s.is_empty())
+                .unwrap_or(false),
         "assignee should be null or empty string when not set"
     );
 
