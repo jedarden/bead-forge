@@ -1051,13 +1051,14 @@ impl Storage {
     }
 
     pub fn mark_dirty(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        let now = Utc::now().to_rfc3339();
-        conn.execute(
-            "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
-            params![id, now],
-        )?;
-        Ok(())
+        self.with_immediate_transaction(|tx| {
+            let now = Utc::now().to_rfc3339();
+            tx.execute(
+                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                params![id, now],
+            )?;
+            Ok(())
+        })
     }
 
     pub fn rebuild_blocked_cache(&self) -> Result<()> {
