@@ -560,6 +560,8 @@ pub struct Issue {
     pub dependencies: Vec<Dependency>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub comments: Vec<Comment>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub events: Vec<Event>,
 
     // Annotations (bf-only: arbitrary key-value metadata stored in bead_annotations table)
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -608,6 +610,7 @@ impl Default for Issue {
             labels: Vec::new(),
             dependencies: Vec::new(),
             comments: Vec::new(),
+            events: Vec::new(),
             annotations: BTreeMap::new(),
         }
     }

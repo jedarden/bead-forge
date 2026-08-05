@@ -9,11 +9,10 @@ use crate::jsonl::{
     export_jsonl, export_jsonl_dirty, export_jsonl_merge, import_jsonl, UpsertResult,
 };
 use crate::merge::update_base_anchor;
-use crate::model::{Issue, IssueChanges};
+use crate::model::Issue;
 use crate::storage::Storage;
 use anyhow::Result;
 use chrono::Utc;
-use rusqlite::params;
 use std::path::{Path, PathBuf};
 
 /// Sync operation results.
@@ -401,7 +400,7 @@ pub fn auto_flush(
 mod tests {
     use super::*;
     use crate::config::init_workspace;
-    use crate::model::{Issue, IssueType, Priority, Status};
+    use crate::model::{Issue, IssueChanges, IssueType, Priority, Status};
     use crate::storage::Storage;
     use tempfile::TempDir;
 

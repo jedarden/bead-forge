@@ -55,7 +55,7 @@ fn test_cli_formatter_includes_assignee_when_unset() {
 #[test]
 fn test_cli_formatter_includes_assignee_when_set() {
     let issue = create_test_bead_with_assignee();
-    let output = JsonFormatter::default().format_issue(&issue);
+    let output = JsonFormatter.format_issue(&issue);
     let v: Value = serde_json::from_str(&output).unwrap();
 
     assert_eq!(v.get("assignee").and_then(|a| a.as_str()), Some("claude-code"));

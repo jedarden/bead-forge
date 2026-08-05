@@ -4,7 +4,7 @@
 //! numbered archive files (issues.jsonl.1, .2, etc.). Uses streaming rewrite
 //! of the active file and streaming append to archives for efficiency.
 
-use crate::config::{load_config, load_metadata};
+use crate::config::load_metadata;
 use crate::model::Issue;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Duration, Utc};
