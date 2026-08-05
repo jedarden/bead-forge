@@ -83,7 +83,7 @@ impl From<std::io::Error> for TestError {
 ///     }
 /// }
 /// ```
-pub fn run_module_test(module: &str, timeout_secs: u64) -> Result<Output, TestError> {
+pub fn run_module_test(module: &str, timeout_secs: u64) -> Result<std::process::Output, TestError> {
     // Build the cargo test command
     let mut cmd = Command::new("cargo");
     cmd.arg("test").arg(module);
@@ -101,7 +101,7 @@ pub fn run_module_test(module: &str, timeout_secs: u64) -> Result<Output, TestEr
     let child_id = child.id();
 
     // Create a thread to wait for process completion with timeout
-    let handle = thread::spawn(move || -> Result<Output, TestError> {
+    let handle = thread::spawn(move || -> Result<std::process::Output, TestError> {
         // Wait for the process to complete
         let result = child.wait();
 
@@ -110,7 +110,7 @@ pub fn run_module_test(module: &str, timeout_secs: u64) -> Result<Output, TestEr
             Ok(status) => {
                 // Process completed, we can't get output after wait() without
                 // having saved the pipes earlier, so return empty output with status
-                Ok(Output {
+                Ok(std::process::Output {
                     status,
                     stdout: Vec::new(),
                     stderr: Vec::new(),

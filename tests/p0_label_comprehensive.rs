@@ -245,6 +245,24 @@ fn test_p0_label_add() {
     assert!(labels.contains(&"p0-item".to_string()));
     assert!(labels.contains(&"critical".to_string()));
     assert_eq!(json[0]["priority"], 0, "Priority should remain P0");
+
+    // Edge case: Add duplicate label to verify deduplication
+    let (_, stderr, success) = run_bf_command(
+        workspace,
+        &["label", "add", &bead_id, "-l", "p0-item", "-l", "new-label"],
+    );
+    assert!(success, "bf label add with duplicate failed: {}", stderr);
+
+    // Verify duplicate was deduplicated and new label was added
+    let (show_stdout, _, _) = run_bf_command(workspace, &["show", &bead_id, "--format", "json"]);
+    let json = parse_json_output(&show_stdout);
+    let labels = extract_labels_from_json(&json);
+
+    assert_eq!(labels.len(), 3, "Should have 3 unique labels (p0-item, critical, new-label)");
+    assert!(labels.contains(&"p0-item".to_string()));
+    assert!(labels.contains(&"critical".to_string()));
+    assert!(labels.contains(&"new-label".to_string()));
+    assert_eq!(json[0]["priority"], 0, "Priority should remain P0 after adding labels with duplicates");
 }
 
 // ============================================================================
