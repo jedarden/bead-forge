@@ -345,10 +345,10 @@ fn test_epic_label_operations_different_priorities() {
             .remove_label(&id, &format!("label-{}", priority.0))
             .unwrap();
 
-        let final = storage.get_issue(&id).unwrap().unwrap();
-        assert_eq!(final.labels.len(), 1);
-        assert!(final.labels.contains(&format!("added-{}", priority.0)));
-        assert_eq!(final.priority, priority); // Priority should be unchanged
+        let final_state = storage.get_issue(&id).unwrap().unwrap();
+        assert_eq!(final_state.labels.len(), 1);
+        assert!(final_state.labels.contains(&format!("added-{}", priority.0)));
+        assert_eq!(final_state.priority, priority); // Priority should be unchanged
     }
 }
 

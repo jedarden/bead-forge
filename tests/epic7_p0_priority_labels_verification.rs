@@ -134,7 +134,7 @@ fn test_epic7_p0_roundtrip() {
         id: "epic7-roundtrip".to_string(),
         title: "Epic 7 Roundtrip Test".to_string(),
         issue_type: IssueType::Epic,
-        Status::InProgress,
+        status: Status::InProgress,
         priority: Priority::CRITICAL,
         labels: vec!["critical".to_string(), "high-priority".to_string()],
         description: Some("Testing P0 epic with labels roundtrip".to_string()),
