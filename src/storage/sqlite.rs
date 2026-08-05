@@ -2797,6 +2797,187 @@ mod tests {
         let cleared2 = storage.get_issue("bf-clear-assignee2").unwrap().unwrap();
         assert_eq!(cleared2.assignee, None, "assignee should be NULL after clearing via method");
     }
+
+    #[test]
+    fn test_clear_assignee_on_unassigned_bead() {
+        // Test clearing an already NULL assignee (idempotent operation)
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue without an assignee
+        let mut issue = Issue::new("bf-no-assignee".to_string(), "Test unassigned bead".to_string(), ".".to_string());
+        issue.assignee = None;
+        issue.status = Status::Open;
+        issue.priority = Priority::MEDIUM;
+
+        storage.create_issue(&issue).unwrap();
+
+        // Verify initial state has no assignee
+        let retrieved = storage.get_issue("bf-no-assignee").unwrap().unwrap();
+        assert_eq!(retrieved.assignee, None);
+
+        // Attempt to clear the already NULL assignee
+        let changes = Issue::clear_assignee(&issue, "test-actor".to_string());
+        storage.update_issue("bf-no-assignee", &changes).unwrap();
+
+        // Should still be NULL (idempotent)
+        let cleared = storage.get_issue("bf-no-assignee").unwrap().unwrap();
+        assert_eq!(cleared.assignee, None, "assignee should remain NULL when clearing already unassigned bead");
+    }
+
+    #[test]
+    fn test_clear_assignee_on_nonexistent_bead() {
+        // Test error handling when trying to clear assignee on a bead that doesn't exist
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a test issue (not the one we'll try to update)
+        let mut issue = Issue::new("bf-exists".to_string(), "Existing bead".to_string(), ".".to_string());
+        issue.assignee = Some("alice".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Try to clear assignee on a bead that doesn't exist
+        let changes = IssueChanges {
+            assignee: Some(String::new()),
+            actor: Some("test-actor".to_string()),
+            ..Default::default()
+        };
+
+        let result = storage.update_issue("bf-does-not-exist", &changes);
+
+        // Should return an error
+        assert!(result.is_err(), "clearing assignee on nonexistent bead should return error");
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("not found") || err_msg.contains("Bead not found"),
+            "error message should indicate bead was not found"
+        );
+    }
+
+    #[test]
+    fn test_assignee_clear_transactional_atomicity() {
+        // Test that assignee clearing is atomic (all-or-nothing within transaction)
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue with assignee
+        let mut issue = Issue::new("bf-atomic-clear".to_string(), "Test atomic clearing".to_string(), ".".to_string());
+        issue.assignee = Some("alice".to_string());
+        issue.status = Status::Open;
+        issue.priority = Priority::MEDIUM;
+        storage.create_issue(&issue).unwrap();
+
+        // Get initial updated_at timestamp
+        let initial = storage.get_issue("bf-atomic-clear").unwrap().unwrap();
+        let initial_updated_at = initial.updated_at;
+
+        // Small delay to ensure timestamp difference
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Clear assignee using IssueChanges
+        let changes = IssueChanges {
+            assignee: Some(String::new()),
+            actor: Some("test-actor".to_string()),
+            ..Default::default()
+        };
+
+        let update_result = storage.update_issue("bf-atomic-clear", &changes);
+
+        // Update should succeed
+        assert!(update_result.is_ok(), "assignee clear should succeed");
+
+        // Verify the change was applied atomically
+        let updated = storage.get_issue("bf-atomic-clear").unwrap().unwrap();
+        assert_eq!(updated.assignee, None, "assignee should be NULL");
+
+        // Verify updated_at changed (indicates the full row update was atomic)
+        assert_ne!(updated.updated_at, initial_updated_at, "updated_at should change after successful update");
+
+        // Verify the issue still has all its original fields (atomic operation preserved them)
+        assert_eq!(updated.id, "bf-atomic-clear");
+        assert_eq!(updated.title, "Test atomic clearing");
+        assert_eq!(updated.status, Status::Open);
+        assert_eq!(updated.priority, Priority::MEDIUM);
+    }
+
+    #[test]
+    fn test_assignee_clear_with_whitespace_variations() {
+        // Test that various whitespace patterns are handled correctly when clearing assignee
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create issue with assignee
+        let mut issue = Issue::new("bf-whitespace-test".to_string(), "Test whitespace handling".to_string(), ".".to_string());
+        issue.assignee = Some("alice".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Clear with empty string
+        let changes1 = IssueChanges {
+            assignee: Some(String::new()),
+            actor: Some("actor1".to_string()),
+            ..Default::default()
+        };
+        storage.update_issue("bf-whitespace-test", &changes1).unwrap();
+
+        let cleared1 = storage.get_issue("bf-whitespace-test").unwrap().unwrap();
+        assert_eq!(cleared1.assignee, None, "empty string should clear to NULL");
+
+        // Set a new assignee
+        let changes2 = IssueChanges {
+            assignee: Some("bob".to_string()),
+            actor: Some("actor2".to_string()),
+            ..Default::default()
+        };
+        storage.update_issue("bf-whitespace-test", &changes2).unwrap();
+
+        let assigned = storage.get_issue("bf-whitespace-test").unwrap().unwrap();
+        assert_eq!(assigned.assignee.as_deref(), Some("bob"));
+
+        // Clear with whitespace-only string (should be treated as empty and clear to NULL)
+        let changes3 = IssueChanges {
+            assignee: Some("   ".to_string()),  // whitespace only
+            actor: Some("actor3".to_string()),
+            ..Default::default()
+        };
+        storage.update_issue("bf-whitespace-test", &changes3).unwrap();
+
+        let cleared2 = storage.get_issue("bf-whitespace-test").unwrap().unwrap();
+        assert_eq!(cleared2.assignee, None, "whitespace-only string should clear to NULL");
+    }
+
+    #[test]
+    fn test_assignee_clear_creates_event() {
+        // Test that clearing an assignee creates an assignee_changed event
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create issue with assignee
+        let mut issue = Issue::new("bf-event-test".to_string(), "Test event creation".to_string(), ".".to_string());
+        issue.assignee = Some("alice".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Get initial events count
+        let initial_events = storage.list_events("bf-event-test").unwrap();
+        let initial_count = initial_events.len();
+
+        // Clear the assignee
+        let changes = Issue::clear_assignee(&issue, "test-actor".to_string());
+        storage.update_issue("bf-event-test", &changes).unwrap();
+
+        // Verify an event was created
+        let final_events = storage.list_events("bf-event-test").unwrap();
+        assert_eq!(final_events.len(), initial_count + 1, "should have one new event");
+
+        // Find the assignee_changed event
+        let assignee_event = final_events.iter()
+            .find(|e| e.event_type == crate::model::EventType::AssigneeChanged)
+            .expect("should have assignee_changed event");
+
+        assert_eq!(assignee_event.old_value.as_deref(), Some("alice"));
+        assert_eq!(assignee_event.new_value, None);
+        assert_eq!(assignee_event.actor, "test-actor");
+    }
 }
 
 #[cfg(test)]
