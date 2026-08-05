@@ -4,8 +4,6 @@
 
 use bead_forge::model::{Dependency, DependencyType, Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
-use std::thread;
-use std::time::Duration;
 
 // ============================================================================
 // Test 1: P0 bead with dependencies
@@ -40,7 +38,7 @@ fn test_p0_bead_with_dependencies() {
             depends_on_id: "dep-bead".to_string(),
             dep_type: DependencyType::Blocks,
             created_at: now,
-            created_by: None,
+            created_by: Some(String::new()),
             metadata: None,
             thread_id: None,
             title: None,
@@ -89,7 +87,7 @@ fn test_multiple_p0_with_interdependencies() {
             depends_on_id: "p0-blocker".to_string(),
             dep_type: DependencyType::Blocks,
             created_at: now,
-            created_by: None,
+            created_by: Some(String::new()),
             metadata: None,
             thread_id: None,
             title: None,
@@ -252,10 +250,11 @@ fn test_p0_close_reopen() {
     storage.create_issue(&p0_bead).unwrap();
 
     // Close the P0 bead
+    // Note: IssueChanges doesn't have close_reason/closed_by_session/closed_at fields.
+    // The storage layer handles these automatically when status is set to Closed.
     let close_changes = IssueChanges {
         status: Some(Status::Closed),
-        close_reason: Some("Test completion".to_string()),
-        closed_by_session: Some("test-session".to_string()),
+        actor: Some("test-session".to_string()),
         ..Default::default()
     };
     storage.update_issue("p0-close-reopen", &close_changes).unwrap();
@@ -266,12 +265,11 @@ fn test_p0_close_reopen() {
     assert_eq!(closed_bead.priority, Priority::CRITICAL);
 
     // Reopen the P0 bead
+    // Note: closed_at/close_reason/closed_by_session are not IssueChanges fields.
+    // Setting status to Open is sufficient; storage layer clears closure metadata.
     let reopen_changes = IssueChanges {
         status: Some(Status::Open),
-        closed_at: Some(None),
-        close_reason: Some(None),
-        closed_by_session: Some(None),
-        assignee: Some(String::new()),
+        actor: Some("test-session".to_string()),
         ..Default::default()
     };
     storage.update_issue("p0-close-reopen", &reopen_changes).unwrap();
@@ -390,7 +388,7 @@ fn test_p0_with_multiple_dependencies() {
                 depends_on_id: "dep-1".to_string(),
                 dep_type: DependencyType::Blocks,
                 created_at: now,
-                created_by: None,
+                created_by: Some(String::new()),
                 metadata: None,
                 thread_id: None,
                 title: None,
@@ -400,7 +398,7 @@ fn test_p0_with_multiple_dependencies() {
                 depends_on_id: "dep-2".to_string(),
                 dep_type: DependencyType::Blocks,
                 created_at: now,
-                created_by: None,
+                created_by: Some(String::new()),
                 metadata: None,
                 thread_id: None,
                 title: None,
@@ -410,7 +408,7 @@ fn test_p0_with_multiple_dependencies() {
                 depends_on_id: "dep-3".to_string(),
                 dep_type: DependencyType::Blocks,
                 created_at: now,
-                created_by: None,
+                created_by: Some(String::new()),
                 metadata: None,
                 thread_id: None,
                 title: None,
@@ -496,7 +494,10 @@ fn test_p0_epic_with_children() {
             depends_on_id: "p0-epic-with-children".to_string(),
             dep_type: DependencyType::ParentChild,
             created_at: now,
-            created_by: None,
+            created_by: Some(String::new()),
+            metadata: None,
+            thread_id: None,
+            title: None,
         }],
         ..Default::default()
     };
@@ -513,7 +514,10 @@ fn test_p0_epic_with_children() {
             depends_on_id: "p0-epic-with-children".to_string(),
             dep_type: DependencyType::ParentChild,
             created_at: now,
-            created_by: None,
+            created_by: Some(String::new()),
+            metadata: None,
+            thread_id: None,
+            title: None,
         }],
         ..Default::default()
     };
