@@ -1560,6 +1560,14 @@ impl Storage {
         created_by: &str,
     ) -> Result<()> {
         self.with_immediate_transaction(|tx| {
+            // Prevent self-blocking: a bead cannot depend on itself for blocking dependency types
+            if issue_id == depends_on_id && dep_type.is_blocking() {
+                return Err(anyhow::anyhow!(
+                    "Cannot add self-blocking dependency: bead '{}' cannot block itself",
+                    issue_id
+                ));
+            }
+
             let now = Utc::now();
             tx.execute(
                 "INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by) VALUES (?1, ?2, ?3, ?4, ?5)",

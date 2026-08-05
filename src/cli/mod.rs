@@ -1667,7 +1667,7 @@ fn cmd_create(
             {
                 last_err = Some(e);
             }
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         }
     }
     if !created {
@@ -3956,4 +3956,143 @@ mod tests {
     pub mod show_json_tests;
     pub use crate::config::init_workspace;
     pub use crate::Storage;
+
+    // Unit tests for multi-label argument parsing (bf-hjeu2s)
+    use super::*;
+
+    #[test]
+    fn test_create_command_parse_no_labels() {
+        // Test 0 labels: bf create --title "Test" (no --label flag)
+        let args = vec!["bf", "create", "--title", "Test"];
+        let cli = Cli::parse_from(args);
+
+        let command = cli.command.expect("Command should be present");
+        match command {
+            Commands::Create { label, .. } => {
+                assert_eq!(label.len(), 0, "Should have no labels when --label flag is omitted");
+                assert!(label.is_empty(), "Labels vector should be empty");
+            }
+            _ => panic!("Expected Create command"),
+        }
+    }
+
+    #[test]
+    fn test_create_command_parse_one_label() {
+        // Test 1 label: bf create --title "Test" --label "urgent"
+        let args = vec!["bf", "create", "--title", "Test", "--label", "urgent"];
+        let cli = Cli::parse_from(args);
+
+        let command = cli.command.expect("Command should be present");
+        match command {
+            Commands::Create { label, title, .. } => {
+                assert_eq!(label.len(), 1, "Should have exactly one label");
+                assert_eq!(label[0], "urgent", "Label value should be 'urgent'");
+                assert_eq!(title, "Test", "Title should be 'Test'");
+            }
+            _ => panic!("Expected Create command"),
+        }
+    }
+
+    #[test]
+    fn test_create_command_parse_multiple_labels() {
+        // Test 3+ labels: bf create --title "Test" --label "urgent" --label "backend" --label "p0"
+        let args = vec![
+            "bf", "create", "--title", "Test",
+            "--label", "urgent",
+            "--label", "backend",
+            "--label", "p0"
+        ];
+        let cli = Cli::parse_from(args);
+
+        let command = cli.command.expect("Command should be present");
+        match command {
+            Commands::Create { label, .. } => {
+                assert_eq!(label.len(), 3, "Should have exactly three labels");
+                assert!(label.contains(&"urgent".to_string()), "Should contain 'urgent' label");
+                assert!(label.contains(&"backend".to_string()), "Should contain 'backend' label");
+                assert!(label.contains(&"p0".to_string()), "Should contain 'p0' label");
+
+                // Verify exact ordering (clap preserves order)
+                assert_eq!(label[0], "urgent", "First label should be 'urgent'");
+                assert_eq!(label[1], "backend", "Second label should be 'backend'");
+                assert_eq!(label[2], "p0", "Third label should be 'p0'");
+            }
+            _ => panic!("Expected Create command"),
+        }
+    }
+
+    #[test]
+    fn test_create_command_label_count_and_content() {
+        // Comprehensive test verifying both count and content of labels vector
+        let test_cases = vec![
+            // (args vector, expected label count, expected labels)
+            (
+                vec!["bf", "create", "--title", "Test"],
+                0,
+                vec![]
+            ),
+            (
+                vec!["bf", "create", "--title", "Test", "--label", "single"],
+                1,
+                vec!["single"]
+            ),
+            (
+                vec![
+                    "bf", "create", "--title", "Test",
+                    "--label", "urgent",
+                    "--label", "backend",
+                    "--label", "p0",
+                    "--label", "frontend"
+                ],
+                4,
+                vec!["urgent", "backend", "p0", "frontend"]
+            ),
+        ];
+
+        for (args, expected_count, expected_labels) in test_cases {
+            let cli = Cli::parse_from(args.clone());
+            let command = cli.command.expect("Command should be present");
+
+            match command {
+                Commands::Create { label, .. } => {
+                    assert_eq!(
+                        label.len(),
+                        expected_count,
+                        "Label count mismatch for args: {:?}",
+                        args
+                    );
+                    assert_eq!(
+                        label,
+                        expected_labels,
+                        "Label content mismatch for args: {:?}",
+                        args
+                    );
+                }
+                _ => panic!("Expected Create command for args: {:?}", args),
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_command_label_with_special_characters() {
+        // Test labels with special characters and spaces
+        let args = vec![
+            "bf", "create", "--title", "Test",
+            "--label", "bug-fix",
+            "--label", "high_priority",
+            "--label", "API/v2"
+        ];
+        let cli = Cli::parse_from(args);
+
+        let command = cli.command.expect("Command should be present");
+        match command {
+            Commands::Create { label, .. } => {
+                assert_eq!(label.len(), 3, "Should parse labels with special characters");
+                assert_eq!(label[0], "bug-fix", "Should handle hyphenated labels");
+                assert_eq!(label[1], "high_priority", "Should handle underscored labels");
+                assert_eq!(label[2], "API/v2", "Should handle labels with slashes");
+            }
+            _ => panic!("Expected Create command"),
+        }
+    }
 }
