@@ -67,7 +67,7 @@ fn test_dirty_issues_table_schema() {
     // Check foreign key to issues table
     let has_fk: bool = conn
         .query_row(
-            "SELECT COUNT(*) FROM pragma_foreign_key_list('dirty_issues') WHERE table='issues'",
+            "SELECT COUNT(*) FROM pragma_foreign_key_list('dirty_issues') WHERE \"table\"='issues'",
             [],
             |row| row.get::<_, i64>(0).map(|n| n > 0),
         )
