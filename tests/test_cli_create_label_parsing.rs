@@ -225,3 +225,40 @@ fn test_create_single_label() {
         _ => panic!("Expected Create command, got a different command"),
     }
 }
+
+#[test]
+fn test_create_multiple_labels() {
+    // Test parsing of `bf create --title "Test" --label "urgent" --label "backend" --label "p0"`
+    // Verifies parsed labels Vec contains exactly 3 elements
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Test",
+        "--label",
+        "urgent",
+        "--label",
+        "backend",
+        "--label",
+        "p0",
+    ];
+
+    let cli = Cli::parse_from(args);
+
+    let command = cli.command.expect("Command should be present");
+    match command {
+        Commands::Create { label, .. } => {
+            // Verify parsed labels Vec contains exactly 3 elements
+            assert_eq!(label.len(), 3, "Labels count should be 3");
+            // Verify all 3 labels are present
+            assert!(label.contains(&"urgent".to_string()), "Should contain 'urgent' label");
+            assert!(label.contains(&"backend".to_string()), "Should contain 'backend' label");
+            assert!(label.contains(&"p0".to_string()), "Should contain 'p0' label");
+            // Verify order is preserved
+            assert_eq!(label[0], "urgent", "First label should be 'urgent'");
+            assert_eq!(label[1], "backend", "Second label should be 'backend'");
+            assert_eq!(label[2], "p0", "Third label should be 'p0'");
+        }
+        _ => panic!("Expected Create command, got a different command"),
+    }
+}
