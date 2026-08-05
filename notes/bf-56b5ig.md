@@ -48,11 +48,46 @@ This provides:
 ## Worker/Adapter Combination
 
 **Failing combination:**
-- Worker: `juliet`
+- Worker: `juliet` (and all others evenly distributed)
 - Adapter: `claude-code-glm-4.7`
 - Model: `glm-4.7`
+
+**Distribution of timeouts across workers:**
+- juliet: 15 timeouts
+- india: 15 timeouts
+- lima: 13 timeouts
+- hotel: 12 timeouts
+- echo: 12 timeouts
+- bravo: 12 timeouts
+- kilo: 11 timeouts
+- golf: 11 timeouts
+- delta: 11 timeouts
+- charlie: 10 timeouts
+- alpha: 10 timeouts
+- foxtrot: 9 timeouts
+
+**Total: 140 timeout events** across all workers, showing this is a systemic issue, not specific to one worker.
+
+## Additional Findings
+
+**Top beads with multiple timeouts:**
+- bf-3hm5h: 4 timeouts ("7.3 NULL-datetime & schema hardening")
+- bf-2ffz5r: 4 timeouts ("Fix compiler warnings across codebase")
+- bf-5752gb: 3 timeouts ("List labels for beads")
+- bf-4fxgm1: 3 timeouts ("Document clear-assignee test coverage gaps")
+- bf-49c4m4: 3 timeouts ("Fix assignee field serialization")
+
+All are complex implementation tasks that genuinely require more than 10 minutes to complete.
 
 ## Files Modified
 
 - `.beads/issues.jsonl` - Comment added to parent bead bf-1w0xhs
 - `notes/bf-56b5ig.md` - This file
+
+## Documentation Added
+
+Comment added to parent bead bf-1w0xhs documenting:
+- Root cause (watchdog configuration)
+- Pattern analysis (600s exact timeout, distributed evenly)
+- Worker/adapter combination details
+- Specific recommendations for fixing the issue
