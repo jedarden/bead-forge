@@ -8,6 +8,7 @@ pub mod commit_check;
 pub mod config;
 pub mod critical_path;
 pub mod doctor;
+pub mod error;
 pub mod exit_code;
 pub mod format;
 pub mod git_log;
@@ -39,6 +40,7 @@ pub use config::{
     SyncConfig,
 };
 pub use doctor::{check, rebuild_cache, reclaim_stale, repair, verify_schema, DoctorResult};
+pub use error::{BeadForgeError, ParsingFormat, Result};
 pub use id::{generate_id, is_valid_bead_id};
 pub use log::{
     format_event_text, format_event_toon, format_events_json, query_events, EventFilter,
