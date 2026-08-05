@@ -1,6 +1,6 @@
 //! Integration test for log file saving functionality
 
-use bead_forge::module_test::{run_and_save_module_test, save_module_log};
+use bead_forge::module_test::{run_and_save_module_test, save_module_test_log};
 use std::fs;
 use std::path::Path;
 
@@ -15,7 +15,7 @@ fn test_save_module_log_creates_file() {
         stderr: b"Test stderr output\nLine 2\n".to_vec(),
     };
 
-    let result = save_module_log("test_save_log", &sample_output);
+    let result = save_module_test_log("test_save_log", &sample_output);
 
     assert!(result.is_ok(), "save_module_log should succeed");
 
@@ -51,7 +51,7 @@ fn test_save_module_log_preserves_all_output() {
         stderr: large_stderr.as_bytes().to_vec(),
     };
 
-    let log_path = save_module_log("test_large_output", &sample_output)
+    let log_path = save_module_test_log("test_large_output", &sample_output)
         .expect("save_module_log should succeed");
 
     let content = fs::read_to_string(&log_path)
@@ -71,7 +71,7 @@ fn test_save_module_log_includes_exit_code() {
         stderr: b"Some error\n".to_vec(),
     };
 
-    let log_path = save_module_log("test_exit_code", &sample_output)
+    let log_path = save_module_test_log("test_exit_code", &sample_output)
         .expect("save_module_log should succeed");
 
     let content = fs::read_to_string(&log_path)
@@ -93,7 +93,7 @@ fn test_save_module_log_creates_directory_if_needed() {
         stderr: b"".to_vec(),
     };
 
-    let result = save_module_log("test_dir_creation", &sample_output);
+    let result = save_module_test_log("test_dir_creation", &sample_output);
 
     assert!(result.is_ok(), "save_module_log should succeed");
 
