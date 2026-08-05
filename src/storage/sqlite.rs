@@ -2390,6 +2390,50 @@ mod tests {
         assert!(ids.contains(&"bf-3"));
         assert!(!ids.contains(&"bf-2"));
     }
+
+    #[test]
+    fn test_assignee_clear_and_null_persistence() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue with an assignee set
+        let mut issue = Issue::new("bf-clear-assignee".to_string(), "Test assignee clearing".to_string(), ".".to_string());
+        issue.assignee = Some("alice".to_string());
+        issue.status = Status::Open;
+        issue.priority = Priority::MEDIUM;
+
+        // Create the issue
+        storage.create_issue(&issue).unwrap();
+
+        // Verify the assignee was set
+        let retrieved = storage.get_issue("bf-clear-assignee").unwrap().unwrap();
+        assert_eq!(retrieved.assignee.as_deref(), Some("alice"));
+
+        // Clear the assignee using IssueChanges with empty string
+        let mut changes = IssueChanges::default();
+        changes.assignee = Some(String::new()); // Empty string signals "clear to NULL"
+        changes.actor = Some("test-actor".to_string());
+
+        storage.update_issue("bf-clear-assignee", &changes).unwrap();
+
+        // Read the issue back and verify assignee is NULL
+        let cleared = storage.get_issue("bf-clear-assignee").unwrap().unwrap();
+        assert_eq!(cleared.assignee, None, "assignee should be NULL after clearing");
+
+        // Also test using the convenience method
+        let mut issue2 = Issue::new("bf-clear-assignee2".to_string(), "Test assignee clearing via method".to_string(), ".".to_string());
+        issue2.assignee = Some("bob".to_string());
+        storage.create_issue(&issue2).unwrap();
+
+        // Clear using the Issue::clear_assignee() method
+        let clear_changes = issue2.clear_assignee("test-actor".to_string());
+        storage.update_issue("bf-clear-assignee2", &clear_changes).unwrap();
+
+        // Verify assignee is NULL
+        let cleared2 = storage.get_issue("bf-clear-assignee2").unwrap().unwrap();
+        assert_eq!(cleared2.assignee, None, "assignee should be NULL after clearing via method");
+    }
 }
 
 #[cfg(test)]
