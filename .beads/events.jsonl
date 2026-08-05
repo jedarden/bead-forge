@@ -220,3 +220,6 @@
 {"bead":"bf-46xuto","duration_ms":41805,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T15:37:06.152688303+00:00","worker":"echo"}
 {"bead":"bf-50vn7v","event":"claim","strand":"auto","ts":"2026-08-05T15:37:06.191528529+00:00","worker":"echo"}
 {"adapter":"claude-code-glm-4.7","bead":"bf-50vn7v","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:37:06.194440977+00:00","worker":"echo"}
+{"bead":"bf-3fkja","duration_ms":282551,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T15:37:30.165637472+00:00","worker":"delta"}
+{"bead":"bf-32s2qg","event":"claim","strand":"auto","ts":"2026-08-05T15:37:30.241269628+00:00","worker":"delta"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-32s2qg","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:37:30.247305172+00:00","worker":"delta"}
