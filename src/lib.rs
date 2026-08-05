@@ -16,6 +16,7 @@ pub mod jsonl;
 pub mod log;
 pub mod merge;
 pub mod migrate;
+pub mod module_test;
 pub mod model;
 pub mod recovery;
 pub mod reopen;
