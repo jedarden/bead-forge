@@ -9,6 +9,7 @@ use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, ClaimResultOutput, OutputFormat, StatsOutput};
 use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::reopen::reopen_bead;
+use crate::robot_docs::RobotDocs;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
 use crate::validation::normalize_assignee;

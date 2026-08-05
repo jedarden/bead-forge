@@ -35,6 +35,14 @@ pub struct DepTreeNode {
     pub path: String, // Comma-separated path of IDs for cycle detection
 }
 
+/// Dependency display information with type, bead ID, and title.
+#[derive(Debug, Clone)]
+pub struct DependencyDisplay {
+    pub dep_type: String,
+    pub bead_id: String,
+    pub title: String,
+}
+
 pub struct Storage {
     /// The database connection. Made public for testing purposes.
     pub conn: Mutex<Connection>,
@@ -1396,6 +1404,39 @@ impl Storage {
             });
         }
         Ok(deps)
+    }
+
+    /// Get dependencies with display information (title) by joining with issues table.
+    ///
+    /// Returns dependency type, bead ID, and title for each dependency of the given parent bead.
+    /// Handles both blocking (blocks) and non-blocking dependencies.
+    /// Returns empty Vec for beads with no dependencies.
+    ///
+    /// # Arguments
+    /// * `parent_id` - The ID of the parent bead to get dependencies for
+    ///
+    /// # Returns
+    /// Vector of DependencyDisplay structs containing dependency type, bead ID, and title
+    pub fn get_dependencies_display(&self, parent_id: &str) -> Result<Vec<DependencyDisplay>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare_cached(
+            "SELECT d.type, i.id, i.title
+             FROM dependencies d
+             LEFT JOIN issues i ON d.depends_on_id = i.id
+             WHERE d.issue_id = ?1",
+        )?;
+
+        let result = stmt
+            .query_map(params![parent_id], |row| {
+                Ok(DependencyDisplay {
+                    dep_type: row.get(0)?,
+                    bead_id: row.get(1)?,
+                    title: row.get(2)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        Ok(result)
     }
 
     pub fn add_label(&self, issue_id: &str, label: &str) -> Result<()> {

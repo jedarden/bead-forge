@@ -175,3 +175,15 @@
 {"bead":"bf-5p7ngt","duration_ms":600386,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T15:00:13.231763329+00:00","worker":"golf"}
 {"bead":"bf-5p7ngt","event":"claim","strand":"auto","ts":"2026-08-05T15:00:13.279873335+00:00","worker":"golf"}
 {"adapter":"claude-code-glm-4.7","bead":"bf-5p7ngt","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:00:13.289857095+00:00","worker":"golf"}
+{"bead":"bf-15l2q6","duration_ms":380281,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T15:28:28.378354600+00:00","worker":"bravo"}
+{"bead":"bf-1uxcvz","event":"claim","strand":"auto","ts":"2026-08-05T15:28:28.429972950+00:00","worker":"bravo"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-1uxcvz","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:28:28.438986433+00:00","worker":"bravo"}
+{"bead":"bf-66lbhv","duration_ms":600349,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T15:28:39.325089627+00:00","worker":"hotel"}
+{"bead":"bf-66lbhv","event":"claim","strand":"auto","ts":"2026-08-05T15:28:39.364208965+00:00","worker":"hotel"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-66lbhv","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:28:39.372074798+00:00","worker":"hotel"}
+{"bead":"bf-kp2e0t","duration_ms":508729,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T15:29:40.974955494+00:00","worker":"juliet"}
+{"bead":"bf-4fxgm1","event":"claim","strand":"auto","ts":"2026-08-05T15:29:41.042232351+00:00","worker":"juliet"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-4fxgm1","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:29:41.047298647+00:00","worker":"juliet"}
+{"bead":"bf-37k5d0","duration_ms":431885,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T15:30:31.654794612+00:00","worker":"charlie"}
+{"bead":"bf-5jasxl","event":"claim","strand":"auto","ts":"2026-08-05T15:30:31.698962208+00:00","worker":"charlie"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-5jasxl","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:30:31.702250719+00:00","worker":"charlie"}
