@@ -1,46 +1,63 @@
 # Clear-Assignee Functionality Inventory
 
+**Bead ID:** bf-4xu8ib  
+**Date:** 2026-08-05  
+**Purpose:** Comprehensive inventory of all clear-assignee functionality in the bead-forge codebase
+
 ## Overview
-This document catalogs all clear-assignee functionality in the bead-forge codebase, including functions, methods, CLI flags, and tests.
+
+Clear-assignee functionality allows users and automated systems to remove an assignee from a bead, setting it to `NULL` (unassigned state). This is critical for NEEDLE fleet worker coordination and manual workflow management.
 
 ---
 
-## 1. Model Layer (`src/model.rs`)
+## 1. Core Implementation Functions
 
-### `Issue::clear_assignee()` Method
-**Location:** `src/model.rs:841-847`
+### 1.1 CLI Layer (`src/cli/mod.rs`)
 
+#### Command-Line Flag
+- **Location:** Line 192
+- **Definition:** `clear_assignee: bool`
+- **Purpose:** Boolean flag for `bf update` command
+- **Conflicts:** Mutually exclusive with `--assignee` flag (enforced by clap)
+- **Documentation:** "Clear the assignee (set to unassigned). Equivalent to --assignee "" but more discoverable"
+
+#### Flag Processing Logic
+- **Location:** Lines 1198-1210
+- **Implementation:**
 ```rust
-pub fn clear_assignee(&self, actor: String) -> IssueChanges {
-    IssueChanges {
-        assignee: Some(String::new()),
-        actor: Some(actor),
-        ..Default::default()
-    }
-}
+let assignee = if clear_assignee {
+    Some(String::new())  // Empty string signals "clear to NULL"
+} else {
+    assignee
+};
 ```
-
-**Purpose:** Creates an `IssueChanges` struct with the assignee set to `Some(String::new())` (empty string). This is the canonical way to signal "clear assignee" to the storage layer.
-
-**Contract:**
-- Returns `IssueChanges` with `assignee: Some("")`
-- Storage layer interprets `Some("")` as "clear to NULL"
-- For full semantics with event recording, use `Storage::clear_assignee` directly (NOTE: this method doesn't actually exist - see storage layer below)
-
-**Related:** Similar pattern methods exist for `close()` and `reopen()` operations.
+- **Behavior:** Converts `--clear-assignee` flag to empty string, which flows into storage layer as "clear to NULL" signal
 
 ---
 
-## 2. Storage Layer (`src/storage/sqlite.rs`)
+### 1.2 Model Layer (`src/model.rs`)
 
-### Update Logic - Assignee Clearing
-**Location:** `src/storage/sqlite.rs:646-654`
+#### Issue::clear_assignee() Method
+- **Location:** Lines 830-847
+- **Signature:** `pub fn clear_assignee(&self, actor: String) -> IssueChanges`
+- **Purpose:** Convenience method to create assignee-clearing changes
+- **Returns:** `IssueChanges` struct with `assignee: Some(String::new())`
+- **Actor Tracking:** Includes actor parameter for event logging
+- **Documentation Notes:** 
+  - Method docs note: "For full assignee-clear semantics with event recording, use `Storage::clear_assignee` directly instead"
+  - However, no such `Storage::clear_assignee` method exists (documentation references planned but unimplemented feature)
 
+---
+
+### 1.3 Storage Layer (`src/storage/sqlite.rs`)
+
+#### Core Clearing Logic in update_issue()
+- **Location:** Lines 637-646
+- **Implementation:**
 ```rust
 if let Some(ref assignee) = changes.assignee {
     if assignee.trim().is_empty() {
-        // Clearing stores NULL, never an empty string that would
-        // read back as "assigned" and hide the bead from claiming.
+        // Clearing stores NULL, never an empty string
         updates.push("assignee = NULL");
     } else {
         updates.push("assignee = ?");
@@ -48,15 +65,16 @@ if let Some(ref assignee) = changes.assignee {
     }
 }
 ```
+- **Behavior:** 
+  - Empty/whitespace-only string → `NULL` in database
+  - Non-empty string → stored as-is
+  - `None` → assignee field not touched (no update)
 
-**Purpose:** In `update_issue()`, checks if `assignee` is an empty string (after trimming) and converts it to SQL `NULL` instead of storing an empty string.
-
-**Why:** Empty strings would read back as "assigned" and hide the bead from claiming operations.
-
-### Event Recording
-**Location:** `src/storage/sqlite.rs:700-713`
-
+#### Event Recording for Assignee Changes
+- **Location:** Lines 690-703
+- **Implementation:**
 ```rust
+// Record assignee_changed event when assignee changes
 if let Some(ref new_assignee) = changes.assignee {
     let new_val = if new_assignee.trim().is_empty() {
         None
@@ -64,257 +82,201 @@ if let Some(ref new_assignee) = changes.assignee {
         Some(new_assignee.as_str())
     };
     if current_assignee.as_deref() != new_val {
-        let actor = changes.actor.as_deref().unwrap_or("cli");
-        // Creates assignee_changed event...
+        // Insert assignee_changed event...
     }
 }
 ```
+- **Behavior:** Generates `assignee_changed` event tracking old_value → new_value
 
-**Purpose:** Records an `assignee_changed` event when the assignee field changes, including when it's cleared (empty string → `None`).
+#### Automatic Clearing in reopen_issue()
+- **Location:** Line 997 (within SQL UPDATE statement)
+- **Behavior:** Automatically clears assignee when reopening closed beads
+- **Rationale:** Assignee from previous closure is "stale" and should be reset for new claiming cycle
 
-### Filter Query Support
-**Location:** `src/storage/sqlite.rs:249-257`
+---
 
+### 1.4 Validation Layer (`src/validation.rs`)
+
+#### normalize_assignee() Function
+- **Location:** Lines 7-42
+- **Signature:** `pub fn normalize_assignee(value: Option<&str>) -> Option<String>`
+- **Purpose:** Normalizes assignee values for `bf create` command
+- **Behavior:**
+  - `None` → `None` (no assignee)
+  - `Some("value")` → `Some("value")` (trimmed)
+  - `Some("")` → `None` (empty collapses to None)
+  - `Some("  ")` → `None` (whitespace-only collapses to None)
+- **Important:** Used by `bf create` but NOT by `bf update` to preserve clear intent (`Some("")` = clear)
+
+---
+
+## 2. Test Coverage
+
+### 2.1 Manual Tests
+
+#### End-to-End Shell Test
+- **Location:** `tests/manual_test_clear_assignee.sh`
+- **Coverage:**
+  - Creating bead with assignee
+  - Executing `bf update --clear-assignee`
+  - Verifying assignee is cleared in final output
+  - Interactive human verification required
+
+### 2.2 Automated Tests
+
+#### CLI Integration Tests
+- **`tests/update_flags.rs`:**
+  - `test_cli_update_clear_assignee_flag()` (line 602)
+  - `test_cli_update_clear_assignee_conflicts_with_assignee()` (line 629)
+
+- **`tests/cli_integration_crud.rs`:**
+  - `test_update_clear_assignee()` (line 645)
+
+- **`tests/test_claim_create_update_json.rs`:**
+  - `test_update_json_clear_assignee()` (line 619)
+
+- **`tests/test_show_assignee_display.rs`:**
+  - Clear-assignee display verification
+
+- **`tests/test_p0_bug_critical.rs`:**
+  - `test_p0_bug_clear_assignee()` (line 142)
+
+#### Unit Tests
+- **`src/storage/sqlite.rs`:**
+  - `test_assignee_clear_and_null_persistence()` (line 2661)
+  - Tests both direct `IssueChanges` method and `Issue::clear_assignee()` convenience method
+  - Verifies `NULL` persistence (not empty string)
+
+- **`src/reopen.rs`:**
+  - `test_reopen_clears_assignee()` (line 240)
+  - Verifies automatic assignee clearing on reopen
+
+---
+
+## 3. Configuration and Options
+
+### 3.1 Command-Line Interface
+
+#### `bf update` Command
+```bash
+# Clear assignee using dedicated flag
+bf update <bead-id> --clear-assignee
+
+# Clear assignee using empty string (equivalent)
+bf update <bead-id> --assignee ""
+
+# Flags conflict (clap enforces mutual exclusivity)
+bf update <bead-id> --clear-assignee --assignee "alice"  # ERROR
+```
+
+#### Flag Configuration
+- **Type:** Boolean flag (`--clear-assignee`)
+- **Default:** `false`
+- **Conflicts:** `--assignee` (cannot be used together)
+- **Processing:** Converted to empty string internally
+
+### 3.2 Programmatic API
+
+#### Direct IssueChanges
 ```rust
-if let Some(ref assignee) = filter.assignee {
-    if assignee.is_empty() {
-        // Empty-string filter selects unassigned beads.
-        query.push_str(" AND (i.assignee IS NULL OR i.assignee = '')");
-    } else {
-        query.push_str(&format!(" AND i.assignee = ?{}", param_idx));
-        params.push(assignee.clone());
-        param_idx += 1;
-    }
-}
+let mut changes = IssueChanges::default();
+changes.assignee = Some(String::new());  // Signals "clear to NULL"
+changes.actor = Some("system".to_string());
+storage.update_issue("bf-123", &changes)?;
 ```
 
-**Purpose:** In `list_issues()`, allows filtering for unassigned beads by passing an empty string as the `assignee` filter value.
-
-### Test: `test_assignee_clear_and_null_persistence()`
-**Location:** `src/storage/sqlite.rs:2669-2709`
-
-**Tests:**
-1. Creating an issue with an assignee
-2. Clearing assignee via `IssueChanges` with `assignee = Some(String::new())`
-3. Verifying `assignee` becomes `None` (NULL in database)
-4. Using `Issue::clear_assignee()` method
-5. Verifying it also produces NULL
-
----
-
-## 3. CLI Layer (`src/cli/mod.rs`)
-
-### `--clear-assignee` Flag
-**Location:** `src/cli/mod.rs:192`
-
+#### Convenience Method
 ```rust
-clear_assignee: bool,
-```
-
-**Purpose:** Boolean flag in `Update` command struct. Mutually exclusive with `--assignee` (enforced by clap).
-
-### Flag to Value Conversion
-**Location:** `src/cli/mod.rs:1206-1213`
-
-```rust
-// --clear-assignee is sugar for --assignee "": both flow the
-// empty-string "clear to NULL" signal into update_issue. clap
-// guarantees the two flags are mutually exclusive.
-let assignee = if clear_assignee {
-    Some(String::new())
-} else {
-    assignee
-};
-```
-
-**Purpose:** Converts the boolean `--clear-assignee` flag into `Some(String::new())` which flows through to storage as the clear signal.
-
-**Design Intent:** Discoverable sugar for `--assignee ""` - frees an open bead with a stale assignee without requiring claim-then-reclaim.
-
----
-
-## 4. Validation Layer (`src/validation.rs`)
-
-### `normalize_assignee()` Function
-**Location:** `src/validation.rs:37-41`
-
-```rust
-pub fn normalize_assignee(assignee: Option<&str>) -> Option<String> {
-    assignee
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-}
-```
-
-**Purpose:** Normalizes assignee input for `bf create` by trimming whitespace and collapsing empty/whitespace-only values to `None`.
-
-**IMPORTANT:** NOT used by `bf update`! The update command's `--assignee` value is three-valued:
-- `None` = leave unchanged
-- `Some("")` = clear to NULL
-- `Some(x)` = set to x
-
-**Where Used:**
-- `bf create` - to derive new bead's assignee
-- NOT used in `bf update` (to preserve the "clear" intent)
-
----
-
-## 5. Reopen Module (`src/reopen.rs`)
-
-### Reopen Clears Assignee
-**Location:** `src/reopen.rs:13-14` (doc comments)
-
-**Purpose:** The `reopen_bead()` function clears the assignee when reopening a closed bead, as the assignee is considered stale from when it was closed.
-
-### Test: `test_reopen_clears_assignee()`
-**Location:** `src/reopen.rs:240-279`
-
-**Tests:**
-1. Creates a closed bead with an assignee
-2. Reopens the bead
-3. Verifies assignee is cleared (None)
-
----
-
-## 6. Tests
-
-### Unit Tests
-
-#### `tests/update_flags.rs::test_cli_update_clear_assignee_flag()`
-**Location:** `tests/update_flags.rs:602-626`
-
-**Purpose:** Tests `bf update --clear-assignee` flag functionality.
-
-**Acceptance:**
-1. Creates bead with assignee
-2. Runs `update --clear-assignee`
-3. Verifies assignee is null
-
-#### `tests/update_flags.rs::test_cli_update_clear_assignee_conflicts_with_assignee()`
-**Location:** `tests/update_flags.rs:629-657`
-
-**Purpose:** Tests that `--clear-assignee` and `--assignee` are mutually exclusive.
-
-**Acceptance:**
-1. Attempts to use both flags together
-2. Verifies command fails with clap conflict error
-
-#### `tests/cli_integration_crud.rs::test_update_clear_assignee()`
-**Location:** `tests/cli_integration_crud.rs:645-656`
-
-**Purpose:** Integration test for clear-assignee through the full CLI.
-
-**Acceptance:**
-1. Creates bead with assignee
-2. Runs `bf update --clear-assignee`
-3. Verifies command succeeds
-
-### Manual Test
-
-#### `tests/manual_test_clear_assignee.sh`
-**Location:** `tests/manual_test_clear_assignee.sh`
-
-**Purpose:** End-to-end shell test for `bf update --clear-assignee`.
-
-**Acceptance Criteria:**
-1. Create a test bead with an assignee
-2. Run `bf update --clear-assignee` on the bead
-3. Verify the command succeeds without error
-4. Confirm the assignee field is cleared (null) in output
-
----
-
-## 7. Data Flow Summary
-
-### Clear Assignee Flow
-
-```
-CLI: --clear-assignee flag
-         ↓
-CLI: Convert to Some(String::new())
-         ↓
-Storage: update_issue() receives Some("")
-         ↓
-Storage: Empty string check → assignee = NULL
-         ↓
-Storage: Event recorded (assignee_changed)
-         ↓
-Result: Database stores NULL, bead appears unassigned
-```
-
-### Model Layer Shortcut
-
-```
-issue.clear_assignee(actor) → IssueChanges { assignee: Some(""), actor }
-         ↓
-Pass to storage.update_issue()
-         ↓
-Same flow as above
+let issue = storage.get_issue("bf-123")?;
+let changes = issue.clear_assignee("system".to_string());
+storage.update_issue("bf-123", &changes)?;
 ```
 
 ---
 
-## 8. Configuration Options
+## 4. Key Design Patterns
 
-### CLI Flags
-- `--clear-assignee` (update command): Boolean flag to clear assignee
-- `--assignee ""` (update command): Equivalent alternative syntax
-- `--assignee <value>` (update/create): Set assignee to specific value
+### 4.1 Three-Valued Logic for Assignee Updates
 
-### Mutually Exclusive Flags
-- `--clear-assignee` and `--assignee` cannot be used together (enforced by clap)
+| Value | Meaning | Database Result |
+|-------|---------|-----------------|
+| `None` | Leave unchanged | No UPDATE on assignee column |
+| `Some("")` | Clear assignee | Sets assignee to NULL |
+| `Some("value")` | Set assignee | Sets assignee to "value" |
 
----
+### 4.2 Event Recording Contract
 
-## 9. Key Implementation Notes
+All assignee changes generate `assignee_changed` events with:
+- **old_value:** Previous assignee (or None)
+- **new_value:** New assignee (or None for cleared)
+- **actor:** Who made the change
 
-1. **Empty String to NULL Mapping:** The critical invariant is that empty assignee strings are always mapped to NULL in the database, never stored as empty strings.
+Empty string assigns serialize as `None` in events.
 
-2. **Three-Valued Update Logic:** `bf update` uses three-valued logic for assignee:
-   - `None` = no change
-   - `Some("")` = clear
-   - `Some(value)` = set
+### 4.3 Reopen Side Effect
 
-3. **Normalization Split:** `normalize_assignee()` is used by `bf create` but NOT `bf update` to preserve the clear intent.
+**Behavior:** Reopening closed beads (`bf reopen` or `Storage::reopen_issue`) automatically clears assignee.
 
-4. **Reopen Side Effect:** Reopening a closed bead automatically clears the assignee as a side effect (stale assignee from previous work).
+**Rationale:** 
+- Assignee represents the worker who last closed the bead
+- On reopen, the bead should be available for claiming by any worker
+- Prevents "stale assignee" blocking new claims
 
-5. **Event Recording:** All assignee changes, including clears, generate `assignee_changed` events with proper old_value/new_value tracking.
-
----
-
-## Summary Table
-
-| Layer | Component | Location | Purpose |
-|-------|-----------|----------|---------|
-| Model | `Issue::clear_assignee()` | src/model.rs:841 | Creates IssueChanges with empty string |
-| Storage | Empty string → NULL | src/storage/sqlite.rs:646 | Maps empty to NULL in SQL |
-| Storage | Event recording | src/storage/sqlite.rs:700 | Records assignee_changed event |
-| CLI | `--clear-assignee` flag | src/cli/mod.rs:192 | User-facing clear flag |
-| CLI | Flag conversion | src/cli/mod.rs:1209 | Converts bool to Some("") |
-| Validation | `normalize_assignee()` | src/validation.rs:37 | Normalizes for create only |
-| Reopen | Auto-clear on reopen | src/reopen.rs:13 | Clears stale assignee |
-| Tests | Multiple unit/integration tests | tests/*.rs | Test coverage |
+**Implementation:** 
+- Both `src/reopen.rs` (command layer) and `Storage::reopen_issue()` (storage layer)
+- SQL UPDATE statement sets `assignee = NULL` as part of reopen transaction
 
 ---
 
-## Test Coverage
+## 5. Documentation References
 
-✅ **Covered:**
-- Unit test for `Issue::clear_assignee()` method
-- Unit test for storage layer empty string → NULL persistence
-- Unit test for CLI `--clear-assignee` flag
-- Unit test for `--clear-assignee`/`--assignee` mutual exclusivity
-- Integration test for full CLI flow
-- Manual end-to-end shell test
-- Reopen auto-clear assignee test
+### 5.1 Contract Documentation
+- **`docs/assignee-serialization-contract.md`:** Full contract specification
+- **`docs/batch-json-schema.md`:** Batch API assignee clearing behavior
+- **`docs/README.md`:** User-facing command reference
+- **`docs/plan/plan.md`:** Implementation plan and known bugs
 
-⚠️ **Potential Gaps:**
-- No explicit test for empty string filter query in `list_issues()`
-- No test for event recording on assignee clear (though covered implicitly in other tests)
-- No test for interaction between assignee clear and other fields in same update
+### 5.2 Tracking Beads
+Multiple beads track clear-assignee work:
+- **bf-4xu8ib:** This inventory
+- **bf-5wun8h:** Test coverage inventory  
+- **bf-5n92ir:** Test results and verification
+- **bf-4fxgm1:** Test coverage summary
+- **bf-gj673:** Assignee-clearing gap tracking
 
 ---
 
-Generated: 2026-08-05
-Bead: bf-4xu8ib
+## 6. Discovered Gaps
+
+### 6.1 Coverage Gaps
+1. **Batch operations:** No test coverage for `bf batch` with `--clear-assignee`
+2. **Combined operations:** Limited testing of `--clear-assignee` with other flags
+3. **Error handling:** No specific tests for clear-assignee on non-existent beads
+4. **JSONL export:** No verification that cleared assignee serializes correctly to JSONL
+
+### 6.2 Documentation Issues
+1. **Missing Storage method:** Documentation references `Storage::clear_assignee` but no such method exists
+2. **Inconsistent terminology:** Some docs say "clear to NULL", others say "clear to unassigned"
+
+---
+
+## Summary
+
+Clear-assignee functionality is **well-implemented across all layers** of the bead-forge stack:
+
+✅ **CLI Layer:** Dedicated `--clear-assignee` flag with proper conflict handling  
+✅ **Model Layer:** Convenience method for programmatic use  
+✅ **Storage Layer:** Robust NULL persistence with event recording  
+✅ **Validation Layer:** Proper normalization for create vs. update semantics  
+✅ **Reopen Behavior:** Automatic clearing on bead reopen  
+✅ **Test Coverage:** Comprehensive coverage of core use cases  
+
+**Status:** Production-ready with minor documentation inconsistencies and some edge case test gaps.
+
+---
+
+**Next Steps:**
+1. Document discovered test gaps in tracking beads
+2. Consider adding `Storage::clear_assignee()` method for API completeness
+3. Add edge case tests for batch operations and combined flags
+4. Verify JSONL export serialization of cleared assignees
