@@ -940,7 +940,7 @@ fn test_bf_46xuto_comprehensive_validation() {
     let storage = Storage::open(&dir.path().join("test.db")).unwrap();
 
     // Create epic with complete bf-46xuto metadata
-    let mut epic = Issue {
+    let epic = Issue {
         id: "bf-46xuto-comprehensive".to_string(),
         title: "Test epic with P0 and labels".to_string(),
         issue_type: IssueType::Epic,
@@ -948,8 +948,8 @@ fn test_bf_46xuto_comprehensive_validation() {
         priority: Priority::CRITICAL,
         labels: vec!["critical".to_string(), "epic-p0".to_string()],
         assignee: Some("claude-code-glm-4.7-golf".to_string()),
-        created_at: Some("2026-08-05T13:45:13.824351216Z".to_string()),
-        updated_at: Some("2026-08-05T13:48:06.884739674Z".to_string()),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
         ..Default::default()
     };
 
@@ -983,9 +983,9 @@ fn test_bf_46xuto_comprehensive_validation() {
         Some("claude-code-glm-4.7-golf".to_string())
     );
 
-    // Timestamps
-    assert!(retrieved.created_at.is_some());
-    assert!(retrieved.updated_at.is_some());
+    // Timestamps - verify they are set (DateTime fields are always set)
+    let time_diff = retrieved.updated_at.signed_duration_since(retrieved.created_at);
+    assert!(time_diff.num_seconds() >= 0, "updated_at should be after created_at");
 
     // JSON serialization test
     let json = serde_json::to_string(&retrieved).unwrap();
