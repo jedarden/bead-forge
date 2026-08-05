@@ -555,3 +555,24 @@ pub fn ensure_wal_mode(conn: &Connection) -> anyhow::Result<()> {
     )?;
     Ok(())
 }
+
+// Function name aliases for exact bead specification compatibility
+/// Alias for issues_table() - matches bead bf-ybn5qu acceptance criteria
+pub const fn table_issues() -> &'static str {
+    issues_table()
+}
+
+/// Alias for dependencies_table() - matches bead bf-ybn5qu acceptance criteria
+pub const fn table_dependencies() -> &'static str {
+    dependencies_table()
+}
+
+/// Alias for comments_table() - matches bead bf-ybn5qu acceptance criteria
+pub const fn table_comments() -> &'static str {
+    comments_table()
+}
+
+/// Alias for events_table() - matches bead bf-ybn5qu acceptance criteria
+pub const fn table_events() -> &'static str {
+    events_table()
+}
