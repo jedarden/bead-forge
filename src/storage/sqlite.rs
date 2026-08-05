@@ -83,6 +83,23 @@ impl Storage {
         Ok(storage)
     }
 
+    /// Create a Storage instance from an existing SQLite connection.
+    ///
+    /// This is useful when you have an already-opened connection and want to
+    /// use the Storage API without reopening the database. The connection
+    /// should have the appropriate schema applied already.
+    pub fn from_conn(conn: Connection) -> Result<Self> {
+        // Set busy timeout for concurrent access
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        // Apply schema to ensure tables exist
+        apply_schema(&conn)?;
+        Ok(Storage {
+            conn: Mutex::new(conn),
+            secret_scanner: Mutex::new(None),
+        })
+    }
+
+
     /// Explicitly apply database migrations.
     ///
     /// This is called during `bf migrate` to ensure all bf-only tables
@@ -1088,7 +1105,7 @@ impl Storage {
         }
     }
 
-    fn row_to_issue_conn(conn: &Connection, row: &rusqlite::Row) -> Result<Issue> {
+    pub fn row_to_issue_conn(conn: &Connection, row: &rusqlite::Row) -> Result<Issue> {
         let status_str: String = row.get(7)?;
         let type_str: String = row.get(9)?;
         let parse_opt_dt = |idx: usize| -> Result<Option<DateTime<Utc>>> {

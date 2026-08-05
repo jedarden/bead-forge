@@ -221,19 +221,39 @@ where
 /// Incremental flush that only writes dirty beads to JSONL.
 /// This is the main entry point for auto-flush functionality.
 pub fn incremental_flush(conn: &rusqlite::Connection, path: &Path) -> Result<FlushResult> {
-    use crate::storage::Storage;
-
-    // Create a storage wrapper around the connection
-    let storage = Storage::from_conn(conn)?;
+    use crate::storage::sqlite::Storage;
 
     // List dirty issues from database
     let list_dirty = || -> Result<Vec<crate::model::Issue>> {
-        storage.list_dirty_issues()
+        let mut stmt = conn.prepare(
+            "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+                    i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
+                    i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
+                    i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
+                    i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
+                    i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
+                    i.sender, i.ephemeral, i.pinned, i.is_template,
+                    GROUP_CONCAT(bl.label) AS labels
+             FROM issues i
+             INNER JOIN dirty_issues d ON i.id = d.issue_id
+             LEFT JOIN bead_labels bl ON i.id = bl.bead_id
+             GROUP BY i.id
+             ORDER BY i.id",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut issues = Vec::new();
+        while let Some(row) = rows.next()? {
+            issues.push(Storage::row_to_issue_conn(conn, row)?);
+        }
+        drop(rows);
+        drop(stmt);
+        Ok(issues)
     };
 
     // Clear dirty marks after successful export
     let clear_dirty = || -> Result<()> {
-        storage.clear_dirty()
+        conn.execute("DELETE FROM dirty_issues", [])?;
+        Ok(())
     };
 
     // Use export_jsonl_dirty for the actual export
