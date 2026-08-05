@@ -915,7 +915,7 @@ impl Storage {
             // Close the bead
             let now = Utc::now();
             tx.execute(
-                "UPDATE issues SET status = 'closed', closed_at = ?, close_reason = ?, closed_by_session = ?, updated_at = ? WHERE id = ?",
+                "UPDATE issues SET status = 'closed', assignee = NULL, closed_at = ?, close_reason = ?, closed_by_session = ?, updated_at = ? WHERE id = ?",
                 params![now.to_rfc3339(), reason, actor, now.to_rfc3339(), id],
             )?;
             tx.execute(

@@ -642,6 +642,7 @@ impl TraceManager {
     /// * `log_path` - Path to the log file (will be created if it doesn't exist)
     /// * `stdout` - Standard output content to write
     /// * `stderr` - Standard error content to write
+    /// * `exit_code` - Optional exit code to append to the log
     ///
     /// # Returns
     /// * `Result<(), io::Error>` - Ok(()) on success, io::Error on failure
@@ -650,13 +651,14 @@ impl TraceManager {
     /// ```ignore
     /// let manager = TraceManager::for_current_workspace()?;
     /// let log_path = manager.traces_dir.join("test-output.log");
-    /// manager.write_captured_output(&log_path, "stdout content", "stderr content")?;
+    /// manager.write_captured_output(&log_path, "stdout content", "stderr content", Some(0))?;
     /// ```
     pub fn write_captured_output(
         &self,
         log_path: &Path,
         stdout: &str,
         stderr: &str,
+        exit_code: Option<i32>,
     ) -> Result<(), io::Error> {
         // Ensure parent directories exist
         if let Some(parent) = log_path.parent() {
@@ -677,6 +679,11 @@ impl TraceManager {
         output.push_str("\n=== STDERR ===\n");
         output.push_str(stderr);
 
+        // Append exit code if provided
+        if let Some(code) = exit_code {
+            output.push_str(&format!("\n=== EXIT CODE: {} ===\n", code));
+        }
+
         // Use std::fs::write for atomic file creation
         fs::write(log_path, output).map_err(|e| {
             io::Error::new(
@@ -695,6 +702,7 @@ impl TraceManager {
     /// * `bead_id` - The bead identifier
     /// * `stdout` - Standard output content to write
     /// * `stderr` - Standard error content to write
+    /// * `exit_code` - Optional exit code to append to the log
     ///
     /// # Returns
     /// * `Result<(), io::Error>` - Ok(()) on success, io::Error on failure
@@ -702,13 +710,14 @@ impl TraceManager {
     /// # Examples
     /// ```ignore
     /// let manager = TraceManager::for_current_workspace()?;
-    /// manager.write_bead_output("bf-1d22i6", "Test output", "Test errors")?;
+    /// manager.write_bead_output("bf-1d22i6", "Test output", "Test errors", Some(0))?;
     /// ```
     pub fn write_bead_output(
         &self,
         bead_id: &str,
         stdout: &str,
         stderr: &str,
+        exit_code: Option<i32>,
     ) -> Result<(), io::Error> {
         // Ensure the bead trace directory exists
         let bead_dir = self.bead_trace_dir(bead_id).map_err(|e| {
@@ -720,7 +729,7 @@ impl TraceManager {
 
         // Write to a combined log file
         let log_path = bead_dir.join("output.log");
-        self.write_captured_output(&log_path, stdout, stderr)
+        self.write_captured_output(&log_path, stdout, stderr, exit_code)
     }
 
     /// Execute cargo test in the specified directory and capture all output

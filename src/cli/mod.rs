@@ -233,6 +233,10 @@ pub enum Commands {
         /// Close reason
         #[arg(long, default_value = "Completed")]
         reason: String,
+
+        /// Output JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Reopen a bead
@@ -1245,7 +1249,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 json,
             )
         }
-        Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason, no_auto_flush),
+        Commands::Close { id, reason, json } => cmd_close(&beads_dir, &id, &reason, no_auto_flush, json),
         Commands::Reopen { id } => cmd_reopen(&beads_dir, &id, no_auto_flush),
         Commands::Delete { id } => cmd_delete(&beads_dir, &id, no_auto_flush),
         Commands::Ready {
@@ -1920,14 +1924,29 @@ fn cmd_update(
     Ok(())
 }
 
-fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str, no_auto_flush: bool) -> Result<()> {
+fn cmd_close(beads_dir: &PathBuf, id: &str, reason: &str, no_auto_flush: bool, json: bool) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
 
     close_bead(&db_path, id, reason, "cli")?;
-    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
-    println!("Closed bead {}", id);
+    let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
+
+    if json {
+        let formatter = get_formatter(OutputFormat::Json);
+        let data = serde_json::json!({
+            "id": id,
+            "closed": true,
+            "reason": reason
+        });
+        let json_str = serde_json::to_string(&data)?;
+        println!(
+            "{}",
+            formatter.format_with_envelope_and_warning("close", &json_str, warning.as_deref())
+        );
+    } else {
+        println!("Closed bead {}", id);
+    }
 
     Ok(())
 }
