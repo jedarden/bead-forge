@@ -1633,7 +1633,7 @@ fn cmd_create(
     }
 
     // Validate priority is in range 0-4
-    validate_priority(priority).map_err(|e| anyhow!(e))?;
+    validate_priority(priority).to_result().map_err(|e| anyhow!(e))?;
 
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
@@ -1940,7 +1940,7 @@ fn cmd_update(
 
     // Validate priority if provided
     if let Some(p) = priority {
-        validate_priority(p).map_err(|e| anyhow!(e))?;
+        validate_priority(p).to_result().map_err(|e| anyhow!(e))?;
     }
 
     // Parse due_at if provided
