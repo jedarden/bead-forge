@@ -141,6 +141,46 @@ Labels: multi-label, p0-test, test
 - `--json` flag provides proper structured output
 - All data persists correctly through creation, storage, and retrieval
 
+### Additional Manual CLI Test (2026-08-05 18:51)
+
+**Command executed:**
+```bash
+bf create --title "Test P0 Multi-label Bead" \
+  --priority 0 \
+  --label phase-3 \
+  --label testing \
+  --label multi-label \
+  --description "Testing creation of P0 priority bead with multiple labels via CLI"
+```
+
+**Result:** ✅ SUCCESS - Created bead `bf-6ayscd`
+
+**Verification with `bf show bf-6ayscd`:**
+```
+ID: bf-6ayscd
+Title: Test P0 Multi-label Bead
+Status: open
+Priority: P0
+Type: task
+Description: Testing creation of P0 priority bead with multiple labels via CLI
+Created at: 2026-08-05 18:51:30 UTC
+Updated at: 2026-08-05 18:51:30 UTC
+Labels: multi-label, phase-3, testing
+```
+
+**Label verification with `bf labels bf-6ayscd`:**
+```
+multi-label
+phase-3
+testing
+```
+
+**Test cleanup:**
+```bash
+bf close bf-6ayscd --reason "Test completed - verified P0 priority and multi-label creation works correctly"
+```
+Result: ✅ Successfully closed
+
 ## Final Assessment
 
-Both automated test suite (30 tests ✅) and manual CLI testing (✅) confirm that multi-label functionality on P0 priority beads is fully working and production-ready.
+Both automated test suite (30 tests ✅) and multiple manual CLI testing sessions (✅) confirm that multi-label functionality on P0 priority beads is fully working and production-ready. Testing completed on 2026-08-05 with successful creation, verification, and cleanup of P0 multi-label beads.
