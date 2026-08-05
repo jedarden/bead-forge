@@ -232,14 +232,10 @@ fn test_p0_multiple_labels_search_and_filter() {
     assert!(!search_json.is_empty(), "Should find at least one P0 bead with 'critical' label");
 
     // Verify we can also filter by priority alone
-    let (list_stdout, _, _) = run_bf_command(&workspace, &["list", "--priority", "0", "--json"]);
+    let (list_stdout, _, _) = run_bf_command(&workspace, &["list", "--priority", "0", "--json", "--envelope"]);
     let list_output = parse_json_output(&list_stdout);
-    // Extract data from envelope if present
-    let list_json = if list_output.get("data").is_some() {
-        list_output.get("data").unwrap().as_array().unwrap()
-    } else {
-        list_output.as_array().unwrap()
-    };
+    // Extract data from envelope (envelope is always present with --envelope flag)
+    let list_json = list_output.get("data").unwrap().as_array().unwrap();
 
     assert!(list_json.len() >= 3);
     for bead in list_json {
@@ -407,14 +403,10 @@ fn test_p0_batch_operations_with_labels() {
     assert!(output.status.success());
 
     // Verify all beads were created
-    let (list_stdout, _, _) = run_bf_command(&workspace, &["list", "--priority", "0", "--json"]);
+    let (list_stdout, _, _) = run_bf_command(&workspace, &["list", "--priority", "0", "--json", "--envelope"]);
     let list_output = parse_json_output(&list_stdout);
-    // Extract data from envelope if present
-    let list_json = if list_output.get("data").is_some() {
-        list_output.get("data").unwrap().as_array().unwrap()
-    } else {
-        list_output.as_array().unwrap()
-    };
+    // Extract data from envelope (envelope is always present with --envelope flag)
+    let list_json = list_output.get("data").unwrap().as_array().unwrap();
 
     assert_eq!(list_json.len(), 3);
     for bead in list_json {

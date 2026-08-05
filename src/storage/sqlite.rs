@@ -288,10 +288,20 @@ impl Storage {
         query.push_str(" GROUP BY i.id");
         query.push_str(" ORDER BY i.updated_at DESC, i.id ASC");
         if let Some(limit) = filter.limit {
-            query.push_str(&format!(" LIMIT {}", limit));
+            // Validate limit to prevent potential DoS attacks
+            const MAX_LIMIT: usize = 10000;
+            let safe_limit = limit.min(MAX_LIMIT);
+            query.push_str(&format!(" LIMIT ?{}", param_idx));
+            params.push(safe_limit.to_string());
+            param_idx += 1;
         }
         if let Some(offset) = filter.offset {
-            query.push_str(&format!(" OFFSET {}", offset));
+            // Validate offset to prevent potential DoS attacks
+            const MAX_OFFSET: usize = 1000000;
+            let safe_offset = offset.min(MAX_OFFSET);
+            query.push_str(&format!(" OFFSET ?{}", param_idx));
+            params.push(safe_offset.to_string());
+            param_idx += 1;
         }
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(&query)?;

@@ -632,6 +632,60 @@ impl TraceManager {
         self.traces_dir.join(bead_id).join("stderr.txt")
     }
 
+    /// Format exit status information with signal detection
+    ///
+    /// This function creates a formatted string representation of a process exit status,
+    /// distinguishing between normal exit codes and termination signals on Unix systems.
+    ///
+    /// # Arguments
+    /// * `exit_code` - Optional exit code (None indicates signal termination on Unix)
+    /// * `signal` - Optional signal number (Unix only, None on Windows or normal exit)
+    ///
+    /// # Returns
+    /// * `String` - Formatted status string
+    ///
+    /// # Examples
+    /// ```
+    /// // Normal exit
+    /// assert_eq!(format_exit_status(Some(0), None), "exit code 0");
+    /// assert_eq!(format_exit_status(Some(1), None), "exit code 1");
+    ///
+    /// // Signal termination (Unix)
+    /// assert_eq!(format_exit_status(None, Some(9)), "signal SIGKILL (9)");
+    /// assert_eq!(format_exit_status(None, Some(15)), "signal SIGTERM (15)");
+    /// ```
+    pub fn format_exit_status(exit_code: Option<i32>, signal: Option<i32>) -> String {
+        match (exit_code, signal) {
+            (Some(code), None) => {
+                format!("exit code {}", code)
+            }
+            (None, Some(sig)) => {
+                #[cfg(unix)]
+                {
+                    let signal_name = match sig {
+                        1 => "SIGHUP",
+                        2 => "SIGINT",
+                        3 => "SIGQUIT",
+                        6 => "SIGABRT",
+                        9 => "SIGKILL",
+                        15 => "SIGTERM",
+                        _ => "UNKNOWN",
+                    };
+                    format!("signal {} ({})", signal_name, sig)
+                }
+                #[cfg(windows)]
+                {
+                    format!("signal {}", sig)
+                }
+            }
+            (None, None) => "unknown termination".to_string(),
+            (Some(code), Some(sig)) => {
+                // Both present - edge case, show both
+                format!("exit code {} (signal {})", code, sig)
+            }
+        }
+    }
+
     /// Write captured output to a log file atomically
     ///
     /// This function writes both stdout and stderr content to a single log file
@@ -643,6 +697,7 @@ impl TraceManager {
     /// * `stdout` - Standard output content to write
     /// * `stderr` - Standard error content to write
     /// * `exit_code` - Optional exit code to append to the log
+    /// * `signal` - Optional signal number (Unix only, defaults to None)
     ///
     /// # Returns
     /// * `Result<(), io::Error>` - Ok(()) on success, io::Error on failure
@@ -651,7 +706,7 @@ impl TraceManager {
     /// ```ignore
     /// let manager = TraceManager::for_current_workspace()?;
     /// let log_path = manager.traces_dir.join("test-output.log");
-    /// manager.write_captured_output(&log_path, "stdout content", "stderr content", Some(0))?;
+    /// manager.write_captured_output(&log_path, "stdout content", "stderr content", Some(0), None)?;
     /// ```
     pub fn write_captured_output(
         &self,
@@ -659,6 +714,31 @@ impl TraceManager {
         stdout: &str,
         stderr: &str,
         exit_code: Option<i32>,
+    ) -> Result<(), io::Error> {
+        self.write_captured_output_with_signal(log_path, stdout, stderr, exit_code, None)
+    }
+
+    /// Write captured output to a log file with signal information
+    ///
+    /// This is an extended version of write_captured_output that supports signal
+    /// detection on Unix systems for processes terminated by signals.
+    ///
+    /// # Arguments
+    /// * `log_path` - Path to the log file (will be created if it doesn't exist)
+    /// * `stdout` - Standard output content to write
+    /// * `stderr` - Standard error content to write
+    /// * `exit_code` - Optional exit code to append to the log
+    /// * `signal` - Optional signal number (Unix only)
+    ///
+    /// # Returns
+    /// * `Result<(), io::Error>` - Ok(()) on success, io::Error on failure
+    pub fn write_captured_output_with_signal(
+        &self,
+        log_path: &Path,
+        stdout: &str,
+        stderr: &str,
+        exit_code: Option<i32>,
+        signal: Option<i32>,
     ) -> Result<(), io::Error> {
         // Ensure parent directories exist
         if let Some(parent) = log_path.parent() {
@@ -679,9 +759,10 @@ impl TraceManager {
         output.push_str("\n=== STDERR ===\n");
         output.push_str(stderr);
 
-        // Append exit code if provided
-        if let Some(code) = exit_code {
-            output.push_str(&format!("\n=== EXIT CODE: {} ===\n", code));
+        // Append exit status information if provided
+        if exit_code.is_some() || signal.is_some() {
+            let status_str = Self::format_exit_status(exit_code, signal);
+            output.push_str(&format!("\n=== EXIT STATUS: {} ===\n", status_str));
         }
 
         // Use std::fs::write for atomic file creation
@@ -691,6 +772,65 @@ impl TraceManager {
                 format!("Failed to write output to {}: {}", log_path.display(), e),
             )
         })
+    }
+
+    /// Write captured output from TestOutput (module_test integration)
+    ///
+    /// This is a convenience function that integrates with module_test::TestOutput
+    /// to write captured test output to a log file with exit code information.
+    ///
+    /// # Arguments
+    /// * `log_path` - Path to the log file
+    /// * `test_output` - TestOutput from module_test::run_module_test
+    ///
+    /// # Returns
+    /// * `Result<(), io::Error>` - Ok(()) on success, io::Error on failure
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use bead_forge::module_test::{run_module_test, TestError};
+    /// use bead_forge::trace::TraceManager;
+    ///
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let log_path = manager.traces_dir.join("test-output.log");
+    ///
+    /// match run_module_test("storage", 30) {
+    ///     Ok(test_output) => {
+    ///         manager.write_test_output(&log_path, &test_output)?;
+    ///     }
+    ///     Err(TestError::Timeout { timeout_secs }) => {
+    ///         eprintln!("Test timed out after {} seconds", timeout_secs);
+    ///     }
+    ///     Err(e) => {
+    ///         eprintln!("Test error: {}", e);
+    ///     }
+    /// }
+    /// ```
+    pub fn write_test_output(&self, log_path: &Path, test_output: &crate::module_test::TestOutput) -> Result<(), io::Error> {
+        // Extract exit code from TestOutput
+        let exit_code = test_output.exit_code();
+
+        // On Unix, if exit_code is None, the process was terminated by a signal
+        // We could enhance this further with platform-specific signal detection
+        #[cfg(unix)]
+        let signal = if exit_code.is_none() {
+            // Process terminated by signal - could use wait().signal() on Unix
+            // For now, we'll use None since TestOutput uses ExitStatus
+            None
+        } else {
+            None
+        };
+
+        #[cfg(not(unix))]
+        let signal = None;
+
+        self.write_captured_output_with_signal(
+            log_path,
+            &test_output.stdout,
+            &test_output.stderr,
+            exit_code,
+            signal,
+        )
     }
 
     /// Write captured output to a bead-specific log file atomically
@@ -2985,7 +3125,7 @@ mod tests {
         let stderr = "Test stderr content";
 
         // Write captured output
-        let result = manager.write_captured_output(&log_path, stdout, stderr);
+        let result = manager.write_captured_output(&log_path, stdout, stderr, None);
 
         assert!(result.is_ok(), "Should successfully write output");
         assert!(log_path.exists(), "Log file should exist");
@@ -3009,7 +3149,7 @@ mod tests {
 
         // Write the same file twice
         manager
-            .write_captured_output(&log_path, stdout, stderr)
+            .write_captured_output(&log_path, stdout, stderr, None)
             .unwrap();
         let content1 = fs::read_to_string(&log_path).unwrap();
 
@@ -3039,7 +3179,7 @@ mod tests {
         assert!(!log_path.parent().unwrap().exists(), "Parent should not exist");
 
         // Write should create parent directories
-        let result = manager.write_captured_output(&log_path, "stdout", "stderr");
+        let result = manager.write_captured_output(&log_path, "stdout", "stderr", None);
 
         assert!(result.is_ok(), "Should create parent directories and write");
         assert!(log_path.exists(), "Log file should exist");
@@ -3054,7 +3194,7 @@ mod tests {
         let log_path = temp_dir.path().join("empty-test.log");
 
         // Write empty content
-        let result = manager.write_captured_output(&log_path, "", "");
+        let result = manager.write_captured_output(&log_path, "", "", None);
 
         assert!(result.is_ok(), "Should handle empty content");
         assert!(log_path.exists(), "File should exist even with empty content");
@@ -3076,7 +3216,7 @@ mod tests {
         let stdout = "Line ".repeat(10000);
         let stderr = "Error ".repeat(5000);
 
-        let result = manager.write_captured_output(&log_path, &stdout, &stderr);
+        let result = manager.write_captured_output(&log_path, &stdout, &stderr, None);
 
         assert!(result.is_ok(), "Should handle large content");
 
@@ -3097,7 +3237,7 @@ mod tests {
         let stdout = "Test with special chars: \t\n\r\"'\\<>{}[]";
         let stderr = "Error with unicode: café 日本語 🎉";
 
-        let result = manager.write_captured_output(&log_path, stdout, stderr);
+        let result = manager.write_captured_output(&log_path, stdout, stderr, None);
 
         assert!(result.is_ok(), "Should handle special characters");
 
@@ -3116,12 +3256,12 @@ mod tests {
 
         // Write initial content
         manager
-            .write_captured_output(&log_path, "Original stdout", "Original stderr")
+            .write_captured_output(&log_path, "Original stdout", "Original stderr", None)
             .unwrap();
 
         // Overwrite with new content
         manager
-            .write_captured_output(&log_path, "New stdout", "New stderr")
+            .write_captured_output(&log_path, "New stdout", "New stderr", None)
             .unwrap();
 
         // Verify file was completely overwritten
@@ -3140,7 +3280,7 @@ mod tests {
         let stderr = "Bead stderr content";
 
         // Write bead output
-        let result = manager.write_bead_output(bead_id, stdout, stderr);
+        let result = manager.write_bead_output(bead_id, stdout, stderr, None);
 
         assert!(result.is_ok(), "Should successfully write bead output");
 
@@ -3170,7 +3310,7 @@ mod tests {
             let stdout = format!("Stdout for {}", bead_id);
             let stderr = format!("Stderr for {}", bead_id);
 
-            manager.write_bead_output(bead_id, &stdout, &stderr).unwrap();
+            manager.write_bead_output(bead_id, &stdout, &stderr, None).unwrap();
 
             // Verify each bead's output was written correctly
             let log_path = manager.traces_dir.join(bead_id).join("output.log");
@@ -3188,7 +3328,7 @@ mod tests {
 
         // Test that the function returns Result<(), io::Error>
         let result: Result<(), io::Error> =
-            manager.write_bead_output("bf-test", "stdout", "stderr");
+            manager.write_bead_output("bf-test", "stdout", "stderr", None);
 
         assert!(result.is_ok(), "Should return Ok(())");
     }
@@ -3202,7 +3342,7 @@ mod tests {
 
         // Test that the function returns Result<(), io::Error>
         let result: Result<(), io::Error> =
-            manager.write_captured_output(&log_path, "stdout", "stderr");
+            manager.write_captured_output(&log_path, "stdout", "stderr", None);
 
         assert!(result.is_ok(), "Should return Ok(())");
     }
@@ -3219,7 +3359,7 @@ mod tests {
         let stderr = "Error 1\nError 2";
 
         manager
-            .write_captured_output(&log_path, stdout, stderr)
+            .write_captured_output(&log_path, stdout, stderr, None)
             .unwrap();
 
         // Verify content is preserved
@@ -3242,7 +3382,7 @@ mod tests {
 
         for _ in 0..3 {
             manager
-                .write_captured_output(&log_path, stdout, stderr)
+                .write_captured_output(&log_path, stdout, stderr, None)
                 .unwrap();
         }
 
