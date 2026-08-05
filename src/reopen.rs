@@ -469,4 +469,78 @@ mod tests {
             "Event should show old status as 'closed'"
         );
     }
+
+    #[test]
+    fn test_reopen_rolls_back_on_transaction_error() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let db_path = temp_dir.path().join("test.db");
+
+        let storage = Storage::open(&db_path).expect("Failed to open storage");
+
+        // Create a closed bead with an assignee
+        let bead_id = "bf-test-rollback-1".to_string();
+        let now = Utc::now();
+        let bead = Issue {
+            id: bead_id.clone(),
+            title: "Test bead for rollback".to_string(),
+            status: Status::Closed,
+            assignee: Some("test-worker".to_string()),
+            created_at: now,
+            updated_at: now,
+            closed_at: Some(now),
+            close_reason: Some("Test close".to_string()),
+            ..Default::default()
+        };
+
+        storage.create_issue(&bead).expect("Failed to create test bead");
+
+        // Clear any dirty marks from create_issue (clears all dirty issues)
+        storage.clear_dirty().expect("Failed to clear dirty");
+
+        // Add a trigger that will cause the events INSERT to fail
+        let conn = storage.conn.lock().unwrap();
+        conn.execute(
+            "CREATE TRIGGER prevent_event_insert
+             BEFORE INSERT ON events
+             WHEN NEW.event_type = 'reopened'
+             BEGIN SELECT RAISE(ABORT, 'Test trigger for rollback'); END",
+            [],
+        ).expect("Failed to create trigger");
+        drop(conn);
+
+        // Store the original state for later comparison
+        let bead_before = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+        let closed_at_before = bead_before.closed_at;
+        let close_reason_before = bead_before.close_reason.clone();
+
+        // Verify bead is NOT dirty before the reopen attempt
+        let dirty_before = storage.list_dirty_issues().expect("Failed to list dirty issues");
+        let was_dirty_before = dirty_before.iter().any(|b| b.id == bead_id);
+        assert!(!was_dirty_before, "Bead should not be dirty before reopen attempt");
+
+        // Attempt to reopen - this should fail partway through the transaction
+        let result = storage.reopen_issue(&bead_id);
+
+        // Should fail due to trigger
+        assert!(result.is_err(), "Reopen should fail when trigger aborts");
+
+        // Verify rollback occurred - bead should still be closed with original values
+        let storage = Storage::open(&db_path).expect("Failed to open storage");
+        let bead_after = storage.get_issue(&bead_id).expect("Failed to get bead").unwrap();
+
+        // All original fields should be intact (no partial update)
+        assert_eq!(bead_after.status, Status::Closed, "Status should remain closed after rollback");
+        assert_eq!(bead_after.assignee, Some("test-worker".to_string()), "Assignee should remain after rollback");
+        assert_eq!(bead_after.closed_at, closed_at_before, "closed_at should remain unchanged after rollback");
+        assert_eq!(bead_after.close_reason, close_reason_before, "close_reason should remain unchanged after rollback");
+
+        // Verify no reopened event was created (transaction rolled back)
+        let events = storage.list_events(&bead_id).expect("Failed to list events");
+        assert!(!events.iter().any(|e| e.event_type == crate::model::EventType::Reopened), "Should not have reopened event after rollback");
+
+        // Verify bead is still NOT marked as dirty (transaction was rolled back)
+        let dirty_after = storage.list_dirty_issues().expect("Failed to list dirty issues");
+        let is_dirty_after = dirty_after.iter().any(|b| b.id == bead_id);
+        assert!(!is_dirty_after, "Bead should not be marked as dirty after failed reopen (transaction rolled back)");
+    }
 }

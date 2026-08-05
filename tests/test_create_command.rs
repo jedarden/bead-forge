@@ -794,4 +794,389 @@ claim_ttl_minutes: 30
             );
         }
     }
+
+    // Bead bf-3ak0x: Tests for create command
+    // Acceptance Criteria:
+    // - test_create_basic: creates bead with just --title
+    // - test_create_default_values: verifies defaults (status=open, priority=2, type=task)
+    // - test_create_output_format: verifies output is just the ID
+
+    #[test]
+    fn test_create_basic() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("Basic test bead")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to create bead");
+
+        assert!(
+            create_output.status.success(),
+            "bf create failed: {}",
+            String::from_utf8_lossy(&create_output.stderr)
+        );
+
+        let create_text = String::from_utf8_lossy(&create_output.stdout);
+        let bead_id = create_text.trim();
+
+        // Verify bead ID format (bf-xxx where xxx is 3-8 chars, adaptive based on count)
+        let hash_part = bead_id.strip_prefix("bf-").expect("Output should start with 'bf-'");
+        assert!(
+            hash_part.len() >= 3
+                && hash_part.len() <= 8
+                && hash_part.chars().all(|c| c.is_ascii_alphanumeric()),
+            "Bead ID hash part should be 3-8 alphanumeric chars, got: {} (full ID: {})",
+            hash_part,
+            bead_id
+        );
+
+        // Verify bead exists in database
+        let show_output = Command::new(bf_binary())
+            .arg("show")
+            .arg(bead_id)
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to show bead");
+
+        assert!(
+            show_output.status.success(),
+            "bf show failed: {}",
+            String::from_utf8_lossy(&show_output.stderr)
+        );
+
+        let show_text = String::from_utf8_lossy(&show_output.stdout);
+        assert!(
+            show_text.contains("Basic test bead"),
+            "Show output should contain bead title"
+        );
+    }
+
+    #[test]
+    fn test_create_default_values() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Create bead with minimal parameters (only title)
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("Bead with defaults")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to create bead");
+
+        assert!(
+            create_output.status.success(),
+            "bf create failed: {}",
+            String::from_utf8_lossy(&create_output.stderr)
+        );
+
+        let create_text = String::from_utf8_lossy(&create_output.stdout);
+        let bead_id = create_text.trim();
+
+        // Verify default values
+        let show_output = Command::new(bf_binary())
+            .arg("show")
+            .arg(bead_id)
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to show bead");
+
+        let show_text = String::from_utf8_lossy(&show_output.stdout);
+
+        // Check defaults - status should be "open", priority should be "P2", type should be "task"
+        assert!(
+            show_text.contains("open"),
+            "Default status should be 'open', got: {}",
+            show_text
+        );
+        assert!(
+            show_text.contains("P2"),
+            "Default priority should be 'P2', got: {}",
+            show_text
+        );
+        assert!(
+            show_text.contains("task"),
+            "Default type should be 'task', got: {}",
+            show_text
+        );
+    }
+
+    #[test]
+    fn test_create_output_format() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("Output format test")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to create bead");
+
+        assert!(
+            create_output.status.success(),
+            "bf create failed: {}",
+            String::from_utf8_lossy(&create_output.stderr)
+        );
+
+        let create_text = String::from_utf8_lossy(&create_output.stdout);
+
+        // Output should be a single line (ID followed by newline, standard Unix convention)
+        let lines: Vec<&str> = create_text.lines().collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "Output should be exactly one line, got {} lines",
+            lines.len()
+        );
+
+        // Extract the ID from the line
+        let bead_id = lines[0];
+
+        // Output should match the expected bead ID format (bf-xxx)
+        assert!(
+            bead_id.starts_with("bf-"),
+            "Output should start with 'bf-', got: {}",
+            bead_id
+        );
+
+        // Output should be only the ID (no additional text like "Created:", "Bead ID:", etc.)
+        let hash_part = bead_id.strip_prefix("bf-").expect("Should start with bf-");
+        assert!(
+            hash_part.len() >= 3
+                && hash_part.len() <= 8
+                && hash_part.chars().all(|c| c.is_ascii_alphanumeric()),
+            "Output should be just the bead ID (bf- followed by 3-8 alphanumeric chars), got: {}",
+            bead_id
+        );
+    }
+
+    // Edge case and error handling tests (Test Bead: bf-64532)
+    // Acceptance Criteria:
+    // - test_create_missing_title: should fail without --title
+    // - test_create_invalid_type: should fail with invalid type
+    // - test_create_invalid_priority: should fail with invalid priority
+    // - test_create_empty_title: should fail with empty string title
+
+    #[test]
+    fn test_create_missing_title() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Test that create fails without --title argument
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to run bf create");
+
+        // The command should fail (non-zero exit code)
+        assert!(
+            !create_output.status.success(),
+            "bf create should fail without --title argument"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message indicates required argument is missing
+        assert!(
+            stderr.contains("required") || stderr.contains("--title") || stderr.contains("title"),
+            "Error message should mention required --title argument, got: {}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn test_create_empty_title() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Test that create fails with empty string title
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to run bf create");
+
+        // The command should fail (non-zero exit code)
+        assert!(
+            !create_output.status.success(),
+            "bf create should fail with empty title"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message mentions empty title
+        assert!(
+            stderr.contains("empty") || stderr.contains("title"),
+            "Error message should mention empty title, got: {}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn test_create_whitespace_only_title() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Test that create fails with whitespace-only title
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("   ")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to run bf create");
+
+        // The command should fail (non-zero exit code)
+        assert!(
+            !create_output.status.success(),
+            "bf create should fail with whitespace-only title"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message mentions whitespace or empty title
+        assert!(
+            stderr.contains("empty") || stderr.contains("whitespace") || stderr.contains("title"),
+            "Error message should mention empty/whitespace title, got: {}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn test_create_invalid_type() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Test that create fails with empty string type
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("Test bead")
+            .arg("--type")
+            .arg("")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to run bf create");
+
+        // The command should fail (non-zero exit code)
+        assert!(
+            !create_output.status.success(),
+            "bf create should fail with empty type"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message mentions empty type
+        assert!(
+            stderr.contains("empty") || stderr.contains("type"),
+            "Error message should mention empty type, got: {}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn test_create_whitespace_only_type() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Test that create fails with whitespace-only type
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("Test bead")
+            .arg("--type")
+            .arg("   ")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to run bf create");
+
+        // The command should fail (non-zero exit code)
+        assert!(
+            !create_output.status.success(),
+            "bf create should fail with whitespace-only type"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message mentions whitespace or empty type
+        assert!(
+            stderr.contains("empty") || stderr.contains("whitespace") || stderr.contains("type"),
+            "Error message should mention empty/whitespace type, got: {}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn test_create_invalid_priority() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Test that create fails with non-numeric priority
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("Test bead")
+            .arg("--priority")
+            .arg("invalid")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to run bf create");
+
+        // The command should fail (non-zero exit code)
+        assert!(
+            !create_output.status.success(),
+            "bf create should fail with non-numeric priority"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message mentions invalid priority or number
+        assert!(
+            stderr.contains("invalid") || stderr.contains("number") || stderr.contains("priority") || stderr.contains("parse"),
+            "Error message should mention invalid priority/number, got: {}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn test_create_priority_out_of_range() {
+        let temp_dir = setup_test_workspace();
+        let workspace = temp_dir.path();
+
+        // Test with priority value > 4 (should fail due to CHECK constraint)
+        let create_output = Command::new(bf_binary())
+            .arg("create")
+            .arg("--title")
+            .arg("Test bead with high priority")
+            .arg("--priority")
+            .arg("999")
+            .current_dir(workspace)
+            .output()
+            .expect("Failed to run bf create");
+
+        // The command should fail due to CHECK constraint: priority >= 0 AND priority <= 4
+        assert!(
+            !create_output.status.success(),
+            "bf create should fail with priority > 4 (CHECK constraint)"
+        );
+
+        let stderr = String::from_utf8_lossy(&create_output.stderr);
+
+        // Verify error message mentions constraint or priority
+        assert!(
+            stderr.contains("constraint") || stderr.contains("priority") || stderr.contains("CHECK"),
+            "Error message should mention priority constraint, got: {}",
+            stderr
+        );
+    }
 }

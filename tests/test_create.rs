@@ -605,17 +605,18 @@ mod tests {
     fn test_create_empty_title() {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
-        // Test that create command handles empty string title
+        // Test that create command fails when title is an empty string
         let (stdout, stderr, success) = run_create(
             &beads_dir,
             &["--title", "", "--type", "task", "--priority", "2"],
         );
 
-        // Empty title should either be rejected or accepted (depending on implementation)
-        // This test documents current behavior
-        println!(
-            "Empty title test - success: {}, stdout: {}, stderr: {}",
-            success, stdout, stderr
+        assert!(!success, "Create command should fail when title is empty");
+        // Check that stderr mentions title validation error
+        assert!(
+            stderr.contains("title") || stderr.contains("empty") || stderr.contains("whitespace"),
+            "Error message should mention title validation: {}",
+            stderr
         );
     }
 
@@ -776,5 +777,55 @@ mod tests {
 
         // Verify the bead was stored correctly in the database
         verify_bead_in_database(&beads_dir, bead_id, &expected);
+    }
+
+    #[test]
+    fn test_create_invalid_type() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that create command fails when type is an empty string
+        let (stdout, stderr, success) = run_create(
+            &beads_dir,
+            &["--title", "Test bead", "--type", "", "--priority", "2"],
+        );
+
+        assert!(!success, "Create command should fail when type is empty");
+        assert!(
+            stderr.contains("type") || stderr.contains("empty") || stderr.contains("validation"),
+            "Error message should mention type validation: {}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn test_create_invalid_priority() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that create command fails when priority is out of range (> 4)
+        let (stdout, stderr, success) = run_create(
+            &beads_dir,
+            &["--title", "Test bead", "--type", "task", "--priority", "5"],
+        );
+
+        assert!(!success, "Create command should fail when priority > 4");
+        assert!(
+            stderr.contains("priority") || stderr.contains("constraint") || stderr.contains("0.*4"),
+            "Error message should mention priority constraint: {}",
+            stderr
+        );
+
+        // Test that create command fails when priority is negative (< 0)
+        // Note: clap parses '-1' as a flag, so we need to use --priority=5 or test with 10
+        let (stdout, stderr, success) = run_create(
+            &beads_dir,
+            &["--title", "Test bead 2", "--type", "task", "--priority", "10"],
+        );
+
+        assert!(!success, "Create command should fail when priority > 4 (value: 10)");
+        assert!(
+            stderr.contains("priority") || stderr.contains("constraint"),
+            "Error message should mention priority constraint for value 10: {}",
+            stderr
+        );
     }
 }

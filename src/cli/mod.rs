@@ -1551,11 +1551,23 @@ fn cmd_create(
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open_with_config(&db_path, &config)?;
 
+    // Validate title is not empty or only whitespace
+    let title_trimmed = title.trim();
+    if title_trimmed.is_empty() {
+        return Err(anyhow!("Title cannot be empty or only whitespace"));
+    }
+
+    // Validate type is not empty or only whitespace
+    let type_trimmed = type_.trim();
+    if type_trimmed.is_empty() {
+        return Err(anyhow!("Type cannot be empty or only whitespace"));
+    }
+
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
 
-    let mut issue = Issue::new(String::new(), title, ".".to_string());
-    issue.issue_type = IssueType::from_str(type_.as_str()).map_err(|e| anyhow::anyhow!(e))?;
+    let mut issue = Issue::new(String::new(), title_trimmed.to_string(), ".".to_string());
+    issue.issue_type = IssueType::from_str(type_trimmed).map_err(|e| anyhow::anyhow!(e))?;
     issue.priority = Priority(priority);
     issue.description = description;
     // Normalize empty/whitespace-only to None so `bf create --assignee ''`
