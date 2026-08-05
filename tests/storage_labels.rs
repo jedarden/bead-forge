@@ -64,11 +64,10 @@ fn test_remove_label_uses_immediate_transaction() {
     };
     storage.create_issue(&issue).unwrap();
 
-    // This test verifies that remove_label() uses BEGIN IMMEDIATE transaction
-    // The fact that this method succeeds proves it uses BEGIN IMMEDIATE:
-    // - with_immediate_transaction() wraps the operation in BEGIN IMMEDIATE
-    // - The remove_label implementation calls with_immediate_transaction
-    // - If it used a regular transaction, concurrent removals could race
+    // Verify remove_label uses BEGIN IMMEDIATE transaction mode.
+    // Implementation verification: remove_label() calls with_immediate_transaction()
+    // which executes "BEGIN IMMEDIATE" before running the transaction body.
+    // See src/storage/sqlite.rs:1743 and src/storage/sqlite.rs:156
     storage.remove_label("test-2", "label1").unwrap();
 
     // Verify removal worked
