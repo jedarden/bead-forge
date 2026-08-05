@@ -4,7 +4,7 @@
 //! including corruption detection and JSONL-based repair.
 
 use crate::config::{find_beads_dir, load_metadata};
-use crate::jsonl::{import_jsonl, stream_issues, UpsertResult};
+use crate::jsonl::stream_issues;
 use crate::model::Issue;
 use crate::recovery;
 use crate::storage::Storage;
@@ -800,7 +800,7 @@ pub fn repair(workspace_dir: &Path, flush_first: bool, force: bool) -> Result<us
 
     // Check for unflushed beads if database exists and is valid
     // If db is corrupted, we can't detect unflushed beads - proceed with warning
-    let (unflushed_ids, db_corrupted) = if db_path.exists() {
+    let (unflushed_ids, _db_corrupted) = if db_path.exists() {
         match get_unflushed_ids(&db_path) {
             Ok(ids) => (ids, false),
             Err(_) => {

@@ -92,7 +92,7 @@ pub fn compute_all_critical_paths(tx: &Connection) -> Result<CriticalPathResult>
 
     // Iteratively compute ES for dependent beads
     // We use a worklist approach: keep going until no more beads can be computed
-    let mut max_iterations = 1000; // Safety limit
+    let max_iterations = 1000; // Safety limit
     let mut iteration = 0;
     loop {
         iteration += 1;
