@@ -60,3 +60,8 @@ required-features = []
 [[bin]]
 name = "bf"
 path = "src/main.rs"
+
+[[test]]
+name = "test_claim_with_dependencies"
+path = "tests/test_claim_with_dependencies.rs"
+required-features = []
