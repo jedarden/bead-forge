@@ -1,52 +1,41 @@
-# Verification: NEEDLE Explore Strand Excludes Assigned Beads
+# NEEDLE Explore Strand Assignee Exclusion Verification
 
-## Task Summary
+## Task
+Verify that the NEEDLE explore strand would exclude beads with non-empty assignees.
 
-Verified that NEEDLE's explore strand correctly excludes beads with non-empty assignees from the candidate pool.
-
-## Test Bead Details
-
-**Bead ID:** bf-bheo5h
-**Title:** Test bead for stale assignee simulation
-**Status:** open
-**Priority:** P2
-**Assignee:** dead-worker-X (stale assignee simulation)
+## Test Infrastructure Used
+- **Test bead ID**: `bf-wu6wp4`
+- **Title**: "Test bead with assignee for NEEDLE explore strand exclusion"
+- **Assignee**: `test-agent`
+- **Status**: `open`
+- **Created by**: `bf-3joukp` (Child 1 of 4 split from bf-4ocs0n)
 
 ## Verification Results
 
-### 1. Bead Appears in General Queries ✅
-
+### 1. ✓ Test bead appears in general queries
+The test bead `bf-wu6wp4` appears in general `bf list` queries:
 ```bash
-$ bf list | grep bf-bheo5h
-[bf-bheo5h] Test bead for stale assignee simulation - open (P2)
+$ bf list --status open --type test | grep bf-wu6wp4
+[bf-wu6wp4] Test bead with assignee for NEEDLE explore strand exclusion - open (P2)
 ```
 
-The bead is present in the general bead list and queryable by ID.
+### 2. ✗ NEEDLE explore strand does NOT exclude assigned beads
 
-### 2. Bead Details Confirmed ✅
+**Critical Finding**: The `get_ready_candidates()` function in `src/claim.rs` does **NOT** filter out beads with non-empty assignees, despite documentation stating it should.
 
-```bash
-$ bf show bf-bheo5h --format json --envelope | jq '.data | {id, assignee, status}'
-{
-  "id": "bf-bheo5h",
-  "assignee": "dead-worker-X",
-  "status": "open"
-}
+#### What the code does (src/claim.rs:427-432)
+```sql
+WHERE i.status = 'open'
+  AND i.ephemeral = 0
+  AND i.pinned = 0
+  AND i.is_template = 0
+  AND i.deleted_at IS NULL
+  AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
 ```
 
-### 3. Bead Excluded from Discoverable List ✅
+**Missing**: `AND i.assignee IS NULL` condition
 
-```bash
-$ bf ready | grep bf-bheo5h
-# (no output - bead is excluded)
-```
-
-**Critical Finding:** The bead with assignee `dead-worker-X` does NOT appear in the `bf ready` output. This confirms that the NEEDLE explore strand exclusion logic is implemented and working correctly.
-
-## NEEDLE Explore Strand Logic
-
-According to `docs/stale-assignee-workflow.md`, NEEDLE's explore strand uses SQL queries like:
-
+#### What documentation expects (docs/stale-assignee-workflow.md:213-223)
 ```sql
 SELECT id, title, priority FROM issues 
 WHERE status = 'open' 
@@ -55,35 +44,50 @@ AND id NOT IN (SELECT blocked FROM dependencies WHERE blocker IN (...))
 ORDER BY priority, created_at;
 ```
 
-**Key Point:** The `assignee IS NULL` filter automatically excludes beads with non-NULL assignees from the candidate pool.
+Documentation explicitly states:
+> Line 5: "A bead with a non-empty `assignee` field is excluded from the ready/claim list, effectively making it invisible to the fleet."
 
-## Implementation Status
+### 3. Other parts support assignee filtering
+The `list_issues()` function in `src/storage/sqlite.rs` DOES support assignee filtering (lines 241-250):
+```rust
+if let Some(ref assignee) = filter.assignee {
+    if assignee.is_empty() {
+        // Empty-string filter selects unassigned beads.
+        query.push_str(" AND (i.assignee IS NULL OR i.assignee = '')");
+    } else {
+        query.push_str(&format!(" AND i.assignee = ?{}", param_idx));
+        params.push(assignee.clone());
+        param_idx += 1;
+    }
+}
+```
 
-✅ **Exclusion logic is implemented and working correctly**
+## Conclusion
 
-- The `bf ready` command (which NEEDLE uses) correctly filters out beads with non-empty assignees
-- Beads with stale assignees are invisible to the fleet until the assignee is cleared
-- This is confirmed by:
-  1. Test bead exists in general queries (`bf list`)
-  2. Test bead does NOT appear in discoverable queries (`bf ready`)
-  3. Documentation confirms the SQL filter `WHERE assignee IS NULL`
-  4. Comprehensive test suite validates the workflow: `tests/stale_assignee_clearing_workflow.rs`
+**Current Behavior**: NEEDLE explore strand does NOT exclude assigned beads.
 
-## Impact
+**Root Cause**: Implementation gap in `src/claim.rs` - both velocity-aware and standard scoring queries in `get_ready_candidates()` are missing the `assignee IS NULL` filter condition.
 
-This behavior is **by design** and essential for NEEDLE's concurrent claiming model:
+**Impact**: Assigned beads with `status='open'` will appear in the ready/claim candidate list, contrary to documented NEEDLE explore strand behavior.
 
-1. **Prevents duplicate claims:** Multiple workers cannot claim the same bead
-2. **Enables worker crash recovery:** When a worker crashes, beads remain assigned to the dead worker
-3. **Requires manual remediation:** Stale assignees must be cleared with `bf update --clear-assignee`
-4. **Maintains data integrity:** No race conditions in the candidate pool
+**Evidence from Previous Beads**:
+- `bf-5nflyq`: Found that `get_ready_candidates()` does NOT explicitly filter by assignee
+- `bf-5mdrqa`: Found that SQL WHERE clause does NOT filter by assignee field
+- `bf-5hahhz`: Incorrectly claimed exclusion is implemented at explore.rs:617-622 (file does not exist)
 
-## Related Documentation
+## Recommendations
 
-- Full workflow: `docs/stale-assignee-workflow.md`
-- Test implementation: `tests/stale_assignee_clearing_workflow.rs`
-- CLI reference: `docs/README.md`
+1. **Add assignee filtering** to both velocity-aware and standard scoring queries in `get_ready_candidates()`
+2. **Add corresponding tests** to ensure assigned beads are excluded from ready/claim lists
+3. **Update documentation** if the current behavior (no filtering) is intentional
+4. **Review claim() function** to ensure it also excludes assigned beads (though it transitions status to 'in_progress', which should handle this implicitly)
 
-## Verification Date
+## Files Involved
 
-2026-08-05
+- `src/claim.rs` - Lines 219-240 (velocity-aware), 301-322 (standard)
+- `src/storage/sqlite.rs` - Lines 241-250 (assignee filtering in list_issues)
+- `docs/stale-assignee-workflow.md` - Documentation expecting assignee filtering
+- `tests/stale_assignee_clearing_workflow.rs` - End-to-end tests for the workflow
+
+Test Date: 2026-08-05
+Investigated By: bf-4ocs0n verification task
