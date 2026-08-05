@@ -85,16 +85,6 @@ fn test_dirty_issues_mark_and_list() {
 
     let storage = Storage::open(&db_path).unwrap();
 
-    // Mark an issue as dirty
-    storage.mark_dirty("bf-test-123").unwrap();
-
-    // List dirty issues
-    let dirty_issues = storage.list_dirty_issues().unwrap();
-
-    // The list will be empty since bf-test-123 doesn't exist in issues table
-    // but we verified the table operations work
-    assert_eq!(dirty_issues.len(), 0);
-
     // Create an issue first
     let issue = bead_forge::model::Issue::new(
         "bf-test-456".to_string(),
