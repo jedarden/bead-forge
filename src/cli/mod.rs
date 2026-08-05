@@ -1789,6 +1789,8 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             if let Some(assignee) = &issue.assignee {
                 println!("Assignee: {}", assignee);
             }
+            println!("Created at: {}", issue.created_at.format("%Y-%m-%d %H:%M:%S UTC"));
+            println!("Updated at: {}", issue.updated_at.format("%Y-%m-%d %H:%M:%S UTC"));
             if let Some(reason) = &issue.close_reason {
                 println!("Close reason: {}", reason);
             }
@@ -1809,22 +1811,11 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             }
         }
         _ => {
-            println!("ID: {}", issue.id);
-            println!("Title: {}", issue.title);
-            println!("Status: {}", issue.status);
-            println!("Priority: {}", issue.priority);
-            println!("Type: {}", issue.issue_type);
-            if let Some(desc) = &issue.description {
-                println!("Description: {}", desc);
-            }
-            if let Some(assignee) = &issue.assignee {
-                println!("Assignee: {}", assignee);
-            }
+            // Use the text formatter for consistency
+            let formatter = get_formatter(OutputFormat::Text);
+            println!("{}", formatter.format_issue(&issue));
             if let Some(reason) = &issue.close_reason {
                 println!("Close reason: {}", reason);
-            }
-            if !issue.labels.is_empty() {
-                println!("Labels: {}", issue.labels.join(", "));
             }
             if !issue.annotations.is_empty() {
                 println!("Annotations:");

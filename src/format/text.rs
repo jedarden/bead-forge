@@ -1,5 +1,5 @@
 use crate::format::{ClaimResultOutput, Formatter, StatsOutput};
-use crate::model::Issue;
+use crate::model::{Dependency, Issue};
 use crate::velocity::VelocityStats;
 
 #[derive(Debug, Clone, Copy)]
@@ -20,6 +20,8 @@ impl Formatter for TextFormatter {
         if let Some(assignee) = &issue.assignee {
             s.push_str(&format!("Assignee: {}\n", assignee));
         }
+        s.push_str(&format!("Created at: {}\n", issue.created_at.format("%Y-%m-%d %H:%M:%S UTC")));
+        s.push_str(&format!("Updated at: {}\n", issue.updated_at.format("%Y-%m-%d %H:%M:%S UTC")));
         if !issue.labels.is_empty() {
             s.push_str(&format!("Labels: {}\n", issue.labels.join(", ")));
         }
@@ -173,4 +175,162 @@ pub fn format_velocity_text(stats: &[VelocityStats]) -> String {
     }
 
     s
+}
+
+/// Format dependencies as a text string for display.
+///
+/// # Arguments
+/// * `dependencies` - Slice of Dependency objects to format
+///
+/// # Returns
+/// A formatted string in the format "Depends: bf-xxx (Title) (blocks), bf-yyy (Title)"
+/// or an empty string if there are no dependencies. The "(blocks)" suffix is only
+/// added for blocking dependency types (those that affect ready work).
+///
+/// # Examples
+/// ```
+/// // Blocking and non-blocking dependencies
+/// // Output: "Depends: bf-abc (Some task) (blocks), bf-def (Another task)"
+/// ```
+pub fn format_dependencies(dependencies: &[Dependency]) -> String {
+    if dependencies.is_empty() {
+        return String::new();
+    }
+
+    let parts: Vec<String> = dependencies
+        .iter()
+        .map(|dep| {
+            let title = dep.title.as_deref().unwrap_or("Unknown");
+            if dep.dep_type.is_blocking() {
+                format!("{} ({}) (blocks)", dep.depends_on_id, title)
+            } else {
+                format!("{} ({})", dep.depends_on_id, title)
+            }
+        })
+        .collect();
+
+    format!("Depends: {}", parts.join(", "))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Dependency, DependencyType};
+    use chrono::Utc;
+
+    #[test]
+    fn test_format_dependencies_empty() {
+        let deps: Vec<Dependency> = vec![];
+        let result = format_dependencies(&deps);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_format_dependencies_blocking() {
+        let deps = vec![Dependency {
+            issue_id: "bf-parent".to_string(),
+            depends_on_id: "bf-blocker".to_string(),
+            dep_type: DependencyType::Blocks,
+            created_at: Utc::now(),
+            created_by: None,
+            metadata: None,
+            thread_id: None,
+            title: Some("Blocker task".to_string()),
+        }];
+
+        let result = format_dependencies(&deps);
+        assert_eq!(result, "Depends: bf-blocker (Blocker task) (blocks)");
+    }
+
+    #[test]
+    fn test_format_dependencies_non_blocking() {
+        let deps = vec![Dependency {
+            issue_id: "bf-parent".to_string(),
+            depends_on_id: "bf-related".to_string(),
+            dep_type: DependencyType::Related,
+            created_at: Utc::now(),
+            created_by: None,
+            metadata: None,
+            thread_id: None,
+            title: Some("Related task".to_string()),
+        }];
+
+        let result = format_dependencies(&deps);
+        assert_eq!(result, "Depends: bf-related (Related task)");
+    }
+
+    #[test]
+    fn test_format_dependencies_mixed() {
+        let deps = vec![
+            Dependency {
+                issue_id: "bf-parent".to_string(),
+                depends_on_id: "bf-blocker".to_string(),
+                dep_type: DependencyType::Blocks,
+                created_at: Utc::now(),
+                created_by: None,
+                metadata: None,
+                thread_id: None,
+                title: Some("Blocker task".to_string()),
+            },
+            Dependency {
+                issue_id: "bf-parent".to_string(),
+                depends_on_id: "bf-related".to_string(),
+                dep_type: DependencyType::Related,
+                created_at: Utc::now(),
+                created_by: None,
+                metadata: None,
+                thread_id: None,
+                title: Some("Related task".to_string()),
+            },
+        ];
+
+        let result = format_dependencies(&deps);
+        assert_eq!(result, "Depends: bf-blocker (Blocker task) (blocks), bf-related (Related task)");
+    }
+
+    #[test]
+    fn test_format_dependencies_unknown_title() {
+        let deps = vec![Dependency {
+            issue_id: "bf-parent".to_string(),
+            depends_on_id: "bf-unknown".to_string(),
+            dep_type: DependencyType::Blocks,
+            created_at: Utc::now(),
+            created_by: None,
+            metadata: None,
+            thread_id: None,
+            title: None,
+        }];
+
+        let result = format_dependencies(&deps);
+        assert_eq!(result, "Depends: bf-unknown (Unknown) (blocks)");
+    }
+
+    #[test]
+    fn test_format_dependencies_multiple_blocking() {
+        let deps = vec![
+            Dependency {
+                issue_id: "bf-parent".to_string(),
+                depends_on_id: "bf-blocker1".to_string(),
+                dep_type: DependencyType::Blocks,
+                created_at: Utc::now(),
+                created_by: None,
+                metadata: None,
+                thread_id: None,
+                title: Some("First blocker".to_string()),
+            },
+            Dependency {
+                issue_id: "bf-parent".to_string(),
+                depends_on_id: "bf-blocker2".to_string(),
+                dep_type: DependencyType::ParentChild,
+                created_at: Utc::now(),
+                created_by: None,
+                metadata: None,
+                thread_id: None,
+                title: Some("Second blocker".to_string()),
+            },
+        ];
+
+        let result = format_dependencies(&deps);
+        assert_eq!(result, "Depends: bf-blocker1 (First blocker) (blocks), bf-blocker2 (Second blocker) (blocks)");
+    }
 }

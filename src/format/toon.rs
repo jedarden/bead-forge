@@ -1,5 +1,5 @@
 use crate::format::{text::format_stats_text, ClaimResultOutput, Formatter, StatsOutput};
-use crate::model::Issue;
+use crate::model::{Dependency, Issue};
 use crate::velocity::VelocityStats;
 
 #[derive(Debug, Clone, Copy)]
@@ -123,4 +123,12 @@ pub fn format_ready_bead(id: &str, title: &str, priority: i32, impact: i64, floa
         "[{}] {} (priority={}, impact={}, float={})",
         id, title, priority, impact, float
     )
+}
+
+/// Format dependencies as a text string for display.
+///
+/// This is the same implementation as text::format_dependencies since
+/// both text and toon formatters use the same dependency format.
+pub fn format_dependencies(dependencies: &[Dependency]) -> String {
+    crate::format::text::format_dependencies(dependencies)
 }

@@ -40,7 +40,6 @@ fn create_p0_bug(id: &str, title: &str, labels: Vec<&str>) -> Issue {
         original_type: None,
         compaction_level: None,
         compacted_at: None,
-        compacted_at: None,
         original_size: None,
         sender: None,
         ephemeral: false,
@@ -203,27 +202,18 @@ fn test_p0_bug_closed_and_reopened() {
     bug.assignee = Some("fixer".to_string());
     storage.create_issue(&bug).unwrap();
 
-    // Close the bug
-    let mut close_changes = bug.close("test-session".to_string(), "Fixed in production".to_string());
-    close_changes.actor = Some("fixer".to_string());
-    storage.update_issue("bf-crit-reopen", &close_changes).unwrap();
+    // Close the bug using the storage API
+    storage.close_issue("bf-crit-reopen", "Fixed in production", "fixer").unwrap();
 
     let closed = storage.get_issue("bf-crit-reopen").unwrap().unwrap();
     assert_eq!(closed.status, Status::Closed);
     assert_eq!(closed.priority, Priority::CRITICAL);
     assert_eq!(closed.labels.len(), 1);
 
-    // Reopen the bug
-    let now = chrono::Utc::now();
-    let mut reopen_changes = Issue {
-        status: Status::Open,
-        closed_at: None,
-        close_reason: None,
-        closed_by_session: None,
-        assignee: Some(String::new()), // Clear assignee on reopen
-        updated_at: now,
-        ..Default::default()
-    };
+    // Reopen the bug using Issue::reopen() and update_issue
+    let bug_to_reopen = storage.get_issue("bf-crit-reopen").unwrap().unwrap();
+    let mut reopen_changes = bug_to_reopen.reopen("fixer".to_string());
+    reopen_changes.assignee = Some(String::new()); // Clear assignee on reopen
     storage.update_issue("bf-crit-reopen", &reopen_changes).unwrap();
 
     let reopened = storage.get_issue("bf-crit-reopen").unwrap().unwrap();
