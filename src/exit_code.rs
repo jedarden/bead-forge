@@ -4,6 +4,30 @@
 
 use std::fmt;
 
+/// Represents different types of process termination.
+///
+/// This enum distinguishes between normal exit codes and signal termination,
+/// providing a more structured representation than a raw integer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExitCode {
+    /// Normal process exit with a specific code.
+    Code(i32),
+    /// Process was terminated by a signal (e.g., SIGTERM, SIGKILL).
+    Signal(String),
+    /// No exit code available (process status unknown).
+    None,
+}
+
+impl fmt::Display for ExitCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExitCode::Code(code) => write!(f, "{}", code),
+            ExitCode::Signal(signal) => write!(f, "{}", signal),
+            ExitCode::None => write!(f, "none"),
+        }
+    }
+}
+
 /// Exit status for CLI commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitStatus {
@@ -174,6 +198,95 @@ pub fn append_exit_code_to_log(log: &str, code: Option<i32>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Tests for ExitCode enum
+
+    #[test]
+    fn test_exit_code_code_variant() {
+        let code = ExitCode::Code(0);
+        assert_eq!(code, ExitCode::Code(0));
+    }
+
+    #[test]
+    fn test_exit_code_signal_variant() {
+        let signal = ExitCode::Signal("SIGTERM".to_string());
+        assert_eq!(signal, ExitCode::Signal("SIGTERM".to_string()));
+    }
+
+    #[test]
+    fn test_exit_code_none_variant() {
+        let none = ExitCode::None;
+        assert_eq!(none, ExitCode::None);
+    }
+
+    #[test]
+    fn test_exit_code_equality() {
+        let code1 = ExitCode::Code(42);
+        let code2 = ExitCode::Code(42);
+        let code3 = ExitCode::Code(99);
+
+        assert_eq!(code1, code2);
+        assert_ne!(code1, code3);
+    }
+
+    #[test]
+    fn test_exit_code_display_code() {
+        let code = ExitCode::Code(0);
+        assert_eq!(format!("{}", code), "0");
+
+        let code = ExitCode::Code(1);
+        assert_eq!(format!("{}", code), "1");
+
+        let code = ExitCode::Code(255);
+        assert_eq!(format!("{}", code), "255");
+    }
+
+    #[test]
+    fn test_exit_code_display_signal() {
+        let signal = ExitCode::Signal("SIGTERM".to_string());
+        assert_eq!(format!("{}", signal), "SIGTERM");
+
+        let signal = ExitCode::Signal("SIGKILL".to_string());
+        assert_eq!(format!("{}", signal), "SIGKILL");
+
+        let signal = ExitCode::Signal("SIGINT".to_string());
+        assert_eq!(format!("{}", signal), "SIGINT");
+    }
+
+    #[test]
+    fn test_exit_code_display_none() {
+        let none = ExitCode::None;
+        assert_eq!(format!("{}", none), "none");
+    }
+
+    #[test]
+    fn test_exit_code_clone() {
+        let code = ExitCode::Code(42);
+        let cloned = code.clone();
+        assert_eq!(code, cloned);
+
+        let signal = ExitCode::Signal("SIGTERM".to_string());
+        let cloned_signal = signal.clone();
+        assert_eq!(signal, cloned_signal);
+
+        let none = ExitCode::None;
+        let cloned_none = none.clone();
+        assert_eq!(none, cloned_none);
+    }
+
+    #[test]
+    fn test_exit_code_debug_formatting() {
+        let code = ExitCode::Code(42);
+        assert!(format!("{:?}", code).contains("Code"));
+
+        let signal = ExitCode::Signal("SIGTERM".to_string());
+        assert!(format!("{:?}", signal).contains("Signal"));
+
+        let none = ExitCode::None;
+        assert!(format!("{:?}", none).contains("None"));
+    }
+
+    // Tests for ExitStatus enum
 
     #[test]
     fn test_exit_status_codes() {
