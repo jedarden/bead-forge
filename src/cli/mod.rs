@@ -2991,6 +2991,12 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
 
     if let Some(issue_id) = id {
         // Single bead mode - show labels for one bead
+        // Check if bead exists first
+        let bead_exists = storage.get_issue(issue_id)?.is_some();
+        if !bead_exists {
+            return Err(anyhow!("Bead not found: {}", issue_id));
+        }
+
         let labels = storage.get_labels(issue_id)?;
         if format == "json" {
             // Output labels array as compact JSON
