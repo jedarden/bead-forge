@@ -1950,12 +1950,14 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
     let candidates =
         storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
 
-    match format {
-        "json" => {
-            // Use the shared formatter for consistency with `list`/`search`.
+    // Use the common formatter pattern for consistency with other commands
+    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+    let formatter = get_formatter(output_format);
+
+    match output_format {
+        OutputFormat::Json => {
             // Resolve each scored candidate to its full Issue record so
             // the formatter has every field; empty result prints `[]`.
-            let formatter = get_formatter(OutputFormat::Json);
             let issues: Vec<Issue> = candidates
                 .iter()
                 .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
@@ -1984,7 +1986,8 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
                 }
             }
         }
-        "toon" => {
+        OutputFormat::Toon => {
+            // Use the shared toon formatter for each candidate
             for candidate in candidates {
                 println!(
                     "{}",
@@ -1998,7 +2001,8 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
                 );
             }
         }
-        _ => {
+        OutputFormat::Text => {
+            // Use the shared text formatter pattern
             for candidate in candidates {
                 println!(
                     "[{}] {} (priority={}, impact={}, float={})",
