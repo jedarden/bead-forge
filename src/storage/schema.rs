@@ -576,3 +576,28 @@ pub const fn table_comments() -> &'static str {
 pub const fn table_events() -> &'static str {
     events_table()
 }
+
+/// Alias for labels_table() - matches bead bf-2rt721 acceptance criteria
+pub const fn table_labels() -> &'static str {
+    labels_table()
+}
+
+/// Alias for issue_labels_table() - matches bead bf-2rt721 acceptance criteria
+pub const fn table_issue_labels() -> &'static str {
+    issue_labels_table()
+}
+
+/// Alias for assignees_table() - matches bead bf-2rt721 acceptance criteria
+pub const fn table_assignees() -> &'static str {
+    assignees_table()
+}
+
+/// Alias for issue_assignees_table() - matches bead bf-2rt721 acceptance criteria
+pub const fn table_issue_assignees() -> &'static str {
+    issue_assignees_table()
+}
+
+/// Alias for issue_relations_table() - matches bead bf-2rt721 acceptance criteria
+pub const fn table_issue_relations() -> &'static str {
+    issue_relations_table()
+}
