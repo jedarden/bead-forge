@@ -1,15 +1,25 @@
-# Verification of Multi-Label Parsing in bead-forge CLI
+# Verification: clap CLI Multi-Label Parsing (bf-1xvv3k)
 
-## Summary
-✅ **VERIFIED**: The clap CLI definition fully supports multi-label parsing with proper configuration and wiring.
+## Date
+2026-08-05
 
-## Verification Results
+## Verification Summary
+✅ **PASS** - The Create command properly supports multi-label parsing using clap v4's default behavior for `Vec<String>` fields.
 
-### 1. Create Command Label Field Definition ✅
+## Create Command Label Field Configuration
 
-**Location**: `src/cli/mod.rs:88-97`
+### Field Definition (src/cli/mod.rs:97)
+```rust
+#[arg(long)]
+label: Vec<String>,
+```
 
-The Create command defines the label field as:
+### clap Attributes Analysis
+- **Type**: `Vec<String>` - Enables repeated flag usage
+- **Attribute**: `#[arg(long)]` - Basic flag declaration without `num_args`
+- **clap v4 behavior**: Default `Append` action collects each `--label` occurrence into the vector
+
+### Documentation (lines 88-95)
 ```rust
 /// Labels
 ///
@@ -19,19 +29,11 @@ The Create command defines the label field as:
 /// - Usage: `bf create --title "Fix bug" --label bug --label urgent --label priority`
 /// - No `num_args` needed: empty Vec when flag is omitted, one value per flag when used
 /// - Gotcha: labels with spaces must be quoted: `--label "multi word label"`
-#[arg(long)]
-label: Vec<String>,
 ```
 
-**Status**: ✅ Correctly defined as `Vec<String>`
-**Documentation**: ✅ Comprehensive inline documentation present
-**Clap Attributes**: ✅ Properly configured with `#[arg(long)]` for repeated flag usage
+## Handler Wiring Verification
 
-### 2. Command Handler Wiring ✅
-
-**Location**: `src/cli/mod.rs:1207-1225`
-
-The handler is properly connected in the `match command` block:
+### Command Pattern Match (lines 1207-1225)
 ```rust
 Commands::Create {
     title,
@@ -39,7 +41,7 @@ Commands::Create {
     priority,
     description,
     assignee,
-    label,  // ← Vec<String> properly extracted
+    label,        // ← Extracted from command
     json,
 } => cmd_create(
     &beads_dir,
@@ -48,116 +50,108 @@ Commands::Create {
     priority,
     description,
     assignee,
-    label,  // ← Passed as Vec<String> to handler
+    label,        // ← Passed to handler
     json,
     no_auto_flush,
 ),
 ```
 
-**Status**: ✅ Field properly extracted and passed to handler
-
-### 3. Handler Implementation ✅
-
-**Location**: `src/cli/mod.rs:1607-1701`
-
-The `cmd_create` function receives and processes labels:
+### cmd_create Function Signature (lines 1607-1616)
 ```rust
 fn cmd_create(
-    // ... other parameters
-    labels: Vec<String>,  // ← Vec<String> parameter
-    // ... other parameters
-) -> Result<()> {
-    // ... validation and setup code ...
-    
-    let mut issue = Issue::new(String::new(), title_trimmed.to_string(), ".".to_string());
-    // ... other field assignments ...
-    
-    issue.labels = labels;  // ← Direct assignment to Issue model
-    
-    // ... rest of creation logic ...
-}
+    beads_dir: &PathBuf,
+    title: String,
+    type_: String,
+    priority: i32,
+    description: Option<String>,
+    assignee: Option<String>,
+    labels: Vec<String>,  // ← Received as labels (plural)
+    json: bool,
+    no_auto_flush: bool,
+) -> Result<()>
 ```
 
-**Status**: ✅ Properly receives `Vec<String>` and assigns to Issue model
-
-### 4. Issue Model Support ✅
-
-**Location**: `src/model.rs:571-572`
-
-The Issue struct defines labels as:
+### Assignment to Issue (line 1648)
 ```rust
-#[serde(skip_serializing_if = "Vec::is_empty", default)]
-pub labels: Vec<String>,
+issue.labels = labels;  // ← Assigned to Issue struct
 ```
 
-**Status**: ✅ Model properly supports labels as `Vec<String>`
+## Comparison with Other Multi-Value Fields
 
-### 5. Clap Configuration Details
+### Similar Pattern in Create Command
+- Create's `label` field uses minimal `#[arg(long)]` configuration
+- Optional (no `required = true`): creating beads without labels is valid
+- No `num_args` needed for repeated flag pattern
 
-**Multi-value parsing behavior**:
-- **Type**: `Vec<String>` 
-- **Action**: Default `Append` action in clap v4
-- **Usage pattern**: Repeated flags: `--label bug --label enhancement`
-- **Empty handling**: Returns empty `Vec` when flag not used
-- **Single value**: `--label bug` → `vec!["bug"]`
-- **Multiple values**: `--label bug --label enhancement` → `vec!["bug", "enhancement"]`
-- **Space handling**: Labels with spaces require quotes: `--label "multi word"`
-
-**No explicit `num_args` needed** because:
-- clap's default for `Vec<T>` fields is the Append action
-- Each flag occurrence appends one value to the vector
-- `num_args` is only needed for positional multi-value arguments or special cases
-
-## Usage Examples
-
-### Single label:
-```bash
-bf create --title "Fix login bug" --label bug
-```
-
-### Multiple labels:
-```bash
-bf create --title "Fix login bug" --label bug --label urgent --label priority
-```
-
-### Label with spaces:
-```bash
-bf create --title "Fix login" --label "high priority"
-```
-
-### No labels:
-```bash
-bf create --title "Fix login"
-```
-
-## Additional Multi-Value Patterns in the CLI
-
-The codebase demonstrates several other multi-value patterns for reference:
-
-### LabelCommands::Add (src/cli/mod.rs:962-973)
+### Stricter Pattern in LabelCommands::Add (lines 961-977)
 ```rust
-/// Label(s) to add (multiple labels supported)
 #[arg(short, long, required = true, num_args = 1..)]
 label: Vec<String>,
 ```
-- Uses `num_args = 1..` to enforce at least one label
+- **Why different?** Add command requires at least one label
+- `num_args = 1..` enforces "one or more" values
 - `required = true` forces flag presence
+- `short` enables `-l` shorthand
 
-### Search command (src/cli/mod.rs:624-627)
+### Search Command Labels (line 626)
 ```rust
-/// Filter by label
 #[arg(short, long)]
 label: Vec<String>,
 ```
-- Same pattern as Create: repeated flags collect into Vec
-- No minimum requirement
+- Same minimal pattern as Create
+- Multiple labels OR'd together in search logic
+
+## Usage Examples
+
+### Valid Usage Patterns
+```bash
+# Single label
+bf create --title "Fix bug" --label bug
+
+# Multiple labels (repeated flag)
+bf create --title "Fix bug" --label bug --label urgent --label priority
+
+# No labels (empty Vec)
+bf create --title "Fix bug"
+
+# Multi-word label (quoted)
+bf create --title "Fix bug" --label "high priority"
+```
+
+### Invalid Usage
+```bash
+# This passes each label as a separate word, not as repeated flags
+bf create --title "Fix bug" --label bug urgent priority
+# Only "bug" is captured; "urgent" and "priority" are parsed as positional args
+```
+
+## clap v4 Mechanics
+
+### Default Action for Vec<String>
+- clap's `Append` action is automatically used for `Vec<T>` fields
+- Each occurrence of `--label <value>` appends to the vector
+- No explicit `num_args` needed for the repeated flag pattern
+- Empty Vec when flag is not provided
+
+### When to Use num_args
+- `num_args = 1..` - Require at least one value (enforces presence)
+- `num_args(0..)` - Explicitly allow zero or more (already default for Vec)
+- `num_args(N)` - Exact count (rare for repeated flags)
 
 ## Conclusion
 
-✅ **All acceptance criteria met**:
-1. ✅ Create command has label field defined as `Vec<String>`
-2. ✅ Comprehensive clap configuration documentation present
-3. ✅ Proper clap attributes configured (repeated long flags)
-4. ✅ Field properly wired to cmd_create handler through the full stack
+The Create command's label field is correctly configured for multi-label parsing:
+1. ✅ Field defined as `Vec<String>` at line 97
+2. ✅ clap attribute `#[arg(long)]` enables repeated flag usage
+3. ✅ Proper documentation in comment block (lines 88-95)
+4. ✅ Correctly wired to cmd_create handler (lines 1213, 1222)
+5. ✅ Assigned to Issue.labels at line 1648
 
-The implementation follows clap v4 best practices for multi-value flag parsing and includes excellent inline documentation explaining the behavior pattern.
+**No adjustments needed** - the current configuration follows clap v4 best practices for optional repeated flags.
+
+## Related Commands with Similar Patterns
+- `Search.status` / `Search.type_` / `Search.label` - Repeated filter flags
+- `Claim.workspace_paths` - Multiple path arguments
+- `LabelCommands::Add.label` - Stricter variant with required/enforced
+- `LabelCommands::Remove.label` - Same strict pattern
+- `CommentsCommands.Add.text` - Positional multi-value (not flag-based)
