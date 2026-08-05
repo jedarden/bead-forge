@@ -400,7 +400,7 @@ impl Storage {
     /// Returns an empty vector if the table is empty.
     pub fn query_dirty_issues(&self) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare_cached("SELECT bead_id FROM dirty_issues ORDER BY bead_id")?;
+        let mut stmt = conn.prepare_cached("SELECT issue_id FROM dirty_issues ORDER BY marked_at ASC")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         let mut bead_ids = Vec::new();
         for bead_id in rows {
