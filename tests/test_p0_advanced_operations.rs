@@ -689,3 +689,167 @@ fn test_multiple_p0_with_different_types() {
     assert!(p0_issues.iter().any(|i| i.issue_type == IssueType::Task));
     assert!(p0_issues.iter().any(|i| i.issue_type == IssueType::Bug));
 }
+
+// ============================================================================
+// Test 16: P0 bead get_labels retrieves correct labels
+// ============================================================================
+
+#[test]
+fn test_p0_get_labels_retrieves_correct_labels() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create P0 bead with multiple labels
+    let p0_with_labels = Issue {
+        id: "p0-labels-test".to_string(),
+        title: "P0 with Labels".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec![
+            "critical".to_string(),
+            "urgent".to_string(),
+            "security".to_string(),
+            "backend".to_string(),
+        ],
+        ..Default::default()
+    };
+    storage.create_issue(&p0_with_labels).unwrap();
+
+    // Verify labels via storage.get_labels()
+    let retrieved_labels = storage.get_labels("p0-labels-test").unwrap();
+
+    // Should have exactly 4 labels
+    assert_eq!(retrieved_labels.len(), 4);
+
+    // Should contain all expected labels
+    assert!(retrieved_labels.contains(&"critical".to_string()));
+    assert!(retrieved_labels.contains(&"urgent".to_string()));
+    assert!(retrieved_labels.contains(&"security".to_string()));
+    assert!(retrieved_labels.contains(&"backend".to_string()));
+
+    // Verify full issue retrieval also includes labels
+    let full_issue = storage.get_issue("p0-labels-test").unwrap().unwrap();
+    assert_eq!(full_issue.priority, Priority::CRITICAL);
+    assert_eq!(full_issue.labels.len(), 4);
+    assert_eq!(full_issue.labels, retrieved_labels);
+}
+
+// ============================================================================
+// Test 17: P0 bead with empty labels list
+// ============================================================================
+
+#[test]
+fn test_p0_empty_labels_list() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create P0 bead with no labels
+    let p0_no_labels = Issue {
+        id: "p0-no-labels".to_string(),
+        title: "P0 without Labels".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec![],
+        ..Default::default()
+    };
+    storage.create_issue(&p0_no_labels).unwrap();
+
+    // Verify get_labels returns empty vector
+    let retrieved_labels = storage.get_labels("p0-no-labels").unwrap();
+    assert_eq!(retrieved_labels.len(), 0);
+    assert!(retrieved_labels.is_empty());
+
+    // Verify full issue retrieval also has empty labels
+    let full_issue = storage.get_issue("p0-no-labels").unwrap().unwrap();
+    assert_eq!(full_issue.priority, Priority::CRITICAL);
+    assert!(full_issue.labels.is_empty());
+}
+
+// ============================================================================
+// Test 18: P0 bead with single label
+// ============================================================================
+
+#[test]
+fn test_p0_single_label() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create P0 bead with single label
+    let p0_single_label = Issue {
+        id: "p0-single-label".to_string(),
+        title: "P0 with Single Label".to_string(),
+        issue_type: IssueType::Bug,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec!["p0-only".to_string()],
+        ..Default::default()
+    };
+    storage.create_issue(&p0_single_label).unwrap();
+
+    // Verify get_labels returns single label
+    let retrieved_labels = storage.get_labels("p0-single-label").unwrap();
+    assert_eq!(retrieved_labels.len(), 1);
+    assert_eq!(retrieved_labels[0], "p0-only");
+
+    // Verify full issue retrieval
+    let full_issue = storage.get_issue("p0-single-label").unwrap().unwrap();
+    assert_eq!(full_issue.priority, Priority::CRITICAL);
+    assert_eq!(full_issue.labels.len(), 1);
+    assert_eq!(full_issue.labels[0], "p0-only");
+}
+
+// ============================================================================
+// Test 19: Multiple P0 beads with different labels
+// ============================================================================
+
+#[test]
+fn test_multiple_p0_with_different_labels() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create first P0 bead with security labels
+    let p0_security = Issue {
+        id: "p0-security".to_string(),
+        title: "P0 Security Issue".to_string(),
+        issue_type: IssueType::Bug,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec!["security".to_string(), "critical".to_string(), "cve".to_string()],
+        ..Default::default()
+    };
+    storage.create_issue(&p0_security).unwrap();
+
+    // Create second P0 bead with performance labels
+    let p0_performance = Issue {
+        id: "p0-performance".to_string(),
+        title: "P0 Performance Issue".to_string(),
+        issue_type: IssueType::Bug,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec!["performance".to_string(), "critical".to_string(), "hot-path".to_string()],
+        ..Default::default()
+    };
+    storage.create_issue(&p0_performance).unwrap();
+
+    // Verify labels for first P0
+    let security_labels = storage.get_labels("p0-security").unwrap();
+    assert_eq!(security_labels.len(), 3);
+    assert!(security_labels.contains(&"security".to_string()));
+    assert!(security_labels.contains(&"critical".to_string()));
+    assert!(security_labels.contains(&"cve".to_string()));
+
+    // Verify labels for second P0
+    let performance_labels = storage.get_labels("p0-performance").unwrap();
+    assert_eq!(performance_labels.len(), 3);
+    assert!(performance_labels.contains(&"performance".to_string()));
+    assert!(performance_labels.contains(&"critical".to_string()));
+    assert!(performance_labels.contains(&"hot-path".to_string()));
+
+    // Verify both are P0
+    let issue_1 = storage.get_issue("p0-security").unwrap().unwrap();
+    let issue_2 = storage.get_issue("p0-performance").unwrap().unwrap();
+    assert_eq!(issue_1.priority, Priority::CRITICAL);
+    assert_eq!(issue_2.priority, Priority::CRITICAL);
+}

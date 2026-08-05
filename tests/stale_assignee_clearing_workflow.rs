@@ -314,7 +314,8 @@ fn test_clear_assignee_conflicts_with_assignee_flag() {
         .arg("--assignee")
         .arg("some-worker")
         .current_dir(&workspace_dir)
-        .output();
+        .output()
+        .expect("Failed to execute bf update");
 
     assert!(
         !update_output.status.success(),
