@@ -436,3 +436,6 @@
 {"bead":"bf-57crdc","duration_ms":600375,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T16:50:41.501952470+00:00","worker":"alpha"}
 {"bead":"bf-2uzjzx","event":"claim","strand":"auto","ts":"2026-08-05T16:50:41.540711086+00:00","worker":"alpha"}
 {"adapter":"claude-code-glm-4.7","bead":"bf-2uzjzx","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T16:50:41.543656889+00:00","worker":"alpha"}
+{"bead":"bf-2dierh","duration_ms":600299,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T17:25:36.097760424+00:00","worker":"india"}
+{"bead":"bf-1n8dfu","event":"claim","strand":"auto","ts":"2026-08-05T17:25:36.135611193+00:00","worker":"india"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-1n8dfu","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T17:25:36.138496637+00:00","worker":"india"}

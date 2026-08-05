@@ -465,7 +465,7 @@ fn test_p0_all_issue_types_without_labels() {
     let issue_types = vec![
         ("bf-nolabel-bug", IssueType::Bug),
         ("bf-nolabel-task", IssueType::Task),
-        ("bf-nolabel-story", IssueType::Story),
+        ("bf-nolabel-feature", IssueType::Feature),
         ("bf-nolabel-epic", IssueType::Epic),
     ];
 

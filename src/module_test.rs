@@ -5,6 +5,9 @@
 //! enforcement and returns detailed test output and exit status.
 
 use anyhow::{Context, Result};
+use std::fs::{self, create_dir_all};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::Duration;
