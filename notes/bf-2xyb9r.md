@@ -1,55 +1,47 @@
-# Test Bead D (bf-2xyb9r) - Completion Summary
+# Bead bf-2xyb9r: Test Bead D
 
-## Overview
-Fourth test bead completed successfully. This test focused on workflow validation and basic functionality verification.
+## What was tested
 
-## Implementation
+Comprehensive test of the `bf search` command functionality, verifying full-text search over bead titles and descriptions with various filter options.
 
-### Test Suite Created
-Created `tests/test_bead_d_workflow.rs` with basic workflow validation tests:
+## Test created
 
-1. **Basic Bead Workflow Test**
-   - Tests bead creation and retrieval workflow
-   - Validates persistence mechanisms
-   - Uses temp directory for isolated testing
+`test_bf_search.sh` - Comprehensive test suite for `bf search` command verifying:
 
-2. **Bead ID Generation Test**
-   - Validates bead ID prefix consistency
-   - Tests ID generation patterns
-   - Ensures proper formatting
+1. **Workspace initialization**: Creating a temporary test workspace
+2. **Bead creation**: Creating 4 test beads with different titles, types, and priorities
+3. **Keyword search**: Search for "authentication" and "database" keywords
+4. **Multi-result search**: Search for "bug" keyword (returns multiple results)
+5. **Empty search handling**: Search with non-existent keyword returns no results
+6. **Type filter**: Filter beads by issue type (bug)
+7. **Priority filter**: Filter beads by priority range (critical P0 only)
+8. **Combined search**: Keyword search combined with type filter
 
-3. **Multi-label Bead Creation Test**
-   - Tests multiple label application
-   - Validates label vector handling
-   - Tests label presence validation
+## Results
 
-4. **Bead Status Transitions Test**
-   - Validates status transition states
-   - Tests open → in_progress → blocked → closed flow
-   - Ensures status consistency
+All tests passed:
 
-## Verification
+✓ Workspace initialization successful
+✓ Bead creation (4 beads: bf-2da, bf-2q6, bf-452, bf-24a)
+✓ Keyword search (authentication) found bf-2da
+✓ Keyword search (database) found bf-2q6
+✓ Multi-result search (bug) found 2 bug beads
+✓ Empty search handling works correctly
+✓ Type filter returns exactly 2 bugs
+✓ Priority filter returns exactly 2 critical (0) priority beads
+✓ Combined search (keyword + type filter) found both bug beads
 
-### Build Status
-```bash
-cargo build 2>&1 | grep -E "^error"
-# No output - clean build
-```
+## Technical details
 
-### Test Compilation
-Test file compiles successfully with no errors.
-
-## Files Modified
-- `tests/test_bead_d_workflow.rs` - New test file created
-
-## Summary
-Test Bead D successfully demonstrated:
-- Basic workflow testing patterns
-- Bead ID generation validation
-- Multi-label bead creation
-- Status transition testing
-
-The test suite provides a foundation for future workflow testing and validates core bead-forge functionality.
+- The `bf search` command performs full-text search over bead titles and descriptions
+- Filters for type, status, priority range, and assignee are supported
+- Multiple filter values for type, status, and labels are OR-combined
+- Empty results correctly return no matching beads
+- Output format shows: `[id] title - status (priority)`
 
 ## Notes
-This test bead completed without issues. All tests compile cleanly and follow the established testing patterns used throughout the bead-forge codebase.
+
+- Search works on bead titles and descriptions, not on type/assignee fields (those require explicit filters)
+- The `--format json` option is available for programmatic consumption
+- Priority filter supports min/max range queries
+- Test beads are created in a temporary workspace that is automatically cleaned up
