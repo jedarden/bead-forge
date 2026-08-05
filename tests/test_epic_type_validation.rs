@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_invalid_empty_type() {
-        // Test that creating a bead with empty type is handled gracefully
+        // Test that creating a bead with empty type is rejected
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
         let (_stdout, stderr, success) = run_create(
@@ -273,30 +273,54 @@ mod tests {
             ],
         );
 
-        // Empty type is accepted as a Custom type (IssueType::Custom(""))
-        // This is by design - the system allows custom types
+        // Empty type should be rejected - it's not a valid issue type
+        assert!(!success, "Empty type should be rejected");
         assert!(
-            success,
-            "Empty type should be accepted as Custom type. stderr: {}",
+            stderr.contains("Type cannot be empty") || stderr.contains("empty or only whitespace"),
+            "Error message should mention empty type validation. Got: {}",
             stderr
         );
-
-        // Verify the bead was created
-        let bead_id = _stdout.trim();
-        assert!(!bead_id.is_empty(), "Bead ID should be returned");
     }
 
     #[test]
     fn test_invalid_special_characters_type() {
         // Test creating beads with type strings containing control characters
-        // The system accepts custom types, so these should succeed
-        let test_cases = vec![
+        // Empty and whitespace-only types should be rejected
+        let rejection_cases = vec![
             ("", "Empty Type"),                       // Empty string
             ("   ", "Whitespace Type"),               // All whitespace
-            ("custom-type", "Custom Type with Dash"), // Custom type with dash
+            ("\t", "Tab Type"),                        // Tab only
+            ("  \t  ", "Mixed Whitespace Type"),      // Mixed whitespace
         ];
 
-        for (type_val, title) in test_cases {
+        for (type_val, title) in rejection_cases {
+            let (_temp_dir, beads_dir) = setup_test_workspace();
+
+            let (_stdout, stderr, success) = run_create(
+                &beads_dir,
+                &["--title", title, "--type", type_val, "--priority", "2"],
+            );
+
+            assert!(
+                !success,
+                "Type '{}' should be rejected. stderr: {}",
+                type_val, stderr
+            );
+            assert!(
+                stderr.contains("empty") || stderr.contains("whitespace"),
+                "Error should mention empty/whitespace validation for type '{}'. Got: {}",
+                type_val, stderr
+            );
+        }
+
+        // Valid custom types should still be accepted
+        let valid_custom_types = vec![
+            ("custom-type", "Custom Type with Dash"), // Custom type with dash
+            ("spike", "Spike"),                       // Custom type
+            ("investigation", "Investigation"),       // Custom type
+        ];
+
+        for (type_val, title) in valid_custom_types {
             let (_temp_dir, beads_dir) = setup_test_workspace();
 
             let (stdout, stderr, success) = run_create(
