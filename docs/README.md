@@ -733,6 +733,29 @@ echo '.beads/issues.jsonl merge=beads' >> .gitattributes
 
 **Fleet concurrency tests** (`tests/fleet_concurrency.rs`) — spawn N concurrent `bf` *processes* doing create/claim/close and assert the upstream bug classes stay dead: no parallel-write silent loss (`count` equals successful creates), no loss across flush + fresh-DB reimport, and no bead claimed twice under a 20-worker herd on 15 beads.
 
+### Timeout Behavior
+
+NEEDLE workers enforce a **600-second (10-minute) timeout** on all bead execution. This timeout is external to `bf` — it is imposed by the NEEDLE harness process wrapper, not by bead-forge itself.
+
+**Exit code 124** indicates a bead was terminated by this external timeout. When a worker times out, the harness kills the process and records exit code 124 in the event log:
+
+```bash
+bf log bf-abc123 --format json | jq '.[] | select(.exit_code == 124)'
+
+# Example event:
+{
+  "bead_id": "bf-abc123",
+  "event_type": "exit",
+  "exit_code": 124,
+  "timestamp": "2026-08-05T14:32:15Z",
+  "message": "External timeout termination"
+}
+```
+
+**Automatic retry:** Timeouts are treated as transient failures. The NEEDLE fleet automatically retries timed-out beads (up to its retry limit), so a single timeout does not permanently block progress. The bead's status remains `in_progress` and it re-enters the candidate pool for claiming.
+
+**This is external enforcement:** `bf` does not enforce timeouts itself — it only records the exit codes that the NEEDLE harness reports. If you see exit code 124 in event logs, the timeout came from the worker's process wrapper, not from bead-forge.
+
 ---
 
 ## Implementation
