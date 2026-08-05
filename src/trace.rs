@@ -9,6 +9,7 @@ use rand::Rng;
 use serde_json;
 use sha2::{Digest, Sha256};
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
@@ -283,6 +284,66 @@ impl TraceManager {
         }
 
         Ok(bead_dir)
+    }
+
+    /// Build trace file path for a module
+    ///
+    /// This function constructs the path for a module's raw trace file
+    /// with the format: `.beads/traces/<bead-id>/<module-name>-raw.log`
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead identifier (e.g., "bf-5bb8tg")
+    /// * `module_name` - The name of the module (e.g., "phase-1")
+    ///
+    /// # Returns
+    /// * `Result<PathBuf, io::Error>` - Path to the module's raw trace file
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let trace_path = manager.module_trace_path("bf-5bb8tg", "phase-1")?;
+    /// // Returns: .beads/traces/bf-5bb8tg/phase-1-raw.log
+    /// ```
+    pub fn module_trace_path(&self, bead_id: &str, module_name: &str) -> Result<PathBuf, io::Error> {
+        // Sanitize module name to be filesystem-safe
+        let sanitized_name = module_name
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .collect::<String>();
+
+        let filename = format!("{}-raw.log", sanitized_name);
+        let bead_dir = self.traces_dir.join(bead_id);
+        let trace_path = bead_dir.join(&filename);
+
+        Ok(trace_path)
+    }
+
+    /// Ensure the bead trace directory exists and build module trace path
+    ///
+    /// This function ensures the bead trace directory exists and returns
+    /// the path for a module's raw trace file. It combines `bead_trace_dir`
+    /// and `module_trace_path` for convenience.
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead identifier (e.g., "bf-5bb8tg")
+    /// * `module_name` - The name of the module (e.g., "phase-1")
+    ///
+    /// # Returns
+    /// * `Result<PathBuf, io::Error>` - Path to the module's raw trace file
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let trace_path = manager.ensure_module_trace_path("bf-5bb8tg", "phase-1")?;
+    /// // Directory is created and path is returned
+    /// ```
+    pub fn ensure_module_trace_path(&self, bead_id: &str, module_name: &str) -> Result<PathBuf, io::Error> {
+        // Ensure the bead trace directory exists
+        self.bead_trace_dir(bead_id)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        // Build and return the module trace path
+        self.module_trace_path(bead_id, module_name)
     }
 
     /// Create a trace directory with comprehensive error handling and writable verification
@@ -2593,5 +2654,224 @@ mod tests {
         assert!(trace_metadata.start_time.is_some());
         assert!(trace_metadata.end_time.is_some());
         assert!(trace_metadata.duration_ms.unwrap() > 0);
+    }
+
+    #[test]
+    fn test_module_trace_path_construction() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Test basic path construction
+        let trace_path = manager
+            .module_trace_path("bf-5bb8tg", "phase-1")
+            .unwrap();
+
+        // Verify the path has the correct format
+        let path_str = trace_path.to_str().unwrap();
+        assert!(
+            path_str.ends_with("bf-5bb8tg/phase-1-raw.log"),
+            "Path should end with bf-5bb8tg/phase-1-raw.log, got: {}",
+            path_str
+        );
+
+        // Verify the path is under the traces directory
+        assert!(
+            trace_path.starts_with(&manager.traces_dir),
+            "Path should start with traces directory"
+        );
+    }
+
+    #[test]
+    fn test_module_trace_path_with_various_module_names() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Test with various module names
+        let test_cases = vec![
+            ("bf-test1", "phase-1", "bf-test1/phase-1-raw.log"),
+            ("bf-test2", "phase-2", "bf-test2/phase-2-raw.log"),
+            ("bf-test3", "editor", "bf-test3/editor-raw.log"),
+            ("bf-test4", "coverage", "bf-test4/coverage-raw.log"),
+        ];
+
+        for (bead_id, module_name, expected_suffix) in test_cases {
+            let trace_path = manager.module_trace_path(bead_id, module_name).unwrap();
+            let path_str = trace_path.to_str().unwrap();
+            assert!(
+                path_str.ends_with(expected_suffix),
+                "Expected path ending with {}, got: {}",
+                expected_suffix,
+                path_str
+            );
+        }
+    }
+
+    #[test]
+    fn test_module_trace_path_sanitization() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Test sanitization of module names with special characters
+        let test_cases = vec![
+            ("bf-test1", "phase 1", "bf-test1/phase_1-raw.log"),
+            ("bf-test2", "test/module", "bf-test2/test_module-raw.log"),
+            ("bf-test3", "test:module", "bf-test3/test_module-raw.log"),
+            ("bf-test4", "test.module", "bf-test4/test_module-raw.log"),
+            ("bf-test5", "test-module", "bf-test5/test-module-raw.log"),
+            ("bf-test6", "test_module", "bf-test6/test_module-raw.log"),
+        ];
+
+        for (bead_id, module_name, expected_suffix) in test_cases {
+            let trace_path = manager.module_trace_path(bead_id, module_name).unwrap();
+            let path_str = trace_path.to_str().unwrap();
+            assert!(
+                path_str.ends_with(expected_suffix),
+                "For module '{}', expected path ending with {}, got: {}",
+                module_name,
+                expected_suffix,
+                path_str
+            );
+        }
+    }
+
+    #[test]
+    fn test_module_trace_path_does_not_create_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Verify that module_trace_path only constructs paths without creating files
+        let bead_id = "bf-nocreate";
+        let module_name = "test-module";
+
+        let trace_path = manager.module_trace_path(bead_id, module_name).unwrap();
+
+        // Verify the bead directory does NOT exist (module_trace_path doesn't create it)
+        let bead_dir = manager.traces_dir.join(bead_id);
+        assert!(
+            !bead_dir.exists(),
+            "Bead directory should not exist after module_trace_path call"
+        );
+
+        // Verify the trace file does NOT exist
+        assert!(
+            !trace_path.exists(),
+            "Trace file should not exist after module_trace_path call"
+        );
+    }
+
+    #[test]
+    fn test_ensure_module_trace_path_creates_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let bead_id = "bf-ensure";
+        let module_name = "test-module";
+
+        // Call ensure_module_trace_path which should create the directory
+        let trace_path = manager
+            .ensure_module_trace_path(bead_id, module_name)
+            .unwrap();
+
+        // Verify the bead directory now exists
+        let bead_dir = manager.traces_dir.join(bead_id);
+        assert!(
+            bead_dir.exists() && bead_dir.is_dir(),
+            "Bead directory should exist after ensure_module_trace_path call"
+        );
+
+        // Verify the trace path has the correct format
+        let path_str = trace_path.to_str().unwrap();
+        assert!(
+            path_str.ends_with("bf-ensure/test-module-raw.log"),
+            "Path should end with bf-ensure/test-module-raw.log, got: {}",
+            path_str
+        );
+
+        // The trace file itself should not exist yet (just the path is returned)
+        assert!(
+            !trace_path.exists(),
+            "Trace file should not exist yet (only path is returned)"
+        );
+    }
+
+    #[test]
+    fn test_ensure_module_trace_path_idempotent() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let bead_id = "bf-idempotent";
+        let module_name = "test-module";
+
+        // First call should create directory
+        let trace_path1 = manager
+            .ensure_module_trace_path(bead_id, module_name)
+            .unwrap();
+
+        // Second call should also succeed and return the same path
+        let trace_path2 = manager
+            .ensure_module_trace_path(bead_id, module_name)
+            .unwrap();
+
+        assert_eq!(
+            trace_path1, trace_path2,
+            "Should return the same path on repeated calls"
+        );
+
+        // Directory should still exist
+        let bead_dir = manager.traces_dir.join(bead_id);
+        assert!(bead_dir.exists(), "Directory should exist after both calls");
+    }
+
+    #[test]
+    fn test_module_trace_path_return_type() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Test that the function returns Result<PathBuf, io::Error>
+        let result: Result<PathBuf, io::Error> = manager.module_trace_path("bf-test", "phase-1");
+
+        assert!(result.is_ok(), "Should return Ok result");
+
+        let trace_path = result.unwrap();
+        assert!(
+            trace_path.is_absolute() || trace_path.is_relative(),
+            "Should return a valid PathBuf"
+        );
+    }
+
+    #[test]
+    fn test_module_trace_path_with_empty_module_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Test with empty module name
+        let trace_path = manager.module_trace_path("bf-empty", "").unwrap();
+        let path_str = trace_path.to_str().unwrap();
+
+        // Empty module name should still produce a valid path
+        assert!(
+            path_str.ends_with("bf-empty/-raw.log"),
+            "Empty module name should produce path ending with -raw.log, got: {}",
+            path_str
+        );
+    }
+
+    #[test]
+    fn test_module_trace_path_with_complex_bead_id() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Test with complex bead ID (like those used in production)
+        let bead_id = "bf-5bb8tg-auto";
+        let module_name = "phase-1-implementation";
+
+        let trace_path = manager.module_trace_path(bead_id, module_name).unwrap();
+        let path_str = trace_path.to_str().unwrap();
+
+        assert!(
+            path_str.ends_with("bf-5bb8tg-auto/phase-1-implementation-raw.log"),
+            "Complex names should be preserved, got: {}",
+            path_str
+        );
     }
 }
