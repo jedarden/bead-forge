@@ -280,7 +280,7 @@ fn test_p0_multiple_beads_with_different_labels() {
     }
 
     // Verify all P0 beads were created with correct labels
-    for (id, _, expected_labels) in p0_beads {
+    for (id, _, expected_labels) in &p0_beads {
         let retrieved = storage.get_issue(id).unwrap().unwrap();
         assert_eq!(retrieved.priority, Priority::CRITICAL);
         assert_eq!(retrieved.labels.len(), expected_labels.len());

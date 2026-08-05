@@ -1,95 +1,70 @@
-# P0 Bead Creation with Labels - Test Results
+# Test Results: P0 Bead Creation with Labels
 
-## Test Date: 2026-08-05
+## Overview
+Tested comprehensive scenarios for creating Priority 0 (Critical) beads with labels in bead-forge.
 
-## Tests Performed
+## Test Suite Created
+Created comprehensive test file: `tests/test_p0_bead_creation_with_labels.rs`
 
-### 1. P0 Bead Creation with Multiple Labels (via --label flag)
-**Command:** `bf create --title "Test P0 bead with labels" --description "Testing bead creation with priority 0 and multiple labels" --priority 0 --label phase-1 --label p0 --label test`
+## Test Results
+All 17 tests passed successfully:
 
-**Result:** ✅ SUCCESS
-- Bead ID: bf-3zqvp9
-- Priority: P0 (Critical)
-- Labels: p0, phase-1, test
-- All labels correctly attached in alphabetical order
+### Core Functionality Tests
+1. ✅ `test_p0_task_creation_with_single_label` - P0 task with single label
+2. ✅ `test_p0_task_creation_with_multiple_labels` - P0 task with multiple labels
+3. ✅ `test_p0_bug_creation_with_labels` - P0 bug with labels
+4. ✅ `test_p0_feature_creation_with_labels` - P0 feature with labels
+5. ✅ `test_p0_epic_creation_with_labels` - P0 epic with labels
 
-### 2. Label Addition via `bf label add` Command
-**Command:** `bf label add bf-1rtndg --label phase-2 --label testing`
+### Label Operations Tests
+6. ✅ `test_p0_label_addition_after_creation` - Adding labels to existing P0 beads
+7. ✅ `test_p0_label_removal` - Removing labels from P0 beads
+8. ✅ `test_p0_label_update_via_changes` - Updating labels through IssueChanges
+9. ✅ `test_p0_priority_maintained_with_label_operations` - Priority remains P0 through all label operations
 
-**Result:** ✅ SUCCESS
-- Labels successfully added to existing bead
-- Bead ID bf-1rtndg received labels: phase-2, testing
-- Command allows adding multiple labels in single command
+### Advanced Features Tests
+10. ✅ `test_p0_json_serialization_with_labels` - JSON serialization/deserialization with P0 + labels
+11. ✅ `test_p0_multiple_beads_with_different_labels` - Multiple P0 beads with varying labels
+12. ✅ `test_p0_with_empty_labels` - P0 beads without labels
+13. ✅ `test_p0_with_special_character_labels` - Labels with special characters (hyphens, colons)
+14. ✅ `test_p0_with_unicode_labels` - Labels with unicode characters (emoji, Chinese, French)
 
-### 3. JSON Output for P0 Bead Creation
-**Command:** `bf create --title "Multi-label P0 test" --description "Testing multiple labels on P0 bead creation" --priority 0 --label p0 --label phase-3 --label integration --label critical --json`
-
-**Result:** ✅ SUCCESS
-- JSON output: `{"version":1,"kind":"create","data":{"id":"bf-5amgrx"}}`
-- Bead created with correct priority and all labels
-- Structured JSON format works correctly
-
-### 4. Label Removal
-**Command:** `bf label remove bf-5amgrx --label integration`
-
-**Result:** ✅ SUCCESS
-- Label 'integration' successfully removed from bead bf-5amgrx
-- Remaining labels: critical, p0, phase-3
-- Other labels unaffected
-
-### 5. Label Listing and Verification
-**Commands:** 
-- `bf label list` (all workspace labels)
-- `bf label list bf-5amgrx` (specific bead)
-
-**Result:** ✅ SUCCESS
-- Workspace label list shows all unique labels with counts
-- Specific bead label list shows only that bead's labels
-- P0 label count increased from 1 to 3 after our tests
-
-### 6. Search and Filtering by Labels
-**Commands:**
-- `bf search --label p0`
-- `bf search "P0" --label testing`
-- `bf search --priority-min 0 --priority-max 0`
-
-**Result:** ✅ SUCCESS
-- Label filtering works correctly
-- Combined search with text query and labels works
-- Priority range filtering works (shows all P0 beads)
-
-### 7. Label Persistence Through Updates
-**Command:** `bf update bf-32s2qg --status in_progress`
-
-**Result:** ✅ SUCCESS
-- Labels remain intact after status update
-- All 4 labels (cli-test, p0, testing, verification) preserved
-- Labels are independent of other metadata updates
+### State Preservation Tests
+15. ✅ `test_p0_closed_bead_retains_labels` - Labels preserved when closing P0 beads
+16. ✅ `test_p0_label_aggregation` - Global label counting works with P0 beads
+17. ✅ `test_p0_comprehensive_integration` - Full integration test with epic + children
 
 ## Key Findings
 
-1. **Multiple Labels Work:** The `--label` flag can be used multiple times in create commands
-2. **Post-Creation Label Management:** Labels can be added/removed via `bf label add` and `bf label remove` commands
-3. **P0 Priority Handling:** P0 (priority 0) beads work correctly with all label operations
-4. **Search Integration:** Label filtering integrates with text search and priority filters
-5. **Data Persistence:** Labels persist correctly through status updates and other modifications
-6. **JSON Output:** Structured JSON output works for label operations
+### ✅ Confirmed Working
+- P0 (Priority::CRITICAL, value 0) beads can be created with any number of labels
+- All label operations (add, remove, update) preserve P0 priority correctly
+- JSON serialization maintains both P0 priority and labels correctly
+- Labels work correctly across all issue types (Task, Bug, Feature, Epic)
+- Special characters and unicode in labels work correctly
+- Closed beads retain their labels
+- Global label aggregation includes P0 beads correctly
 
-## Test Beads Created
+### Test Coverage
+The test suite covers:
+- All issue types (Task, Bug, Feature, Epic)
+- Single and multiple labels
+- Empty label arrays
+- Label CRUD operations
+- Priority preservation during label operations
+- JSON round-trip serialization
+- Special characters and unicode
+- State preservation (closed beads)
+- Integration scenarios
 
-1. **bf-3zqvp9** - "Test P0 bead with labels" (P0, labels: p0, phase-1, test)
-2. **bf-1rtndg** - "Test bead for adding labels later" (P1, labels: phase-2, testing)
-3. **bf-2j94ww** - "Critical performance issue" (P0, labels: database, p0, performance, phase-1)
-4. **bf-5amgrx** - "Multi-label P0 test" (P0, labels: critical, p0, phase-3)
-5. **bf-32s2qg** - "Comprehensive P0 label test" (P0, labels: cli-test, p0, testing, verification)
+## Build Status
+- ✅ All tests compiled successfully
+- ✅ All 17 tests passed
+- ⚠️ Some compiler warnings present (unrelated to this test suite)
 
 ## Conclusion
-
-All P0 bead creation and label management functionality works correctly. The label system is fully functional for:
-- Creation-time label assignment
-- Post-creation label addition/removal
-- Label-based search and filtering
-- Label persistence through updates
-- Multi-label support on single beads
-
-No issues found with P0 priority beads and label operations.
+P0 bead creation with labels is fully functional and well-tested. The implementation correctly handles:
+- Creating P0 beads with any number of labels
+- Maintaining P0 priority through all label operations
+- Serializing/deserializing P0 beads with labels
+- Working with labels across all issue types and scenarios
