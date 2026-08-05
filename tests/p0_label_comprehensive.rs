@@ -305,6 +305,88 @@ fn test_p0_label_remove() {
     assert!(labels.contains(&"keep-me".to_string()));
     assert!(!labels.contains(&"remove-me".to_string()));
     assert_eq!(json[0]["priority"], 0, "Priority should remain P0");
+
+    // Edge case 1: Attempt to remove non-existent label
+    let (_, stderr, success) = run_bf_command(
+        workspace,
+        &["label", "remove", &bead_id, "-l", "non-existent"],
+    );
+    // Should either succeed with no-op or fail gracefully
+    // Verify the existing labels are unchanged
+    let (show_stdout, _, _) = run_bf_command(workspace, &["show", &bead_id, "--format", "json"]);
+    let json = parse_json_output(&show_stdout);
+    let labels = extract_labels_from_json(&json);
+
+    assert_eq!(labels.len(), 1, "Label count should be unchanged after removing non-existent label");
+    assert!(labels.contains(&"keep-me".to_string()));
+    assert_eq!(json[0]["priority"], 0, "Priority should remain P0 after removing non-existent label");
+
+    // Edge case 2: Remove the last label
+    let (_, stderr, success) =
+        run_bf_command(workspace, &["label", "remove", &bead_id, "-l", "keep-me"]);
+    assert!(success, "bf label remove failed for last label: {}", stderr);
+
+    // Verify all labels are removed but priority is maintained
+    let (show_stdout, _, _) = run_bf_command(workspace, &["show", &bead_id, "--format", "json"]);
+    let json = parse_json_output(&show_stdout);
+    let labels = extract_labels_from_json(&json);
+
+    assert_eq!(labels.len(), 0, "P0 bead should have no labels after removing the last one");
+    assert_eq!(json[0]["priority"], 0, "Priority should remain P0 even with no labels");
+
+    // Edge case 3: Attempt to remove label from bead with no labels
+    let (_, stderr, success) = run_bf_command(
+        workspace,
+        &["label", "remove", &bead_id, "-l", "any-label"],
+    );
+    // Should handle gracefully - either succeed with no-op or fail gracefully
+    // Verify the bead still has no labels and P0 priority
+    let (show_stdout, _, _) = run_bf_command(workspace, &["show", &bead_id, "--format", "json"]);
+    let json = parse_json_output(&show_stdout);
+    let labels = extract_labels_from_json(&json);
+
+    assert_eq!(labels.len(), 0, "Label count should remain 0");
+    assert_eq!(json[0]["priority"], 0, "Priority should remain P0");
+
+    // Edge case 4: Remove multiple labels at once
+    let (stdout2, _, _) = run_bf_command(
+        workspace,
+        &[
+            "create",
+            "--title",
+            "P0 Multiple Remove",
+            "--priority",
+            "0",
+            "--label",
+            "first",
+            "--label",
+            "second",
+            "--label",
+            "third",
+            "--label",
+            "keep",
+        ],
+    );
+    let bead_id2 = extract_bead_id(&stdout2);
+
+    // Remove multiple labels at once
+    let (_, stderr, success) = run_bf_command(
+        workspace,
+        &["label", "remove", &bead_id2, "-l", "first", "-l", "second", "-l", "third"],
+    );
+    assert!(success, "bf label remove with multiple labels failed: {}", stderr);
+
+    // Verify only the kept label remains
+    let (show_stdout, _, _) = run_bf_command(workspace, &["show", &bead_id2, "--format", "json"]);
+    let json = parse_json_output(&show_stdout);
+    let labels = extract_labels_from_json(&json);
+
+    assert_eq!(labels.len(), 1);
+    assert!(labels.contains(&"keep".to_string()));
+    assert!(!labels.contains(&"first".to_string()));
+    assert!(!labels.contains(&"second".to_string()));
+    assert!(!labels.contains(&"third".to_string()));
+    assert_eq!(json[0]["priority"], 0, "Priority should remain P0 after removing multiple labels");
 }
 
 // ============================================================================
