@@ -322,3 +322,233 @@ fn test_remove_label_special_characters() {
 
     println!("✓ test_remove_label_special_characters passed");
 }
+
+#[test]
+fn test_remove_label_marks_dirty() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create an issue with labels
+    let issue = Issue {
+        id: "test-11".to_string(),
+        title: "Test Issue".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: vec!["label1".to_string(), "label2".to_string()],
+        ..Default::default()
+    };
+    storage.create_issue(&issue).unwrap();
+
+    // Clear any dirty flags from the create operation
+    storage.clear_dirty().unwrap();
+
+    // Verify no dirty issues
+    let dirty_issues = storage.list_dirty_issues().unwrap();
+    assert_eq!(dirty_issues.len(), 0, "Should start with no dirty issues");
+
+    // Remove a label
+    storage.remove_label("test-11", "label1").unwrap();
+
+    // Verify the issue is now marked as dirty
+    let dirty_issues = storage.list_dirty_issues().unwrap();
+    assert_eq!(dirty_issues.len(), 1, "Issue should be marked dirty after label removal");
+    assert_eq!(dirty_issues[0].id, "test-11");
+
+    println!("✓ test_remove_label_marks_dirty passed");
+}
+
+#[test]
+fn test_remove_label_both_tables() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create an issue with labels
+    let issue = Issue {
+        id: "test-12".to_string(),
+        title: "Test Issue".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: vec!["keep".to_string(), "remove-me".to_string()],
+        ..Default::default()
+    };
+    storage.create_issue(&issue).unwrap();
+
+    // Verify label exists in both tables using direct SQL
+    let conn = storage.conn.lock().unwrap();
+    let labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM labels WHERE issue_id = ?1 AND label = ?2",
+            rusqlite::params!("test-12", "remove-me"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(labels_count, 1, "Label should exist in labels table");
+
+    let bead_labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1 AND label = ?2",
+            rusqlite::params!("test-12", "remove-me"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(bead_labels_count, 1, "Label should exist in bead_labels table");
+    drop(conn);
+
+    // Remove the label
+    storage.remove_label("test-12", "remove-me").unwrap();
+
+    // Verify label is removed from both tables using direct SQL
+    let conn = storage.conn.lock().unwrap();
+    let labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM labels WHERE issue_id = ?1 AND label = ?2",
+            rusqlite::params!("test-12", "remove-me"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(labels_count, 0, "Label should be removed from labels table");
+
+    let bead_labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1 AND label = ?2",
+            rusqlite::params!("test-12", "remove-me"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(bead_labels_count, 0, "Label should be removed from bead_labels table");
+
+    // Verify other label still exists in both tables
+    let keep_labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM labels WHERE issue_id = ?1 AND label = ?2",
+            rusqlite::params!("test-12", "keep"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(keep_labels_count, 1, "Other label should remain in labels table");
+
+    let keep_bead_labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1 AND label = ?2",
+            rusqlite::params!("test-12", "keep"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        keep_bead_labels_count, 1,
+        "Other label should remain in bead_labels table"
+    );
+
+    println!("✓ test_remove_label_both_tables passed");
+}
+
+#[test]
+fn test_cascade_delete_on_issue_removal() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Verify the schema has ON DELETE CASCADE foreign keys for both label tables
+    let conn = storage.conn.lock().unwrap();
+
+    // Check labels table FK
+    let labels_fk_sql: String = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='labels'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        labels_fk_sql.contains("ON DELETE CASCADE"),
+        "labels table should have ON DELETE CASCADE foreign key"
+    );
+    assert!(
+        labels_fk_sql.contains("REFERENCES issues(id)"),
+        "labels table should reference issues(id)"
+    );
+
+    // Check bead_labels table FK
+    let bead_labels_fk_sql: String = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='bead_labels'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        bead_labels_fk_sql.contains("ON DELETE CASCADE"),
+        "bead_labels table should have ON DELETE CASCADE foreign key"
+    );
+    assert!(
+        bead_labels_fk_sql.contains("REFERENCES issues(id)"),
+        "bead_labels table should reference issues(id)"
+    );
+
+    drop(conn);
+
+    // Create an issue with labels to verify the FKs work correctly
+    let issue = Issue {
+        id: "test-13".to_string(),
+        title: "Test Issue".to_string(),
+        issue_type: IssueType::Task,
+        status: Status::Open,
+        labels: vec!["label1".to_string(), "label2".to_string()],
+        ..Default::default()
+    };
+    storage.create_issue(&issue).unwrap();
+
+    // Verify labels exist in both tables using direct SQL
+    let conn = storage.conn.lock().unwrap();
+    let labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM labels WHERE issue_id = ?1",
+            rusqlite::params!("test-13"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(labels_count, 2, "Both labels should exist in labels table");
+
+    let bead_labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1",
+            rusqlite::params!("test-13"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(bead_labels_count, 2, "Both labels should exist in bead_labels table");
+    drop(conn);
+
+    // Manually delete the issue using direct SQL to test cascade behavior
+    let conn = storage.conn.lock().unwrap();
+    conn.execute("DELETE FROM issues WHERE id = ?", rusqlite::params!("test-13"))
+        .unwrap();
+    drop(conn);
+
+    // Verify labels are automatically removed from both tables via cascade
+    let conn = storage.conn.lock().unwrap();
+    let labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM labels WHERE issue_id = ?1",
+            rusqlite::params!("test-13"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        labels_count, 0,
+        "Labels should be cascaded from labels table when issue is deleted"
+    );
+
+    let bead_labels_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1",
+            rusqlite::params!("test-13"),
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        bead_labels_count, 0,
+        "Labels should be cascaded from bead_labels table when issue is deleted"
+    );
+
+    println!("✓ test_cascade_delete_on_issue_removal passed");
+}
