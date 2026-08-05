@@ -1220,6 +1220,227 @@ impl Storage {
         Ok(annotations)
     }
 
+    /// Parse a row into an Issue without loading dependencies, comments, or annotations.
+    /// Used by list_issues for batch loading performance optimization.
+    fn row_to_issue_partial(row: &rusqlite::Row) -> Result<Issue> {
+        let status_str: String = row.get(7)?;
+        let type_str: String = row.get(9)?;
+        let parse_opt_dt = |idx: usize| -> Result<Option<DateTime<Utc>>> {
+            let s: Option<String> = row.get(idx)?;
+            match s {
+                None => Ok(None),
+                Some(ref val) if val.is_empty() => Ok(None),
+                Some(val) => Ok(Some(parse_datetime(val)?)),
+            }
+        };
+        let id: String = row.get(0)?;
+
+        // Parse labels from GROUP_CONCAT result (comma-separated string)
+        let labels_str: Option<String> = row.get(36)?;
+        let labels: Vec<String> = labels_str
+            .map(|s| s.split(',').map(String::from).collect())
+            .unwrap_or_default();
+
+        Ok(Issue {
+            content_hash: row.get(1)?,
+            title: row.get(2)?,
+            description: row.get(3)?,
+            design: row.get(4)?,
+            acceptance_criteria: row.get(5)?,
+            notes: row.get(6)?,
+            status: Status::from_str(&status_str).unwrap_or(Status::Custom(status_str)),
+            priority: row.get(8)?,
+            issue_type: IssueType::from_str(&type_str).unwrap_or(IssueType::Custom(type_str)),
+            assignee: row.get(10)?,
+            owner: row.get(11)?,
+            estimated_minutes: row.get(12)?,
+            created_at: parse_required_datetime(row.get(13)?)?,
+            created_by: row.get(14)?,
+            updated_at: parse_required_datetime(row.get(15)?)?,
+            closed_at: parse_opt_dt(16)?,
+            close_reason: row.get(17)?,
+            closed_by_session: row.get(18)?,
+            due_at: parse_opt_dt(19)?,
+            defer_until: parse_opt_dt(20)?,
+            external_ref: row.get(21)?,
+            source_system: row.get(22)?,
+            source_repo: row.get(23)?,
+            deleted_at: parse_opt_dt(24)?,
+            deleted_by: row.get(25)?,
+            delete_reason: row.get(26)?,
+            original_type: row.get(27)?,
+            compaction_level: row.get(28)?,
+            compacted_at: parse_opt_dt(29)?,
+            compacted_at_commit: row.get(30)?,
+            original_size: row.get(31)?,
+            sender: row.get(32)?,
+            ephemeral: row.get::<_, i32>(33)? != 0,
+            pinned: row.get::<_, i32>(34)? != 0,
+            is_template: row.get::<_, i32>(35)? != 0,
+            labels,
+            dependencies: Vec::new(),  // Loaded separately via batch_load_dependencies
+            comments: Vec::new(),      // Loaded separately via batch_load_comments
+            annotations: BTreeMap::new(),  // Loaded separately via batch_load_annotations
+            id,
+        })
+    }
+
+    /// Batch load dependencies for multiple issues at once.
+    /// Returns a map from issue_id to its dependencies.
+    fn batch_load_dependencies(
+        conn: &Connection,
+        issue_ids: &[&String],
+    ) -> Result<std::collections::HashMap<String, Vec<Dependency>>> {
+        if issue_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let mut result = std::collections::HashMap::new();
+        for issue_id in issue_ids {
+            result.insert(issue_id.to_string(), Vec::new());
+        }
+
+        // Build the IN clause with placeholders
+        let in_clause = issue_ids.iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let query = format!(
+            "SELECT issue_id, depends_on_id, type, metadata, thread_id, created_at, created_by
+             FROM dependencies
+             WHERE issue_id IN ({})",
+            in_clause
+        );
+
+        let mut stmt = conn.prepare(&query)?;
+        let mut rows = stmt.query(
+            issue_ids.iter()
+                .map(|s| s as &dyn rusqlite::ToSql)
+                .collect::<Vec<_>>()
+                .as_slice()
+        )?;
+
+        while let Some(row) = rows.next()? {
+            let issue_id: String = row.get(0)?;
+            let type_str: String = row.get(2)?;
+            let dep = Dependency {
+                issue_id: row.get(0)?,
+                depends_on_id: row.get(1)?,
+                dep_type: DependencyType::from_str(&type_str)
+                    .unwrap_or(DependencyType::Custom(type_str)),
+                metadata: row
+                    .get::<_, Option<String>>(3)?
+                    .and_then(|s| serde_json::from_str(&s).ok()),
+                thread_id: row.get(4)?,
+                created_at: parse_required_datetime(row.get(5)?)?,
+                created_by: row.get(6)?,
+                title: None,
+            };
+            result.entry(issue_id).or_default().push(dep);
+        }
+
+        Ok(result)
+    }
+
+    /// Batch load comments for multiple issues at once.
+    /// Returns a map from issue_id to its comments.
+    fn batch_load_comments(
+        conn: &Connection,
+        issue_ids: &[&String],
+    ) -> Result<std::collections::HashMap<String, Vec<Comment>>> {
+        if issue_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let mut result = std::collections::HashMap::new();
+        for issue_id in issue_ids {
+            result.insert(issue_id.to_string(), Vec::new());
+        }
+
+        let in_clause = issue_ids.iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let query = format!(
+            "SELECT id, issue_id, author, text, created_at
+             FROM comments
+             WHERE issue_id IN ({})",
+            in_clause
+        );
+
+        let mut stmt = conn.prepare(&query)?;
+        let mut rows = stmt.query(
+            issue_ids.iter()
+                .map(|s| s as &dyn rusqlite::ToSql)
+                .collect::<Vec<_>>()
+                .as_slice()
+        )?;
+
+        while let Some(row) = rows.next()? {
+            let issue_id: String = row.get(1)?;
+            let comment = Comment {
+                id: row.get(0)?,
+                issue_id: row.get(1)?,
+                author: row.get(2)?,
+                body: row.get(3)?,
+                created_at: parse_required_datetime(row.get(4)?)?,
+            };
+            result.entry(issue_id).or_default().push(comment);
+        }
+
+        Ok(result)
+    }
+
+    /// Batch load annotations for multiple issues at once.
+    /// Returns a map from issue_id to its annotations.
+    fn batch_load_annotations(
+        conn: &Connection,
+        issue_ids: &[&String],
+    ) -> Result<std::collections::HashMap<String, BTreeMap<String, String>>> {
+        if issue_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let mut result = std::collections::HashMap::new();
+        for issue_id in issue_ids {
+            result.insert(issue_id.to_string(), BTreeMap::new());
+        }
+
+        let in_clause = issue_ids.iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let query = format!(
+            "SELECT bead_id, key, value
+             FROM bead_annotations
+             WHERE bead_id IN ({})",
+            in_clause
+        );
+
+        let mut stmt = conn.prepare(&query)?;
+        let mut rows = stmt.query(
+            issue_ids.iter()
+                .map(|s| s as &dyn rusqlite::ToSql)
+                .collect::<Vec<_>>()
+                .as_slice()
+        )?;
+
+        while let Some(row) = rows.next()? {
+            let bead_id: String = row.get(0)?;
+            let key: String = row.get(1)?;
+            let value: String = row.get(2)?;
+            result.entry(bead_id).or_default().insert(key, value);
+        }
+
+        Ok(result)
+    }
+
     fn load_labels(&self, issue_id: &str) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         Self::load_labels_conn(&conn, issue_id)
