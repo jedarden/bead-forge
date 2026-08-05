@@ -87,3 +87,60 @@ The multi-label functionality on P0 priority beads is fully working and tested. 
 6. **Data persistence and serialization** work correctly for multi-label P0 beads
 
 The functionality is production-ready and handles all tested scenarios correctly.
+
+---
+
+## Manual CLI Testing (2026-08-05)
+
+### Live CLI Test
+In addition to the automated test suite, performed manual CLI testing to verify real-world usage:
+
+**Command executed:**
+```bash
+bf create --title "Test multi-label P0 priority bead" --type task --priority 0 --label test --label multi-label --label p0-test --json
+```
+
+**Result:** ✅ SUCCESS
+```json
+{
+  "version": 1,
+  "kind": "create",
+  "data": {
+    "assignee": null,
+    "description": null,
+    "id": "bf-55ma7u",
+    "labels": ["test", "multi-label", "p0-test"],
+    "priority": 0,
+    "status": "open",
+    "title": "Test multi-label P0 priority bead",
+    "type": "task"
+  }
+}
+```
+
+**Verification with `bf show bf-55ma7u`:**
+```
+ID: bf-55ma7u
+Title: Test multi-label P0 priority bead
+Status: open
+Priority: P0
+Type: task
+Labels: multi-label, p0-test, test
+```
+
+### Manual Test Results ✅
+- **P0 Priority**: Correctly set as `priority: 0` (Critical/P0)
+- **Multiple Labels**: All 3 labels (`test`, `multi-label`, `p0-test`) applied successfully
+- **Data Integrity**: Labels correctly stored and retrieved from SQLite
+- **JSON Output**: Structured output includes all expected fields
+- **Priority Filtering**: `bf list --priority 0` correctly includes the new bead
+
+### CLI Interface Verification ✅
+- Repeated `--label` flags work correctly for multiple labels
+- `--priority 0` correctly sets P0 (Critical) priority
+- `--json` flag provides proper structured output
+- All data persists correctly through creation, storage, and retrieval
+
+## Final Assessment
+
+Both automated test suite (30 tests ✅) and manual CLI testing (✅) confirm that multi-label functionality on P0 priority beads is fully working and production-ready.
