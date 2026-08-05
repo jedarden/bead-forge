@@ -86,6 +86,13 @@ pub enum Commands {
         assignee: Option<String>,
 
         /// Labels
+        ///
+        /// CLAP MULTI-VALUE PATTERN:
+        /// - `Vec<String>` enables repeated flag usage: `--label bug --label enhancement`
+        /// - clap v4's default Append action collects each occurrence into the vector
+        /// - Usage: `bf create --title "Fix bug" --label bug --label urgent --label priority`
+        /// - No `num_args` needed: empty Vec when flag is omitted, one value per flag when used
+        /// - Gotcha: labels with spaces must be quoted: `--label "multi word label"`
         #[arg(long)]
         label: Vec<String>,
 
@@ -953,6 +960,15 @@ pub enum LabelCommands {
     /// present are left as-is.
     Add {
         /// Label(s) to add (multiple labels supported)
+        ///
+        /// CLAP MULTI-VALUE PATTERN:
+        /// - `Vec<String>` with `num_args = 1..` requires at least one value
+        /// - Short/long flags: `-l bug -l urgent` or `--label bug --label urgent`
+        /// - `num_args = 1..` means "one or more": clap validates minimum count at parse time
+        /// - Each flag appends to Vec: ["bug", "urgent"] becomes `["bug", "urgent"]`
+        /// - `required = true` forces the flag to appear at least once (independent of num_args)
+        /// - Gotcha: `num_args` applies per occurrence, not total. `-l bug urgent` (two args, one flag)
+        ///   is treated differently from `-l bug -l urgent` (two flags, one arg each)
         #[arg(short, long, required = true, num_args = 1..)]
         label: Vec<String>,
 
@@ -965,6 +981,13 @@ pub enum LabelCommands {
     /// Removes one or more labels (-l repeatable) from a bead.
     Remove {
         /// Label(s) to remove (multiple labels supported)
+        ///
+        /// CLAP MULTI-VALUE PATTERN:
+        /// - Same pattern as LabelCommands::Add: `Vec<String>` with `num_args = 1..`
+        /// - Usage: `bf label remove -l bug -l urgent <id>` removes multiple labels at once
+        /// - `num_args = 1..` enforces at least one label per command invocation
+        /// - clap's Append action means repeated flags build the full list to remove
+        /// - Gotcha: removing a non-existent label is a no-op (not an error) — check storage layer
         #[arg(short, long, required = true, num_args = 1..)]
         label: Vec<String>,
 
@@ -993,6 +1016,15 @@ pub enum CommentsCommands {
         id: String,
 
         /// Comment text
+        ///
+        /// CLAP MULTI-VALUE PATTERN:
+        /// - `Vec<String>` with `num_args = 1..` collects all remaining positional arguments
+        /// - This is a positional multi-value, not a flag: `bf comments add <id> word1 word2 "word 3"`
+        /// - `num_args = 1..` means "one or more" values collected into the vector
+        /// - Values are joined with spaces in the handler (line 3091: `text.join(" ")`)
+        /// - Usage pattern: quotes optional for single words, required for multi-word arguments
+        /// - Gotcha: shell word splitting happens before clap sees the args; `--flag "val ue"`
+        ///   is one arg, but `--flag val ue` is two (and both end up in the Vec)
         #[arg(required = true, num_args = 1..)]
         text: Vec<String>,
     },
