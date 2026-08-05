@@ -3062,8 +3062,12 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
 
         let labels = storage.get_labels(issue_id)?;
         if format == "json" {
-            // Output labels array as compact JSON
-            println!("{}", serde_json::to_string(&labels)?);
+            // Output JSON structure: {"id": "...", "labels": ["label1", "label2"]}
+            let obj = serde_json::json!({
+                "id": issue_id,
+                "labels": labels
+            });
+            println!("{}", serde_json::to_string(&obj)?);
         } else {
             for label in &labels {
                 println!("{}", label);

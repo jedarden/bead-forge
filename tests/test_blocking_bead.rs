@@ -1,29 +1,63 @@
-/// Comprehensive test for blocking bead functionality
+/// Comprehensive test suite for blocking bead functionality
 ///
-/// This test verifies:
-/// 1. Creating blocking dependencies between beads
-/// 2. Blocked beads cannot be claimed
-/// 3. Closing blockers cascades to unblock dependents
-/// 4. Multiple blockers work correctly
-/// 5. blocked_issues_cache is properly maintained
-/// 6. Ready candidates excludes blocked beads
+/// This test module provides:
+/// 1. Helper functions for bead creation and dependency setup
+/// 2. Common test fixtures for complex blocking scenarios
+/// 3. Utilities for blocking validation and verification
+/// 4. Tests for all blocking dependency behaviors
+///
+/// Test coverage includes:
+/// - Creating blocking dependencies between beads
+/// - Blocked beads cannot be claimed
+/// - Closing blockers cascades to unblock dependents
+/// - Multiple blockers work correctly
+/// - blocked_issues_cache is properly maintained
+/// - Ready candidates excludes blocked beads
+/// - Circular dependency detection
+/// - Transitive blocking relationships
+/// - Diamond dependency patterns
 
 use bead_forge::claim::{claim, get_ready_candidates};
 use bead_forge::model::{Issue, IssueType, Priority, Status, DependencyType};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 use tempfile::NamedTempFile;
+use std::collections::HashSet;
 
 #[cfg(test)]
 mod blocking_bead_tests {
     use super::*;
 
+    // ===== TEST FIXTURES AND SETUP =====
+
+    /// Create a temporary test database with storage backend
     fn setup_test_db() -> (NamedTempFile, Storage) {
         let temp_file = NamedTempFile::new().unwrap();
         let storage = Storage::open(temp_file.path()).unwrap();
         (temp_file, storage)
     }
 
+    /// Create a temporary test database with secret scanning enabled
+    fn setup_test_db_with_secrets() -> (NamedTempFile, Storage) {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Configure secret scanner for testing
+        use bead_forge::secrets::SecretScanner;
+        let scanner = SecretScanner::from_config(&bead_forge::config::SecretProtection {
+            enabled: true,
+            patterns: vec!["SK_TEST_".to_string()],
+            allowlist_paths: vec![],
+            allowlist_patterns: vec![],
+        }).unwrap();
+
+        storage.set_secret_scanner(scanner);
+        (temp_file, storage)
+    }
+
+    // ===== BEAD CREATION HELPERS =====
+
+    /// Create a basic open bead with specified properties
     fn create_open_bead(storage: &Storage, id: &str, title: &str, priority: Priority) -> Issue {
         let issue = Issue {
             id: id.to_string(),
@@ -38,6 +72,230 @@ mod blocking_bead_tests {
         };
         storage.create_issue(&issue).unwrap();
         issue
+    }
+
+    /// Create a bead with custom status
+    fn create_bead_with_status(storage: &Storage, id: &str, title: &str, status: Status, priority: Priority) -> Issue {
+        let issue = Issue {
+            id: id.to_string(),
+            title: title.to_string(),
+            priority,
+            status,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+        issue
+    }
+
+    /// Create a bead with custom issue type
+    fn create_bead_with_type(storage: &Storage, id: &str, title: &str, issue_type: IssueType, priority: Priority) -> Issue {
+        let issue = Issue {
+            id: id.to_string(),
+            title: title.to_string(),
+            priority,
+            status: Status::Open,
+            issue_type,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+        issue
+    }
+
+    /// Create a bead with labels
+    fn create_bead_with_labels(storage: &Storage, id: &str, title: &str, priority: Priority, labels: &[&str]) -> Issue {
+        let issue = Issue {
+            id: id.to_string(),
+            title: title.to_string(),
+            priority,
+            status: Status::Open,
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            labels: labels.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+        issue
+    }
+
+    /// Create a fully custom bead from an Issue struct
+    fn create_custom_bead(storage: &Storage, issue: &Issue) -> Issue {
+        storage.create_issue(issue).unwrap();
+        let retrieved = storage.get_issue(&issue.id).unwrap().unwrap();
+        retrieved
+    }
+
+    // ===== DEPENDENCY SETUP HELPERS =====
+
+    /// Create a simple blocker-dependent relationship
+    fn create_blocking_pair(storage: &Storage, blocker_id: &str, dependent_id: &str) -> (Issue, Issue) {
+        let blocker = create_open_bead(storage, blocker_id, &format!("Blocker {}", blocker_id), Priority::HIGH);
+        let dependent = create_open_bead(storage, dependent_id, &format!("Dependent {}", dependent_id), Priority::MEDIUM);
+
+        storage.add_dependency(dependent_id, blocker_id, &DependencyType::Blocks, "test").unwrap();
+
+        (blocker, dependent)
+    }
+
+    /// Create a blocking chain: A -> B -> C -> ...
+    fn create_blocking_chain(storage: &Storage, ids: &[&str]) -> Vec<Issue> {
+        let mut beads = Vec::new();
+
+        // Create all beads first
+        for id in ids {
+            let bead = create_open_bead(storage, id, &format!("Bead {}", id), Priority::MEDIUM);
+            beads.push(bead);
+        }
+
+        // Add blocking dependencies in sequence
+        for i in 0..ids.len() - 1 {
+            storage.add_dependency(ids[i + 1], ids[i], &DependencyType::Blocks, "test").unwrap();
+        }
+
+        beads
+    }
+
+    /// Create a diamond dependency pattern: A blocks B and C, both B and C block D
+    fn create_diamond_pattern(storage: &Storage) -> (Issue, Issue, Issue, Issue) {
+        let a = create_open_bead(storage, "bf-root", "Root A", Priority::HIGH);
+        let b = create_open_bead(storage, "bf-branch1", "Branch B", Priority::MEDIUM);
+        let c = create_open_bead(storage, "bf-branch2", "Branch C", Priority::MEDIUM);
+        let d = create_open_bead(storage, "bf-leaf", "Leaf D", Priority::MEDIUM);
+
+        // A -> B, A -> C
+        storage.add_dependency("bf-branch1", "bf-root", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-branch2", "bf-root", &DependencyType::Blocks, "test").unwrap();
+
+        // B -> D, C -> D
+        storage.add_dependency("bf-leaf", "bf-branch1", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-leaf", "bf-branch2", &DependencyType::Blocks, "test").unwrap();
+
+        (a, b, c, d)
+    }
+
+    /// Create multiple blockers for a single dependent
+    fn create_multiple_blockers(storage: &Storage, dependent_id: &str, blocker_ids: &[&str]) -> (Issue, Vec<Issue>) {
+        let dependent = create_open_bead(storage, dependent_id, "Dependent with multiple blockers", Priority::MEDIUM);
+        let mut blockers = Vec::new();
+
+        for blocker_id in blocker_ids {
+            let blocker = create_open_bead(storage, blocker_id, &format!("Blocker {}", blocker_id), Priority::HIGH);
+            storage.add_dependency(dependent_id, blocker_id, &DependencyType::Blocks, "test").unwrap();
+            blockers.push(blocker);
+        }
+
+        (dependent, blockers)
+    }
+
+    /// Create a circular dependency: A -> B -> A
+    fn create_circular_pair(storage: &Storage) -> (Issue, Issue) {
+        let a = create_open_bead(storage, "bf-circular-a", "Circular A", Priority::HIGH);
+        let b = create_open_bead(storage, "bf-circular-b", "Circular B", Priority::MEDIUM);
+
+        // A blocks B, B blocks A (circular)
+        storage.add_dependency("bf-circular-b", "bf-circular-a", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-circular-a", "bf-circular-b", &DependencyType::Blocks, "test").unwrap();
+
+        (a, b)
+    }
+
+    // ===== VALIDATION AND VERIFICATION UTILITIES =====
+
+    /// Verify that a bead has the expected status
+    fn assert_status(storage: &Storage, bead_id: &str, expected_status: Status) {
+        let bead = storage.get_issue(bead_id).unwrap().unwrap();
+        assert_eq!(bead.status, expected_status, "Bead {} should have status {:?}", bead_id, expected_status);
+    }
+
+    /// Verify that a bead is blocked
+    fn assert_blocked(storage: &Storage, bead_id: &str) {
+        assert_status(storage, bead_id, Status::Blocked);
+    }
+
+    /// Verify that a bead is open
+    fn assert_open(storage: &Storage, bead_id: &str) {
+        assert_status(storage, bead_id, Status::Open);
+    }
+
+    /// Verify that a bead is in the ready candidates list
+    fn assert_ready(storage: &Storage, bead_id: &str) {
+        let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None)).unwrap();
+        assert!(candidates.iter().any(|c| c.id == bead_id), "Bead {} should be in ready candidates", bead_id);
+    }
+
+    /// Verify that a bead is NOT in the ready candidates list
+    fn assert_not_ready(storage: &Storage, bead_id: &str) {
+        let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None)).unwrap();
+        assert!(!candidates.iter().any(|c| c.id == bead_id), "Bead {} should not be in ready candidates", bead_id);
+    }
+
+    /// Get the count of blocking dependencies for a bead
+    fn get_blocking_count(storage: &Storage, bead_id: &str) -> usize {
+        let deps = storage.get_dependencies(bead_id).unwrap();
+        deps.iter().filter(|d| d.dep_type.is_blocking()).count()
+    }
+
+    /// Check if two beads have a blocking relationship
+    fn has_blocking_relationship(storage: &Storage, dependent_id: &str, blocker_id: &str) -> bool {
+        let deps = storage.get_dependencies(dependent_id).unwrap();
+        deps.iter().any(|d| d.depends_on_id == blocker_id && d.dep_type.is_blocking())
+    }
+
+    /// Detect if there's a circular dependency involving a bead
+    fn detect_circular_dependency(storage: &Storage, bead_id: &str) -> bool {
+        let mut visited = HashSet::new();
+        let mut path = Vec::new();
+        detect_cycle_recursive(storage, bead_id, &mut visited, &mut path)
+    }
+
+    fn detect_cycle_recursive(storage: &Storage, current_id: &str, visited: &mut HashSet<String>, path: &mut Vec<String>) -> bool {
+        if path.contains(&current_id.to_string()) {
+            return true; // Cycle detected
+        }
+
+        if visited.contains(&current_id.to_string()) {
+            return false; // Already checked this branch
+        }
+
+        visited.insert(current_id.to_string());
+        path.push(current_id.to_string());
+
+        let deps = storage.get_dependencies(current_id).unwrap();
+        for dep in deps.iter().filter(|d| d.dep_type.is_blocking()) {
+            if detect_cycle_recursive(storage, &dep.depends_on_id, visited, path) {
+                return true;
+            }
+        }
+
+        path.pop();
+        false
+    }
+
+    /// Verify that the blocked_issues_cache contains the expected beads
+    fn assert_in_blocked_cache(storage: &Storage, bead_id: &str) {
+        let blocked_count = storage.with_immediate_transaction(|tx| {
+            let mut stmt = tx.prepare("SELECT COUNT(*) FROM blocked_issues_cache WHERE issue_id = ?").unwrap();
+            stmt.query_row([bead_id], |row| row.get::<_, i64>(0))
+                .map_err(|e| anyhow::anyhow!("Failed to query blocked cache: {}", e))
+        }).unwrap();
+
+        assert_eq!(blocked_count, 1, "Bead {} should appear in blocked_issues_cache", bead_id);
+    }
+
+    /// Get all IDs from the blocked_issues_cache
+    fn get_blocked_cache_ids(storage: &Storage) -> HashSet<String> {
+        storage.get_blocked_issues().unwrap()
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect()
     }
 
     #[test]

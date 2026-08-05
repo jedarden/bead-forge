@@ -178,3 +178,36 @@ fn test_epic_type_preservation() {
     let retrieved = storage.get_issue("type-preservation").unwrap().unwrap();
     assert_eq!(retrieved.issue_type, IssueType::Epic);
 }
+
+#[test]
+fn test_negative_priority_rejected() {
+    // Test that creating an epic with negative priority (-1) is rejected
+    // This validates that the priority validation function correctly rejects
+    // invalid priority values outside the valid range of 0-4
+
+    use bead_forge::validation::{validate_priority, ValidationResult};
+
+    // Test that negative priority is rejected
+    let result = validate_priority(-1);
+    assert!(result.is_invalid(), "Priority -1 should be rejected as invalid");
+
+    // Verify the error message contains useful information
+    let error_msg = result.to_string();
+    assert!(error_msg.contains("Invalid priority"), "Error should mention 'Invalid priority'");
+    assert!(error_msg.contains("-1"), "Error should include the invalid value");
+
+    // Test that the validation result can be converted to a Result error
+    let result_as_result = result.to_result();
+    assert!(result_as_result.is_err(), "to_result() should return Err for invalid priority");
+
+    // Additional verification: test that the entire negative range is rejected
+    let negative_values = vec![-1, -2, -10, -100];
+    for priority in negative_values {
+        let result = validate_priority(priority);
+        assert!(
+            result.is_invalid(),
+            "Priority {} should be rejected as invalid",
+            priority
+        );
+    }
+}

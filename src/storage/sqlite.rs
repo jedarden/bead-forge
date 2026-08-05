@@ -6,7 +6,8 @@ use crate::model::{
 };
 use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
+use crate::error::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::BTreeMap;
@@ -1116,24 +1117,24 @@ impl Storage {
     pub fn sync_from_jsonl(&self, jsonl_path: &Path) -> Result<ImportResult> {
         self.with_immediate_transaction(|tx| {
             import_jsonl(jsonl_path, |issue| {
-                let existing = Self::get_issue_tx(tx, &issue.id).map_err(|e| anyhow::anyhow!(e)).map_err(|e| BeadForgeError::from(e))?;
+                let existing = Self::get_issue_tx(tx, &issue.id)?;
                 match existing {
                     None => {
-                        Self::create_issue_tx(tx, issue).map_err(|e| anyhow::anyhow!(e)).map_err(|e| BeadForgeError::from(e))?;
+                        Self::create_issue_tx(tx, issue)?;
                         Ok(UpsertResult::New)
                     }
                     Some(existing_issue) => {
                         // Compute hash from incoming issue (content_hash is None from JSONL due to #[serde(skip)])
                         let incoming_hash = issue.content_hash();
                         if existing_issue.content_hash.as_ref() != Some(&incoming_hash) {
-                            Self::update_issue_from_json_tx(tx, issue).map_err(|e| anyhow::anyhow!(e)).map_err(|e| BeadForgeError::from(e))?;
+                            Self::update_issue_from_json_tx(tx, issue)?;
                             Ok(UpsertResult::Updated)
                         } else {
                             Ok(UpsertResult::Unchanged)
                         }
                     }
                 }
-            }).map_err(|e| BeadForgeError::from(e))
+            })
         })
     }
 
@@ -1141,12 +1142,12 @@ impl Storage {
         if dirty_only {
             let result = export_jsonl_dirty(
                 jsonl_path,
-                || self.list_dirty_issues(),
-                || self.clear_dirty(),
+                || self.list_dirty_issues().map_err(Into::into),
+                || self.clear_dirty().map_err(Into::into),
             )?;
             Ok(result.count)
         } else {
-            let result = export_jsonl(jsonl_path, || self.list_all_issues())?;
+            let result = export_jsonl(jsonl_path, || self.list_all_issues().map_err(Into::into))?;
             // Clear dirty flags after full export (all beads are now synced)
             self.clear_dirty()?;
             Ok(result.count)
