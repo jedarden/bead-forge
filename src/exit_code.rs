@@ -629,4 +629,90 @@ mod tests {
         let code = ExitCode::Code(-1);
         assert_eq!(format_exit_code(Some(code)), "=== Exit Code: -1 ===");
     }
+
+    // Tests for normal exit codes (0, 1, 127, 255)
+
+    #[test]
+    fn test_normal_exit_code_zero() {
+        // Test exit code 0 (success)
+        let code = ExitCode::Code(0);
+        assert_eq!(format!("{}", code), "0");
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 0 ===");
+
+        let term = ProcessTermination::from_code(Some(0));
+        assert_eq!(term, ProcessTermination::ExitCode(0));
+        assert_eq!(term.format(), "=== Exit Code: 0 ===");
+
+        assert_eq!(format_exit_code_to_log(0), "Exit code 0: success");
+        assert_eq!(ExitStatus::from_code(0), ExitStatus::Success);
+    }
+
+    #[test]
+    fn test_normal_exit_code_one() {
+        // Test exit code 1 (general failure)
+        let code = ExitCode::Code(1);
+        assert_eq!(format!("{}", code), "1");
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 1 ===");
+
+        let term = ProcessTermination::from_code(Some(1));
+        assert_eq!(term, ProcessTermination::ExitCode(1));
+        assert_eq!(term.format(), "=== Exit Code: 1 ===");
+
+        assert_eq!(format_exit_code_to_log(1), "Exit code 1: failure");
+        assert_eq!(ExitStatus::from_code(1), ExitStatus::Failure);
+    }
+
+    #[test]
+    fn test_normal_exit_code_127() {
+        // Test exit code 127 (command not found)
+        let code = ExitCode::Code(127);
+        assert_eq!(format!("{}", code), "127");
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 127 ===");
+
+        let term = ProcessTermination::from_code(Some(127));
+        assert_eq!(term, ProcessTermination::ExitCode(127));
+        assert_eq!(term.format(), "=== Exit Code: 127 ===");
+
+        // 127 is not a special exit code in ExitStatus, so it maps to Failure
+        assert_eq!(format_exit_code_to_log(127), "Exit code 127: failure");
+        assert_eq!(ExitStatus::from_code(127), ExitStatus::Failure);
+    }
+
+    #[test]
+    fn test_normal_exit_code_255() {
+        // Test exit code 255 (exit code out of range)
+        let code = ExitCode::Code(255);
+        assert_eq!(format!("{}", code), "255");
+        assert_eq!(format_exit_code(Some(code)), "=== Exit Code: 255 ===");
+
+        let term = ProcessTermination::from_code(Some(255));
+        assert_eq!(term, ProcessTermination::ExitCode(255));
+        assert_eq!(term.format(), "=== Exit Code: 255 ===");
+
+        // 255 is not a special exit code in ExitStatus, so it maps to Failure
+        assert_eq!(format_exit_code_to_log(255), "Exit code 255: failure");
+        assert_eq!(ExitStatus::from_code(255), ExitStatus::Failure);
+    }
+
+    #[test]
+    fn test_normal_exit_codes_formatting_consistency() {
+        // Test that all normal exit codes format consistently
+        let normal_codes = [0, 1, 127, 255];
+
+        for code in normal_codes {
+            let exit_code = ExitCode::Code(code);
+            let formatted = format_exit_code(Some(exit_code.clone()));
+
+            // All should format with === prefix/suffix
+            assert!(formatted.starts_with("=== Exit Code:"));
+            assert!(formatted.ends_with("==="));
+
+            // All should contain the numeric code
+            assert!(formatted.contains(&format!("{}", code)));
+
+            // ProcessTermination should format identically
+            let term = ProcessTermination::from_code(Some(code));
+            assert_eq!(term.format(), formatted);
+        }
+    }
 }
