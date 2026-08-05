@@ -457,3 +457,15 @@
 {"bead":"bf-10xjst","duration_ms":600376,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T17:45:35.386907332+00:00","worker":"india"}
 {"bead":"bf-2ffz5r","event":"claim","strand":"auto","ts":"2026-08-05T17:45:35.428365158+00:00","worker":"india"}
 {"adapter":"claude-code-glm-4.7","bead":"bf-2ffz5r","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T17:45:35.430956857+00:00","worker":"india"}
+{"bead":"bf-2ffz5r","duration_ms":600303,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T18:26:16.613119364+00:00","worker":"delta"}
+{"bead":"bf-2mqo9k","event":"claim","strand":"auto","ts":"2026-08-05T18:26:16.652543919+00:00","worker":"delta"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-2mqo9k","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T18:26:16.658263715+00:00","worker":"delta"}
+{"bead":"bf-g04edj","duration_ms":199118,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T18:26:36.539057+00:00","worker":"kilo"}
+{"bead":"bf-1n8dfu","event":"claim","strand":"auto","ts":"2026-08-05T18:26:36.592677008+00:00","worker":"kilo"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-1n8dfu","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T18:26:36.596098692+00:00","worker":"kilo"}
+{"bead":"bf-4oid5v","duration_ms":335560,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T18:27:07.263831887+00:00","worker":"juliet"}
+{"bead":"bf-2ffz5r","event":"claim","strand":"auto","ts":"2026-08-05T18:27:07.395846686+00:00","worker":"juliet"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-2ffz5r","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T18:27:07.398716534+00:00","worker":"juliet"}
+{"bead":"bf-2xpi8x","duration_ms":600459,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T18:27:07.871564118+00:00","worker":"echo"}
+{"bead":"bf-4kjodm","event":"claim","strand":"auto","ts":"2026-08-05T18:27:07.932155008+00:00","worker":"echo"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-4kjodm","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T18:27:07.937400571+00:00","worker":"echo"}

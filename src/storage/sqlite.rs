@@ -742,6 +742,43 @@ impl Storage {
             }
             // Invalidate critical path cache if status changed (affects dependency graph)
             if changes.status.is_some() {
+                // If transitioning TO a terminal state (closed, tombstone, done, completed),
+                // check if any dependents should be unblocked
+                if let Some(new_status) = &changes.status {
+                    if new_status.is_terminal() {
+                        // Find all dependents that were blocked by this bead
+                        let mut dependents = tx.prepare(
+                            "SELECT DISTINCT issue_id FROM dependencies
+                             WHERE depends_on_id = ?1
+                             AND type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')",
+                        )?.query_map(params![id], |row| row.get::<_, String>(0))?
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                        // For each dependent, check if ALL its blocking dependencies are now closed
+                        for dependent_id in dependents {
+                            let has_open_blockers = tx.query_row(
+                                "SELECT EXISTS(
+                                    SELECT 1 FROM dependencies d
+                                    INNER JOIN issues i ON i.id = d.depends_on_id
+                                    WHERE d.issue_id = ?1
+                                    AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                                    AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                                )",
+                                params![&dependent_id],
+                                |row| row.get::<_, bool>(0),
+                            ).unwrap_or(false);
+
+                            // If no open blockers remain, unblock the dependent
+                            if !has_open_blockers {
+                                tx.execute(
+                                    "UPDATE issues SET status = 'open', updated_at = ?1 WHERE id = ?2",
+                                    params![now.to_rfc3339(), &dependent_id],
+                                )?;
+                            }
+                        }
+                    }
+                }
+
                 invalidate_cache(tx)?;
                 compute_all_critical_paths(tx)?;
                 // Rebuild blocked_issues_cache when status changes to reflect new blocker states
@@ -1491,6 +1528,30 @@ impl Storage {
                 "INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![issue_id, depends_on_id, dep_type.to_string(), now.to_rfc3339(), created_by],
             )?;
+
+            // Check if this is a blocking dependency and the blocker is open
+            // If so, automatically set the dependent's status to "Blocked"
+            let dep_type_str = dep_type.to_string();
+            if ["blocks", "parent-child", "conditional-blocks", "waits-for"].contains(&dep_type_str.as_str()) {
+                // Check if the blocker is in an open/active state
+                let blocker_status: Option<String> = tx.query_row(
+                    "SELECT status FROM issues WHERE id = ?1",
+                    params![depends_on_id],
+                    |row| row.get(0),
+                ).ok();
+
+                // If blocker is NOT closed/tombstone/done/completed, block the dependent
+                if let Some(status) = blocker_status {
+                    if !["closed", "tombstone", "done", "completed"].contains(&status.as_str()) {
+                        // Update dependent's status to "blocked"
+                        tx.execute(
+                            "UPDATE issues SET status = 'blocked', updated_at = ?1 WHERE id = ?2",
+                            params![now.to_rfc3339(), issue_id],
+                        )?;
+                    }
+                }
+            }
+
             // The dependency is stored on issue_id's record and exported with it.
             mark_dirty_tx(tx, issue_id)?;
             // Invalidate critical path cache after adding a dependency

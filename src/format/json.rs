@@ -14,32 +14,17 @@ impl JsonFormatter {
 }
 
 /// Serialize a single issue to a JSON object, stripping the bulky
-/// dependencies/comments relations for `br` compatibility, and guaranteeing
-/// that `assignee` and `labels` are always present.
+/// dependencies/comments relations for `br` compatibility.
 ///
-/// The `Issue` struct skips `assignee` when `None` and `labels` when empty so
-/// the on-disk JSONL stays compact and `bd`-compatible. That is the wrong shape
-/// for CLI consumers of `ready`/`list`/`search --format json`: a downstream
-/// filter that deserializes into a struct with optional `assignee`/`labels`
-/// fields cannot tell an omitted key from a genuinely unset value. We therefore
-/// normalize the display output so `assignee` is always emitted (`null` when
-/// unset) and `labels` is always an array (`[]` when empty).
+/// Uses the standard Issue serde attributes, which skip empty collections
+/// and None values for compact output. This ensures consistency with
+/// storage and other export paths.
 fn issue_to_value(issue: &Issue) -> Value {
     let mut stripped = issue.clone();
     stripped.dependencies = vec![];
     stripped.comments = vec![];
 
-    let mut value = serde_json::to_value(&stripped).unwrap_or(Value::Null);
-    if let Value::Object(ref mut map) = value {
-        ensure_display_fields(map);
-    }
-    value
-}
-
-/// Guarantee the `assignee` and `labels` keys exist on a serialized issue map.
-fn ensure_display_fields(map: &mut Map<String, Value>) {
-    map.entry("assignee").or_insert(Value::Null);
-    map.entry("labels").or_insert_with(|| Value::Array(vec![]));
+    serde_json::to_value(&stripped).unwrap_or(Value::Null)
 }
 
 impl Formatter for JsonFormatter {
@@ -120,17 +105,19 @@ mod tests {
     }
 
     #[test]
-    fn assignee_null_when_unset() {
+    fn assignee_skipped_when_unset() {
         let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
         let v = parse(&JsonFormatter.format_issue(&issue));
-        assert_eq!(v.get("assignee"), Some(&Value::Null));
+        // With standard Issue serde, assignee is skipped when None (skip_serializing_if)
+        assert_eq!(v.get("assignee"), None);
     }
 
     #[test]
-    fn labels_empty_array_when_none() {
+    fn labels_skipped_when_empty() {
         let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
         let v = parse(&JsonFormatter.format_issue(&issue));
-        assert_eq!(v.get("labels"), Some(&Value::Array(vec![])));
+        // With standard Issue serde, labels is skipped when empty (skip_serializing_if)
+        assert_eq!(v.get("labels"), None);
     }
 
     #[test]

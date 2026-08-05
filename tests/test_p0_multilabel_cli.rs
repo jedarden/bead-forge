@@ -222,16 +222,27 @@ fn test_p0_multiple_labels_search_and_filter() {
     let (search_stdout, _, _) =
         run_bf_command(&workspace, &["search", "--label", "critical", "--priority", "0", "--format", "json"]);
 
-    let search_json: Vec<serde_json::Value> = serde_json::from_str(&search_stdout).unwrap();
+    let search_output = parse_json_output(&search_stdout);
+    // Extract data from envelope if present
+    let search_json = if search_output.get("data").is_some() {
+        search_output.get("data").unwrap().as_array().unwrap()
+    } else {
+        search_output.as_array().unwrap()
+    };
     assert!(!search_json.is_empty(), "Should find at least one P0 bead with 'critical' label");
 
     // Verify we can also filter by priority alone
     let (list_stdout, _, _) = run_bf_command(&workspace, &["list", "--priority", "0", "--json"]);
-    let list_json: Vec<serde_json::Value> =
-        serde_json::from_str(&list_stdout).unwrap();
+    let list_output = parse_json_output(&list_stdout);
+    // Extract data from envelope if present
+    let list_json = if list_output.get("data").is_some() {
+        list_output.get("data").unwrap().as_array().unwrap()
+    } else {
+        list_output.as_array().unwrap()
+    };
 
     assert!(list_json.len() >= 3);
-    for bead in &list_json {
+    for bead in list_json {
         assert_eq!(bead.get("priority").unwrap().as_i64().unwrap(), 0);
     }
 }
@@ -397,11 +408,16 @@ fn test_p0_batch_operations_with_labels() {
 
     // Verify all beads were created
     let (list_stdout, _, _) = run_bf_command(&workspace, &["list", "--priority", "0", "--json"]);
-    let list_json: Vec<serde_json::Value> =
-        serde_json::from_str(&list_stdout).unwrap();
+    let list_output = parse_json_output(&list_stdout);
+    // Extract data from envelope if present
+    let list_json = if list_output.get("data").is_some() {
+        list_output.get("data").unwrap().as_array().unwrap()
+    } else {
+        list_output.as_array().unwrap()
+    };
 
     assert_eq!(list_json.len(), 3);
-    for bead in &list_json {
+    for bead in list_json {
         assert_eq!(bead.get("priority").unwrap().as_i64().unwrap(), 0);
         let labels = bead
             .get("labels")

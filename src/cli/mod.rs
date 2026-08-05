@@ -2615,14 +2615,9 @@ fn cmd_batch(
     match output_format {
         crate::format::OutputFormat::Json => {
             let formatter = get_formatter(output_format);
-            // Convert Vec<BatchResult> to JSONL (newline-separated JSON objects)
-            let jsonl = results
-                .iter()
-                .map(|r| serde_json::to_string(r))
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap_or_default()
-                .join("\n");
-            println!("{}", formatter.format_with_envelope("batch", &jsonl));
+            // Convert Vec<BatchResult> to JSON array (not JSONL) for envelope wrapping
+            let json_array = serde_json::to_string(&results).unwrap_or_default();
+            println!("{}", formatter.format_with_envelope("batch", &json_array));
         }
         _ => {
             // Print results in human-readable format
