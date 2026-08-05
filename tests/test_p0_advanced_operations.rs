@@ -41,6 +41,9 @@ fn test_p0_bead_with_dependencies() {
             dep_type: DependencyType::Blocks,
             created_at: now,
             created_by: None,
+            metadata: None,
+            thread_id: None,
+            title: None,
         }],
         ..Default::default()
     };
@@ -87,6 +90,9 @@ fn test_multiple_p0_with_interdependencies() {
             dep_type: DependencyType::Blocks,
             created_at: now,
             created_by: None,
+            metadata: None,
+            thread_id: None,
+            title: None,
         }],
         ..Default::default()
     };
@@ -333,12 +339,15 @@ fn test_p0_with_multiple_dependencies() {
     let storage = Storage::open(&dir.path().join("test.db")).unwrap();
 
     // Create multiple dependencies
+    let now = chrono::Utc::now();
     let dep1 = Issue {
         id: "dep-1".to_string(),
         title: "Dependency 1".to_string(),
         issue_type: IssueType::Task,
         status: Status::Open,
         priority: Priority::HIGH,
+        created_at: now,
+        updated_at: now,
         ..Default::default()
     };
     storage.create_issue(&dep1).unwrap();
@@ -349,6 +358,8 @@ fn test_p0_with_multiple_dependencies() {
         issue_type: IssueType::Task,
         status: Status::Open,
         priority: Priority::HIGH,
+        created_at: now,
+        updated_at: now,
         ..Default::default()
     };
     storage.create_issue(&dep2).unwrap();
@@ -359,6 +370,8 @@ fn test_p0_with_multiple_dependencies() {
         issue_type: IssueType::Task,
         status: Status::Open,
         priority: Priority::HIGH,
+        created_at: now,
+        updated_at: now,
         ..Default::default()
     };
     storage.create_issue(&dep3).unwrap();
@@ -378,6 +391,9 @@ fn test_p0_with_multiple_dependencies() {
                 dep_type: DependencyType::Blocks,
                 created_at: now,
                 created_by: None,
+                metadata: None,
+                thread_id: None,
+                title: None,
             },
             Dependency {
                 issue_id: "p0-multi-deps".to_string(),
@@ -385,6 +401,9 @@ fn test_p0_with_multiple_dependencies() {
                 dep_type: DependencyType::Blocks,
                 created_at: now,
                 created_by: None,
+                metadata: None,
+                thread_id: None,
+                title: None,
             },
             Dependency {
                 issue_id: "p0-multi-deps".to_string(),
@@ -392,6 +411,9 @@ fn test_p0_with_multiple_dependencies() {
                 dep_type: DependencyType::Blocks,
                 created_at: now,
                 created_by: None,
+                metadata: None,
+                thread_id: None,
+                title: None,
             },
         ],
         ..Default::default()

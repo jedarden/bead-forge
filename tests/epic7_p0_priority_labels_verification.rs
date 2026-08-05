@@ -4,7 +4,6 @@
 
 use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
-use serde_json::json;
 
 #[test]
 fn test_epic7_p0_priority_verification() {
@@ -242,7 +241,7 @@ fn test_epic7_comprehensive_verification() {
     let storage = Storage::open(&dir.path().join("test.db")).unwrap();
 
     // Create epic matching bf-2r2kw structure
-    let mut epic = Issue {
+    let epic = Issue {
         id: "epic7-comprehensive".to_string(),
         title: "Test Epic 7: Priority P0 with labels".to_string(),
         issue_type: IssueType::Epic,

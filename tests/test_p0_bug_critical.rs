@@ -2,7 +2,7 @@
 //! Tests for Priority 0 (Critical) bug creation, operations, and persistence
 //! This covers the bug-specific scenario for P0 critical beads
 
-use bead_forge::model::{Issue, IssueType, Priority, Status};
+use bead_forge::model::{Dependency, DependencyType, Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
@@ -40,6 +40,7 @@ fn create_p0_bug(id: &str, title: &str, labels: Vec<&str>) -> Issue {
         original_type: None,
         compaction_level: None,
         compacted_at: None,
+        compacted_at_commit: None,
         original_size: None,
         sender: None,
         ephemeral: false,

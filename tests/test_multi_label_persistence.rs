@@ -96,6 +96,8 @@ fn test_multi_label_serialization_roundtrip() {
         issue_type: IssueType::Bug,
         status: Status::Open,
         priority: Priority::CRITICAL,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
         labels: vec![
             "critical".to_string(),
             "security".to_string(),

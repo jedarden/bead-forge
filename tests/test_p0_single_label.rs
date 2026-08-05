@@ -251,8 +251,6 @@ fn test_p0_single_label_close_reopen() {
     // Close the P0 bead
     let close_changes = bead_forge::model::IssueChanges {
         status: Some(bead_forge::model::Status::Closed),
-        close_reason: Some("Fixed in production".to_string()),
-        closed_by_session: Some("test-session".to_string()),
         actor: Some("fixer".to_string()),
         ..Default::default()
     };

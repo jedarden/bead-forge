@@ -222,8 +222,6 @@ fn test_p0_closed_and_reopened_without_labels() {
     // Close the bug
     let close_changes = IssueChanges {
         status: Some(Status::Closed),
-        close_reason: Some("Fixed in production".to_string()),
-        closed_by_session: Some("test-session".to_string()),
         actor: Some("fixer".to_string()),
         ..Default::default()
     };
@@ -324,7 +322,7 @@ fn test_multiple_p0_bugs_different_categories_without_labels() {
     ];
 
     for (id, title, issue_type) in &bugs {
-        let bug = create_p0_no_labels(id, title, *issue_type);
+        let bug = create_p0_no_labels(id, title, issue_type.clone());
         storage.create_issue(&bug).unwrap();
     }
 
