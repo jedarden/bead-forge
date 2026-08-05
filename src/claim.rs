@@ -433,13 +433,7 @@ pub fn get_ready_candidates(
                AND i.pinned = 0
                AND i.is_template = 0
                AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-               )
+               AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
              ORDER BY (
                  COALESCE(COUNT(d.issue_id), 0) * 3.0
@@ -467,13 +461,7 @@ pub fn get_ready_candidates(
                AND i.pinned = 0
                AND i.is_template = 0
                AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-               )
+               AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
              ORDER BY (
                  COALESCE(COUNT(d.issue_id), 0) * 3.0
@@ -486,7 +474,7 @@ pub fn get_ready_candidates(
                  i.created_at ASC
              LIMIT ?3"
         };
-        tx.prepare(sql)?
+        tx.prepare_cached(sql)?
     } else {
         // Standard scoring without velocity data
         let sql = if unlimited {
@@ -502,13 +490,7 @@ pub fn get_ready_candidates(
                AND i.pinned = 0
                AND i.is_template = 0
                AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-               )
+               AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
              ORDER BY
                  downstream_impact DESC,
@@ -528,13 +510,7 @@ pub fn get_ready_candidates(
                AND i.pinned = 0
                AND i.is_template = 0
                AND i.deleted_at IS NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM dependencies blocker_dep
-                   INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                   WHERE blocker_dep.issue_id = i.id
-                   AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                   AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-               )
+               AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
              ORDER BY
                  downstream_impact DESC,
@@ -543,7 +519,7 @@ pub fn get_ready_candidates(
                  i.created_at ASC
              LIMIT ?1"
         };
-        tx.prepare(sql)?
+        tx.prepare_cached(sql)?
     };
 
     let mut rows = if model.is_some() && harness.is_some() {
