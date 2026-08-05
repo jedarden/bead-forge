@@ -87,6 +87,90 @@ pub fn format_exit_code_to_log(code: i32) -> String {
     format!("Exit code {}: {}", code, status)
 }
 
+/// Process termination information.
+///
+/// Represents how a process terminated, either by exit code or signal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessTermination {
+    /// Process exited with a specific code.
+    ExitCode(i32),
+    /// Process was terminated by a signal.
+    Signal(String),
+    /// Process termination status is unknown.
+    Unknown,
+}
+
+impl ProcessTermination {
+    /// Create a `ProcessTermination` from an optional exit code.
+    ///
+    /// Maps common signal exit codes (128+N) to their signal names.
+    /// Unknown codes are treated as exit codes.
+    pub fn from_code(code: Option<i32>) -> Self {
+        let code = match code {
+            Some(c) if c >= 0 => c,
+            _ => return ProcessTermination::Unknown,
+        };
+
+        // Map signal codes (128 + signal number)
+        let signal_names = vec![
+            (129, "SIGHUP"),
+            (130, "SIGINT"),
+            (131, "SIGQUIT"),
+            (132, "SIGILL"),
+            (133, "SIGTRAP"),
+            (134, "SIGABRT"),
+            (135, "SIGBUS"),
+            (136, "SIGFPE"),
+            (137, "SIGKILL"),
+            (138, "SIGUSR1"),
+            (139, "SIGSEGV"),
+            (140, "SIGUSR2"),
+            (141, "SIGPIPE"),
+            (142, "SIGALRM"),
+            (143, "SIGTERM"),
+            (144, "SIGSTKFLT"),
+            (145, "SIGCHLD"),
+            (146, "SIGCONT"),
+            (147, "SIGSTOP"),
+            (148, "SIGTSTP"),
+            (149, "SIGTTIN"),
+            (150, "SIGTTOU"),
+        ];
+
+        if let Some((_, signal)) = signal_names.iter().find(|(c, _)| *c == code) {
+            return ProcessTermination::Signal(signal.to_string());
+        }
+
+        ProcessTermination::ExitCode(code)
+    }
+
+    /// Format the termination information for display.
+    pub fn format(&self) -> String {
+        match self {
+            ProcessTermination::ExitCode(code) => format!("=== Exit Code: {} ===", code),
+            ProcessTermination::Signal(signal) => format!("=== Signal: {} ===", signal),
+            ProcessTermination::Unknown => "=== Exit Code: unknown ===".to_string(),
+        }
+    }
+}
+
+/// Append exit code information to a log.
+///
+/// Adds a formatted exit code or signal line to the end of a log string.
+///
+/// # Arguments
+///
+/// * `log` - The original log content
+/// * `code` - The optional exit code
+///
+/// # Returns
+///
+/// The log content with exit code information appended
+pub fn append_exit_code_to_log(log: &str, code: Option<i32>) -> String {
+    let termination = ProcessTermination::from_code(code);
+    format!("{}\n{}\n", log, termination.format())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,5 +233,197 @@ mod tests {
         assert_eq!(format!("{}", ExitStatus::Io), "I/O error");
         assert_eq!(format!("{}", ExitStatus::Validation), "validation error");
         assert_eq!(format!("{}", ExitStatus::Conflict), "conflict");
+    }
+
+    // Tests for ProcessTermination and append_exit_code_to_log
+
+    #[test]
+    fn test_process_termination_from_code_zero() {
+        let term = ProcessTermination::from_code(Some(0));
+        assert_eq!(term, ProcessTermination::ExitCode(0));
+    }
+
+    #[test]
+    fn test_process_termination_from_code_positive() {
+        let term = ProcessTermination::from_code(Some(1));
+        assert_eq!(term, ProcessTermination::ExitCode(1));
+    }
+
+    #[test]
+    fn test_process_termination_from_code_sigint() {
+        let term = ProcessTermination::from_code(Some(130));
+        assert_eq!(term, ProcessTermination::Signal("SIGINT".to_string()));
+    }
+
+    #[test]
+    fn test_process_termination_from_code_sigkill() {
+        let term = ProcessTermination::from_code(Some(137));
+        assert_eq!(term, ProcessTermination::Signal("SIGKILL".to_string()));
+    }
+
+    #[test]
+    fn test_process_termination_from_code_sigterm() {
+        let term = ProcessTermination::from_code(Some(143));
+        assert_eq!(term, ProcessTermination::Signal("SIGTERM".to_string()));
+    }
+
+    #[test]
+    fn test_process_termination_from_code_none() {
+        let term = ProcessTermination::from_code(None);
+        assert_eq!(term, ProcessTermination::Unknown);
+    }
+
+    #[test]
+    fn test_process_termination_from_code_negative() {
+        let term = ProcessTermination::from_code(Some(-1));
+        assert_eq!(term, ProcessTermination::Unknown);
+    }
+
+    #[test]
+    fn test_process_termination_from_code_unknown_signal() {
+        // Code 200 is not in the signal mapping, should be treated as exit code
+        let term = ProcessTermination::from_code(Some(200));
+        assert_eq!(term, ProcessTermination::ExitCode(200));
+    }
+
+    #[test]
+    fn test_process_termination_format_exit_code() {
+        assert_eq!(
+            ProcessTermination::ExitCode(0).format(),
+            "=== Exit Code: 0 ==="
+        );
+        assert_eq!(
+            ProcessTermination::ExitCode(1).format(),
+            "=== Exit Code: 1 ==="
+        );
+        assert_eq!(
+            ProcessTermination::ExitCode(255).format(),
+            "=== Exit Code: 255 ==="
+        );
+    }
+
+    #[test]
+    fn test_process_termination_format_signal() {
+        assert_eq!(
+            ProcessTermination::Signal("SIGTERM".to_string()).format(),
+            "=== Signal: SIGTERM ==="
+        );
+        assert_eq!(
+            ProcessTermination::Signal("SIGKILL".to_string()).format(),
+            "=== Signal: SIGKILL ==="
+        );
+        assert_eq!(
+            ProcessTermination::Signal("SIGINT".to_string()).format(),
+            "=== Signal: SIGINT ==="
+        );
+    }
+
+    #[test]
+    fn test_process_termination_format_unknown() {
+        assert_eq!(
+            ProcessTermination::Unknown.format(),
+            "=== Exit Code: unknown ==="
+        );
+    }
+
+    #[test]
+    fn test_append_exit_code_to_log_with_code() {
+        let log = "Test output\nSome more logs";
+        let result = append_exit_code_to_log(log, Some(42));
+
+        assert!(result.contains("Test output"));
+        assert!(result.contains("Some more logs"));
+        assert!(result.contains("=== Exit Code: 42 ==="));
+        // Ensure the exit code is on a new line
+        assert!(result.contains("\n=== Exit Code: 42 ===\n"));
+    }
+
+    #[test]
+    fn test_append_exit_code_to_log_with_signal() {
+        let log = "Test output";
+        let result = append_exit_code_to_log(log, Some(143));
+
+        assert!(result.contains("Test output"));
+        assert!(result.contains("=== Signal: SIGTERM ==="));
+    }
+
+    #[test]
+    fn test_append_exit_code_to_log_with_none() {
+        let log = "Test output";
+        let result = append_exit_code_to_log(log, None);
+
+        assert!(result.contains("Test output"));
+        assert!(result.contains("=== Exit Code: unknown ==="));
+    }
+
+    #[test]
+    fn test_append_exit_code_to_log_empty_content() {
+        let log = "";
+        let result = append_exit_code_to_log(log, Some(0));
+
+        assert!(result.starts_with("\n=== Exit Code: 0 ===\n"));
+    }
+
+    #[test]
+    fn test_process_termination_all_signal_codes() {
+        // Test all known signal codes
+        let signal_cases = vec![
+            (129, "SIGHUP"),
+            (130, "SIGINT"),
+            (131, "SIGQUIT"),
+            (132, "SIGILL"),
+            (133, "SIGTRAP"),
+            (134, "SIGABRT"),
+            (135, "SIGBUS"),
+            (136, "SIGFPE"),
+            (137, "SIGKILL"),
+            (138, "SIGUSR1"),
+            (139, "SIGSEGV"),
+            (140, "SIGUSR2"),
+            (141, "SIGPIPE"),
+            (142, "SIGALRM"),
+            (143, "SIGTERM"),
+            (144, "SIGSTKFLT"),
+            (145, "SIGCHLD"),
+            (146, "SIGCONT"),
+            (147, "SIGSTOP"),
+            (148, "SIGTSTP"),
+            (149, "SIGTTIN"),
+            (150, "SIGTTOU"),
+        ];
+
+        for (code, expected_signal) in signal_cases {
+            let term = ProcessTermination::from_code(Some(code));
+            assert_eq!(
+                term,
+                ProcessTermination::Signal(expected_signal.to_string()),
+                "Failed for code {}: expected {}, got {:?}",
+                code,
+                expected_signal,
+                term
+            );
+        }
+    }
+
+    #[test]
+    fn test_append_exit_code_preserves_content() {
+        let log = "Line 1\nLine 2\nLine 3";
+        let result = append_exit_code_to_log(log, Some(0));
+
+        // Ensure all original lines are preserved
+        assert!(result.contains("Line 1"));
+        assert!(result.contains("Line 2"));
+        assert!(result.contains("Line 3"));
+    }
+
+    #[test]
+    fn test_append_exit_code_multiple_calls() {
+        let log = "Original content";
+        let first = append_exit_code_to_log(log, Some(1));
+        let second = append_exit_code_to_log(&first, Some(2));
+
+        // Should have both exit codes appended
+        assert!(second.contains("=== Exit Code: 1 ==="));
+        assert!(second.contains("=== Exit Code: 2 ==="));
     }
 }

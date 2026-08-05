@@ -8,6 +8,7 @@ pub mod commit_check;
 pub mod config;
 pub mod critical_path;
 pub mod doctor;
+pub mod exit_code;
 pub mod format;
 pub mod git_log;
 pub mod history;
@@ -64,3 +65,4 @@ pub use timing::{
 };
 pub use velocity::*;
 pub use trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};
+pub use exit_code::{append_exit_code_to_log, format_exit_code_to_log, ExitStatus, ProcessTermination};
