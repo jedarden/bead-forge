@@ -1,11 +1,15 @@
+pub mod color;
 pub mod envelope;
 pub mod json;
+pub mod table;
 pub mod text;
 pub mod toon;
 pub mod warning;
 
+pub use color::{status_color, Color, format_status_colored, colorize};
 pub use envelope::{JsonEnvelope, VERSION as ENVELOPE_VERSION};
 pub use json::JsonFormatter;
+pub use table::TableFormatter;
 pub use text::{format_dependencies, format_dependencies_display, TextFormatter};
 pub use toon::ToonFormatter;
 pub use warning::{warn_stderr, with_warning};
