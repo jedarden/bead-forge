@@ -195,6 +195,8 @@ pub const SCHEMA_SQL: &str = r"
         FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_blocked_cache_blocked_at ON blocked_issues_cache(blocked_at);
+    -- Critical optimization: index on issue_id for fast NOT IN lookups during claim queries
+    CREATE INDEX IF NOT EXISTS idx_blocked_cache_issue_id ON blocked_issues_cache(issue_id);
 
     -- Child Counters (for hierarchical IDs like bd-abc.1, bd-abc.2)
     CREATE TABLE IF NOT EXISTS child_counters (
