@@ -992,7 +992,7 @@ impl ReadyCandidate {
     ///
     /// This converts a scored bead result into a ReadyCandidate with proper
     /// type conversions. Labels default to empty since ScoredBead doesn't include them.
-    pub fn from_scored_bead(scored: &crate::claim::ScoredBead) -> Result<Self> {
+    pub fn from_scored_bead(scored: &crate::claim::ScoredBead) -> Result<Self, String> {
         use std::str::FromStr;
 
         // Parse status string to Status enum

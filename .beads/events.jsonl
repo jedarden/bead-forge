@@ -298,3 +298,6 @@
 {"bead":"bf-49c4m4","duration_ms":600376,"event":"timeout","exit_code":124,"outcome":"timeout","strand":"auto","ts":"2026-08-05T15:52:50.933635862+00:00","worker":"foxtrot"}
 {"bead":"bf-49c4m4","event":"claim","strand":"auto","ts":"2026-08-05T15:52:50.973724360+00:00","worker":"foxtrot"}
 {"adapter":"claude-code-glm-4.7","bead":"bf-49c4m4","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:52:50.976178745+00:00","worker":"foxtrot"}
+{"bead":"bf-15l2q6","duration_ms":87843,"event":"complete","exit_code":0,"outcome":"success","strand":"auto","ts":"2026-08-05T15:54:09.349965744+00:00","worker":"echo"}
+{"bead":"bf-37k5d0","event":"claim","strand":"auto","ts":"2026-08-05T15:54:09.389880983+00:00","worker":"echo"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-37k5d0","event":"dispatch","model":"glm-4.7","strand":"auto","ts":"2026-08-05T15:54:09.391900986+00:00","worker":"echo"}

@@ -22,8 +22,19 @@ pub struct ImportResult {
     pub skipped: usize,
 }
 
+#[derive(Debug)]
 pub struct ExportResult {
     pub count: usize,
+}
+
+/// Result type for incremental_flush that includes warnings for failures.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct FlushResult {
+    /// Number of beads successfully flushed
+    pub flushed: usize,
+    /// Warnings about failures (non-empty if flush partially failed)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 pub fn stream_issues(path: &Path) -> Result<impl Iterator<Item = Result<Issue>>> {
