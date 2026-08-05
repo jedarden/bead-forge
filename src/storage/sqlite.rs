@@ -682,6 +682,19 @@ impl Storage {
             if changes.status.is_some() {
                 invalidate_cache(tx)?;
                 compute_all_critical_paths(tx)?;
+                // Rebuild blocked_issues_cache when status changes to reflect new blocker states
+                let now = Utc::now();
+                tx.execute("DELETE FROM blocked_issues_cache", [])?;
+                tx.execute(
+                    "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                     SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                     FROM dependencies d
+                     INNER JOIN issues i ON i.id = d.depends_on_id
+                     WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                     AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                     GROUP BY d.issue_id",
+                    params![now.to_rfc3339()],
+                )?;
             }
             Ok(())
         })
@@ -1199,6 +1212,18 @@ impl Storage {
             // Invalidate critical path cache after adding a dependency
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
+            // Rebuild blocked_issues_cache to reflect the new dependency
+            tx.execute("DELETE FROM blocked_issues_cache", [])?;
+            tx.execute(
+                "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                 SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                 FROM dependencies d
+                 INNER JOIN issues i ON i.id = d.depends_on_id
+                 WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                 GROUP BY d.issue_id",
+                params![now.to_rfc3339()],
+            )?;
             Ok(())
         })
     }
@@ -1213,6 +1238,19 @@ impl Storage {
             // Invalidate critical path cache after removing a dependency
             invalidate_cache(tx)?;
             compute_all_critical_paths(tx)?;
+            // Rebuild blocked_issues_cache to reflect the removed dependency
+            let now = Utc::now();
+            tx.execute("DELETE FROM blocked_issues_cache", [])?;
+            tx.execute(
+                "INSERT INTO blocked_issues_cache (issue_id, blocked_by, blocked_at)
+                 SELECT d.issue_id, '[' || GROUP_CONCAT('\"' || d.depends_on_id || '\"') || ']' AS blocked_by, ?1
+                 FROM dependencies d
+                 INNER JOIN issues i ON i.id = d.depends_on_id
+                 WHERE d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                 AND i.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+                 GROUP BY d.issue_id",
+                params![now.to_rfc3339()],
+            )?;
             Ok(())
         })
     }

@@ -708,3 +708,324 @@ fn test_p0_epic_get_labels_with_children() {
     let epic_retrieved = storage.get_issue("epic-p0-get-labels").unwrap().unwrap();
     assert_eq!(epic_retrieved.priority, Priority::CRITICAL);
 }
+
+// ===== Tests specifically for epic bf-46xuto =====
+
+#[test]
+fn test_bf_46xuto_p0_epic_exact_structure() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create epic matching exact bf-46xuto structure
+    let epic = Issue {
+        id: "bf-46xuto".to_string(),
+        title: "Test epic with P0 and labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::InProgress,
+        priority: Priority::CRITICAL,
+        labels: vec!["critical".to_string(), "epic-p0".to_string()],
+        assignee: Some("claude-code-glm-4.7-golf".to_string()),
+        ..Default::default()
+    };
+
+    storage.create_issue(&epic).unwrap();
+
+    // Verify exact structure matches bf-46xuto
+    let retrieved = storage.get_issue("bf-46xuto").unwrap().unwrap();
+    assert_eq!(retrieved.id, "bf-46xuto");
+    assert_eq!(retrieved.title, "Test epic with P0 and labels");
+    assert_eq!(retrieved.issue_type, IssueType::Epic);
+    assert_eq!(retrieved.status, Status::InProgress);
+    assert_eq!(retrieved.priority, Priority::CRITICAL);
+    assert_eq!(retrieved.priority.0, 0);
+    assert_eq!(format!("{}", retrieved.priority), "P0");
+    assert_eq!(retrieved.labels.len(), 2);
+    assert!(retrieved.labels.contains(&"critical".to_string()));
+    assert!(retrieved.labels.contains(&"epic-p0".to_string()));
+    assert_eq!(
+        retrieved.assignee,
+        Some("claude-code-glm-4.7-golf".to_string())
+    );
+}
+
+#[test]
+fn test_bf_46xuto_label_variations() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Test different label combinations with P0 priority
+    let test_cases = vec![
+        vec!["critical"],
+        vec!["critical", "epic-p0"],
+        vec!["epic-p0"],
+        vec!["critical", "epic-p0", "urgent"],
+        vec!["critical", "epic-p0", "test", "verification"],
+    ];
+
+    for (i, labels) in test_cases.iter().enumerate() {
+        let epic = Issue {
+            id: format!("bf-46xuto-variant-{}", i),
+            title: format!("Test epic variant {}", i),
+            issue_type: IssueType::Epic,
+            status: Status::Open,
+            priority: Priority::CRITICAL,
+            labels: labels.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
+        };
+
+        storage.create_issue(&epic).unwrap();
+
+        let retrieved = storage
+            .get_issue(&format!("bf-46xuto-variant-{}", i))
+            .unwrap()
+            .unwrap();
+
+        // Verify P0 priority regardless of label combination
+        assert_eq!(retrieved.priority, Priority::CRITICAL);
+        assert_eq!(retrieved.priority.0, 0);
+
+        // Verify all labels present
+        assert_eq!(retrieved.labels.len(), labels.len());
+        for label in labels {
+            assert!(retrieved.labels.contains(&label.to_string()));
+        }
+    }
+}
+
+#[test]
+fn test_bf_46xuto_epic_p0_label_operations() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create epic with initial critical label
+    let epic = Issue {
+        id: "bf-46xuto-ops-test".to_string(),
+        title: "P0 Epic label operations test".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec!["critical".to_string()],
+        ..Default::default()
+    };
+
+    storage.create_issue(&epic).unwrap();
+
+    // Add epic-p0 label
+    storage.add_label("bf-46xuto-ops-test", "epic-p0").unwrap();
+
+    let retrieved = storage.get_issue("bf-46xuto-ops-test").unwrap().unwrap();
+    assert_eq!(retrieved.labels.len(), 2);
+    assert!(retrieved.labels.contains(&"critical".to_string()));
+    assert!(retrieved.labels.contains(&"epic-p0".to_string()));
+    assert_eq!(retrieved.priority, Priority::CRITICAL);
+
+    // Add another label
+    storage.add_label("bf-46xuto-ops-test", "urgent").unwrap();
+
+    let updated = storage.get_issue("bf-46xuto-ops-test").unwrap().unwrap();
+    assert_eq!(updated.labels.len(), 3);
+    assert!(updated.labels.contains(&"urgent".to_string()));
+    assert_eq!(updated.priority, Priority::CRITICAL);
+
+    // Remove epic-p0 label
+    storage.remove_label("bf-46xuto-ops-test", "epic-p0").unwrap();
+
+    let final_state = storage.get_issue("bf-46xuto-ops-test").unwrap().unwrap();
+    assert_eq!(final_state.labels.len(), 2);
+    assert!(!final_state.labels.contains(&"epic-p0".to_string()));
+    assert!(final_state.labels.contains(&"critical".to_string()));
+    assert!(final_state.labels.contains(&"urgent".to_string()));
+
+    // Priority should remain P0 throughout
+    assert_eq!(final_state.priority, Priority::CRITICAL);
+    assert_eq!(final_state.priority.0, 0);
+}
+
+#[test]
+fn test_bf_46xuto_json_serialization() {
+    // Create epic matching bf-46xuto for JSON testing
+    let epic = Issue {
+        id: "bf-46xuto-json".to_string(),
+        title: "Test epic with P0 and labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::InProgress,
+        priority: Priority::CRITICAL,
+        labels: vec!["critical".to_string(), "epic-p0".to_string()],
+        assignee: Some("claude-code-glm-4.7-golf".to_string()),
+        ..Default::default()
+    };
+
+    // Serialize to JSON
+    let json = serde_json::to_string(&epic).unwrap();
+
+    // Verify JSON structure
+    let parsed = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    assert_eq!(parsed["id"], "bf-46xuto-json");
+    assert_eq!(parsed["title"], "Test epic with P0 and labels");
+    assert_eq!(parsed["issue_type"], "epic");
+    assert_eq!(parsed["status"], "in_progress");
+    assert_eq!(parsed["priority"], 0);
+    assert_eq!(parsed["assignee"], "claude-code-glm-4.7-golf");
+
+    let label_array = parsed["labels"].as_array().unwrap();
+    assert_eq!(label_array.len(), 2);
+    assert!(label_array.iter().any(|l| l == "critical"));
+    assert!(label_array.iter().any(|l| l == "epic-p0"));
+
+    // Test roundtrip
+    let deserialized: Issue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.id, "bf-46xuto-json");
+    assert_eq!(deserialized.priority, Priority::CRITICAL);
+    assert_eq!(deserialized.priority.0, 0);
+    assert_eq!(deserialized.issue_type, IssueType::Epic);
+    assert_eq!(deserialized.labels.len(), 2);
+    assert!(deserialized.labels.contains(&"critical".to_string()));
+    assert!(deserialized.labels.contains(&"epic-p0".to_string()));
+}
+
+#[test]
+fn test_bf_46xuto_cross_priority_comparison() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create P0 epic
+    let p0_epic = Issue {
+        id: "bf-46xuto-p0-compare".to_string(),
+        title: "P0 Epic with labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec!["critical".to_string(), "epic-p0".to_string()],
+        ..Default::default()
+    };
+
+    // Create P1 epic for comparison
+    let p1_epic = Issue {
+        id: "bf-46xuto-p1-compare".to_string(),
+        title: "P1 Epic with labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::Open,
+        priority: Priority::HIGH,
+        labels: vec!["important".to_string(), "epic-p1".to_string()],
+        ..Default::default()
+    };
+
+    storage.create_issue(&p0_epic).unwrap();
+    storage.create_issue(&p1_epic).unwrap();
+
+    let retrieved_p0 = storage
+        .get_issue("bf-46xuto-p0-compare")
+        .unwrap()
+        .unwrap();
+    let retrieved_p1 = storage
+        .get_issue("bf-46xuto-p1-compare")
+        .unwrap()
+        .unwrap();
+
+    // Verify P0 is higher priority than P1
+    assert!(retrieved_p0.priority < retrieved_p1.priority);
+    assert_eq!(retrieved_p0.priority.0, 0);
+    assert_eq!(retrieved_p1.priority.0, 1);
+
+    // Verify labels are distinct
+    assert!(retrieved_p0.labels.contains(&"epic-p0".to_string()));
+    assert!(!retrieved_p1.labels.contains(&"epic-p0".to_string()));
+    assert!(retrieved_p1.labels.contains(&"epic-p1".to_string()));
+    assert!(!retrieved_p0.labels.contains(&"epic-p1".to_string()));
+}
+
+#[test]
+fn test_bf_46xuto_comprehensive_validation() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create epic with complete bf-46xuto metadata
+    let mut epic = Issue {
+        id: "bf-46xuto-comprehensive".to_string(),
+        title: "Test epic with P0 and labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::InProgress,
+        priority: Priority::CRITICAL,
+        labels: vec!["critical".to_string(), "epic-p0".to_string()],
+        assignee: Some("claude-code-glm-4.7-golf".to_string()),
+        created_at: Some("2026-08-05T13:45:13.824351216Z".to_string()),
+        updated_at: Some("2026-08-05T13:48:06.884739674Z".to_string()),
+        ..Default::default()
+    };
+
+    storage.create_issue(&epic).unwrap();
+
+    // Comprehensive verification
+    let retrieved = storage
+        .get_issue("bf-46xuto-comprehensive")
+        .unwrap()
+        .unwrap();
+
+    // Identity and type
+    assert_eq!(retrieved.id, "bf-46xuto-comprehensive");
+    assert_eq!(retrieved.title, "Test epic with P0 and labels");
+    assert_eq!(retrieved.issue_type, IssueType::Epic);
+
+    // Status and priority
+    assert_eq!(retrieved.status, Status::InProgress);
+    assert_eq!(retrieved.priority, Priority::CRITICAL);
+    assert_eq!(retrieved.priority.0, 0);
+    assert_eq!(format!("{}", retrieved.priority), "P0");
+
+    // Labels
+    assert_eq!(retrieved.labels.len(), 2);
+    assert!(retrieved.labels.contains(&"critical".to_string()));
+    assert!(retrieved.labels.contains(&"epic-p0".to_string()));
+
+    // Assignee
+    assert_eq!(
+        retrieved.assignee,
+        Some("claude-code-glm-4.7-golf".to_string())
+    );
+
+    // Timestamps
+    assert!(retrieved.created_at.is_some());
+    assert!(retrieved.updated_at.is_some());
+
+    // JSON serialization test
+    let json = serde_json::to_string(&retrieved).unwrap();
+    assert!(json.contains("\"priority\":0"));
+    assert!(json.contains("\"issue_type\":\"epic\""));
+    assert!(json.contains("\"status\":\"in_progress\""));
+    assert!(json.contains("critical"));
+    assert!(json.contains("epic-p0"));
+
+    // Roundtrip test
+    let deserialized: Issue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.priority, Priority::CRITICAL);
+    assert_eq!(deserialized.issue_type, IssueType::Epic);
+    assert_eq!(deserialized.labels.len(), 2);
+}
+
+#[test]
+fn test_bf_46xuto_display_properties() {
+    // Test display formatting for P0 epic
+    let epic = Issue {
+        id: "bf-46xuto-display".to_string(),
+        title: "Test epic with P0 and labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::InProgress,
+        priority: Priority::CRITICAL,
+        labels: vec!["critical".to_string(), "epic-p0".to_string()],
+        assignee: Some("claude-code-glm-4.7-golf".to_string()),
+        ..Default::default()
+    };
+
+    // Test priority display
+    let priority_display = format!("{}", epic.priority);
+    assert_eq!(priority_display, "P0");
+
+    // Test type display
+    let type_display = format!("{}", epic.issue_type);
+    assert_eq!(type_display, "epic");
+
+    // Verify all properties accessible
+    assert_eq!(epic.labels.len(), 2);
+    assert_eq!(epic.priority.0, 0);
+    assert_eq!(epic.status, Status::InProgress);
+}
