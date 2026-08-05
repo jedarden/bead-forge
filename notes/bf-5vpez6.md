@@ -1,51 +1,23 @@
-# Bead bf-5vpez6: Update bead status and add comments - Verification
+# bf-5vpez6: Update bead status and add comments
 
-## Summary
-Verified that the `bf update` and `bf comments` commands are fully functional and meet all acceptance criteria.
+## Testing Summary
 
-## Acceptance Criteria Verification
+Successfully tested all bead status update and comment functionality:
 
-### 1. Update bead status to 'in_progress' using `bf update` ✅
-```bash
-bf create --title "Test update and comments" --type task --priority 2
-# Created: bf-tuum5y
+### 1. Status Update Testing
+- Tested `bf update bf-64xpw1 --status in_progress`
+- Status successfully changed from "open" to "in_progress"
+- Change persisted and visible in `bf show` output
 
-bf update bf-tuum5y --status in_progress
-# Output: Updated bead bf-tuum5y
-```
+### 2. Comment Functionality Testing
+- Added first comment: "This is a test comment to verify comment functionality works correctly."
+- Added second comment: "Second test comment - testing comment history ordering and display."
+- Comments successfully persisted with IDs 38 and 39
 
-### 2. Add comments to beads using `bf comment` ✅
-```bash
-bf comments add bf-tuum5y "This is a test comment for the update and comment functionality"
-# Output: Added comment 1 to bf-tuum5y
-```
-
-### 3. Verify status changes appear in `bf show` ✅
-```bash
-bf show bf-tuum5y
-# Output shows: Status: in_progress
-```
-
-### 4. Test comment history display ✅
-```bash
-bf comments list bf-tuum5y
-# Output: [37] cli: This is a test comment for the update and comment functionality
-```
-
-## Implementation Details
-
-The functionality is already implemented in:
-- `src/cli/mod.rs` - CLI command definitions for `Update` and `Comments`
-- `src/storage/` - Storage backend for status and comment operations
-- `src/model.rs` - Data models including `IssueChanges` and comment structures
-
-## Commands Tested
-
-1. **`bf update <id> --status <status>`** - Successfully updates bead status
-2. **`bf comments add <id> <text>`** - Successfully adds comments
-3. **`bf comments list <id>`** - Successfully displays comment history
-4. **`bf show <id>`** - Successfully displays updated status
+### 3. Display Verification
+- `bf show bf-64xpw1` correctly displays the updated "in_progress" status
+- `bf comments list bf-64xpw1` correctly displays both comments in chronological order
+- Comments show proper format: [id] author: body
 
 ## Conclusion
-
-All acceptance criteria are met. The bead update and comment functionality is working as expected.
+All bead status update and comment management features are working correctly. The `bf update` and `bf comments` subcommands function as expected.
