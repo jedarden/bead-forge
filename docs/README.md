@@ -497,6 +497,47 @@ bf update bf-abc123 --assignee ""
 - Reassigning work to a different team
 - Making completed beads available for review
 
+#### NEEDLE Integration
+
+The NEEDLE explore strand excludes beads that have an assignee from its candidate pool. When `bf claim` runs, it filters out any beads with a non-null assignee. This means that beads with stale assignees (e.g., from crashed workers) become invisible to the fleet until the assignee is cleared.
+
+```bash
+# Example: A worker crashed while working on bf-abc123
+# The bead shows "in_progress" status with assignee "worker-7"
+# NEEDLE workers will skip it during claim until you clear:
+
+bf update bf-abc123 --clear-assignee
+
+# Now the bead appears in `bf ready` and can be claimed again
+bf ready --format json | jq '.[] | select(.id == "bf-abc123")'
+```
+
+#### Bulk Clearing Stale Assignees
+
+When a worker pool crashes or is decommissioned, you may need to clear assignees from multiple beads at once:
+
+```bash
+# Find all beads assigned to a decommissioned worker
+bf list --assignee worker-7 --format json | jq -r '.[].id' > /tmp/stale.txt
+
+# Clear all of them in one batch operation
+cat /tmp/stale.txt | xargs -I {} bf update {} --clear-assignee
+
+# Or use bf batch for atomic multi-op
+bf batch --json "$(bf list --assignee worker-7 --format json | jq -s '[.[] | {op: "update", id: .id, clear_assignee: true}]')"
+```
+
+#### Reassigning Work
+
+To transfer a bead from one worker to another, use `--assignee` directly (no need to clear first):
+
+```bash
+# Transfer bead from worker-7 to worker-8
+bf update bf-abc123 --assignee worker-8
+```
+
+The `--clear-assignee` flag is specifically for **unassigning** (making available for any worker), not for reassigning to a specific worker.
+
 ---
 
 ## Output Formats
