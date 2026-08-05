@@ -195,44 +195,47 @@ impl From<serde_yaml::Error> for BeadForgeError {
 
 impl From<anyhow::Error> for BeadForgeError {
     fn from(err: anyhow::Error) -> Self {
-        // Try to downcast to known error types first
+        // anyhow::Error is a wrapper type - extract the underlying error if possible
+        // Since we can't clone/own the underlying errors, we preserve context in messages
+
         if let Some(sqlite_err) = err.downcast_ref::<rusqlite::Error>() {
             return BeadForgeError::Database {
                 message: format!("SQLite operation failed: {}", sqlite_err),
-                source: sqlite_err.clone(),
+                source: rusqlite::Error::InvalidQuery, // Fallback source, message has full context
                 database_path: None,
             };
         }
+
         if let Some(io_err) = err.downcast_ref::<std::io::Error>() {
             return BeadForgeError::Io {
                 message: format!("I/O operation failed: {}", io_err),
-                source: io_err.clone(),
+                source: std::io::Error::new(io_err.kind(), "anyhow error"), // Fallback source
                 path: None,
             };
         }
+        }
+
         if let Some(json_err) = err.downcast_ref::<serde_json::Error>() {
             return BeadForgeError::Parsing {
                 message: format!("JSON parsing failed: {}", json_err),
                 format: ParsingFormat::Json,
-                source: Some(Box::new(json_err.clone())),
+                source: None, // Message preserves full error context
             };
         }
+
         if let Some(yaml_err) = err.downcast_ref::<serde_yaml::Error>() {
             return BeadForgeError::Parsing {
                 message: format!("YAML parsing failed: {}", yaml_err),
                 format: ParsingFormat::Yaml,
-                source: Some(Box::new(yaml_err.clone())),
+                source: None, // Message preserves full error context
             };
         }
 
-        // Fallback: wrap as a generic parsing error with the anyhow error context
+        // Fallback: preserve error chain in message, no source needed
         BeadForgeError::Parsing {
             message: format!("Operation failed: {}", err),
             format: ParsingFormat::Custom,
-            source: Some(Box::new(err.into_inner().unwrap_or_else(|| {
-                Box::new(std::io::Error::new(std::io::ErrorKind::Other, err.to_string()))
-                    as Box<dyn std::error::Error + Send + Sync>
-            }))),
+            source: None,
         }
     }
 }
