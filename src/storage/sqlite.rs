@@ -1481,15 +1481,21 @@ impl Storage {
         }
 
         self.with_immediate_transaction(|tx| {
-            tx.execute(
+            // Delete from both label tables; DELETE is idempotent (0 rows affected = no-op)
+            let rows_deleted_labels = tx.execute(
                 "DELETE FROM labels WHERE issue_id = ?1 AND label = ?2",
                 params![issue_id, trimmed_label],
             )?;
-            tx.execute(
+            let rows_deleted_bead_labels = tx.execute(
                 "DELETE FROM bead_labels WHERE bead_id = ?1 AND label = ?2",
                 params![issue_id, trimmed_label],
             )?;
-            mark_dirty_tx(tx, issue_id)?;
+
+            // Only mark as dirty if a label was actually removed
+            // If neither deletion affected any rows, this is a no-op (idempotent)
+            if rows_deleted_labels > 0 || rows_deleted_bead_labels > 0 {
+                mark_dirty_tx(tx, issue_id)?;
+            }
             Ok(())
         })
     }
