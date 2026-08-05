@@ -1183,6 +1183,47 @@ mod tests {
     }
 
     #[test]
+    fn test_create_trace_dir_with_writable_verification() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a trace directory with the specific bead ID from the task
+        let bead_id = "bf-4kzs6h-remaining";
+        let trace_dir = manager.create_trace_dir(bead_id).unwrap();
+
+        // Verify the directory exists
+        assert!(trace_dir.exists(), "Trace directory should be created");
+        assert!(trace_dir.is_dir(), "Path should be a directory");
+        assert!(trace_dir.ends_with(bead_id), "Directory should end with bead ID");
+
+        // Verify the directory path is correct
+        let expected_path = temp_dir.path().join(".beads").join("traces").join(bead_id);
+        assert_eq!(trace_dir, expected_path, "Directory should be at expected path");
+
+        // Verify the directory is writable by creating a test file
+        let test_file = trace_dir.join("test_writable.txt");
+        fs::write(&test_file, b"test content").unwrap();
+        assert!(test_file.exists(), "Should be able to write files to the directory");
+
+        // Clean up test file
+        fs::remove_file(&test_file).unwrap();
+    }
+
+    #[test]
+    fn test_create_trace_dir_idempotent() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let bead_id = "bf-idempotent-test";
+        let trace_dir1 = manager.create_trace_dir(bead_id).unwrap();
+        let trace_dir2 = manager.create_trace_dir(bead_id).unwrap();
+
+        // Both calls should succeed and return the same path
+        assert_eq!(trace_dir1, trace_dir2, "Should return same path on repeated calls");
+        assert!(trace_dir1.exists(), "Directory should exist after first call");
+    }
+
+    #[test]
     fn test_write_and_read_metadata() {
         let temp_dir = TempDir::new().unwrap();
         let manager = TraceManager::new(temp_dir.path());
