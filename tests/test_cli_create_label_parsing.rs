@@ -198,3 +198,30 @@ fn test_create_no_labels() {
         _ => panic!("Expected Create command, got a different command"),
     }
 }
+
+#[test]
+fn test_create_single_label() {
+    // Test parsing of `bf create --title "Test" --label "urgent"`
+    // Verifies parsed labels Vec contains exactly 1 element
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Test",
+        "--label",
+        "urgent",
+    ];
+
+    let cli = Cli::parse_from(args);
+
+    let command = cli.command.expect("Command should be present");
+    match command {
+        Commands::Create { label, .. } => {
+            // Verify count is exactly 1
+            assert_eq!(label.len(), 1, "Labels count should be 1");
+            // Verify labels[0] == "urgent"
+            assert_eq!(label[0], "urgent", "Label value should be 'urgent'");
+        }
+        _ => panic!("Expected Create command, got a different command"),
+    }
+}
