@@ -216,6 +216,10 @@ pub enum Commands {
         /// New due date (RFC3339 format, e.g., 2025-01-01T00:00:00Z)
         #[arg(long)]
         due_at: Option<String>,
+
+        /// Output JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Close a bead
@@ -1202,6 +1206,7 @@ pub fn run(cli: Cli) -> Result<()> {
             notes,
             design,
             due_at,
+            json,
         } => {
             // --clear-assignee is sugar for --assignee "": both flow the
             // empty-string "clear to NULL" signal into update_issue. clap
@@ -1237,7 +1242,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 design,
                 due_at,
                 no_auto_flush,
-                false, /* json */
+                json,
             )
         }
         Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason, no_auto_flush),
