@@ -419,8 +419,8 @@ bf list          [--status <s>] [--type <t>] [--assignee <a>] [--priority <N>]
                  [--annotation k=v] [--limit <N>] [--all] [--format json|text|toon] [--json]
 bf show          <id> [--format json|text|toon] [--json]
 bf update        <id> [--title "..."] [--status <s>] [--priority <N>] [--assignee <a>]
-                 [--description "..."] [--description-file <path>] [--acceptance-criteria "..."]
-                 [--notes "..."] [--design "..."] [--due-at <RFC3339>]
+                 [--clear-assignee] [--description "..."] [--description-file <path>]
+                 [--acceptance-criteria "..."] [--notes "..."] [--design "..."] [--due-at <RFC3339>]
 bf close         <id> [--reason "..."]
 bf reopen        <id>
 bf delete        <id>
@@ -479,6 +479,23 @@ bf commit-check  # git pre-commit hook for secret scanning
 ```
 
 All `br` commands work identically. `bf` is a strict superset.
+
+### Clearing Assignees
+
+The `--clear-assignee` flag removes the assignee from a bead, setting it back to unassigned. This is useful when a worker abandons a bead or when you want to make a bead available for claiming.
+
+```bash
+# Clear assignee to make bead available for claiming
+bf update bf-abc123 --clear-assignee
+
+# Equivalent to --assignee "" but more discoverable
+bf update bf-abc123 --assignee ""
+```
+
+**Use cases:**
+- A worker crashes and leaves stale assignee on beads
+- Reassigning work to a different team
+- Making completed beads available for review
 
 ---
 

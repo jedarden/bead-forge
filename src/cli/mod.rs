@@ -1959,19 +1959,20 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
     let formatter = get_formatter(output_format);
 
+    // Convert each ScoredBead to ReadyCandidate, then to Issue.
+    // This ensures ReadyCandidate structs are converted to Issue before formatting
+    // for all output formats, not just JSON.
+    let issues: Vec<Issue> = candidates
+        .iter()
+        .filter_map(|c| {
+            ReadyCandidate::from_scored_bead(c)
+                .ok()
+                .map(|candidate| candidate.to_issue())
+        })
+        .collect();
+
     match output_format {
         OutputFormat::Json => {
-            // Convert each ScoredBead to ReadyCandidate, then to Issue.
-            // This ensures ReadyCandidate structs are converted to Issue before formatting.
-            let issues: Vec<Issue> = candidates
-                .iter()
-                .filter_map(|c| {
-                    ReadyCandidate::from_scored_bead(c)
-                        .ok()
-                        .map(|candidate| candidate.to_issue())
-                })
-                .collect();
-
             let jsonl = formatter.format_issues(&issues);
             if envelope {
                 // Wrap in envelope with kind="ready"
@@ -1996,32 +1997,14 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
             }
         }
         OutputFormat::Toon => {
-            // Use the shared toon formatter for each candidate
-            for candidate in candidates {
-                println!(
-                    "{}",
-                    crate::format::toon::format_ready_bead(
-                        &candidate.id,
-                        &candidate.title,
-                        candidate.priority,
-                        candidate.downstream_impact,
-                        candidate.critical_float,
-                    )
-                );
-            }
+            // Use the formatter to ensure consistent output
+            let output = formatter.format_issues(&issues);
+            print!("{}", output);
         }
         OutputFormat::Text => {
-            // Use the shared text formatter pattern
-            for candidate in candidates {
-                println!(
-                    "[{}] {} (priority={}, impact={}, float={})",
-                    candidate.id,
-                    candidate.title,
-                    candidate.priority,
-                    candidate.downstream_impact,
-                    candidate.critical_float
-                );
-            }
+            // Use the formatter to ensure consistent output
+            let output = formatter.format_issues(&issues);
+            print!("{}", output);
         }
     }
 
