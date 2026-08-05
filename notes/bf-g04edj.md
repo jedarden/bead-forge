@@ -1,79 +1,49 @@
-# Dependency Display Verification - bf-g04edj
-
-## Test Summary
-Verified dependency display feature in `bf show` command works correctly across all scenarios.
+# Dependency Display Verification Summary
 
 ## Test Results
 
-### ✅ 1. Bead with Dependencies (Mixed Types)
-**Bead:** bf-fwzn8o (Test parent bead with dependencies)
-**Result:** PASS
+All acceptance criteria have been verified successfully:
+
+### Test Beads Created
+1. `bf-4hgw87` - Test bead with no dependencies
+2. `bf-15bs0k` - Another test bead (no dependencies)
+3. `bf-g2yado` - Test bead with dependencies (1 blocking + 1 non-blocking)
+4. `bf-2q8cer` - Fourth test bead (1 blocking dependency)
+5. `bf-38j7j1` - Test bead with multiple dependencies (2 blocking + 1 non-blocking)
+
+### Verification Results
+
+| Scenario | Expected | Actual | Status |
+|----------|----------|--------|--------|
+| Bead with no dependencies | No Dependencies section | No Dependencies section shown | ✓ |
+| Bead with blocking dependency | Shows "(blocks)" indicator | "(blocks)" appears after dependency | ✓ |
+| Bead with non-blocking dependency | No "(blocks)" indicator | No indicator shown | ✓ |
+| Multiple dependencies | All listed comma-separated | Correct format | ✓ |
+| Bead titles | Shown in parentheses | Titles displayed correctly | ✓ |
+| Bead status when blocked | Shows "blocked" | Status correctly set | ✓ |
+
+### Output Format Examples
+
+**No dependencies:**
+```
+ID: bf-4hgw87
+Title: Test bead with no dependencies
+Status: open
+...
+(No Dependencies section)
+```
+
+**With dependencies:**
 ```
 Dependencies:
-  Depends: bf-xijhcm (Test blocking dependency) (blocks), bf-2g9pqk (Test related dependency)
+  Depends: bf-4hgw87 (Test bead with no dependencies) (blocks), bf-15bs0k (Another test bead)
 ```
-- ✅ Dependencies section displayed
-- ✅ Blocking dependency shows `(blocks)` indicator
-- ✅ Non-blocking dependency shows without `(blocks)`
-- ✅ Bead titles correctly displayed in parentheses
-
-### ✅ 2. Bead with No Dependencies
-**Bead:** bf-1ts0qm (Test bead with no dependencies)
-**Result:** PASS
-- ✅ No Dependencies section displayed (correct behavior)
-
-### ✅ 3. Bead with Multiple Dependencies
-**Bead:** bf-3521v5 (Test bead with multiple dependencies)
-**Result:** PASS
-```
-Dependencies:
-  Depends: bf-xijhcm (Test blocking dependency) (blocks), bf-2g9pqk (Test related dependency), bf-1ts0qm (Test bead with no dependencies) (blocks)
-```
-- ✅ Multiple dependencies displayed correctly
-- ✅ Mixed dependency types handled properly
-- ✅ Comma-separated format maintained
-- ✅ Bead titles displayed correctly
-
-### ✅ 4. Toon Format Output
-**Command:** `bf show bf-fwzn8o --format toon`
-**Result:** PASS
-- ✅ Dependencies displayed correctly in toon format
-- ✅ Format consistent with text output
-
-### ✅ 5. JSON Format Output
-**Command:** `bf show bf-fwzn8o --format json`
-**Result:** PASS
-- ✅ Dependencies stripped from JSON output (expected behavior per code comments)
-- ✅ NEEDLE BrDependency format compatibility maintained
-
-### ✅ 6. Dependency List Command
-**Command:** `bf dep list bf-fwzn8o`
-**Result:** PASS
-```
-  bf-fwzn8o depends on bf-xijhcm (blocks)
-  bf-fwzn8o depends on bf-2g9pqk (relates_to)
-```
-- ✅ Dependencies listed correctly with types
-
-## Acceptance Criteria Status
-
-- ✅ Create test bead with dependencies
-- ✅ Run show command and verify dependency display
-- ✅ Test blocking dependency shows (blocks) indicator
-- ✅ Test non-blocking dependency shows without (blocks)
-- ✅ Test bead with no dependencies shows appropriate output
-- ✅ Verify bead titles are correctly displayed
-- ✅ Verify output format matches specification
-- ✅ Check edge cases (multiple dependencies, no dependencies)
-- ✅ Ensure no breaking changes to existing functionality
-
-## Implementation Notes
-The feature uses `format_dependencies_display()` which:
-1. Formats dependencies as "Depends: bf-xxx (Title) (blocks), bf-yyy (Title)"
-2. Shows "(blocks)" indicator only for blocking dependencies
-3. Displays bead titles in parentheses after IDs
-4. Returns empty string for beads with no dependencies
-5. Gracefully degrades if query fails (empty Vec)
 
 ## Conclusion
-All acceptance criteria met. Dependency display feature works correctly in text and toon formats, handles multiple and mixed dependency types, and properly displays bead titles.
+The dependency display feature works correctly for all test scenarios:
+- Beads with no dependencies show no Dependencies section
+- Blocking dependencies show "(blocks)" indicator
+- Non-blocking dependencies (relates_to) show no indicator
+- Multiple dependencies are displayed comma-separated on a single line
+- Bead titles are correctly shown in parentheses after the bead ID
+- Bead status is correctly set to "blocked" when blocking dependencies exist
