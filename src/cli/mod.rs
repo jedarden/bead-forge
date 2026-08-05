@@ -1237,6 +1237,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 design,
                 due_at,
                 no_auto_flush,
+                false, /* json */
             )
         }
         Commands::Close { id, reason } => cmd_close(&beads_dir, &id, &reason, no_auto_flush),
@@ -1858,6 +1859,7 @@ fn cmd_update(
     design: Option<String>,
     due_at: Option<String>,
     no_auto_flush: bool,
+    json: bool,
 ) -> Result<()> {
     let config = load_config(beads_dir)?;
     let metadata = load_metadata(beads_dir)?;
@@ -1893,8 +1895,22 @@ fn cmd_update(
     };
 
     storage.update_issue(id, &changes)?;
-    autoflush_after_mutation(beads_dir, &config, no_auto_flush);
-    println!("Updated bead {}", id);
+    let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
+
+    if json {
+        let formatter = get_formatter(OutputFormat::Json);
+        let data = serde_json::json!({
+            "id": id,
+            "updated": true
+        });
+        let json_str = serde_json::to_string(&data)?;
+        println!(
+            "{}",
+            formatter.format_with_envelope_and_warning("update", &json_str, warning.as_deref())
+        );
+    } else {
+        println!("Updated bead {}", id);
+    }
 
     Ok(())
 }
