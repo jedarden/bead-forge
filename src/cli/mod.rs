@@ -1757,6 +1757,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
         }
     };
 
+    // Fetch dependencies for display (graceful degradation if query fails)
+    let dependencies_display = match storage.get_dependencies_display(id) {
+        Ok(deps) => deps,
+        Err(_) => Vec::new(),
+    };
+
     match format {
         "json" => {
             // Strip dependencies/comments before serializing: NEEDLE's BrDependency
@@ -1803,10 +1809,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
                     println!("  {}: {}", key, value);
                 }
             }
-            if !issue.dependencies.is_empty() {
+            // Use formatted dependencies with titles
+            if !dependencies_display.is_empty() {
                 println!("Dependencies:");
-                for dep in &issue.dependencies {
-                    println!("  -> {} ({})", dep.depends_on_id, dep.dep_type);
+                let formatted = crate::format::format_dependencies_display(&dependencies_display[..]);
+                for line in formatted.lines() {
+                    println!("  {}", line);
                 }
             }
         }
@@ -1823,10 +1831,12 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
                     println!("  {}: {}", key, value);
                 }
             }
-            if !issue.dependencies.is_empty() {
+            // Use formatted dependencies with titles
+            if !dependencies_display.is_empty() {
                 println!("Dependencies:");
-                for dep in &issue.dependencies {
-                    println!("  -> {} ({})", dep.depends_on_id, dep.dep_type);
+                let formatted = crate::format::format_dependencies_display(&dependencies_display[..]);
+                for line in formatted.lines() {
+                    println!("  {}", line);
                 }
             }
         }
