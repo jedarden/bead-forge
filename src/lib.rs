@@ -67,4 +67,4 @@ pub use timing::{
 };
 pub use velocity::*;
 pub use trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};
-pub use exit_code::{append_exit_code_to_log, format_exit_code_to_log, ExitStatus, ProcessTermination};
+pub use exit_code::{append_exit_code_to_log, format_exit_code, format_exit_code_to_log, ExitCode, ExitStatus, ProcessTermination};
