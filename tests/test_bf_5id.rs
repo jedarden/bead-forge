@@ -75,6 +75,7 @@ fn test_close_unblocks_dependent_with_single_blocker() {
         thread_id: None,
         created_at: Utc::now(),
         created_by: Some("test".to_string()),
+        title: None,
     }];
     storage.create_issue(&bead_b).unwrap();
 
@@ -134,6 +135,7 @@ fn test_close_does_not_unblock_dependent_with_multiple_blockers() {
             thread_id: None,
             created_at: Utc::now(),
             created_by: Some("test".to_string()),
+            title: None,
         },
         Dependency {
             issue_id: "bf-c".to_string(),
@@ -143,6 +145,7 @@ fn test_close_does_not_unblock_dependent_with_multiple_blockers() {
             thread_id: None,
             created_at: Utc::now(),
             created_by: Some("test".to_string()),
+            title: None,
         },
     ];
     storage.create_issue(&bead_c).unwrap();
@@ -190,6 +193,7 @@ fn test_close_cascades_chain_of_dependencies() {
         thread_id: None,
         created_at: Utc::now(),
         created_by: Some("test".to_string()),
+        title: None,
     }];
     storage.create_issue(&phase2).unwrap();
 
@@ -202,6 +206,7 @@ fn test_close_cascades_chain_of_dependencies() {
         thread_id: None,
         created_at: Utc::now(),
         created_by: Some("test".to_string()),
+        title: None,
     }];
     storage.create_issue(&phase3).unwrap();
 
@@ -290,6 +295,7 @@ fn test_non_blocked_dependent_is_unchanged() {
         thread_id: None,
         created_at: Utc::now(),
         created_by: Some("test".to_string()),
+        title: None,
     }];
     storage.create_issue(&bead_b).unwrap();
 

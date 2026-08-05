@@ -282,6 +282,7 @@ fn test_json_formatter_strips_dependencies_and_comments() {
             created_by: None,
             metadata: None,
             thread_id: None,
+            title: None,
         }],
         comments: vec![Comment {
             id: 1,

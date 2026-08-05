@@ -112,6 +112,7 @@ fn test_jsonl_round_trip_with_dependencies() {
         created_by: Some("test".to_string()),
         metadata: None,
         thread_id: None,
+        title: None,
     });
 
     let storage = ws.storage().unwrap();

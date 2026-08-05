@@ -1135,6 +1135,7 @@ impl Storage {
                 thread_id: row.get(4)?,
                 created_at: parse_required_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
+                title: None,
             });
         }
         Ok(deps)
@@ -1391,6 +1392,7 @@ impl Storage {
                 thread_id: row.get(4)?,
                 created_at: parse_required_datetime(row.get(5)?)?,
                 created_by: row.get(6)?,
+                title: None,
             });
         }
         Ok(deps)

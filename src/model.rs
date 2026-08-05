@@ -829,15 +829,18 @@ impl Issue {
 
     /// Create the changes needed to clear the assignee.
     ///
-    /// Returns an `IssueChanges` struct with the assignee set to `None`.
+    /// Returns an `IssueChanges` struct with the assignee set to `Some("")`.
     /// This can be passed to `Storage::update_issue` to clear the assignee.
+    ///
+    /// The storage layer interprets `Some("")` as "clear to NULL" and sets
+    /// the database field to NULL. This is the correct way to clear assignee.
     ///
     /// For full assignee-clear semantics with event recording,
     /// use `Storage::clear_assignee` directly instead.
     #[must_use]
     pub fn clear_assignee(&self, actor: String) -> IssueChanges {
         IssueChanges {
-            assignee: None,
+            assignee: Some(String::new()),
             actor: Some(actor),
             ..Default::default()
         }
