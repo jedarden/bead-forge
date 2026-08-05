@@ -601,3 +601,23 @@ pub const fn table_issue_assignees() -> &'static str {
 pub const fn table_issue_relations() -> &'static str {
     issue_relations_table()
 }
+
+/// Alias for priorities_table() - matches bead bf-2roxos acceptance criteria
+pub const fn table_priorities() -> &'static str {
+    priorities_table()
+}
+
+/// Alias for statuses_table() - matches bead bf-2roxos acceptance criteria
+pub const fn table_statuses() -> &'static str {
+    statuses_table()
+}
+
+/// Alias for issue_types_table() - matches bead bf-2roxos acceptance criteria
+pub const fn table_issue_types() -> &'static str {
+    issue_types_table()
+}
+
+/// Alias for bead_annotations_table() - matches bead bf-2roxos acceptance criteria
+pub const fn table_bead_annotations() -> &'static str {
+    bead_annotations_table()
+}
