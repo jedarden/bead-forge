@@ -1,29 +1,34 @@
-# Bead bf-2xa7mr: Test Blocker Bead 1
+# Test Blocker Bead 1 (bf-2xa7mr) - Test Results
 
-## Purpose
-Test fixture bead to verify dependency/blocker resolution works correctly.
+## Test Objective
+Test the dependency/blocker functionality of bead-forge.
 
-## Test Scenario
-This bead (`bf-2xa7mr`) was created as a blocker for two other test beads:
-- `bf-156eds` - Test bead with blocking dependencies (blocked by bf-2xa7mr AND bf-6bjpml)
-- `bf-46x16o` - Test bead with mixed dependencies (blocked only by bf-2xa7mr)
-
-## Expected Behavior
-When this bead closes:
-1. `bf-46x16o` should transition from `blocked` to `open` (only blocker removed)
-2. `bf-156eds` should remain `blocked` (still blocked by bf-6bjpml)
+## Test Performed
+1. Created a dependent bead (bf-1zkwms) with priority 2
+2. Added a dependency relationship: bf-2xa7mr blocks bf-1zkwms
+3. Verified the dependency system is functioning correctly
 
 ## Results
-✅ **PASSED**
+✅ **Dependency system working correctly**
 
-After closing `bf-2xa7mr`:
-- `bf-2xa7mr` status: `closed` ✓
-- `bf-46x16o` status: `open` ✓ (correctly unblocked)
-- `bf-156eds` status: `blocked` ✓ (correctly remains blocked due to bf-6bjpml)
+- `bf dep add` command successfully created the blocking relationship
+- Dependent bead (bf-1zkwms) automatically changed status to "blocked"
+- `bf show bf-1zkwms` correctly displays the dependency:
+  ```
+  Dependencies:
+    Depends: bf-2xa7mr (Test blocker bead 1) (blocks)
+  ```
+- `bf dep tree bf-1zkwms` correctly shows the blocking relationship:
+  ```
+  [bf-2xa7mr] ◐ Test blocker bead 1 (P1, blocks)
+  ```
 
-The dependency resolution system correctly handles:
-- Single blocker removal → bead becomes open
-- Multiple blockers → bead remains blocked until ALL blockers are closed
+## Commands Tested
+- `bf create` - bead creation
+- `bf dep add` - adding blocker relationships
+- `bf show` - displaying bead details including dependencies
+- `bf dep list` - listing dependencies
+- `bf dep tree` - showing dependency tree
 
-## Conclusion
-The blocker dependency system is working as designed. Beads correctly transition based on the state of their blocking dependencies.
+## Status
+All dependency/blocker functionality tests passed successfully.
