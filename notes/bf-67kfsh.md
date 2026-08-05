@@ -1,59 +1,36 @@
-# Test Results: bf-67kfsh - Deferred Status with Labels
+# Test Results: Deferred Status with Labels (bf-67kfsh)
 
-## Test Date
-2026-08-05
+## Test Summary
+Verified that deferred status works correctly alongside label assignments.
 
-## Objective
-Verify that deferred status works correctly alongside label assignments.
+## Test Procedure
+1. Created test bead `bf-4s9qcl` with type `test` and three labels: `test-label-1`, `test-label-2`, `deferred-test`
+2. Updated bead status to `deferred` via `bf update bf-4s9qcl --status deferred`
+3. Verified display via `bf show bf-4s9qcl`
+4. Cleaned up by closing the bead
 
-## Test Procedure 1
+## Results
+✅ All acceptance criteria met:
+- Bead created with deferred status: **PASS**
+- Multiple labels attached (3 labels): **PASS**
+- Deferred status and labels appear correctly in `bf show`: **PASS**
+- Test bead cleaned up (closed): **PASS**
 
-1. **Created test bead** (bf-rtpgzz):
-   ```bash
-   bf create --title "Test deferred status with labels" --description "Testing deferred status functionality with multiple labels"
-   ```
+## Verification Output
+```
+ID: bf-4s9qcl
+Title: Test deferred status with labels
+Status: deferred
+Priority: P2
+Type: test
+Description: 
+Labels: deferred-test, test-label-1, test-label-2
+```
 
-2. **Set status to deferred**:
-   ```bash
-   bf update bf-rtpgzz --status deferred
-   ```
+## Conclusion
+The deferred status feature works correctly with the labels feature. Both fields are stored, retrieved, and displayed as expected without conflicts.
 
-3. **Added multiple labels**:
-   ```bash
-   bf label add bf-rtpgzz --label test-integration --label deferred-test --label phase-3
-   ```
-
-4. **Verified with `bf show`**:
-   - Status displayed correctly as "deferred"
-   - All three labels displayed correctly: "deferred-test, phase-3, test-integration"
-
-5. **Cleaned up**:
-   ```bash
-   bf delete bf-rtpgzz
-   ```
-
-## Test Procedure 2
-
-1. **Created test bead** (bf-qwnqfu):
-   ```bash
-   bf create --title "Test deferred status with labels" --label test-label --label another-label --label third-label
-   ```
-
-2. **Set status to deferred**:
-   ```bash
-   bf update bf-qwnqfu --status deferred
-   ```
-
-3. **Verified with `bf show`**:
-   - Status displayed correctly: `Status: deferred`
-   - All three labels displayed correctly in alphabetical order: `Labels: another-label, test-label, third-label`
-
-4. **Cleaned up**:
-   ```bash
-   bf delete bf-qwnqfu
-   ```
-
-## Result
-✅ **PASS** - Deferred status works correctly with label assignments.
-
-Both the deferred status and multiple labels are properly stored and retrieved in the SQLite backend, and display correctly in `bf show` output. Labels are displayed in alphabetical order regardless of creation order.
+## Test Bead
+- Test bead: `bf-4s9qcl`
+- Final status: closed
+- Close reason: "Test completed - deferred status and labels verified successfully"
