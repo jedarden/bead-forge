@@ -52,7 +52,7 @@ pub use rotate::{
     find_bead_in_archives, list_all_with_archives, list_archives, rotate, RotateOptions,
     RotateResult,
 };
-pub use storage::{schema, sqlite, DepTreeNode, Stats, Storage};
+pub use storage::{DepTreeNode, Stats, Storage};
 pub use subprocess::{
     execute_command, execute_command_streaming, execute_command_to_trace, SubprocessConfig,
     SubprocessResult,
