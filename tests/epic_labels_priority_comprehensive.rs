@@ -268,7 +268,7 @@ fn test_epic_json_serialization_all_priorities() {
 
         let label_array = parsed["labels"].as_array().unwrap();
         assert_eq!(label_array.len(), labels.len());
-        for label in labels {
+        for label in &labels {
             assert!(label_array.iter().any(|l| l == label));
         }
 
