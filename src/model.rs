@@ -988,6 +988,35 @@ pub struct ReadyCandidate {
 }
 
 impl ReadyCandidate {
+    /// Create a ReadyCandidate from a ScoredBead.
+    ///
+    /// This converts a scored bead result into a ReadyCandidate with proper
+    /// type conversions. Labels default to empty since ScoredBead doesn't include them.
+    pub fn from_scored_bead(scored: &crate::claim::ScoredBead) -> Result<Self> {
+        use std::str::FromStr;
+
+        // Parse status string to Status enum
+        let status = Status::from_str(&scored.status)
+            .unwrap_or(Status::Open);
+
+        // Convert i32 priority to Priority wrapper
+        let priority = Priority(scored.priority);
+
+        // Parse created_at string to DateTime
+        let created_at = DateTime::parse_from_rfc3339(&scored.created_at)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| Utc::now());
+
+        Ok(ReadyCandidate {
+            id: scored.id.clone(),
+            title: scored.title.clone(),
+            priority,
+            status,
+            created_at,
+            labels: Vec::new(), // ScoredBead doesn't include labels
+        })
+    }
+
     /// Convert a ReadyCandidate to a full Issue with sensible defaults for missing fields.
     pub fn to_issue(&self) -> Issue {
         let now = Utc::now();

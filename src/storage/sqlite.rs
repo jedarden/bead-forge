@@ -281,10 +281,32 @@ impl Storage {
         let param_refs: Vec<&dyn rusqlite::ToSql> =
             params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
         let mut rows = stmt.query(param_refs.as_slice())?;
-        let mut issues = Vec::new();
+
+        // Collect all issue data first (without deps/comments/annotations)
+        let mut issues_data: Vec<(String, Issue)> = Vec::new();
         while let Some(row) = rows.next()? {
-            issues.push(Self::row_to_issue_conn(&conn, row)?);
+            let id: String = row.get(0)?;
+            let issue = Self::row_to_issue_partial(row)?;
+            issues_data.push((id, issue));
         }
+
+        // Collect all IDs for batch loading
+        let issue_ids: Vec<&String> = issues_data.iter().map(|(id, _)| id).collect();
+
+        // Batch load all dependencies, comments, and annotations
+        let all_dependencies = Self::batch_load_dependencies(&conn, &issue_ids)?;
+        let all_comments = Self::batch_load_comments(&conn, &issue_ids)?;
+        let all_annotations = Self::batch_load_annotations(&conn, &issue_ids)?;
+
+        // Combine into final Issue structs
+        let mut issues = Vec::new();
+        for (id, mut issue) in issues_data {
+            issue.dependencies = all_dependencies.get(&id).cloned().unwrap_or_default();
+            issue.comments = all_comments.get(&id).cloned().unwrap_or_default();
+            issue.annotations = all_annotations.get(&id).cloned().unwrap_or_default();
+            issues.push(issue);
+        }
+
         Ok(issues)
     }
 

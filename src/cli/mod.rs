@@ -7,7 +7,7 @@ use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, ClaimResultOutput, OutputFormat, StatsOutput};
-use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
+use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, ReadyCandidate, Status};
 use crate::reopen::reopen_bead;
 use crate::robot_docs::RobotDocs;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
@@ -1960,11 +1960,15 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
 
     match output_format {
         OutputFormat::Json => {
-            // Resolve each scored candidate to its full Issue record so
-            // the formatter has every field; empty result prints `[]`.
+            // Convert each ScoredBead to ReadyCandidate, then to Issue.
+            // This ensures ReadyCandidate structs are converted to Issue before formatting.
             let issues: Vec<Issue> = candidates
                 .iter()
-                .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
+                .filter_map(|c| {
+                    ReadyCandidate::from_scored_bead(c)
+                        .ok()
+                        .map(|candidate| candidate.to_issue())
+                })
                 .collect();
 
             let jsonl = formatter.format_issues(&issues);
