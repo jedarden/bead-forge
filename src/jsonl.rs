@@ -218,10 +218,39 @@ where
     Ok(result)
 }
 
+/// Query the dirty_issues table and return all bead_ids.
+///
+/// This reads the dirty_issues table into a Vec<String> using a prepared statement.
+/// The IDs are sorted by marked_at timestamp (oldest first) to provide predictable ordering.
+pub fn get_dirty_issue_ids(conn: &rusqlite::Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT issue_id FROM dirty_issues ORDER BY marked_at ASC"
+    )?;
+
+    let mut rows = stmt.query([])?;
+    let mut ids = Vec::new();
+    while let Some(row) = rows.next()? {
+        ids.push(row.get(0)?);
+    }
+
+    Ok(ids)
+}
+
 /// Incremental flush that only writes dirty beads to JSONL.
 /// This is the main entry point for auto-flush functionality.
 pub fn incremental_flush(conn: &rusqlite::Connection, path: &Path) -> Result<FlushResult> {
     use crate::storage::sqlite::Storage;
+
+    // Query dirty issue IDs from dirty_issues table
+    let dirty_ids = get_dirty_issue_ids(conn)?;
+
+    // Early return if no dirty issues
+    if dirty_ids.is_empty() {
+        return Ok(FlushResult {
+            flushed: 0,
+            warnings: Vec::new(),
+        });
+    }
 
     // List dirty issues from database
     let list_dirty = || -> Result<Vec<crate::model::Issue>> {
@@ -1618,6 +1647,68 @@ not json at all
     }
 
     // ==================== incremental_flush tests ====================
+
+    #[test]
+    fn get_dirty_issue_ids_returns_correct_ids() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db_path = tmp.path().join("beads.db");
+
+        // Create database and schema
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA_SQL)
+            .unwrap();
+
+        // Initially no dirty issues
+        let ids = get_dirty_issue_ids(&conn).unwrap();
+        assert_eq!(ids.len(), 0, "should return empty vec when no dirty issues");
+
+        // Create some issues first (required for foreign key constraint)
+        for i in 1..=3 {
+            let id = format!("bf-{}", i);
+            conn.execute(
+                "INSERT INTO issues (id, title, status, priority, issue_type, source_repo, created_at, updated_at)
+                 VALUES (?1, ?2, 'open', 2, 'task', '.', datetime('now'), datetime('now'))",
+                [id.clone(), format!("Bead {}", i)],
+            )
+            .unwrap();
+        }
+
+        // Mark some beads as dirty
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-2')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-3')",
+            [],
+        )
+        .unwrap();
+
+        // Verify the query returns correct IDs
+        let ids = get_dirty_issue_ids(&conn).unwrap();
+        assert_eq!(ids.len(), 3, "should return 3 dirty issue IDs");
+
+        // Verify the IDs are the ones we inserted
+        assert!(ids.contains(&"bf-1".to_string()), "should contain bf-1");
+        assert!(ids.contains(&"bf-2".to_string()), "should contain bf-2");
+        assert!(ids.contains(&"bf-3".to_string()), "should contain bf-3");
+
+        // Verify ordering by marked_at (insertion order)
+        assert_eq!(ids[0], "bf-1", "first ID should be bf-1 (oldest)");
+        assert_eq!(ids[1], "bf-2", "second ID should be bf-2");
+        assert_eq!(ids[2], "bf-3", "third ID should be bf-3 (newest)");
+
+        // Clear dirty marks and verify empty result
+        conn.execute("DELETE FROM dirty_issues", []).unwrap();
+        let ids = get_dirty_issue_ids(&conn).unwrap();
+        assert_eq!(ids.len(), 0, "should return empty vec after clearing dirty marks");
+    }
 
     #[test]
     fn incremental_flush_success_clears_dirty_marks() {
