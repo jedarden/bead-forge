@@ -27,7 +27,7 @@ fn test_negative_priority_fails() {
         "create",
         "--title", "Test Epic",
         "--type", "epic",
-        "--priority", "-1",
+        "--priority=-1",
     ]);
 
     // Should fail
