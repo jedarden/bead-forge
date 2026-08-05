@@ -12,7 +12,7 @@
 //! 4. Claim scoring uses expected_seconds from velocity_stats: score = impact / expected_seconds
 
 use anyhow::Result;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 

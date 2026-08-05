@@ -36,7 +36,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 
 /// Persistent timer state that can be written to disk and read back.
 ///

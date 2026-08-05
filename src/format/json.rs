@@ -1,7 +1,7 @@
 use crate::format::{ClaimResultOutput, Formatter, JsonEnvelope, StatsOutput};
 use crate::model::Issue;
 use crate::velocity::VelocityStats;
-use serde_json::{self, Map, Value};
+use serde_json::{self, Value};
 
 #[derive(Debug, Clone, Copy)]
 pub struct JsonFormatter;

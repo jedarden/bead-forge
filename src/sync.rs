@@ -749,7 +749,7 @@ mod tests {
                     .prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label")
                     .unwrap();
                 let labels: Vec<String> = stmt
-                    .query_map(params!["bf-labels"], |row| row.get::<_, String>(0))
+                    .query_map(rusqlite::params!["bf-labels"], |row| row.get::<_, String>(0))
                     .unwrap()
                     .filter_map(|r| r.ok())
                     .collect();
@@ -765,7 +765,7 @@ mod tests {
                     .prepare("SELECT COUNT(*) FROM bead_labels WHERE bead_id = ?1")
                     .unwrap();
                 let count: i64 = stmt
-                    .query_row(params!["bf-nolabels"], |row| row.get(0))
+                    .query_row(rusqlite::params!["bf-nolabels"], |row| row.get(0))
                     .unwrap();
                 assert_eq!(count, 0);
                 Ok(())
@@ -962,7 +962,7 @@ mod tests {
                     .prepare("SELECT label FROM bead_labels WHERE bead_id = ?1 ORDER BY label")
                     .unwrap();
                 let labels: Vec<String> = stmt
-                    .query_map(params!["bf-many-labels"], |row| row.get::<_, String>(0))
+                    .query_map(rusqlite::params!["bf-many-labels"], |row| row.get::<_, String>(0))
                     .unwrap()
                     .filter_map(|r| r.ok())
                     .collect();
