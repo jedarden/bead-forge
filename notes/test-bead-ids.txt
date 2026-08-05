@@ -1,0 +1,25 @@
+# Test Bead IDs for Dependency Testing
+Generated: 2026-08-05 21:14:49 UTC
+
+Main test bead: bf-19nflf
+- Title: Test bead for dependency testing
+- Status: blocked (correctly blocked by bf-3zoq52)
+- Description: Main test bead to verify blocking and non-blocking dependencies
+
+Blocking dependency bead: bf-3zoq52
+- Title: Blocking dependency test bead
+- Status: open
+- Description: This bead blocks the main test bead
+- Relationship: bf-3zoq52 blocks bf-19nflf
+
+Non-blocking dependency bead: bf-4wtr1s
+- Title: Non-blocking dependency test bead
+- Status: open
+- Description: This bead is related but does not block the main test bead
+- Relationship: bf-19nflf relates_to bf-4wtr1s
+
+Verification:
+✓ Main bead created successfully
+✓ Blocking dependency added (bf-19nflf status changed to blocked)
+✓ Non-blocking dependency added (relates_to type)
+✓ All bead IDs recorded for subsequent tests
