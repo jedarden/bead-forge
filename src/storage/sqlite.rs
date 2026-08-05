@@ -254,7 +254,7 @@ impl Storage {
             query.push_str(&format!(" OFFSET {}", offset));
         }
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&query)?;
+        let mut stmt = conn.prepare_cached(&query)?;
         let param_refs: Vec<&dyn rusqlite::ToSql> =
             params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
         let mut rows = stmt.query(param_refs.as_slice())?;
@@ -267,7 +267,7 @@ impl Storage {
 
     pub fn list_all_issues(&self) -> Result<Vec<Issue>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
                     i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
                     i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
