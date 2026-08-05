@@ -1739,7 +1739,7 @@ impl Storage {
 
         if let (Some(m), Some(h)) = (model, harness) {
             // Velocity-aware scoring: join velocity_stats and compute combined_score
-            let mut stmt = conn.prepare(
+            let mut stmt = conn.prepare_cached(
                 "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
                         COALESCE(c.float, 999) as critical_float,
                         i.priority,
@@ -1759,13 +1759,7 @@ impl Storage {
                    AND i.pinned = 0
                    AND i.is_template = 0
                    AND i.deleted_at IS NULL
-                   AND NOT EXISTS (
-                       SELECT 1 FROM dependencies blocker_dep
-                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                       WHERE blocker_dep.issue_id = i.id
-                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-                   )
+                   AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
                  GROUP BY i.id
                  ORDER BY
                      combined_score / COALESCE(vs.p50_seconds, 1800) DESC,
@@ -1791,7 +1785,7 @@ impl Storage {
             }
         } else {
             // Standard scoring without velocity data
-            let mut stmt = conn.prepare(
+            let mut stmt = conn.prepare_cached(
                 "SELECT COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
                         COALESCE(c.float, 999) as critical_float,
                         i.priority,
@@ -1804,13 +1798,7 @@ impl Storage {
                    AND i.pinned = 0
                    AND i.is_template = 0
                    AND i.deleted_at IS NULL
-                   AND NOT EXISTS (
-                       SELECT 1 FROM dependencies blocker_dep
-                       INNER JOIN issues blocker ON blocker.id = blocker_dep.depends_on_id
-                       WHERE blocker_dep.issue_id = i.id
-                       AND blocker_dep.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
-                       AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')  -- TERMINAL_STATUS_SQL_LIST
-                   )
+                   AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
                  GROUP BY i.id
                  ORDER BY
                      downstream_impact DESC,
