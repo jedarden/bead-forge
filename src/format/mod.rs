@@ -6,7 +6,7 @@ pub mod warning;
 
 pub use envelope::{JsonEnvelope, VERSION as ENVELOPE_VERSION};
 pub use json::JsonFormatter;
-pub use text::{format_dependencies, TextFormatter};
+pub use text::{format_dependencies, format_dependencies_display, TextFormatter};
 pub use toon::ToonFormatter;
 pub use warning::{warn_stderr, with_warning};
 

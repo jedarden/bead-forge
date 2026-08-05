@@ -212,6 +212,40 @@ pub fn format_dependencies(dependencies: &[Dependency]) -> String {
     format!("Depends: {}", parts.join(", "))
 }
 
+/// Format dependencies from storage DependencyDisplay results.
+///
+/// This is a convenience function that formats dependencies loaded from storage
+/// via `get_dependencies_display()`, which includes bead titles from a JOIN
+/// with the issues table. The DependencyDisplay format includes:
+/// - dep_type: The dependency type (e.g., "blocks", "related")
+/// - bead_id: The ID of the dependency bead
+/// - title: The title of the dependency bead
+///
+/// # Arguments
+/// * `dependencies` - Slice of DependencyDisplay objects from storage
+///
+/// # Returns
+/// A formatted string in the format "Depends: bf-xxx (Title) (blocks), bf-yyy (Title)"
+/// or an empty string if there are no dependencies.
+pub fn format_dependencies_display(dependencies: &[crate::storage::sqlite::DependencyDisplay]) -> String {
+    if dependencies.is_empty() {
+        return String::new();
+    }
+
+    let parts: Vec<String> = dependencies
+        .iter()
+        .map(|dep| {
+            if dep.dep_type == "blocks" {
+                format!("{} ({}) (blocks)", dep.bead_id, dep.title)
+            } else {
+                format!("{} ({})", dep.bead_id, dep.title)
+            }
+        })
+        .collect();
+
+    format!("Depends: {}", parts.join(", "))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
