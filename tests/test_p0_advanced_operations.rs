@@ -502,12 +502,16 @@ fn test_p0_epic_with_children() {
     assert_eq!(retrieved_epic.priority, Priority::CRITICAL);
     assert_eq!(retrieved_epic.issue_type, IssueType::Epic);
 
-    // Verify children reference the epic
+    // Verify children reference the epic via dependencies
     let retrieved_child1 = storage.get_issue("child-1").unwrap().unwrap();
     let retrieved_child2 = storage.get_issue("child-2").unwrap().unwrap();
 
-    assert_eq!(retrieved_child1.parent, Some("p0-epic-with-children".to_string()));
-    assert_eq!(retrieved_child2.parent, Some("p0-epic-with-children".to_string()));
+    assert_eq!(retrieved_child1.dependencies.len(), 1);
+    assert_eq!(retrieved_child1.dependencies[0].depends_on_id, "p0-epic-with-children");
+    assert_eq!(retrieved_child1.dependencies[0].dep_type, DependencyType::ParentChild);
+    assert_eq!(retrieved_child2.dependencies.len(), 1);
+    assert_eq!(retrieved_child2.dependencies[0].depends_on_id, "p0-epic-with-children");
+    assert_eq!(retrieved_child2.dependencies[0].dep_type, DependencyType::ParentChild);
 }
 
 // ============================================================================

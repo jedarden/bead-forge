@@ -236,14 +236,22 @@ fn test_p0_bug_with_dependencies() {
 
     // Create P0 critical bug with dependency
     let mut bug = create_p0_bug("bf-crit-deps", "Critical bug with dependencies", vec!["with-deps"]);
-    bug.dependencies = vec!["bf-dep-1".to_string()];
+    let dep = Dependency {
+        issue_id: "bf-crit-deps".to_string(),
+        depends_on_id: "bf-dep-1".to_string(),
+        dep_type: DependencyType::Blocks,
+        created_at: chrono::Utc::now(),
+        created_by: Some("test".to_string()),
+        ..Default::default()
+    };
+    bug.dependencies = vec![dep];
     storage.create_issue(&bug).unwrap();
 
     let retrieved = storage.get_issue("bf-crit-deps").unwrap().unwrap();
     assert_eq!(retrieved.priority, Priority::CRITICAL);
     assert_eq!(retrieved.issue_type, IssueType::Bug);
     assert_eq!(retrieved.dependencies.len(), 1);
-    assert_eq!(retrieved.dependencies[0], "bf-dep-1");
+    assert_eq!(retrieved.dependencies[0].depends_on_id, "bf-dep-1");
 }
 
 #[test]
