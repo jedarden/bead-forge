@@ -632,6 +632,97 @@ impl TraceManager {
         self.traces_dir.join(bead_id).join("stderr.txt")
     }
 
+    /// Write captured output to a log file atomically
+    ///
+    /// This function writes both stdout and stderr content to a single log file
+    /// using `std::fs::write()` which provides atomic file creation. If the parent
+    /// directories don't exist, they will be created automatically.
+    ///
+    /// # Arguments
+    /// * `log_path` - Path to the log file (will be created if it doesn't exist)
+    /// * `stdout` - Standard output content to write
+    /// * `stderr` - Standard error content to write
+    ///
+    /// # Returns
+    /// * `Result<(), io::Error>` - Ok(()) on success, io::Error on failure
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// let log_path = manager.traces_dir.join("test-output.log");
+    /// manager.write_captured_output(&log_path, "stdout content", "stderr content")?;
+    /// ```
+    pub fn write_captured_output(
+        &self,
+        log_path: &Path,
+        stdout: &str,
+        stderr: &str,
+    ) -> Result<(), io::Error> {
+        // Ensure parent directories exist
+        if let Some(parent) = log_path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).map_err(|e| {
+                    io::Error::new(
+                        e.kind(),
+                        format!("Failed to create parent directory {}: {}", parent.display(), e),
+                    )
+                })?;
+            }
+        }
+
+        // Build combined output
+        let mut output = String::new();
+        output.push_str("=== STDOUT ===\n");
+        output.push_str(stdout);
+        output.push_str("\n=== STDERR ===\n");
+        output.push_str(stderr);
+
+        // Use std::fs::write for atomic file creation
+        fs::write(log_path, output).map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("Failed to write output to {}: {}", log_path.display(), e),
+            )
+        })
+    }
+
+    /// Write captured output to a bead-specific log file atomically
+    ///
+    /// This is a convenience function that combines the bead trace directory
+    /// path construction with atomic output writing.
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead identifier
+    /// * `stdout` - Standard output content to write
+    /// * `stderr` - Standard error content to write
+    ///
+    /// # Returns
+    /// * `Result<(), io::Error>` - Ok(()) on success, io::Error on failure
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let manager = TraceManager::for_current_workspace()?;
+    /// manager.write_bead_output("bf-1d22i6", "Test output", "Test errors")?;
+    /// ```
+    pub fn write_bead_output(
+        &self,
+        bead_id: &str,
+        stdout: &str,
+        stderr: &str,
+    ) -> Result<(), io::Error> {
+        // Ensure the bead trace directory exists
+        let bead_dir = self.bead_trace_dir(bead_id).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to create bead trace directory: {}", e),
+            )
+        })?;
+
+        // Write to a combined log file
+        let log_path = bead_dir.join("output.log");
+        self.write_captured_output(&log_path, stdout, stderr)
+    }
+
     /// Execute cargo test in the specified directory and capture all output
     ///
     /// This function runs `cargo test` in the given directory, captures both
@@ -2873,5 +2964,282 @@ mod tests {
             "Complex names should be preserved, got: {}",
             path_str
         );
+    }
+
+    #[test]
+    fn test_write_captured_output_creates_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("test-output.log");
+        let stdout = "Test stdout content";
+        let stderr = "Test stderr content";
+
+        // Write captured output
+        let result = manager.write_captured_output(&log_path, stdout, stderr);
+
+        assert!(result.is_ok(), "Should successfully write output");
+        assert!(log_path.exists(), "Log file should exist");
+
+        // Verify content
+        let content = fs::read_to_string(&log_path).unwrap();
+        assert!(content.contains("=== STDOUT ==="), "Should contain stdout section");
+        assert!(content.contains(stdout), "Should contain stdout content");
+        assert!(content.contains("=== STDERR ==="), "Should contain stderr section");
+        assert!(content.contains(stderr), "Should contain stderr content");
+    }
+
+    #[test]
+    fn test_write_captured_output_atomic() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("atomic-test.log");
+        let stdout = "Atomic stdout";
+        let stderr = "Atomic stderr";
+
+        // Write the same file twice
+        manager
+            .write_captured_output(&log_path, stdout, stderr)
+            .unwrap();
+        let content1 = fs::read_to_string(&log_path).unwrap();
+
+        manager
+            .write_captured_output(&log_path, "New content", "New errors")
+            .unwrap();
+        let content2 = fs::read_to_string(&log_path).unwrap();
+
+        // File should be completely overwritten (atomic write)
+        assert_ne!(content1, content2, "Atomic writes should replace content");
+        assert!(!content2.contains(stdout), "Old content should be replaced");
+        assert!(content2.contains("New content"), "New content should be present");
+    }
+
+    #[test]
+    fn test_write_captured_output_creates_parent_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Create a path with multiple non-existent parent directories
+        let log_path = temp_dir
+            .path()
+            .join("nested")
+            .join("directories")
+            .join("test.log");
+
+        assert!(!log_path.parent().unwrap().exists(), "Parent should not exist");
+
+        // Write should create parent directories
+        let result = manager.write_captured_output(&log_path, "stdout", "stderr");
+
+        assert!(result.is_ok(), "Should create parent directories and write");
+        assert!(log_path.exists(), "Log file should exist");
+        assert!(log_path.parent().unwrap().exists(), "Parent directories should exist");
+    }
+
+    #[test]
+    fn test_write_captured_output_empty_content() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("empty-test.log");
+
+        // Write empty content
+        let result = manager.write_captured_output(&log_path, "", "");
+
+        assert!(result.is_ok(), "Should handle empty content");
+        assert!(log_path.exists(), "File should exist even with empty content");
+
+        // Verify structure is present even with empty content
+        let content = fs::read_to_string(&log_path).unwrap();
+        assert!(content.contains("=== STDOUT ==="), "Should have stdout section");
+        assert!(content.contains("=== STDERR ==="), "Should have stderr section");
+    }
+
+    #[test]
+    fn test_write_captured_output_large_content() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("large-test.log");
+
+        // Create large stdout and stderr content
+        let stdout = "Line ".repeat(10000);
+        let stderr = "Error ".repeat(5000);
+
+        let result = manager.write_captured_output(&log_path, &stdout, &stderr);
+
+        assert!(result.is_ok(), "Should handle large content");
+
+        // Verify all content was written
+        let content = fs::read_to_string(&log_path).unwrap();
+        assert!(content.contains(&stdout), "Should contain all stdout content");
+        assert!(content.contains(&stderr), "Should contain all stderr content");
+    }
+
+    #[test]
+    fn test_write_captured_output_with_special_characters() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("special-test.log");
+
+        // Test with special characters
+        let stdout = "Test with special chars: \t\n\r\"'\\<>{}[]";
+        let stderr = "Error with unicode: café 日本語 🎉";
+
+        let result = manager.write_captured_output(&log_path, stdout, stderr);
+
+        assert!(result.is_ok(), "Should handle special characters");
+
+        // Verify content is preserved exactly
+        let content = fs::read_to_string(&log_path).unwrap();
+        assert!(content.contains(stdout), "Should preserve special characters");
+        assert!(content.contains(stderr), "Should preserve unicode characters");
+    }
+
+    #[test]
+    fn test_write_captured_output_overwrites_existing() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("overwrite-test.log");
+
+        // Write initial content
+        manager
+            .write_captured_output(&log_path, "Original stdout", "Original stderr")
+            .unwrap();
+
+        // Overwrite with new content
+        manager
+            .write_captured_output(&log_path, "New stdout", "New stderr")
+            .unwrap();
+
+        // Verify file was completely overwritten
+        let content = fs::read_to_string(&log_path).unwrap();
+        assert!(!content.contains("Original"), "Old content should be gone");
+        assert!(content.contains("New stdout"), "New content should be present");
+    }
+
+    #[test]
+    fn test_write_bead_output() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let bead_id = "bf-1d22i6";
+        let stdout = "Bead stdout content";
+        let stderr = "Bead stderr content";
+
+        // Write bead output
+        let result = manager.write_bead_output(bead_id, stdout, stderr);
+
+        assert!(result.is_ok(), "Should successfully write bead output");
+
+        // Verify the bead trace directory was created
+        let bead_dir = manager.traces_dir.join(bead_id);
+        assert!(bead_dir.exists(), "Bead trace directory should exist");
+
+        // Verify the output.log file exists
+        let log_path = bead_dir.join("output.log");
+        assert!(log_path.exists(), "output.log should exist");
+
+        // Verify content
+        let content = fs::read_to_string(&log_path).unwrap();
+        assert!(content.contains(stdout), "Should contain stdout content");
+        assert!(content.contains(stderr), "Should contain stderr content");
+    }
+
+    #[test]
+    fn test_write_bead_output_multiple_beads() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Write output for multiple beads
+        let bead_ids = vec!["bf-1d22i6", "bf-2d22i7", "bf-3d22i8"];
+
+        for bead_id in bead_ids {
+            let stdout = format!("Stdout for {}", bead_id);
+            let stderr = format!("Stderr for {}", bead_id);
+
+            manager.write_bead_output(bead_id, &stdout, &stderr).unwrap();
+
+            // Verify each bead's output was written correctly
+            let log_path = manager.traces_dir.join(bead_id).join("output.log");
+            assert!(log_path.exists(), "Log should exist for {}", bead_id);
+
+            let content = fs::read_to_string(&log_path).unwrap();
+            assert!(content.contains(&stdout), "Should contain correct stdout");
+        }
+    }
+
+    #[test]
+    fn test_write_bead_output_return_type() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        // Test that the function returns Result<(), io::Error>
+        let result: Result<(), io::Error> =
+            manager.write_bead_output("bf-test", "stdout", "stderr");
+
+        assert!(result.is_ok(), "Should return Ok(())");
+    }
+
+    #[test]
+    fn test_write_captured_output_return_type() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("return-type-test.log");
+
+        // Test that the function returns Result<(), io::Error>
+        let result: Result<(), io::Error> =
+            manager.write_captured_output(&log_path, "stdout", "stderr");
+
+        assert!(result.is_ok(), "Should return Ok(())");
+    }
+
+    #[test]
+    fn test_write_captured_output_with_newlines() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("newline-test.log");
+
+        // Test content with various newline patterns
+        let stdout = "Line 1\nLine 2\r\nLine 3\rLine 4";
+        let stderr = "Error 1\nError 2";
+
+        manager
+            .write_captured_output(&log_path, stdout, stderr)
+            .unwrap();
+
+        // Verify content is preserved
+        let content = fs::read_to_string(&log_path).unwrap();
+        assert!(content.contains("Line 1"), "Should preserve newlines in stdout");
+        assert!(content.contains("Line 2"), "Should preserve CRLF in stdout");
+        assert!(content.contains("Error 1"), "Should preserve newlines in stderr");
+    }
+
+    #[test]
+    fn test_write_captured_output_idempotent() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = TraceManager::new(temp_dir.path());
+
+        let log_path = temp_dir.path().join("idempotent-test.log");
+
+        // Write the same content multiple times
+        let stdout = "Repeated content";
+        let stderr = "Repeated errors";
+
+        for _ in 0..3 {
+            manager
+                .write_captured_output(&log_path, stdout, stderr)
+                .unwrap();
+        }
+
+        // Verify final state is correct
+        let content = fs::read_to_string(&log_path).unwrap();
+        let count = content.matches("Repeated content").count();
+        assert_eq!(count, 1, "Content should only appear once (atomic overwrites)");
     }
 }
