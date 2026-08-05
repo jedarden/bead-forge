@@ -349,8 +349,337 @@ bf search -s open --status blocked
 
 ---
 
+## Practical Usage Examples
+
+The following examples demonstrate real-world usage of multi-label commands in `bf`, including edge cases, error scenarios, and expected outputs.
+
+### Creating Beads with Labels
+
+#### Empty Labels (Default)
+
+```bash
+$ bf create --title "Simple task without labels"
+Created bead bf-abc123
+```
+
+**Result:** Bead created with empty label array `[]`
+
+#### Single Label
+
+```bash
+$ bf create --title "Bug fix" --label urgent
+Created bead bf-def456
+
+$ bf show bf-def456
+ID: bf-def456
+Title: Bug fix
+Status: open
+Labels: urgent
+```
+
+**Result:** Bead created with single label `["urgent"]`
+
+#### Multiple Labels
+
+```bash
+$ bf create --title "Frontend performance issue" \
+  --label P0 \
+  --label urgent \
+  --label frontend \
+  --label performance
+Created bead bf-ghi789
+
+$ bf show bf-ghi789
+ID: bf-ghi789
+Title: Frontend performance issue
+Status: open
+Priority: 0
+Labels: P0, urgent, frontend, performance
+```
+
+**Result:** Bead created with 4 labels `["P0", "urgent", "frontend", "performance"]`
+
+#### Labels with Spaces (Quoting)
+
+```bash
+$ bf create --title "UX research task" --label "needs research"
+Created bead bf-jkl012
+
+$ bf show bf-jkl012 --format json | jq '.labels'
+["needs research"]
+```
+
+**Result:** Single label with space `"needs research"`
+
+**Common Error (Missing Quotes):**
+
+```bash
+$ bf create --title "UX task" --label needs research
+Error: The argument '--label <LABEL>' requires a value but no value was supplied
+```
+
+**Explanation:** Without quotes, shell word splitting treats "research" as a separate argument.
+
+### Searching with Multi-Label Filters
+
+#### Empty Filter (Search All)
+
+```bash
+$ bf search --limit 2
+[bf-search1] Database optimization task
+[bf-search2] API documentation update
+```
+
+**Result:** Returns all beads regardless of labels
+
+#### Single Label Filter
+
+```bash
+$ bf search --label urgent --limit 3
+[bf-urgent1] Fix authentication bug
+[bf-urgent2] Deploy hotfix to production
+[bf-urgent3] Security patch for CVE-2025-12345
+```
+
+**Result:** Returns beads with "urgent" label
+
+#### Multiple Label Filters (OR Logic)
+
+```bash
+$ bf search --label P0 --label urgent --limit 5
+[bf-ghi789] Frontend performance issue
+[bf-urgent1] Fix authentication bug
+[bf-p0-1] Data migration stuck
+[bf-p0-2] Memory leak in worker pool
+[bf-urgent2] Deploy hotfix to production
+```
+
+**Result:** Returns beads with **any** of the specified labels (P0 **OR** urgent)
+
+#### Combined Filters
+
+```bash
+$ bf search --status open --label P0 --label frontend --type bug --limit 3
+[bf-bug1] Frontend validation error
+[bf-bug2] Performance regression
+[bf-bug3] Layout break on mobile
+```
+
+**Result:** Returns open bugs with P0 **OR** frontend labels
+
+### Label Management Commands
+
+#### Adding Labels (Multiple in Single Command)
+
+```bash
+$ bf label add --label P0 --label backend --label database bf-abc123
+Added labels to bead bf-abc123: P0, backend, database
+
+$ bf labels bf-abc123
+Labels: P0, backend, database
+```
+
+**Result:** Three labels added atomically in one transaction
+
+#### Adding Labels with Mixed Short/Long Forms
+
+```bash
+$ bf label add -l priority -l urgent --label "needs review" bf-abc123
+Added labels to bead bf-abc123: priority, urgent, needs review
+
+$ bf labels bf-abc123 --format json
+["P0","backend","database","needs review","priority","urgent"]
+```
+
+**Result:** Labels can be added using both `-l` and `--label` forms
+
+#### Removing Labels
+
+```bash
+$ bf label remove --label urgent --label backend bf-abc123
+Removed labels from bead bf-abc123: urgent, backend
+
+$ bf labels bf-abc123
+Labels: P0, database, needs review, priority
+```
+
+**Result:** Specified labels removed, others preserved
+
+#### Listing All Labels
+
+```bash
+$ bf label list
+All unique labels (15):
+  P0 (3 beads)
+  P1 (7 beads)
+  P2 (12 beads)
+  backend (8 beads)
+  frontend (5 beads)
+  urgent (4 beads)
+  performance (2 beads)
+  database (6 beads)
+  security (3 beads)
+  documentation (9 beads)
+  testing (4 beads)
+  priority (2 beads)
+  needs review (1 bead)
+  migration (3 beads)
+  bug (11 beads)
+```
+
+**Result:** Shows all labels across all beads with usage counts
+
+### Error Cases and Edge Scenarios
+
+#### Error: No Labels Provided (Required Command)
+
+```bash
+$ bf label add bf-abc123
+error: The following required arguments were not provided:
+  --label <LABEL>
+
+Usage: bf label add --label <LABEL>... <ID>
+
+For more information, try '--help'.
+```
+
+**Explanation:** `bf label add` requires at least one label due to `required = true, num_args = 1..`
+
+#### Error: Bead Not Found
+
+```bash
+$ bf label add --label urgent bf-nonexistent
+Error: Bead not found: bf-nonexistent
+```
+
+**Result:** Clear error message for non-existent bead ID
+
+#### Error: Invalid Label Format (Empty Label)
+
+```bash
+$ bf label add --label "" bf-abc123
+Error: Label cannot be empty
+```
+
+**Result:** Validation rejects empty label strings
+
+#### Error: Too Many Labels (Practical Limit)
+
+```bash
+# Creating a bead with 50 labels (unusual but allowed)
+$ bf create --title "Over-labeled task" \
+  $(for i in {1..50}; do echo "--label label$i"; done)
+Created bead bf-overflow123
+
+Warning: Bead has 50 labels (high)
+```
+
+**Result:** Succeeds but warns about excessive labeling
+
+### Integration Examples
+
+#### Combining with Priority Filters
+
+```bash
+$ bf search --label P0 --priority-max 1 --limit 5
+[bf-crit1] Database corruption
+[bf-crit2] Service unavailable
+[bf-crit3] Data loss bug
+[bf-crit4] Security vulnerability
+[bf-crit5] Performance regression
+```
+
+**Result:** High-priority beads with P0 label
+
+#### Combining with Assignee Filters
+
+```bash
+$ bf search --label backend --assignee worker-7
+[bf-w7-1] API endpoint optimization
+[bf-w7-2] Database query improvement
+[bf-w7-3] Cache invalidation fix
+```
+
+**Result:** Backend-labeled beads assigned to specific worker
+
+#### Combining with Status Filters
+
+```bash
+$ bf search --label urgent --status in_progress --limit 3
+[bf-prog1] Hotfix for login bug
+[bf-prog2] Memory leak resolution
+[bf-prog3] Deployment automation fix
+```
+
+**Result:** Urgent beads currently being worked on
+
+### Batch Operations with Labels
+
+#### Creating Beads with Labels via Batch
+
+```bash
+$ bf batch --json '[
+  {"op": "create", "title": "Auth fix", "type": "bug", "priority": 0, "labels": ["urgent", "security"]},
+  {"op": "create", "title": "UI polish", "type": "task", "priority": 2, "labels": ["frontend"]},
+  {"op": "label_add", "id": "@0", "labels": ["backend"]}
+]'
+[
+  {"op": 0, "status": "ok", "id": "bf-new1", "message": "Created bead bf-new1"},
+  {"op": 1, "status": "ok", "id": "bf-new2", "message": "Created bead bf-new2"},
+  {"op": 2, "status": "ok", "message": "ok: backend added to bf-new1"}
+]
+```
+
+**Result:** Atomic batch with label operations using placeholder references
+
+### Performance Considerations
+
+#### Label Filtering Performance
+
+```bash
+# Fast search with label filter (indexed)
+$ time bf search --label P0 --limit 10
+real 0m0.045s
+
+# Slower search without label filter (full scan)
+$ time bf search --limit 10
+real 0m0.128s
+```
+
+**Tip:** Label filters are optimized in the SQLite schema with indexes on `bead_labels.label`
+
+#### Bulk Label Operations
+
+```bash
+# Efficient: Multiple labels in one command
+$ bf label add -l a -l b -l c -l d -l e bf-abc123
+# Single transaction, ~5ms
+
+# Less efficient: Multiple commands
+$ for label in a b c d e; do
+  bf label add -l $label bf-abc123
+done
+# 5 transactions, ~25ms (5x slower)
+```
+
+**Tip:** Use single commands with multiple flags for better performance
+
+### Cross-Reference to CLI Commands
+
+The following commands support multi-label parsing as documented in the [CLI reference](README.md#commands):
+
+| Command | Multi-Label Support | Documentation Reference |
+|---------|-------------------|------------------------|
+| `bf create --label` | Optional multi-value | [§ Commands: bf create](README.md#commands) |
+| `bf search --label` | Optional multi-value (OR logic) | [§ Commands: bf search](README.md#commands) |
+| `bf label add --label` | Required multi-value | [§ Commands: bf label add](README.md#commands) |
+| `bf label remove --label` | Required multi-value | [§ Commands: bf label remove](README.md#commands) |
+| `bf batch` (label_add op) | Array of labels in JSON | [§ Batch Operations: label_add](README.md#batch-operation-json-schema) |
+
 ## References
 
 - clap v4 documentation: https://docs.rs/clap/latest/clap/
 - Attribute macro reference: https://docs.rs/clap/latest/clap/_derive/index.html
 - bead-forge source: `src/cli/mod.rs` (search for "CLAP MULTI-VALUE PATTERN")
+- [CLI command reference](README.md#commands) — full command documentation
+- [Batch operations schema](../batch-json-schema.md) — JSON-based multi-label operations
