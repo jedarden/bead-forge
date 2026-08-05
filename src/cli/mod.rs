@@ -12,7 +12,7 @@ use crate::reopen::reopen_bead;
 use crate::robot_docs::RobotDocs;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
-use crate::validation::normalize_assignee;
+use crate::validation::{normalize_assignee, validate_priority};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
@@ -1600,6 +1600,9 @@ fn cmd_create(
         return Err(anyhow!("Type cannot be empty or only whitespace"));
     }
 
+    // Validate priority is in range 0-4
+    validate_priority(priority).map_err(|e| anyhow!(e))?;
+
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
 
@@ -1902,6 +1905,12 @@ fn cmd_update(
     // It flows through to update_issue, whose storage layer maps it to
     // `assignee = NULL` (clearing the assignee). Normalizing to None at this
     // layer would erase the "clear" intent (None means "leave unchanged").
+
+    // Validate priority if provided
+    if let Some(p) = priority {
+        validate_priority(p).map_err(|e| anyhow!(e))?;
+    }
+
     // Parse due_at if provided
     let due_at_parsed = match due_at {
         Some(date_str) => {

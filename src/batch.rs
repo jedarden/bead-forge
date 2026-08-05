@@ -476,6 +476,9 @@ fn execute_create(
     let count: i64 = tx.query_row("SELECT COUNT(*) FROM issues", [], |row| row.get(0))?;
     let prefix = get_default_prefix(config);
 
+    // Validate priority is in range 0-4
+    crate::validation::validate_priority(priority).map_err(|e| anyhow!("Invalid priority: {}", e))?;
+
     let mut issue = Issue::new(String::new(), title.to_string(), ".".to_string());
     issue.issue_type = IssueType::from_str(type_).map_err(|e| anyhow!("Invalid type: {}", e))?;
     issue.priority = Priority(priority);

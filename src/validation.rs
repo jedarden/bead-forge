@@ -4,6 +4,42 @@
 //! so that empty/whitespace-only input is collapsed to `None` rather than
 //! persisted as a literal empty string.
 
+/// Validate a priority field value.
+///
+/// Returns `Ok(())` if the priority is in the valid range (0-4), otherwise
+/// returns an error with a descriptive message. Priority values correspond to:
+/// 0 = Critical, 1 = High, 2 = Medium, 3 = Low, 4 = Backlog.
+///
+/// # Examples
+/// ```
+/// use bead_forge::validation::validate_priority;
+///
+/// // Valid priorities
+/// assert!(validate_priority(0).is_ok());   // Critical
+/// assert!(validate_priority(2).is_ok());   // Medium
+/// assert!(validate_priority(4).is_ok());   // Backlog
+///
+/// // Invalid priorities
+/// assert!(validate_priority(-1).is_err()); // Negative
+/// assert!(validate_priority(5).is_err());  // Too high
+/// ```
+///
+/// # Where this is used
+///
+/// `bf create` and `bf update` call this to validate the priority field before
+/// creating or updating a bead. This prevents invalid priority values from being
+/// stored in the database.
+pub fn validate_priority(priority: i32) -> Result<(), String> {
+    if (0..=4).contains(&priority) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Invalid priority: {}. Must be 0-4 (0=Critical, 1=High, 2=Medium, 3=Low, 4=Backlog)",
+            priority
+        ))
+    }
+}
+
 /// Normalize an assignee field value.
 ///
 /// Trims surrounding whitespace and collapses empty/whitespace-only input to

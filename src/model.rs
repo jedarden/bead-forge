@@ -554,6 +554,20 @@ pub struct Issue {
     pub is_template: bool,
 
     // Relations (for export/display, not always in DB table directly)
+    //
+    // IMPORTANT: These fields use `skip_serializing_if` instead of `#[serde(skip)]`
+    // for a specific reason. We want dependencies and comments to be:
+    // 1. Included in JSONL export/import roundtrips (src/jsonl.rs)
+    // 2. Available for API responses and debugging contexts
+    // 3. Excluded ONLY from JSON formatter output (src/format/json.rs)
+    //
+    // The JSON formatter manually strips dependencies/comments via issue_to_value()
+    // for br compatibility and compact JSONL line length. If we used `#[serde(skip)]`
+    // here, these fields would never be serialized in ANY context, breaking JSONL
+    // round-trips (see tests/jsonl_compat.rs: test_jsonl_round_trip_with_dependencies,
+    // test_jsonl_import_with_comments).
+    //
+    // See also: src/format/json.rs issue_to_value() documentation for detailed rationale.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub labels: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
