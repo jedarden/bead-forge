@@ -1,6 +1,6 @@
 //! Database schema definitions for bead-forge.
 //!
-//! This module provides DDL for the 13 core tables in the bead-forge schema.
+//! This module provides DDL for the 14 core tables in the bead-forge schema.
 //! Each table is defined as a const function returning &str for easy composition.
 
 use rusqlite::Connection;
@@ -284,7 +284,15 @@ CREATE INDEX IF NOT EXISTS idx_bead_annotations_bead_id
     ON bead_annotations (bead_id);"#
 }
 
-/// Complete SQL schema for all 13 tables
+/// Dirty issues table - tracks beads that need flushing to JSONL
+pub const fn dirty_issues_table() -> &'static str {
+    r#"CREATE TABLE IF NOT EXISTS dirty_issues (
+    bead_id TEXT NOT NULL PRIMARY KEY,
+    FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
+)"#
+}
+
+/// Complete SQL schema for all 14 tables
 pub const SCHEMA_SQL: &str = r#"
 -- Issues table
 CREATE TABLE IF NOT EXISTS issues (
@@ -518,6 +526,12 @@ CREATE INDEX IF NOT EXISTS idx_bead_annotations_key_value
     ON bead_annotations (key, value);
 CREATE INDEX IF NOT EXISTS idx_bead_annotations_bead_id
     ON bead_annotations (bead_id);
+
+-- Dirty issues table (tracks beads that need flushing to JSONL)
+CREATE TABLE IF NOT EXISTS dirty_issues (
+    bead_id TEXT NOT NULL PRIMARY KEY,
+    FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
+);
 "#;
 
 /// Execute multiple SQL statements separated by semicolons.
