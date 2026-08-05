@@ -402,3 +402,239 @@ The `claim` command has significant implementation complexity due to:
 - All embedded within a single 360-line function
 
 This complexity justifies bypassing the shared formatter — the output shapes are not `Issue` records and vary significantly per execution path.
+
+---
+
+## 9. Appendix: Deep dive on `stats` and `velocity` commands (bf-20da)
+
+This appendix provides detailed implementation analysis of the `stats` and `velocity` commands'
+JSON output mechanisms, as specified in bead bf-20da. **CORRECTION:** The master table (§1)
+and Family B list (§3) incorrectly classify both commands as using `to_string_pretty`. They
+actually use `serde_json::to_string` (compact) via the shared formatter — see below.
+
+### 9.1 `stats` command — Shared formatter with breakdown folding
+
+**Implementation location:** `src/cli/mod.rs:3098-3161` (`cmd_stats`)
+
+**How it outputs JSON:**
+
+The `stats` command uses the **shared formatter** (contrary to the Family B classification in
+§1/§3). It builds a `StatsOutput` struct that folds optional breakdowns into nested maps,
+then routes through `JsonFormatter::format_stats()`.
+
+```rust
+// Build StatsOutput with breakdowns folded in
+let mut output = StatsOutput::new(stats.total, stats.open, stats.in_progress, stats.closed);
+if by_type {
+    output.by_type = Some(storage.get_stats_by_type()?.into_iter().collect());
+}
+// ... similar for by_priority, by_assignee, by_label
+
+let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+let formatter = get_formatter(output_format);
+match output_format {
+    OutputFormat::Json => {
+        let json_str = formatter.format_stats(&output);  // Formatter method
+        if envelope {
+            println!("{}", formatter.format_with_envelope("stats", &json_str));
+        } else {
+            println!("{}", json_str);
+        }
+    }
+    _ => {
+        print!("{}", formatter.format_stats(&output));
+    }
+}
+```
+
+**Formatter methods used:**
+- `format_stats(&StatsOutput)` → `src/format/json.rs:71-73`
+- `format_with_envelope()` → `src/format/json.rs:79-88` (when `--envelope` flag used)
+
+**Formatter implementation:**
+```rust
+fn format_stats(&self, stats: &StatsOutput) -> String {
+    serde_json::to_string(stats).unwrap_or_else(|_| "{}".to_string())
+}
+```
+Uses **`serde_json::to_string`** (COMPACT), NOT `to_string_pretty` as incorrectly stated in §3.
+
+**Array/object structure patterns:**
+- **Container shape:** Single JSON object `{…}`
+- **Object structure:** `StatsOutput` with four required fields (`total`, `open`, `in_progress`, `closed`) plus optional breakdown maps
+- **Format:** Compact (no pretty-printing)
+- **Empty case:** Always emits a full object (zeros for counts, `null` for missing breakdowns)
+- **Trailing newline:** Yes (uses `println!`)
+- **Key ordering:** Struct field declaration order (`StatsOutput` in `src/format/mod.rs:81-94`)
+- **Envelope support:** Yes (when `--envelope` global flag is used)
+
+**Data structure (from `src/format/mod.rs:81-94`):**
+```rust
+#[derive(Debug, Clone, Serialize)]
+pub struct StatsOutput {
+    pub total: usize,
+    pub open: usize,
+    pub in_progress: usize,
+    pub closed: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by_type: Option<BTreeMap<String, i64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by_priority: Option<BTreeMap<String, i64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by_assignee: Option<BTreeMap<String, i64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by_label: Option<BTreeMap<String, i64>>,
+}
+```
+
+**Example output (without breakdowns):**
+```json
+{"total":42,"open":10,"in_progress":5,"closed":27}
+```
+
+**Example output (with --by-type):**
+```json
+{"total":42,"open":10,"in_progress":5,"closed":27,"by_type":{"bug":15,"task":20,"epic":7}}
+```
+
+**Example output (with --envelope):**
+```json
+{"version":"1.0","kind":"stats","data":{"total":42,"open":10,"in_progress":5,"closed":27}}
+```
+
+**Data flow:**
+1. `storage.get_stats()` fetches aggregate counts
+2. If breakdown flags are set, additional queries populate `by_type`, `by_priority`, `by_assignee`, `by_label`
+3. All breakdowns are folded into the `StatsOutput` struct as optional `BTreeMap` fields
+4. Formatter serializes the entire struct to compact JSON
+5. If `--envelope` is set, the JSON is parsed and wrapped in `JsonEnvelope`
+6. Result printed via `println!()` (trailing newline)
+
+**Notable defect (reiterated from §5.1):**
+
+Despite folding breakdowns into the object when `format == "json"`, the current implementation
+has a bug: the breakdown queries run *after* the format match in the original code path, so
+`bf stats --format json --by-type` would output the JSON object followed by plaintext "By type:"
+headers. The fix is to ensure breakdowns are only included in the JSON object when JSON format
+is requested (not as trailing text).
+
+### 9.2 `velocity` command — Shared formatter, array output
+
+**Implementation location:** `src/cli/mod.rs:3374-3400` (`cmd_velocity`)
+
+**How it outputs JSON:**
+
+The `velocity` command also uses the **shared formatter** (contrary to Family B classification).
+It queries velocity stats and routes through `JsonFormatter::format_velocity()`.
+
+```rust
+let stats = storage.with_immediate_transaction(|tx| {
+    crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())
+})?;
+
+let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+let formatter = get_formatter(output_format);
+match output_format {
+    OutputFormat::Json => {
+        println!("{}", formatter.format_velocity(&stats));
+    }
+    _ => {
+        print!("{}", formatter.format_velocity(&stats));
+    }
+}
+```
+
+**Formatter methods used:**
+- `format_velocity(&[VelocityStats])` → `src/format/json.rs:75-77`
+
+**Formatter implementation:**
+```rust
+fn format_velocity(&self, stats: &[VelocityStats]) -> String {
+    serde_json::to_string(stats).unwrap_or_else(|_| "[]".to_string())
+}
+```
+Uses **`serde_json::to_string`** (COMPACT), NOT `to_string_pretty` as incorrectly stated in §3.
+
+**Array/object structure patterns:**
+- **Container shape:** JSON array `[...]`
+- **Element structure:** `VelocityStats` objects with 8 fields each
+- **Format:** Compact (no pretty-printing)
+- **Empty case:** `[]` (empty array)
+- **Trailing newline:** Yes (uses `println!`)
+- **Key ordering:** Struct field declaration order (`VelocityStats` in `src/velocity.rs:49-59`)
+- **Envelope support:** No (does not use `format_with_envelope`)
+
+**Data structure (from `src/velocity.rs:49-59`):**
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VelocityStats {
+    pub model: String,
+    pub harness: String,
+    pub issue_type: String,
+    pub sample_count: i64,
+    pub p50_seconds: Option<i64>,
+    pub p90_seconds: Option<i64>,
+    pub avg_seconds: Option<f64>,
+    pub last_updated: Option<String>,
+}
+```
+
+**Example output (non-empty):**
+```json
+[{"model":"claude-4.7","harness":"cli","issue_type":"bug","sample_count":42,"p50_seconds":180,"p90_seconds":300,"avg_seconds":200.5,"last_updated":"2026-08-05T12:34:56+00:00"},{"model":"claude-5.0","harness":"gui","issue_type":"task","sample_count":15,"p50_seconds":120,"p90_seconds":250,"avg_seconds":150.0,"last_updated":"2026-08-05T11:22:33+00:00"}]
+```
+
+**Example output (empty):**
+```json
+[]
+```
+
+**Data flow:**
+1. `get_velocity_stats()` queries the `velocity_stats` table with optional filters
+2. Returns `Vec<VelocityStats>` ordered by `sample_count DESC`
+3. Formatter serializes the entire slice to compact JSON
+4. Result printed via `println!()` (trailing newline)
+
+**Filtering behavior:**
+- Accepts optional `--model` and `--harness` filters
+- Filters are applied at query level via SQL WHERE clauses
+- No filters → returns all stats ordered by sample count
+
+### 9.3 Summary comparison: `stats` vs `velocity`
+
+| Aspect | `stats` | `velocity` |
+|--------|---------|------------|
+| **Container shape** | Single object `{…}` | Array `[...]` |
+| **Data structure** | `StatsOutput` (4 required + 4 optional fields) | `Vec<VelocityStats>` (8 fields per element) |
+| **Formatter method** | `format_stats(&StatsOutput)` | `format_velocity(&[VelocityStats])` |
+| **Serialization** | `serde_json::to_string` (compact) | `serde_json::to_string` (compact) |
+| **Empty case** | Object with zeros (`{"total":0,...}`) | Empty array (`[]`) |
+| **Trailing newline** | Yes (`println!`) | Yes (`println!`) |
+| **Envelope support** | Yes (via `--envelope` flag) | No |
+| **Key ordering** | Struct declaration order | Struct declaration order |
+| **Filtering** | Via breakdown flags (`--by-*`) | Via `--model`/`--harness` |
+
+### 9.4 Corrections to prior audit sections
+
+The following entries in the master table (§1) and Family B list (§3) require correction:
+
+**Master table (§1):**
+- Line 41: Change `stats` serialization from `to_string_pretty(&Stats)` to `formatter.format_stats() → serde_json::to_string()`
+- Line 42: Change `velocity` serialization from `to_string_pretty(&Vec<VelocityStats>)` to `formatter.format_velocity() → serde_json::to_string()`
+- Line 41: Change `stats` Compact? from `**no** (pretty)` to `yes`
+- Line 42: Change `velocity` Compact? from `**no** (pretty)` to `yes`
+
+**Family B classification (§1/§3):**
+- Both `stats` and `velocity` should be reclassified from Family B (custom serialization) to
+  Family A (shared formatter), as they both use `get_formatter()` and call dedicated formatter
+  methods (`format_stats`/`format_velocity`).
+
+**Rationale for reclassification:**
+While `stats` and `velocity` don't use `format_issues()` (which is specific to `Issue` data),
+they follow the shared formatter pattern: `get_formatter(format).format_T(&data)`. The
+Formatter trait includes methods for non-`Issue` data types (`format_stats`, `format_velocity`),
+and these commands route through those methods rather than using inline `serde_json` calls.
+
+This makes them architecturally closer to Family A (shared formatter, data type-specific
+methods) than Family B (inline `serde_json` macros, bypassing the formatter trait entirely).
+
