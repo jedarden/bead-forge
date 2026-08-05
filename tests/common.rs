@@ -131,6 +131,36 @@ impl TempWorkspace {
         storage.create_issue(issue)
     }
 
+    /// Create a test bead with custom labels.
+    ///
+    /// This is a convenience helper for creating beads with labels in tests.
+    /// It creates a basic task-type bead with the specified labels attached.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Bead ID (e.g., "bf-test-001")
+    /// * `title` - Bead title
+    /// * `labels` - Array of label strings to attach to the bead
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let ws = TempWorkspace::new().unwrap();
+    /// ws.create_bead_with_labels("bf-labeled", "Test bead", &["bug", "critical"]).unwrap();
+    /// let bead = ws.get_bead("bf-labeled").unwrap().unwrap();
+    /// assert_eq!(bead.labels, vec!["bug".to_string(), "critical".to_string()]);
+    /// ```
+    pub fn create_bead_with_labels(&self, id: &str, title: &str, labels: &[&str]) -> anyhow::Result<()> {
+        let storage = self.storage()?;
+        let bead = bead_forge::Issue {
+            id: id.to_string(),
+            title: title.to_string(),
+            labels: labels.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
+        };
+        storage.create_issue(&bead)
+    }
+
     /// Get a bead by ID.
     pub fn get_bead(&self, id: &str) -> anyhow::Result<Option<bead_forge::Issue>> {
         let storage = self.storage()?;
