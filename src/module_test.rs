@@ -20,16 +20,33 @@ pub struct TestOutput {
     pub status: std::process::ExitStatus,
     /// Whether the test was terminated due to timeout
     pub timed_out: bool,
+    /// Exit code from the process (if available)
+    pub exit_code: Option<i32>,
+    /// Signal that terminated the process (Unix only, if applicable)
+    pub signal: Option<String>,
 }
 
 impl TestOutput {
     /// Create a new test output result
     pub fn new(stdout: String, stderr: String, status: std::process::ExitStatus, timed_out: bool) -> Self {
+        let exit_code = status.code();
+
+        #[cfg(unix)]
+        let signal = {
+            use std::os::unix::process::ExitStatusExt;
+            status.signal().map(|s| s.to_string())
+        };
+
+        #[cfg(not(unix))]
+        let signal = None;
+
         Self {
             stdout,
             stderr,
             status,
             timed_out,
+            exit_code,
+            signal,
         }
     }
 
