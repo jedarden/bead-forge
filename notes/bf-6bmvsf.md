@@ -1,115 +1,216 @@
 # Assignee Serialization Investigation (bf-6bmvsf)
 
-## Summary
+## Task
+Identify all code paths where Issues are serialized to JSON and verify assignee field handling.
 
-Investigated all code paths where Issues are serialized to JSON to identify assignee field handling. Found one path that correctly normalizes assignee and one path that relies on serde default behavior.
-
-## Code Paths That Serialize Issue to JSON
-
-### 1. JSONL Export (src/jsonl.rs) ✅ CORRECT FOR STORAGE
-**Location:** Lines 76-78 (export), Line 52 (import)
-**Method:** `serde_json::to_writer(&mut writer, issue)` and `serde_json::from_str::<Issue>()`
-**Status:** RELIES ON STANDARD SERDE BEHAVIOR
-
-- Uses standard serde serialization with `#[serde(skip_serializing_if = "Option::is_none")]`
-- When assignee is None, the field is SKIPPED in JSONL output
-- This is CORRECT for on-disk storage (compact, bd-compatible)
-- Test at line 926 confirms import handles assignee correctly
-
-### 2. CLI JSON Output (src/format/json.rs) ✅ CORRECT FOR DISPLAY
-**Location:** Lines 27-43
-**Method:** Custom `issue_to_value()` with `ensure_display_fields()`
-**Status:** ACTIVELY NORMALIZES ASSIGN
-
-```rust
-fn ensure_display_fields(map: &mut Map<String, Value>) {
-    map.entry("assignee").or_insert(Value::Null);
-    map.entry("labels").or_insert_with(|| Value::Array(vec![]));
-}
-```
-
-- Strips dependencies/comments (lines 28-30)
-- **Guarantees assignee key is always present** (as null when unset)
-- **Guarantees labels key is always present** (as empty array when unset)
-- Tests at lines 123-134 verify this behavior
-
-### 3. Text Output (src/format/text.rs) ✅ OK FOR TEXT
-**Location:** Lines 20-22
-**Method:** Conditional display
-**Status:** CORRECT FOR TEXT FORMAT
-
-```rust
-if let Some(assignee) = &issue.assignee {
-    s.push_str(&format!("Assignee: {}\n", assignee));
-}
-```
-
-- Shows assignee line only when present (normal for text output)
-- No issues here
-
-### 4. Toon Output (src/format/toon.rs) ✅ OK FOR TOON
-**Location:** Lines 21-23
-**Method:** Conditional display
-**Status:** CORRECT FOR TOON FORMAT
-
-```rust
-if let Some(assignee) = &issue.assignee {
-    parts.push(format!("Assignee: {}", assignee));
-}
-```
-
-- Shows assignee line only when present (normal for toon output)
-- No issues here
-
-### 5. Database Storage (src/storage/sqlite.rs) ✅ CORRECT
-**Location:** Lines 162, 185, 272, 297 (SELECT), Lines 575-582 (UPDATE)
-**Method:** Direct SQL parameter binding
-**Status:** FULLY SUPPORTED
-
-- assignee field properly read/written to SQLite
-- Handles empty string as NULL (lines 576-579)
-- Tracks assignee changes for events (lines 511-520)
-- No issues here
-
-### 6. Claim Result Output (src/format/mod.rs) ✅ CORRECT
-**Location:** Lines 28-44
-**Method:** Dedicated struct with required String field
-**Status:** ALWAYS PRESENT
-
-```rust
-pub struct ClaimResultOutput {
-    pub bead_id: String,
-    pub assignee: String,  // Required field, not Option
-    ...
-}
-```
-
-- assignee is a required String field
-- Always present in claim results
-- No issues here
-
-## Issue Model Definition (src/model.rs)
-
-**Location:** Lines 469-470
-
+## Issue Definition
+From `src/model.rs` lines 469-470:
 ```rust
 /// Assigned user.
 #[serde(default, skip_serializing_if = "Option::is_none")]
 pub assignee: Option<String>,
 ```
 
-**Behavior:**
-- When `Some(value)`: field is present in JSON with the value
-- When `None`: field is SKIPPED in JSON (not present as null)
+The field has `skip_serializing_if = "Option::is_none"` which means:
+- When `Some(value)` → field is serialized
+- When `None` → field is skipped (not present in JSON)
 
-## Conclusion
+This is CORRECT for compact JSONL storage and bd compatibility.
 
-**NO ISSUES FOUND** - All serialization paths handle assignee correctly:
+## All Serialization Code Paths
 
-1. **JSONL export**: Skips assignee when None (correct for compact on-disk storage)
-2. **CLI JSON output**: Always includes assignee as null when unset (correct for display)
-3. **Text/Toon output**: Shows assignee only when present (correct for human-readable output)
-4. **Database**: Properly stores and retrieves assignee with NULL handling
-5. **Claim results**: Always includes assignee as required field
+### 1. JSONL Export (`src/jsonl.rs`)
 
-The implementation correctly distinguishes between storage format (compact) and display format (normalized/complete).
+#### `export_jsonl` (line 63-89)
+```rust
+for issue in &issues {
+    serde_json::to_writer(&mut writer, issue)?;
+}
+```
+**Status:** ✅ CORRECT - Uses standard serde serialization, assignee handled correctly
+
+#### `export_jsonl_merge` (line 107-172)
+```rust
+for issue in upserts {
+    by_id.insert(issue.id.clone(), serde_json::to_string(issue)?);
+}
+```
+**Status:** ✅ CORRECT - Uses standard serde serialization
+
+#### `export_jsonl_dirty` (line 191-208)
+Calls `export_jsonl_merge` internally
+**Status:** ✅ CORRECT
+
+#### `stream_issues` (line 29-36)
+```rust
+let line = line?;
+serde_json::from_str::<Issue>(&line).map_err(Into::into)
+```
+**Status:** ✅ CORRECT - Import path, uses standard deserialization
+
+#### `import_jsonl` (line 38-61)
+```rust
+let issue: Issue = serde_json::from_str(&line)?;
+```
+**Status:** ✅ CORRECT - Import path, uses standard deserialization
+
+### 2. CLI JSON Output (`src/format/json.rs`)
+
+#### `issue_to_value` (line 27-37)
+Special function that strips dependencies/comments and ensures display fields:
+```rust
+fn issue_to_value(issue: &Issue) -> Value {
+    let mut stripped = issue.clone();
+    stripped.dependencies = vec![];
+    stripped.comments = vec![];
+
+    let mut value = serde_json::to_value(&stripped).unwrap_or(Value::Null);
+    if let Value::Object(ref mut map) = value {
+        ensure_display_fields(map);
+    }
+    value
+}
+```
+
+**Status:** ✅ CORRECT - Calls `ensure_display_fields` which adds assignee if missing
+
+#### `ensure_display_fields` (line 39-43)
+```rust
+fn ensure_display_fields(map: &mut Map<String, Value>) {
+    map.entry("assignee").or_insert(Value::Null);
+    map.entry("labels").or_insert_with(|| Value::Array(vec![]));
+}
+```
+**Status:** ✅ CORRECT - Ensures assignee is ALWAYS present in CLI JSON output (null when unset)
+
+#### `JsonFormatter::format_issue` (line 46-48)
+```rust
+fn format_issue(&self, issue: &Issue) -> String {
+    serde_json::to_string(&issue_to_value(issue)).unwrap_or_else(|_| "{}".to_string())
+}
+```
+**Status:** ✅ CORRECT - Uses `issue_to_value` which ensures assignee field
+
+#### `JsonFormatter::format_issues` (line 50-57)
+```rust
+fn format_issues(&self, issues: &[Issue]) -> String {
+    issues
+        .iter()
+        .map(|issue| serde_json::to_string(&issue_to_value(issue)))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_default()
+        .join("\n")
+}
+```
+**Status:** ✅ CORRECT - Uses `issue_to_value` for each issue
+
+### 3. CLI Command Output
+
+#### `cmd_show` (src/cli/mod.rs: line ~1780)
+```rust
+let mut out = issue;
+out.dependencies = vec![];
+out.comments = vec![];
+let formatter = get_formatter(OutputFormat::Json);
+let json_str = formatter.format_issue(&out);
+```
+**Status:** ✅ CORRECT - Uses JsonFormatter which ensures assignee
+
+#### `cmd_create` (src/cli/mod.rs: line ~1631)
+**Manually constructs JSON** - needs verification:
+```rust
+let data = serde_json::json!({
+    "id": id,
+    "title": issue.title,
+    "type": issue.issue_type.to_string(),
+    "priority": issue.priority.0,
+    "status": issue.status.to_string(),
+    "description": issue.description,
+    "assignee": issue.assignee,
+    "labels": issue.labels
+});
+```
+**Status:** ✅ CORRECT - Explicitly includes assignee field
+
+#### `cmd_ready` (src/cli/mod.rs: line ~1967-2010)
+```rust
+let issues: Vec<Issue> = candidates
+    .iter()
+    .filter_map(|c| storage.get_issue(&c.id).ok().flatten())
+    .collect();
+let jsonl = formatter.format_issues(&issues);
+```
+**Status:** ✅ CORRECT - Uses JsonFormatter.format_issues
+
+#### `cmd_list` (src/cli/mod.rs: line ~1654-1762)
+```rust
+let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
+let formatter = get_formatter(output_format);
+// ...
+let jsonl = formatter.format_issues(&issues);
+```
+**Status:** ✅ CORRECT - Uses JsonFormatter.format_issues
+
+### 4. Storage Layer (`src/storage/sqlite.rs`)
+
+No direct serialization to JSON - uses rusqlite for database operations.
+
+### 5. Sync Module (`src/sync.rs`)
+
+Multiple serialization points in tests (lines 586, 644, 719, 725, 805):
+```rust
+writeln!(file, "{}", serde_json::to_string(&newer_issue).unwrap()).unwrap();
+```
+**Status:** ✅ CORRECT - Uses standard serde serialization
+
+### 6. Rotate Module (`src/rotate.rs`)
+
+Lines 157, 171, 520:
+```rust
+serde_json::to_writer(&mut writer, bead)?;
+```
+**Status:** ✅ CORRECT - Uses standard serde serialization
+
+### 7. Other Modules
+
+- `src/log.rs` line 143: Event serialization (not Issue)
+- `src/claim.rs` lines 281, 365: Worker metadata (not Issue)
+- `src/recovery.rs` line 130: Recovery manifest (not Issue)
+- `src/robot_docs.rs` line 349: Robot docs (not Issue)
+- `src/config.rs` line 330: Config metadata (not Issue)
+- `src/timing.rs` lines 161, 208, 295, 454, 550: Timing state (not Issue)
+
+**Status:** ✅ N/A - These don't serialize Issue structs
+
+## Summary
+
+### Paths with CORRECT assignee handling:
+1. ✅ **JSONL Export** (`src/jsonl.rs`): All functions use standard serde serialization
+2. ✅ **CLI JSON Output** (`src/format/json.rs`): Special handling ensures assignee is always present
+3. ✅ **CLI Commands**: All commands use JsonFormatter or explicit JSON construction
+4. ✅ **Sync Module**: Uses standard serde serialization
+5. ✅ **Rotate Module**: Uses standard serde serialization
+
+### Key Design Decision:
+The codebase has TWO serialization strategies:
+
+1. **Storage/JSONL Format** (`src/jsonl.rs`):
+   - Uses standard serde serialization
+   - `assignee` field has `skip_serializing_if = "Option::is_none"`
+   - When `None`, field is OMITTED from JSON (compact format)
+   - When `Some(value)`, field is present
+   - This is CORRECT for disk storage and bd compatibility
+
+2. **CLI Display Format** (`src/format/json.rs`):
+   - Uses `issue_to_value()` which calls `ensure_display_fields()`
+   - `assignee` field is ALWAYS present (even when `None` → `null`)
+   - This is CORRECT for JSON consumers who need stable structure
+   - Ensures downstream filters can distinguish "unset" from "omitted"
+
+### Conclusion:
+**NO ISSUES FOUND** - All serialization paths correctly handle the assignee field:
+- JSONL export/import: Uses standard serde, field appears when set
+- CLI JSON output: Ensures field is always present (null when unset)
+- Manual JSON construction: Explicitly includes assignee
+
+The dual serialization strategy is intentional and correct for different use cases.
