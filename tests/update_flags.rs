@@ -913,3 +913,191 @@ fn test_cli_update_description_file_missing_file_errors() {
         bead["description"]
     );
 }
+
+// ==================== --clear-assignee Integration Tests (bf-2gf2ic) ====================
+//
+// Comprehensive integration tests for `bf update --clear-assignee` that verify:
+// 1. Complete CLI flow: parse args → update storage → verify assignee cleared
+// 2. Assignee field is cleared after command execution
+// 3. All other bead fields remain unchanged
+
+#[test]
+fn test_cli_update_clear_assignee_preserves_other_fields() {
+    // bf-2gf2ic: Test that `bf update --clear-assignee` clears ONLY the
+    // assignee field and preserves all other fields unchanged.
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+
+    // Create a bead with multiple fields populated
+    let bead_id = create_cli_bead(workspace, "Original Title");
+
+    // Set up the bead with comprehensive field values
+    update_cli_bead(
+        workspace,
+        &bead_id,
+        &[
+            "--title",
+            "Feature Implementation",
+            "--status",
+            "in_progress",
+            "--priority",
+            "1",
+            "--assignee",
+            "worker-to-clear",
+            "--description",
+            "Implement the core feature with proper error handling",
+            "--acceptance-criteria",
+            "1. Feature works\n2. Tests pass\n3. Documentation updated",
+            "--notes",
+            "Some implementation notes",
+            "--design",
+            "Design reference docs",
+            "--due-at",
+            "2025-12-31T23:59:59Z",
+        ],
+    );
+
+    // Get the bead state before clearing assignee
+    let bead_before = get_cli_bead_json(workspace, &bead_id);
+
+    // Clear only the assignee
+    update_cli_bead(workspace, &bead_id, &["--clear-assignee"]);
+
+    // Get the bead state after clearing assignee
+    let bead_after = get_cli_bead_json(workspace, &bead_id);
+
+    // Verify assignee is cleared
+    assert!(
+        bead_after["assignee"].is_null(),
+        "assignee should be NULL after --clear-assignee, got {:?}",
+        bead_after["assignee"]
+    );
+
+    // Verify all other fields remain unchanged
+    assert_eq!(
+        bead_after["title"], bead_before["title"],
+        "title should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["status"], bead_before["status"],
+        "status should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["priority"], bead_before["priority"],
+        "priority should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["description"], bead_before["description"],
+        "description should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["acceptance_criteria"], bead_before["acceptance_criteria"],
+        "acceptance_criteria should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["notes"], bead_before["notes"],
+        "notes should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["design"], bead_before["design"],
+        "design should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["due_at"], bead_before["due_at"],
+        "due_at should remain unchanged"
+    );
+
+    // Verify specific values match what we set
+    assert_eq!(bead_after["title"], "Feature Implementation");
+    assert_eq!(bead_after["status"], "in_progress");
+    assert_eq!(bead_after["priority"], 1);
+    assert_eq!(
+        bead_after["description"],
+        "Implement the core feature with proper error handling"
+    );
+    assert_eq!(
+        bead_after["acceptance_criteria"],
+        "1. Feature works\n2. Tests pass\n3. Documentation updated"
+    );
+    assert_eq!(bead_after["notes"], "Some implementation notes");
+    assert_eq!(bead_after["design"], "Design reference docs");
+}
+
+#[test]
+fn test_cli_update_clear_assignee_with_concurrent_title_update() {
+    // Test that --clear-assignee works correctly when combined with other
+    // update flags (not isolation, but combination)
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Original Title");
+
+    // Set up initial state
+    update_cli_bead(
+        workspace,
+        &bead_id,
+        &[
+            "--assignee",
+            "worker-to-clear",
+            "--status",
+            "in_progress",
+            "--description",
+            "Original description",
+        ],
+    );
+
+    // Clear assignee AND update title simultaneously
+    update_cli_bead(
+        workspace,
+        &bead_id,
+        &["--clear-assignee", "--title", "Updated Title"],
+    );
+
+    let bead = get_cli_bead_json(workspace, &bead_id);
+
+    // Verify assignee is cleared
+    assert!(
+        bead["assignee"].is_null(),
+        "assignee should be NULL, got {:?}",
+        bead["assignee"]
+    );
+
+    // Verify title is updated
+    assert_eq!(bead["title"], "Updated Title");
+
+    // Verify other fields remain unchanged
+    assert_eq!(bead["status"], "in_progress");
+    assert_eq!(bead["description"], "Original description");
+}
+
+#[test]
+fn test_cli_update_clear_assignee_empty_bead() {
+    // Test that --clear-assignee works on a bead with minimal fields set
+    let temp_dir = init_cli_workspace();
+    let workspace = temp_dir.path();
+    let bead_id = create_cli_bead(workspace, "Minimal Bead");
+
+    // Get initial state (should have minimal fields)
+    let bead_before = get_cli_bead_json(workspace, &bead_id);
+
+    // Clear assignee on a bead that likely has no assignee set
+    update_cli_bead(workspace, &bead_id, &["--clear-assignee"]);
+
+    let bead_after = get_cli_bead_json(workspace, &bead_id);
+
+    // Verify assignee is still NULL (no-op on empty assignee)
+    assert!(
+        bead_after["assignee"].is_null(),
+        "assignee should remain NULL, got {:?}",
+        bead_after["assignee"]
+    );
+
+    // Verify minimal fields are unchanged
+    assert_eq!(
+        bead_after["title"], bead_before["title"],
+        "title should remain unchanged"
+    );
+    assert_eq!(
+        bead_after["status"], bead_before["status"],
+        "status should remain unchanged"
+    );
+}
