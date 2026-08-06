@@ -972,6 +972,21 @@ pub struct IssueChanges {
     pub actor: Option<String>,
 }
 
+/// Base update structure for simple issue field updates.
+///
+/// This struct provides a minimal set of updatable fields for basic issue updates.
+/// For more complex updates including labels, annotations, and actor tracking,
+/// use `IssueChanges` instead.
+#[derive(Debug, Clone, Default)]
+pub struct IssueUpdate {
+    /// Optional title update
+    pub title: Option<String>,
+    /// Optional status update
+    pub status: Option<Status>,
+    /// Optional priority update
+    pub priority: Option<Priority>,
+}
+
 /// Filter for listing issues (non-Serde, for queries).
 #[derive(Debug, Clone, Default)]
 pub struct IssueFilter {

@@ -2,7 +2,7 @@ use crate::critical_path::{compute_all_critical_paths, invalidate_cache};
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
     Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter,
-    IssueType, Status,
+    IssueType, IssueUpdate, Status,
 };
 use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
@@ -847,13 +847,13 @@ impl Storage {
     /// # use bead_forge::storage::sqlite::Storage;
     /// # fn example(storage: &Storage) -> anyhow::Result<()> {
     /// // Update just the title
-    /// storage.update_issue("bf-123", IssueUpdate {
+    /// storage.apply_issue_update("bf-123", IssueUpdate {
     ///     title: Some("New title".to_string()),
     ///     ..Default::default()
     /// })?;
     ///
     /// // Update status and priority
-    /// storage.update_issue("bf-123", IssueUpdate {
+    /// storage.apply_issue_update("bf-123", IssueUpdate {
     ///     status: Some(Status::InProgress),
     ///     priority: Some(Priority::HIGH),
     ///     ..Default::default()
@@ -861,7 +861,7 @@ impl Storage {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn update_issue(&self, id: &str, updates: IssueUpdate) -> Result<()> {
+    pub fn apply_issue_update(&self, id: &str, updates: IssueUpdate) -> Result<()> {
         // Build the SET clause dynamically based on which fields are Some
         let mut set_clauses = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
