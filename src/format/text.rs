@@ -416,4 +416,380 @@ mod tests {
             annotations: std::collections::BTreeMap::new(),
         }
     }
+
+    // ==================== format_error tests ====================
+
+    #[test]
+    fn format_error_basic() {
+        let formatter = TextFormatter;
+        let result = formatter.format_error("Something went wrong");
+        assert_eq!(result, "Error: Something went wrong\n");
+    }
+
+    #[test]
+    fn format_error_empty() {
+        let formatter = TextFormatter;
+        let result = formatter.format_error("");
+        assert_eq!(result, "Error: \n");
+    }
+
+    #[test]
+    fn format_error_with_special_characters() {
+        let formatter = TextFormatter;
+        let result = formatter.format_error("Error: file not found: <test> & 'quotes'");
+        assert_eq!(result, "Error: file not found: <test> & 'quotes'\n");
+    }
+
+    #[test]
+    fn format_error_long_message() {
+        let formatter = TextFormatter;
+        let long_msg = "A".repeat(1000);
+        let result = formatter.format_error(&long_msg);
+        assert!(result.starts_with("Error: "));
+        assert!(result.ends_with('\n'));
+        assert_eq!(result.len(), 1008); // "Error: " + 1000 chars + "\n"
+    }
+
+    #[test]
+    fn format_error_with_newlines() {
+        let formatter = TextFormatter;
+        let result = formatter.format_error("Line 1\nLine 2\nLine 3");
+        assert_eq!(result, "Error: Line 1\nLine 2\nLine 3\n");
+    }
+
+    #[test]
+    fn format_error_unicode() {
+        let formatter = TextFormatter;
+        let result = formatter.format_error("Error: emoji test 🚀 🔥 💻");
+        assert_eq!(result, "Error: emoji test 🚀 🔥 💻\n");
+    }
+
+    // ==================== format_issues tests ====================
+
+    #[test]
+    fn format_issues_empty() {
+        let formatter = TextFormatter;
+        let issues: Vec<Issue> = vec![];
+        let result = formatter.format_issues(&issues);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn format_issues_single() {
+        let formatter = TextFormatter;
+        let issue = create_test_issue("bf-abc123", "Test issue");
+        let result = formatter.format_issues(&[issue]);
+
+        assert!(result.contains("[bf-abc123]"));
+        assert!(result.contains("Test issue"));
+        assert!(result.contains("open"));
+        assert!(result.contains("MEDIUM"));
+    }
+
+    #[test]
+    fn format_issues_multiple() {
+        let formatter = TextFormatter;
+        let issues = vec![
+            create_test_issue("bf-001", "First issue"),
+            create_test_issue("bf-002", "Second issue"),
+            create_test_issue("bf-003", "Third issue"),
+        ];
+        let result = formatter.format_issues(&issues);
+
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 3);
+        assert!(lines[0].contains("[bf-001]"));
+        assert!(lines[1].contains("[bf-002]"));
+        assert!(lines[2].contains("[bf-003]"));
+    }
+
+    #[test]
+    fn format_issues_with_different_statuses() {
+        let formatter = TextFormatter;
+        let mut issues = vec![
+            create_test_issue("bf-001", "Open issue"),
+            create_test_issue("bf-002", "In progress issue"),
+        ];
+        issues[1].status = Status::InProgress;
+
+        let result = formatter.format_issues(&issues);
+
+        assert!(result.contains("open"));
+        assert!(result.contains("in_progress"));
+    }
+
+    #[test]
+    fn format_issues_with_different_priorities() {
+        let formatter = TextFormatter;
+        let mut issues = vec![
+            create_test_issue("bf-001", "High priority"),
+            create_test_issue("bf-002", "Low priority"),
+        ];
+        issues[0].priority = Priority::HIGH;
+        issues[1].priority = Priority::LOW;
+
+        let result = formatter.format_issues(&issues);
+
+        assert!(result.contains("HIGH"));
+        assert!(result.contains("LOW"));
+    }
+
+    #[test]
+    fn format_issues_special_characters() {
+        let formatter = TextFormatter;
+        let issue = Issue {
+            id: "bf-特殊".to_string(),
+            title: "Title with <quotes> & \"double\" & 'single'".to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            description: None,
+            assignee: None,
+            labels: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            content_hash: None,
+            design: None,
+            acceptance_criteria: None,
+            notes: None,
+            owner: None,
+            estimated_minutes: None,
+            created_by: None,
+            closed_at: None,
+            close_reason: None,
+            closed_by_session: None,
+            due_at: None,
+            defer_until: None,
+            external_ref: None,
+            source_system: None,
+            source_repo: None,
+            deleted_at: None,
+            deleted_by: None,
+            delete_reason: None,
+            original_type: None,
+            compaction_level: None,
+            compacted_at: None,
+            compacted_at_commit: None,
+            original_size: None,
+            sender: None,
+            ephemeral: false,
+            pinned: false,
+            is_template: false,
+            dependencies: vec![],
+            comments: vec![],
+            events: vec![],
+            annotations: std::collections::BTreeMap::new(),
+        };
+
+        let result = formatter.format_issues(&[issue]);
+        assert!(result.contains("bf-特殊"));
+        assert!(result.contains("<quotes>"));
+    }
+
+    #[test]
+    fn format_issues_long_title() {
+        let formatter = TextFormatter;
+        let long_title = "A".repeat(500);
+        let issue = create_test_issue("bf-long", &long_title);
+        let result = formatter.format_issues(&[issue]);
+
+        assert!(result.contains("bf-long"));
+        assert!(result.contains(&long_title));
+    }
+
+    // ==================== format_issue tests ====================
+
+    #[test]
+    fn format_issue_basic() {
+        let formatter = TextFormatter;
+        let issue = create_test_issue("bf-basic", "Basic test issue");
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("ID: bf-basic"));
+        assert!(result.contains("Title: Basic test issue"));
+        assert!(result.contains("Status: open"));
+        assert!(result.contains("Priority: MEDIUM"));
+        assert!(result.contains("Type: task"));
+        assert!(result.contains("Created at:"));
+        assert!(result.contains("Updated at:"));
+    }
+
+    #[test]
+    fn format_issue_with_description() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-desc", "Issue with description");
+        issue.description = Some("This is a detailed description".to_string());
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("ID: bf-desc"));
+        assert!(result.contains("Description: This is a detailed description"));
+    }
+
+    #[test]
+    fn format_issue_with_assignee() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-assignee", "Issue with assignee");
+        issue.assignee = Some("john.doe".to_string());
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("Assignee: john.doe"));
+    }
+
+    #[test]
+    fn format_issue_with_labels() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-labels", "Issue with labels");
+        issue.labels = vec!["bug".to_string(), "urgent".to_string(), "frontend".to_string()];
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("Labels: bug, urgent, frontend"));
+    }
+
+    #[test]
+    fn format_issue_with_all_optional_fields() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-full", "Issue with all fields");
+        issue.description = Some("Complete description".to_string());
+        issue.assignee = Some("jane.smith".to_string());
+        issue.labels = vec!["feature".to_string(), "backend".to_string()];
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("ID: bf-full"));
+        assert!(result.contains("Description: Complete description"));
+        assert!(result.contains("Assignee: jane.smith"));
+        assert!(result.contains("Labels: feature, backend"));
+        assert!(result.contains("Created at:"));
+        assert!(result.contains("Updated at:"));
+    }
+
+    #[test]
+    fn format_issue_empty_description() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-empty-desc", "Issue with empty description");
+        issue.description = Some("".to_string());
+        let result = formatter.format_issue(&issue);
+
+        // Empty description should still be included
+        assert!(result.contains("Description:"));
+    }
+
+    #[test]
+    fn format_issue_empty_assignee() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-empty-assignee", "Issue with empty assignee");
+        issue.assignee = Some("".to_string());
+        let result = formatter.format_issue(&issue);
+
+        // Empty assignee should still be included
+        assert!(result.contains("Assignee:"));
+    }
+
+    #[test]
+    fn format_issue_special_characters_in_fields() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-special", "Issue with special chars: <>&'");
+        issue.description = Some("Description with \"quotes\" & 'apostrophes'".to_string());
+        issue.assignee = Some("user@example.com".to_string());
+        issue.labels = vec!["tag-with-dash".to_string(), "tag_with_underscore".to_string()];
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("<>&'"));
+        assert!(result.contains("\"quotes\""));
+        assert!(result.contains("user@example.com"));
+        assert!(result.contains("tag-with-dash"));
+    }
+
+    #[test]
+    fn format_issue_long_title() {
+        let formatter = TextFormatter;
+        let long_title = "A".repeat(1000);
+        let issue = create_test_issue("bf-long-title", &long_title);
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains(&long_title));
+        assert!(result.contains("ID: bf-long-title"));
+    }
+
+    #[test]
+    fn format_issue_unicode_characters() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-unicode", "Issue with emoji 🚀");
+        issue.description = Some("Description with unicode: café, naïve, 日本語".to_string());
+        issue.assignee = Some("user@example.com".to_string());
+        issue.labels = vec!["unicode-tag-中文".to_string()];
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("🚀"));
+        assert!(result.contains("café"));
+        assert!(result.contains("日本語"));
+        assert!(result.contains("中文"));
+    }
+
+    #[test]
+    fn format_issue_empty_labels() {
+        let formatter = TextFormatter;
+        let issue = create_test_issue("bf-no-labels", "Issue without labels");
+        let result = formatter.format_issue(&issue);
+
+        // Empty labels should NOT be included
+        assert!(!result.contains("Labels:"));
+    }
+
+    #[test]
+    fn format_issue_no_description_or_assignee() {
+        let formatter = TextFormatter;
+        let issue = create_test_issue("bf-minimal", "Minimal issue");
+        let result = formatter.format_issue(&issue);
+
+        // These fields should NOT be present when None
+        assert!(!result.contains("Description:"));
+        assert!(!result.contains("Assignee:"));
+
+        // But required fields should be present
+        assert!(result.contains("ID: bf-minimal"));
+        assert!(result.contains("Title: Minimal issue"));
+        assert!(result.contains("Status: open"));
+        assert!(result.contains("Priority: MEDIUM"));
+        assert!(result.contains("Type: task"));
+    }
+
+    #[test]
+    fn format_issue_newlines_in_description() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-newlines", "Issue with newlines");
+        issue.description = Some("Line 1\nLine 2\nLine 3".to_string());
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("Line 1\nLine 2\nLine 3"));
+    }
+
+    #[test]
+    fn format_issue_different_status() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-status", "Issue with custom status");
+        issue.status = Status::InProgress;
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("Status: in_progress"));
+    }
+
+    #[test]
+    fn format_issue_different_priority() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-priority", "Issue with high priority");
+        issue.priority = Priority::HIGH;
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("Priority: HIGH"));
+    }
+
+    #[test]
+    fn format_issue_different_type() {
+        let formatter = TextFormatter;
+        let mut issue = create_test_issue("bf-type", "Bug issue");
+        issue.issue_type = IssueType::Bug;
+        let result = formatter.format_issue(&issue);
+
+        assert!(result.contains("Type: bug"));
+    }
 }
