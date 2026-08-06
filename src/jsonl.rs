@@ -238,11 +238,11 @@ pub fn get_dirty_issue_ids(conn: &rusqlite::Connection) -> Result<Vec<String>> {
 
 /// Incremental flush that only writes dirty beads to JSONL.
 /// This is the main entry point for auto-flush functionality.
-pub fn incremental_flush(conn: &rusqlite::Connection, path: &Path) -> Result<FlushResult> {
+pub fn incremental_flush(storage: &crate::storage::sqlite::Storage, path: &Path) -> Result<FlushResult> {
     use crate::storage::sqlite::Storage;
 
-    // Query dirty issue IDs from dirty_issues table
-    let dirty_ids = get_dirty_issue_ids(conn)?;
+    // Query dirty issue IDs using Storage's query_dirty_issues method
+    let dirty_ids = storage.query_dirty_issues()?;
 
     // Early return if no dirty issues
     if dirty_ids.is_empty() {
@@ -254,6 +254,7 @@ pub fn incremental_flush(conn: &rusqlite::Connection, path: &Path) -> Result<Flu
 
     // List dirty issues from database
     let list_dirty = || -> Result<Vec<crate::model::Issue>> {
+        let conn = storage.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
                     i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
@@ -272,16 +273,19 @@ pub fn incremental_flush(conn: &rusqlite::Connection, path: &Path) -> Result<Flu
         let mut rows = stmt.query([])?;
         let mut issues = Vec::new();
         while let Some(row) = rows.next()? {
-            issues.push(Storage::row_to_issue_conn(conn, row)?);
+            issues.push(Storage::row_to_issue_conn(&conn, row)?);
         }
         drop(rows);
         drop(stmt);
+        drop(conn);
         Ok(issues)
     };
 
     // Clear dirty marks after successful export
     let clear_dirty = || -> Result<()> {
+        let conn = storage.conn.lock().unwrap();
         conn.execute("DELETE FROM dirty_issues", [])?;
+        drop(conn);
         Ok(())
     };
 

@@ -15,13 +15,22 @@ use crate::storage::Storage;
 use crate::validation::{normalize_assignee, validate_priority};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 /// Version of bead-forge, read from Cargo.toml
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Output format for the labels command
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum LabelsFormat {
+    /// Plain text output
+    Text,
+    /// JSON output
+    Json,
+}
 
 #[derive(Parser)]
 #[command(name = "bf")]
