@@ -129,11 +129,17 @@ bf doctor --reclaim-stale --ttl 120
 
 ### 1. Monitoring Stale Assignees
 
-Set up monitoring to detect stale assignees:
+Set up monitoring to detect stale assignees proactively:
 
 ```bash
-# Find beads assigned but not updated recently
-bf recent --assignee "worker-name" --time-period 24h
+# Daily cron: Check for beads stuck > 24 hours
+0 9 * * * bf recent --status in_progress --since 24h --format json | jq -r '.[].id' | while read id; do
+    echo "WARNING: Bead $id stuck in_progress for >24h"
+    bf log "$id" --since 24h | tail -10
+done
+
+# Weekly cron: Generate stale assignee report
+0 9 * * 1 bf stats --by-assignee > /var/log/bf-assignees-weekly.txt
 ```
 
 ### 2. Worker Health Checks
@@ -145,6 +151,9 @@ Ensure workers have proper health checks and cleanup on exit:
 # 1. Stop claiming new work
 # 2. Clear assignees on any in-progress beads
 # 3. Exit cleanly
+
+# NEEDLE integration: Add to worker shutdown handler
+trap 'bf list --assignee "$WORKER_ID" --format json | jq -r ".[].id" | xargs -I {} bf update {} --clear-assignee' EXIT
 ```
 
 ### 3. Claim TTL Configuration
@@ -153,6 +162,65 @@ Configure appropriate claim TTL in `.beads/config.yaml`:
 
 ```yaml
 claim_ttl_minutes: 30  # Adjust based on your workflow
+```
+
+## Emergency Procedures
+
+### Entire Worker Pool Crash
+
+When all workers crash simultaneously (e.g., system reboot, network outage):
+
+```bash
+# Emergency script: Clear all in_progress beads
+#!/bin/bash
+# /usr/local/bin/bf-emergency-clear-all.sh
+
+bf list --status in_progress --format json | jq -r '.[].id' | while read bead_id; do
+    echo "Clearing: $bead_id"
+    bf update "$bead_id" --clear-assignee --status open
+    bf comment "$bead_id" "Emergency reclamation: Worker pool crash"
+done
+
+echo "Emergency clear complete at $(date)"
+```
+
+### Partial Worker Pool Failure
+
+When only some workers fail:
+
+```bash
+# Identify which workers are still alive
+bf stats --by-assignee --format json | jq -r '.[].assignee' | sort -u > /tmp/all-workers
+
+# Compare to known alive workers from monitoring
+comm -23 /tmp/all-workers /tmp/alive-workers > /tmp/dead-workers
+
+# Clear only dead workers' assignees
+while read worker; do
+    echo "Clearing worker: $worker"
+    bf list --assignee "$worker" --format json | jq -r '.[].id' | \
+        xargs -I {} bf update {} --clear-assignee
+done < /tmp/dead-workers
+```
+
+### Post-Incident Analysis
+
+After remediation, analyze what happened:
+
+```bash
+# 1. Generate incident timeline
+bf log --since 24h --format json | jq '.[] | select(.event_type | test("claim|close"))' > /tmp/incident-timeline.json
+
+# 2. Identify affected beads
+bf log --since 24h | grep -E "ASSIGNEE_CHANGED|CLAIMED" > /tmp/affected-beads.txt
+
+# 3. Check for patterns
+grep -i "timeout\|crash\|OOM" /tmp/incident-timeline.json
+
+# 4. Update prevention measures
+# - Adjust claim_ttl if needed
+# - Add worker health checks
+# - Improve monitoring alerts
 ```
 
 ## Testing
