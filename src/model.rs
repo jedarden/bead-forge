@@ -2034,4 +2034,89 @@ mod tests {
         assert!(json.contains("assignee"), "assignee field should be present when Some");
         assert!(json.contains("alice"), "assignee value should be present");
     }
+
+    #[test]
+    fn test_epic_is_standard_type_not_custom() {
+        // Test that Epic is a standard type, not a Custom variant
+        let epic_type = IssueType::Epic;
+
+        // Epic should not be a Custom type
+        assert!(!matches!(epic_type, IssueType::Custom(_)),
+                   "Epic should be a standard type, not Custom");
+
+        // Epic should be considered a standard type
+        assert!(epic_type.is_standard(),
+                "Epic should be recognized as a standard type");
+
+        // Epic should serialize as "epic"
+        let serialized = serde_json::to_string(&epic_type).unwrap();
+        assert_eq!(serialized, "\"epic\"", "Epic should serialize as 'epic'");
+
+        // "epic" should deserialize back to Epic variant
+        let deserialized: IssueType = serde_json::from_str("\"epic\"").unwrap();
+        assert_eq!(deserialized, IssueType::Epic,
+                   "Deserializing 'epic' should give IssueType::Epic");
+
+        // Epic should not equal a Custom("epic")
+        let custom_epic = IssueType::Custom("epic".to_string());
+        assert_ne!(epic_type, custom_epic,
+                   "Standard Epic should not equal Custom(\"epic\")");
+    }
+
+    #[test]
+    fn test_issue_with_epic_type_not_invalid() {
+        // Test that an Issue with Epic type is handled correctly
+        let issue = Issue {
+            id: "bf-epic-test".to_string(),
+            title: "Test Epic Issue".to_string(),
+            issue_type: IssueType::Epic,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&issue).unwrap();
+
+        // Should contain "epic" as the issue_type
+        assert!(json.contains(r#""issue_type":"epic""#),
+                "Epic type should be serialized correctly");
+
+        // Should not contain "Custom" anywhere in the serialized output
+        assert!(!json.contains("Custom"),
+                "Epic issue should not serialize as Custom type");
+
+        // Deserialize back and verify
+        let deserialized: Issue = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.issue_type, IssueType::Epic,
+                  "Deserialized issue should have Epic type");
+
+        // Verify the Epic type is standard (not custom)
+        assert!(deserialized.issue_type.is_standard(),
+                "Deserialized Epic type should be recognized as standard");
+    }
+
+    #[test]
+    fn test_all_standard_types_are_standard() {
+        // Test that all standard issue types are recognized as standard
+        let standard_types = vec![
+            IssueType::Task,
+            IssueType::Bug,
+            IssueType::Feature,
+            IssueType::Epic,
+            IssueType::Chore,
+            IssueType::Docs,
+            IssueType::Question,
+        ];
+
+        for issue_type in standard_types {
+            assert!(issue_type.is_standard(),
+                    "IssueType::{:?} should be recognized as standard", issue_type);
+        }
+
+        // Custom type should not be standard
+        let custom_type = IssueType::Custom("spike".to_string());
+        assert!(!custom_type.is_standard(),
+                "Custom issue type should not be recognized as standard");
+    }
 }

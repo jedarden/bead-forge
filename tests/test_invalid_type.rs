@@ -310,4 +310,111 @@ mod tests {
             "Custom type should be preserved"
         );
     }
+
+    #[test]
+    fn test_epic_is_not_invalid_type() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that "epic" is accepted as a valid standard type, not treated as invalid
+        let epic_type = "epic";
+        let (stdout, stderr, success) = run_create(
+            &beads_dir,
+            &[
+                "--title",
+                "Test Epic is valid type",
+                "--type",
+                epic_type,
+                "--priority",
+                "2",
+            ],
+        );
+
+        assert!(
+            success,
+            "Epic type should be accepted as valid. Create command failed. stderr: {}",
+            stderr
+        );
+
+        let bead_id = stdout.trim();
+        println!("Created Epic bead with ID: {}", bead_id);
+
+        // Verify the Epic type is preserved correctly in show output
+        let show_output = run_show(&beads_dir, bead_id);
+        assert!(
+            show_output.contains(epic_type) || show_output.contains("Epic"),
+            "Epic type should be preserved in show output. Got: {}",
+            show_output
+        );
+
+        // Verify Epic type is correctly serialized in JSON output
+        let json_output = run_show_json(&beads_dir, bead_id);
+        assert!(
+            json_output.contains(r#""issue_type":"epic""#) || json_output.contains(r#""issue_type": "epic""#),
+            "Epic type should be correctly serialized in JSON. Got: {}",
+            json_output
+        );
+
+        // Verify that Epic is treated as a standard type (not custom)
+        // This is important for Epic to not be considered "invalid"
+        assert!(
+            !json_output.contains("Custom"),
+            "Epic should not be serialized as Custom type"
+        );
+    }
+
+    #[test]
+    fn test_all_standard_types_not_invalid() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that all standard types are accepted and not treated as invalid
+        let standard_types = vec![
+            ("task", "Standard Task"),
+            ("bug", "Standard Bug"),
+            ("feature", "Standard Feature"),
+            ("epic", "Standard Epic"),
+            ("chore", "Standard Chore"),
+            ("docs", "Standard Docs"),
+            ("question", "Standard Question"),
+        ];
+
+        for (issue_type, title) in standard_types {
+            let (stdout, stderr, success) = run_create(
+                &beads_dir,
+                &[
+                    "--title",
+                    title,
+                    "--type",
+                    issue_type,
+                    "--priority",
+                    "2",
+                ],
+            );
+
+            assert!(
+                success,
+                "Standard type '{}' should be accepted as valid. stderr: {}",
+                issue_type, stderr
+            );
+
+            let bead_id = stdout.trim();
+
+            // Verify each standard type is preserved correctly
+            let show_output = run_show(&beads_dir, bead_id);
+            assert!(
+                show_output.contains(issue_type) || show_output.contains(&capitalize(issue_type)),
+                "Standard type '{}' should be preserved in show output",
+                issue_type
+            );
+
+            println!("✓ Standard type '{}' accepted and preserved", issue_type);
+        }
+    }
+
+    fn capitalize(s: &str) -> String {
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    }
 }
