@@ -703,7 +703,7 @@ mod tests {
 
         // Claim it
         let result = storage
-            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None).map_err(|e| e.into()))
             .unwrap();
 
         assert!(result.is_some());
@@ -723,7 +723,7 @@ mod tests {
 
         // No beads available
         let result = storage
-            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None).map_err(|e| e.into()))
             .unwrap();
 
         assert!(result.is_none());

@@ -1619,7 +1619,7 @@ mod tests {
 
         // Attempting to add reverse dependency should fail (cycle detection)
         let result =
-            storage.with_immediate_transaction(|tx| execute_dep_add_blocker(tx, "bf-b", "bf-a"));
+            storage.with_immediate_transaction(|tx| execute_dep_add_blocker(tx, "bf-b", "bf-a").map_err(|e| e.into()));
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1664,7 +1664,7 @@ mod tests {
 
         // Attempting to add same dependency again should fail
         let result =
-            storage.with_immediate_transaction(|tx| execute_dep_add_blocker(tx, "bf-a", "bf-b"));
+            storage.with_immediate_transaction(|tx| execute_dep_add_blocker(tx, "bf-a", "bf-b").map_err(|e| e.into()));
 
         assert!(result.is_err());
         let err = result.unwrap_err();

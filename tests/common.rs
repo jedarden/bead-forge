@@ -105,13 +105,13 @@ impl TempWorkspace {
     /// Import issues from JSONL into the database.
     pub fn import_jsonl(&self) -> anyhow::Result<bead_forge::jsonl::ImportResult> {
         let storage = self.storage()?;
-        storage.sync_from_jsonl(&self.jsonl_path)
+        storage.sync_from_jsonl(&self.jsonl_path).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Export issues from database to JSONL.
     pub fn export_jsonl(&self, dirty_only: bool) -> anyhow::Result<usize> {
         let storage = self.storage()?;
-        storage.sync_to_jsonl(&self.jsonl_path, dirty_only)
+        storage.sync_to_jsonl(&self.jsonl_path, dirty_only).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Create a test bead with the given ID and title.

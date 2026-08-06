@@ -50,6 +50,7 @@ fn create_p0_no_labels(id: &str, title: &str, issue_type: IssueType) -> Issue {
         labels: vec![], // Empty labels - NO LABELS
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: BTreeMap::new(),
     }
 }
