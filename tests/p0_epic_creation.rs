@@ -205,6 +205,149 @@ fn test_p0_vs_other_priorities() {
 }
 
 #[test]
+fn test_p0_epic_with_multiple_labels() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create P0 epic with multiple labels
+    let epic = Issue {
+        id: "epic-p0-labels".to_string(),
+        title: "P0 Epic with Multiple Labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec![
+            "critical".to_string(),
+            "urgent".to_string(),
+            "security".to_string(),
+            "p0".to_string(),
+        ],
+        description: Some("P0 epic with multiple critical labels".to_string()),
+        ..Default::default()
+    };
+
+    storage.create_issue(&epic).unwrap();
+
+    // Verify epic was stored correctly
+    let retrieved = storage.get_issue("epic-p0-labels").unwrap().unwrap();
+
+    // Verify basic properties
+    assert_eq!(retrieved.id, "epic-p0-labels");
+    assert_eq!(retrieved.issue_type, IssueType::Epic);
+    assert_eq!(retrieved.status, Status::Open);
+    assert_eq!(retrieved.priority, Priority::CRITICAL);
+    assert_eq!(retrieved.priority.0, 0);
+
+    // Verify all 4 labels are present
+    assert_eq!(retrieved.labels.len(), 4);
+    assert!(retrieved.labels.contains(&"critical".to_string()));
+    assert!(retrieved.labels.contains(&"urgent".to_string()));
+    assert!(retrieved.labels.contains(&"security".to_string()));
+    assert!(retrieved.labels.contains(&"p0".to_string()));
+
+    // Verify description is preserved
+    assert_eq!(
+        retrieved.description,
+        Some("P0 epic with multiple critical labels".to_string())
+    );
+}
+
+#[test]
+fn test_p0_epic_multiple_labels_json_serialization() {
+    // Create P0 epic with multiple labels and test JSON serialization
+    let epic = Issue {
+        id: "epic-p0-labels-json".to_string(),
+        title: "P0 Multiple Labels JSON Test".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec![
+            "critical".to_string(),
+            "urgent".to_string(),
+            "high-impact".to_string(),
+        ],
+        description: Some("Test JSON serialization with multiple labels".to_string()),
+        ..Default::default()
+    };
+
+    // Serialize to JSON
+    let json = serde_json::to_string(&epic).unwrap();
+
+    // Verify JSON structure
+    let parsed = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    assert_eq!(parsed["priority"], 0);
+    assert_eq!(parsed["issue_type"], "epic");
+
+    // Verify all labels are in JSON
+    let label_array = parsed["labels"].as_array().unwrap();
+    assert_eq!(label_array.len(), 3);
+    assert!(label_array.iter().any(|l| l == "critical"));
+    assert!(label_array.iter().any(|l| l == "urgent"));
+    assert!(label_array.iter().any(|l| l == "high-impact"));
+
+    // Test roundtrip deserialization
+    let deserialized: Issue = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.priority, Priority::CRITICAL);
+    assert_eq!(deserialized.priority.0, 0);
+    assert_eq!(deserialized.labels.len(), 3);
+    assert!(deserialized.labels.contains(&"critical".to_string()));
+    assert!(deserialized.labels.contains(&"urgent".to_string()));
+    assert!(deserialized.labels.contains(&"high-impact".to_string()));
+}
+
+#[test]
+fn test_p0_epic_dynamic_label_operations() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("test.db")).unwrap();
+
+    // Create P0 epic with initial labels
+    let epic = Issue {
+        id: "epic-p0-dynamic".to_string(),
+        title: "P0 Epic Dynamic Labels".to_string(),
+        issue_type: IssueType::Epic,
+        status: Status::Open,
+        priority: Priority::CRITICAL,
+        labels: vec!["critical".to_string()],
+        ..Default::default()
+    };
+
+    storage.create_issue(&epic).unwrap();
+
+    // Add multiple labels dynamically
+    storage.add_label("epic-p0-dynamic", "urgent").unwrap();
+    storage.add_label("epic-p0-dynamic", "security").unwrap();
+    storage.add_label("epic-p0-dynamic", "frontend").unwrap();
+    storage.add_label("epic-p0-dynamic", "performance").unwrap();
+
+    // Verify all labels were added
+    let retrieved = storage.get_issue("epic-p0-dynamic").unwrap().unwrap();
+    assert_eq!(retrieved.labels.len(), 5);
+    assert!(retrieved.labels.contains(&"critical".to_string()));
+    assert!(retrieved.labels.contains(&"urgent".to_string()));
+    assert!(retrieved.labels.contains(&"security".to_string()));
+    assert!(retrieved.labels.contains(&"frontend".to_string()));
+    assert!(retrieved.labels.contains(&"performance".to_string()));
+
+    // Verify priority is unchanged
+    assert_eq!(retrieved.priority, Priority::CRITICAL);
+    assert_eq!(retrieved.priority.0, 0);
+
+    // Remove some labels
+    storage.remove_label("epic-p0-dynamic", "frontend").unwrap();
+    storage.remove_label("epic-p0-dynamic", "performance").unwrap();
+
+    // Verify labels were removed but priority maintained
+    let final_retrieved = storage.get_issue("epic-p0-dynamic").unwrap().unwrap();
+    assert_eq!(final_retrieved.labels.len(), 3);
+    assert!(final_retrieved.labels.contains(&"critical".to_string()));
+    assert!(final_retrieved.labels.contains(&"urgent".to_string()));
+    assert!(final_retrieved.labels.contains(&"security".to_string()));
+    assert!(!final_retrieved.labels.contains(&"frontend".to_string()));
+    assert!(!final_retrieved.labels.contains(&"performance".to_string()));
+    assert_eq!(final_retrieved.priority, Priority::CRITICAL);
+}
+
+#[test]
 fn test_p0_epic_json_roundtrip() {
     // Create epic with P0 priority
     let original = Issue {
