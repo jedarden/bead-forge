@@ -409,7 +409,7 @@ pub fn execute_batch(
 
             // Fail fast on error
             if result.status == "error" {
-                return Err(anyhow!("{}", result.error.unwrap_or_default()));
+                return Err(anyhow!("{}", result.error.unwrap_or_default()).into());
             }
 
             results.push(result);

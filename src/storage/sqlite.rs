@@ -910,6 +910,39 @@ impl Storage {
         })
     }
 
+    /// Update only the title field of an issue.
+    ///
+    /// This is a convenience method for updating just the title field without
+    /// needing to construct a full `IssueUpdate` or `IssueChanges` struct.
+    /// All other fields (status, priority, description, etc.) are preserved.
+    ///
+    /// # Arguments
+    /// * `id` - The issue ID to update
+    /// * `title` - The new title value
+    ///
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # use bead_forge::storage::sqlite::Storage;
+    /// # fn example(storage: &Storage) -> anyhow::Result<()> {
+    /// // Update just the title
+    /// storage.update_title("bf-123", "New title")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn update_title(&self, id: &str, title: &str) -> Result<()> {
+        let query = "UPDATE issues SET title = ?, updated_at = ? WHERE id = ?";
+        let now = Utc::now();
+
+        // Execute within a BEGIN IMMEDIATE transaction for atomicity
+        self.with_immediate_transaction(|tx| {
+            tx.execute(query, params![title, now.to_rfc3339(), id])?;
+            Ok(())
+        })
+    }
+
     /// Update an issue from JSONL import data.
     ///
     /// This replaces all fields of the existing issue with the imported data,

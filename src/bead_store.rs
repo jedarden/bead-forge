@@ -204,13 +204,13 @@ pub fn claim_bead(workspace: &Path, config: ClaimConfig) -> Result<Option<Claime
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(
+            Ok(claim(
                 tx,
                 &config.worker_id,
                 claim_ttl,
                 Utc::now(),
                 Some(&worker_metadata),
-            )
+            )?)
         })?;
 
         Ok(result.map(|r| ClaimedBead {
@@ -243,7 +243,7 @@ pub fn get_ready(workspace: &Path, limit: usize) -> Result<Vec<crate::claim::Sco
     let storage = Storage::open(&db_path)?;
 
     Ok(storage
-        .with_immediate_transaction(|tx| crate::claim::get_ready_candidates(tx, limit, None, None))?)
+        .with_immediate_transaction(|tx| Ok(crate::claim::get_ready_candidates(tx, limit, None, None)?))?)
 }
 
 /// Check if a bead is ready to be claimed (not blocked).

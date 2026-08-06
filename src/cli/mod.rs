@@ -1671,7 +1671,7 @@ fn cmd_create(
         }
     }
     if !created {
-        return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted")));
+        return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted")).into());
     }
 
     // Incremental flush of the just-created bead (best effort; never fatal).
