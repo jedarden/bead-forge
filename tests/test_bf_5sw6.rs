@@ -1,13 +1,13 @@
 // Integration test for bf-5sw6: bf ready --limit 0 should return unlimited beads
 
-use std::path::PathBuf;
 use std::process::Command;
 
-fn bf_cmd() -> Command {
-    let mut cmd = Command::new("target/debug/bf");
-    cmd.current_dir("..").env("BEADS_DIR", ".beads");
-    cmd
-}
+// NOTE: do not add a helper that runs `bf` without `--workspace`/`current_dir`.
+// A previous `bf_cmd()` here did `current_dir("..").env("BEADS_DIR", ".beads")`,
+// which resolves to a store outside the repo. It was dead code, but it is
+// exactly the shape that lets a test mutate a real workspace. Every `bf`
+// invocation must be scoped to a temp workspace — see
+// `tests/workspace_isolation_guard.rs`.
 
 fn bf_absolute_cmd() -> Command {
     let bf_path = if let Ok(exe) = std::env::current_exe() {

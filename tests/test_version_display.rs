@@ -4,10 +4,29 @@
 
 use std::fs;
 use std::process::Command;
+use std::sync::OnceLock;
+use tempfile::TempDir;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Empty temp directory used as the cwd for every `bf` invocation here.
+    ///
+    /// These tests only pass `--version`/`-V`, which clap short-circuits before
+    /// any workspace is resolved. But `bf` otherwise resolves its workspace from
+    /// the process cwd, and under `cargo test` that is the package root — so
+    /// running from there leaves these tests one added subcommand away from
+    /// mutating bead-forge's own live `.beads/` store.
+    /// Enforced by `tests/workspace_isolation_guard.rs`.
+    ///
+    /// Note this changes only the *child* process cwd; the test process keeps
+    /// the package root, so the relative `Cargo.toml` read below still works.
+    fn isolated_cwd() -> &'static std::path::Path {
+        static DIR: OnceLock<TempDir> = OnceLock::new();
+        DIR.get_or_init(|| TempDir::new().expect("failed to create temp cwd"))
+            .path()
+    }
 
     fn get_bf_binary_path() -> std::path::PathBuf {
         // During cargo test, the CARGO_BIN_EXE_bf environment variable points to the built binary
@@ -32,6 +51,7 @@ mod tests {
         // Test that bf --version outputs the correct format
         let bf_path = get_bf_binary_path();
         let output = Command::new(&bf_path)
+            .current_dir(isolated_cwd())
             .arg("--version")
             .output()
             .expect("Failed to run 'bf --version'");
@@ -65,6 +85,7 @@ mod tests {
         // Test that bf --version matches the version in Cargo.toml
         let bf_path = get_bf_binary_path();
         let output = Command::new(&bf_path)
+            .current_dir(isolated_cwd())
             .arg("--version")
             .output()
             .expect("Failed to run 'bf --version'");
@@ -102,6 +123,7 @@ mod tests {
         // Test that bf -V (short version flag) also works
         let bf_path = get_bf_binary_path();
         let output = Command::new(&bf_path)
+            .current_dir(isolated_cwd())
             .arg("-V")
             .output()
             .expect("Failed to run 'bf -V'");
@@ -122,6 +144,7 @@ mod tests {
         // Test that bf --version exits with success
         let bf_path = get_bf_binary_path();
         let output = Command::new(&bf_path)
+            .current_dir(isolated_cwd())
             .arg("--version")
             .output()
             .expect("Failed to run 'bf --version'");

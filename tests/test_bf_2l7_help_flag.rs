@@ -8,10 +8,34 @@
 // surface fails loudly here.
 
 use std::process::Command;
+use std::sync::OnceLock;
+use tempfile::TempDir;
 
 fn bf_binary() -> std::path::PathBuf {
     // cargo test injects CARGO_BIN_EXE_bf pointing at the freshly built binary.
     std::path::PathBuf::from(env!("CARGO_BIN_EXE_bf"))
+}
+
+/// Empty temp directory used as the cwd for every `bf` invocation here.
+///
+/// These tests only pass `--help`/`-h`, which clap short-circuits before any
+/// workspace is resolved. But `bf` otherwise resolves its workspace from the
+/// process cwd, and under `cargo test` that is the package root — so running
+/// from there leaves these tests one added subcommand away from mutating
+/// bead-forge's own live `.beads/` store. Anchoring cwd to an empty temp dir
+/// removes that possibility outright.
+/// Enforced by `tests/workspace_isolation_guard.rs`.
+fn isolated_cwd() -> &'static std::path::Path {
+    static DIR: OnceLock<TempDir> = OnceLock::new();
+    DIR.get_or_init(|| TempDir::new().expect("failed to create temp cwd"))
+        .path()
+}
+
+/// `bf` command anchored to an isolated cwd. Use this, never `Command::new`.
+fn bf() -> Command {
+    let mut cmd = Command::new(bf_binary());
+    cmd.current_dir(isolated_cwd());
+    cmd
 }
 
 /// Every top-level command clap registers. Kept in sync with the `Commands`
@@ -55,7 +79,7 @@ const TOP_LEVEL_COMMANDS: &[&str] = &[
 
 #[test]
 fn test_help_exits_zero() {
-    let output = Command::new(bf_binary())
+    let output = bf()
         .arg("--help")
         .output()
         .expect("Failed to run 'bf --help'");
@@ -69,7 +93,7 @@ fn test_help_exits_zero() {
 
 #[test]
 fn test_help_shows_usage_block() {
-    let output = Command::new(bf_binary())
+    let output = bf()
         .arg("--help")
         .output()
         .expect("Failed to run 'bf --help'");
@@ -95,7 +119,7 @@ fn test_help_shows_usage_block() {
 
 #[test]
 fn test_help_lists_all_commands() {
-    let output = Command::new(bf_binary())
+    let output = bf()
         .arg("--help")
         .output()
         .expect("Failed to run 'bf --help'");
@@ -115,7 +139,7 @@ fn test_help_lists_all_commands() {
 #[test]
 fn test_short_help_flag() {
     // `-h` is clap's short alias and must behave like `--help`.
-    let output = Command::new(bf_binary())
+    let output = bf()
         .arg("-h")
         .output()
         .expect("Failed to run 'bf -h'");
@@ -133,7 +157,7 @@ fn test_short_help_flag() {
 #[test]
 fn test_subcommand_help() {
     // Per-subcommand help must also work: `bf create --help`.
-    let output = Command::new(bf_binary())
+    let output = bf()
         .args(["create", "--help"])
         .output()
         .expect("Failed to run 'bf create --help'");

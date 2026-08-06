@@ -6,10 +6,45 @@
 //! - Missing required parameters (title, type)
 
 use std::process::Command;
+use tempfile::TempDir;
 
-/// Helper to run bf create with arguments and capture output
-fn run_bf_create(args: &[&str]) -> (String, String, bool) {
+/// Create a fresh, initialized workspace in a temp dir.
+///
+/// Every `bf` invocation here MUST be scoped to one of these. `bf` resolves its
+/// workspace from `--workspace`, defaulting to the process cwd (`src/cli/mod.rs`
+/// — `cli.workspace.unwrap_or_else(|| PathBuf::from("."))`). Under `cargo test`
+/// the cwd is the package root, so an unscoped `bf create` writes into
+/// bead-forge's own live `.beads/` store. Several tests below create beads that
+/// succeed, so unscoped runs silently injected real beads into the live store on
+/// every test run. `tests/workspace_isolation_guard.rs` enforces this.
+fn isolated_workspace() -> TempDir {
+    let dir = TempDir::new().expect("failed to create temp workspace");
+
     let output = Command::new(env!("CARGO_BIN_EXE_bf"))
+        .arg("--workspace")
+        .arg(dir.path())
+        .args(["init", "--prefix", "bf"])
+        .output()
+        .expect("Failed to run bf init");
+
+    assert!(
+        output.status.success(),
+        "bf init failed in temp workspace: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    dir
+}
+
+/// Helper to run bf create with arguments and capture output.
+///
+/// Runs against a throwaway workspace, never the repo's own `.beads/`.
+fn run_bf_create(args: &[&str]) -> (String, String, bool) {
+    let workspace = isolated_workspace();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_bf"))
+        .arg("--workspace")
+        .arg(workspace.path())
         .args(args)
         .output()
         .expect("Failed to execute bf command");
