@@ -306,7 +306,7 @@ fn update_export_hashes_for_issues(storage: &Storage, issues: &[Issue]) -> Resul
         }
 
         Ok(())
-    })
+    }).map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Find the .beads directory for a workspace.

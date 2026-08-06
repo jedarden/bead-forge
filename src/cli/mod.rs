@@ -1697,7 +1697,7 @@ fn cmd_create(
         }
     }
     if !created {
-        return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted")).into());
+        return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted").into()).into());
     }
 
     // Incremental flush of the just-created bead (best effort; never fatal).
@@ -2083,7 +2083,7 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
 
     // --limit 0 means unlimited (get_ready_candidates omits LIMIT clause when limit == 0)
     let candidates =
-        storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None))?;
+        storage.with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, limit, None, None)?))?;
 
     // Use the common formatter pattern for consistency with other commands
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
@@ -2202,7 +2202,7 @@ fn cmd_claim(
                     if let Ok(local_storage) = Storage::open(&local_db_path) {
                         if let Ok(local_candidates) =
                             local_storage.with_immediate_transaction(|tx| {
-                                get_ready_candidates(tx, 1, None, None)
+                                Ok(get_ready_candidates(tx, 1, None, None)?)
                             })
                         {
                             for c in local_candidates {
@@ -2226,7 +2226,7 @@ fn cmd_claim(
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let candidates =
-                storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 1, None, None))?;
+                storage.with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 1, None, None)?))?;
             candidates
                 .into_iter()
                 .map(|c| (beads_dir.parent().unwrap_or(beads_dir).to_path_buf(), c))
@@ -2280,7 +2280,7 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
+            Ok(claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))?)
         })?;
 
         match result {
@@ -2328,7 +2328,7 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
+            Ok(claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))?)
         })?;
 
         match result {
@@ -3513,7 +3513,7 @@ fn cmd_velocity(
     let storage = Storage::open(&db_path)?;
 
     let stats = storage.with_immediate_transaction(|tx| {
-        crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())
+        Ok(crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())?)
     })?;
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
@@ -3718,7 +3718,7 @@ fn cmd_critical_path(beads_dir: &PathBuf, id: &str, _max_depth: usize, format: &
     let storage = Storage::open(&db_path)?;
 
     // Compute critical path for the epic
-    let result = storage.with_immediate_transaction(|tx| compute_epic_critical_path(tx, id))?;
+    let result = storage.with_immediate_transaction(|tx| Ok(compute_epic_critical_path(tx, id)?))?;
 
     match format {
         "json" => {

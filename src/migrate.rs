@@ -127,7 +127,7 @@ pub fn migrate(opts: MigrateOptions) -> Result<MigrateResult> {
         Ok(inner_result) => inner_result,
         Err(_) => {
             release_migration_lock(&storage, lock_id)?;
-            Err(anyhow!("Migration panicked"))
+            Err(anyhow!("Migration panicked").into())
         }
     }
 }
@@ -211,16 +211,16 @@ fn acquire_migration_lock(storage: &Storage, locked_by: &str) -> Result<i64> {
              VALUES (1, ?1, ?2, ?3)",
             rusqlite::params![locked_by, now.to_rfc3339(), expires_at.to_rfc3339()],
         )?;
-        Ok::<_, anyhow::Error>(1)
-    })
+        Ok(1)
+    }).map_err(|e| anyhow::anyhow!("Failed to acquire migration lock: {}", e))
 }
 
 /// Release migration lock after migration completes.
 fn release_migration_lock(storage: &Storage, _lock_id: i64) -> Result<()> {
     storage.with_immediate_transaction(|tx| {
         tx.execute("DELETE FROM migration_lock WHERE id = 1", [])?;
-        Ok::<_, anyhow::Error>(())
-    })
+        Ok(())
+    }).map_err(|e| anyhow::anyhow!("Failed to release migration lock: {}", e))
 }
 
 /// Prime critical_path_cache for all beads.
@@ -234,7 +234,7 @@ fn prime_critical_path_cache(storage: &Storage) -> Result<usize> {
             row.get(0)
         })?;
         Ok(count as usize)
-    })
+    }).map_err(|e| anyhow::anyhow!("Failed to prime critical path cache: {}", e))
 }
 
 /// Seed config.yaml with bf-specific defaults if missing.
@@ -416,7 +416,7 @@ fn verify_forward_compat(storage: &Storage) -> Result<bool> {
         }
 
         Ok(all_present)
-    })
+    }).map_err(|e| anyhow::anyhow!("Forward compatibility check failed: {}", e))
 }
 
 /// Migrate from br's JSONL export, reconstructing events from git log.
@@ -665,7 +665,7 @@ fn insert_synthetic_event(
         )?;
 
         Ok(())
-    })
+    }).map_err(|e| anyhow::anyhow!("Failed to insert synthetic event: {}", e))
 }
 
 /// Parse git log to get snapshots of issues.jsonl at each commit.
@@ -745,7 +745,7 @@ fn parse_git_date(date_str: &str) -> Result<DateTime<Utc>> {
     // Fallback: try parsing as ISO-8601
     DateTime::parse_from_rfc3339(trimmed)
         .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|_| anyhow::anyhow!("Failed to parse git date: {}", date_str))
+        .map_err(|_| anyhow::anyhow!("Failed to parse git date: {}", date_str).into())
 }
 
 /// Parse JSONL content into a map of issues.
@@ -885,7 +885,7 @@ pub fn seed_velocity_from_events(storage: &Storage) -> Result<()> {
         }
 
         Ok(())
-    })
+    }).map_err(|e| anyhow::anyhow!("Failed to seed velocity from events: {}", e))
 }
 
 /// Verify migration results.

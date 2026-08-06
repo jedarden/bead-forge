@@ -22,7 +22,7 @@ const RETRY_BASE_MS: u64 = 50;
 /// Error type for secret detection failures.
 #[derive(Debug, thiserror::Error)]
 #[error("secret detected: {0}")]
-pub struct SecretError(String);
+pub struct SecretError(pub String);
 
 /// Dependency tree node with hierarchy information.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -539,7 +539,7 @@ impl Storage {
             }
         };
         if !exists {
-            return Err(anyhow!("Bead not found: {}", id));
+            return Err(BeadForgeError::not_found("bead", id, None));
         }
 
         // Scan for secrets before updating (only for string fields in changes)
@@ -1069,7 +1069,7 @@ impl Storage {
                 )
                 .unwrap_or(false);
             if !exists {
-                return Err(anyhow!("Bead not found: {}", id));
+                return Err(BeadForgeError::not_found("bead", id, None));
             }
 
             // Check if already closed for idempotence
@@ -1190,16 +1190,16 @@ impl Storage {
                 .ok();
 
             if current_status.is_none() {
-                return Err(anyhow!("Bead not found: {}", id));
+                return Err(BeadForgeError::not_found("bead", id, None));
             }
 
             // Check if bead is currently closed
             if current_status.as_deref() != Some("closed") {
-                return Err(anyhow!(
+                return Err(BeadForgeError::validation(format!(
                     "Cannot reopen bead {}: status is '{}', must be 'closed'",
                     id,
                     current_status.unwrap()
-                ));
+                )));
             }
 
             // Reopen the bead
@@ -1728,7 +1728,7 @@ impl Storage {
                 return Err(anyhow::anyhow!(
                     "Cannot add self-blocking dependency: bead '{}' cannot block itself",
                     issue_id
-                ));
+                ).into());
             }
 
             let now = Utc::now();

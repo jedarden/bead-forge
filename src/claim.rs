@@ -623,7 +623,7 @@ pub fn claim_any(
 
             let now = Utc::now();
             match storage.with_immediate_transaction(|tx| {
-                claim(tx, worker, claim_ttl_minutes, now, worker_metadata)
+                Ok(claim(tx, worker, claim_ttl_minutes, now, worker_metadata)?)
             })? {
                 Some(mut result) => {
                     result.workspace_path = Some(workspace_path.clone());
