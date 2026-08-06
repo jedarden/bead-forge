@@ -284,6 +284,36 @@ CREATE INDEX IF NOT EXISTS idx_bead_annotations_bead_id
     ON bead_annotations (bead_id);"#
 }
 
+/// Labels table indexes (minimal - PK and UNIQUE constraints sufficient)
+pub const fn labels_indexes() -> &'static str {
+    ""
+}
+
+/// Priorities table indexes (minimal - PK and UNIQUE constraints sufficient)
+pub const fn priorities_indexes() -> &'static str {
+    ""
+}
+
+/// Statuses table indexes (minimal - PK and UNIQUE constraints sufficient)
+pub const fn statuses_indexes() -> &'static str {
+    ""
+}
+
+/// Issue types table indexes (minimal - PK and UNIQUE constraints sufficient)
+pub const fn issue_types_indexes() -> &'static str {
+    ""
+}
+
+/// Assignees table indexes (minimal - PK and UNIQUE constraints sufficient)
+pub const fn assignees_indexes() -> &'static str {
+    ""
+}
+
+/// Dirty issues table indexes (minimal - PK sufficient)
+pub const fn dirty_issues_indexes() -> &'static str {
+    ""
+}
+
 /// Dirty issues table - tracks beads that need flushing to JSONL
 pub const fn dirty_issues_table() -> &'static str {
     r#"CREATE TABLE IF NOT EXISTS dirty_issues (
@@ -620,4 +650,44 @@ pub const fn table_issue_types() -> &'static str {
 /// Alias for bead_annotations_table() - matches bead bf-2roxos acceptance criteria
 pub const fn table_bead_annotations() -> &'static str {
     bead_annotations_table()
+}
+
+/// All table DDL strings - returns all 14 table definitions in dependency order
+pub fn all_tables() -> Vec<&'static str> {
+    vec![
+        issues_table(),
+        dependencies_table(),
+        comments_table(),
+        events_table(),
+        labels_table(),
+        issue_labels_table(),
+        priorities_table(),
+        statuses_table(),
+        issue_types_table(),
+        issue_relations_table(),
+        assignees_table(),
+        issue_assignees_table(),
+        bead_annotations_table(),
+        dirty_issues_table(),
+    ]
+}
+
+/// All index DDL strings - returns all index definitions
+pub fn all_indexes() -> Vec<&'static str> {
+    vec![
+        issues_indexes(),
+        dependencies_indexes(),
+        comments_indexes(),
+        events_indexes(),
+        labels_indexes(),
+        issue_labels_indexes(),
+        priorities_indexes(),
+        statuses_indexes(),
+        issue_types_indexes(),
+        issue_relations_indexes(),
+        assignees_indexes(),
+        issue_assignees_indexes(),
+        bead_annotations_indexes(),
+        dirty_issues_indexes(),
+    ]
 }
