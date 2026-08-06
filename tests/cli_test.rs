@@ -146,7 +146,7 @@ fn test_create_subcommand_parsing() {
     }
 }
 
-/// Test: Verify create subcommand with labels (multi-value flag)
+/// Test: Verify create subcommand with labels (multi-value flag) - 2 labels
 #[test]
 fn test_create_with_labels_parsing() {
     let args = vec![
@@ -173,6 +173,171 @@ fn test_create_with_labels_parsing() {
         }
         Err(e) => {
             panic!("Failed to parse create command with labels: {}", e);
+        }
+    }
+}
+
+/// Test: Verify create subcommand with 0 labels (no --label flag)
+#[test]
+fn test_create_with_zero_labels_parsing() {
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Test",
+    ];
+    let result = Cli::try_parse_from(args);
+
+    match result {
+        Ok(cli) => {
+            if let Some(Commands::Create { label, title, .. }) = cli.command {
+                assert_eq!(title, "Test", "Title should be parsed correctly");
+                assert_eq!(label.len(), 0, "Should parse 0 labels when no --label flag is provided");
+                assert!(label.is_empty(), "Labels vector should be empty");
+            } else {
+                panic!("Expected Create command");
+            }
+        }
+        Err(e) => {
+            panic!("Failed to parse create command with 0 labels: {}", e);
+        }
+    }
+}
+
+/// Test: Verify create subcommand with 1 label (single --label flag)
+#[test]
+fn test_create_with_single_label_parsing() {
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Test",
+        "--label",
+        "urgent",
+    ];
+    let result = Cli::try_parse_from(args);
+
+    match result {
+        Ok(cli) => {
+            if let Some(Commands::Create { label, title, .. }) = cli.command {
+                assert_eq!(title, "Test", "Title should be parsed correctly");
+                assert_eq!(label.len(), 1, "Should parse 1 label");
+                assert_eq!(label[0], "urgent", "Label should be 'urgent'");
+            } else {
+                panic!("Expected Create command");
+            }
+        }
+        Err(e) => {
+            panic!("Failed to parse create command with 1 label: {}", e);
+        }
+    }
+}
+
+/// Test: Verify create subcommand with 3+ labels (multiple --label flags)
+#[test]
+fn test_create_with_multiple_labels_parsing() {
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Test",
+        "--label",
+        "urgent",
+        "--label",
+        "backend",
+        "--label",
+        "p0",
+    ];
+    let result = Cli::try_parse_from(args);
+
+    match result {
+        Ok(cli) => {
+            if let Some(Commands::Create { label, title, .. }) = cli.command {
+                assert_eq!(title, "Test", "Title should be parsed correctly");
+                assert_eq!(label.len(), 3, "Should parse 3 labels");
+                assert_eq!(label[0], "urgent", "First label should be 'urgent'");
+                assert_eq!(label[1], "backend", "Second label should be 'backend'");
+                assert_eq!(label[2], "p0", "Third label should be 'p0'");
+            } else {
+                panic!("Expected Create command");
+            }
+        }
+        Err(e) => {
+            panic!("Failed to parse create command with 3 labels: {}", e);
+        }
+    }
+}
+
+/// Test: Verify create subcommand with many labels (5 labels for stress testing)
+#[test]
+fn test_create_with_many_labels_parsing() {
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Complex test",
+        "--label",
+        "urgent",
+        "--label",
+        "backend",
+        "--label",
+        "p0",
+        "--label",
+        "feature",
+        "--label",
+        "high-impact",
+    ];
+    let result = Cli::try_parse_from(args);
+
+    match result {
+        Ok(cli) => {
+            if let Some(Commands::Create { label, .. }) = cli.command {
+                assert_eq!(label.len(), 5, "Should parse 5 labels");
+                assert_eq!(label[0], "urgent");
+                assert_eq!(label[1], "backend");
+                assert_eq!(label[2], "p0");
+                assert_eq!(label[3], "feature");
+                assert_eq!(label[4], "high-impact");
+            } else {
+                panic!("Expected Create command");
+            }
+        }
+        Err(e) => {
+            panic!("Failed to parse create command with 5 labels: {}", e);
+        }
+    }
+}
+
+/// Test: Verify create subcommand with labels containing special characters
+#[test]
+fn test_create_with_special_character_labels_parsing() {
+    let args = vec![
+        "bf",
+        "create",
+        "--title",
+        "Test",
+        "--label",
+        "p0-critical",
+        "--label",
+        "backend/api",
+        "--label",
+        "high-priority",
+    ];
+    let result = Cli::try_parse_from(args);
+
+    match result {
+        Ok(cli) => {
+            if let Some(Commands::Create { label, .. }) = cli.command {
+                assert_eq!(label.len(), 3, "Should parse 3 labels with special characters");
+                assert_eq!(label[0], "p0-critical");
+                assert_eq!(label[1], "backend/api");
+                assert_eq!(label[2], "high-priority");
+            } else {
+                panic!("Expected Create command");
+            }
+        }
+        Err(e) => {
+            panic!("Failed to parse create command with special character labels: {}", e);
         }
     }
 }
