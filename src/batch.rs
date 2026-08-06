@@ -615,6 +615,14 @@ fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<(
         return Err(anyhow!("Bead not found: {}", blocker));
     }
 
+    // Prevent self-blocking: a bead cannot depend on itself for blocking dependency types
+    if id == blocker {
+        return Err(anyhow!(
+            "Cannot add self-blocking dependency: bead '{}' cannot block itself",
+            id
+        ));
+    }
+
     // Check for duplicate dependency
     let exists: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM dependencies WHERE issue_id = ?1 AND depends_on_id = ?2)",
