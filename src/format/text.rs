@@ -249,7 +249,7 @@ pub fn format_dependencies_display(dependencies: &[crate::storage::sqlite::Depen
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Dependency, DependencyType};
+    use crate::model::{Dependency, DependencyType, IssueType, Priority, Status};
     use chrono::Utc;
 
     #[test]

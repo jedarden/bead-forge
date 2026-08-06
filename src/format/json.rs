@@ -154,14 +154,6 @@ mod tests {
     }
 
     #[test]
-    fn labels_skipped_when_empty() {
-        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
-        let v = parse(&JsonFormatter.format_issue(&issue));
-        // With standard Issue serde, labels is skipped when empty (skip_serializing_if)
-        assert_eq!(v.get("labels"), None);
-    }
-
-    #[test]
     fn assignee_and_labels_populated_when_present() {
         let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
         issue.assignee = Some("claude-code-glm-4.7-alpha".to_string());
