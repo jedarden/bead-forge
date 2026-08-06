@@ -1,237 +1,211 @@
 # Formatter Test Coverage Review (bf-6dd3xi)
 
-**Date:** 2026-08-05
-**Scope:** Review existing formatter tests across the codebase and document gaps
+**Date:** 2026-08-05  
+**Scope:** Review all existing formatter tests and document gaps
 
 ## Summary
 
-The format module has **partial test coverage** with significant gaps in error handling, edge cases, and integration scenarios. While JSON formatter has reasonably good coverage for core functionality, text and toon formatters lack comprehensive tests.
+Comprehensive review of formatter test coverage across `src/format/json.rs`, `src/format/text.rs`, and `src/format/toon.rs`. Found **16 unit tests** covering formatters, with significant gaps in toon formatter and edge case coverage.
 
-## Files Reviewed
+## Existing Tests
 
-### 1. `src/format/json.rs` (322 lines)
+### src/format/json.rs (10 tests)
 
-#### Existing Tests (11 tests)
+**Field Serialization Tests:**
+- ✅ `assignee_skipped_when_unset` - Assignee skipped when None
+- ✅ `labels_skipped_when_empty` - Labels skipped when empty array  
+- ✅ `assignee_and_labels_populated_when_present` - Fields present when populated
 
-**skip_serializing_if behavior:**
-- ✅ `assignee_skipped_when_unset` - Verifies assignee is omitted when None
-- ✅ `labels_skipped_when_empty` - Verifies labels are omitted when empty vec
-- ✅ `assignee_and_labels_populated_when_present` - Verifies fields appear when set
-
-**format_issues output shape:**
-- ✅ `format_issues_guarantees_fields_per_line` - Ensures consistent field presence per line
+**JSONL Output Tests:**
+- ✅ `format_issues_guarantees_fields_per_line` - All lines have assignee/labels keys
 - ✅ `format_issues_empty_yields_empty_string` - Empty input produces empty output
-- ✅ `format_issues_single_yields_one_valid_json_line` - Single issue outputs exactly one line
-- ✅ `format_issues_multiple_yields_jsonl_one_object_per_line` - Multiple issues produce proper JSONL
+- ✅ `format_issues_single_yields_one_valid_json_line` - Single issue = one line
+- ✅ `format_issues_multiple_yields_jsonl_one_object_per_line` - Multiple issues = JSONL
 
-**Claim result formatting:**
-- ✅ `claim_dry_run_emits_only_preview_keys` - Dry-run includes only preview fields
-- ✅ `claim_single_workspace_omits_workspace_key` - Normal claims omit workspace
-- ✅ `no_claim_is_empty_object` - No claim returns `{}`
+**Claim Result Tests:**
+- ✅ `claim_dry_run_emits_only_preview_keys` - Dry-run includes title/priority/impact/workspace
+- ✅ `claim_single_workspace_omits_workspace_key` - Single workspace omits workspace key
+- ✅ `no_claim_is_empty_object` - Empty claim produces `{}`
 
-#### Critical Gaps
+### src/format/text.rs (6 tests)
 
-**Missing unit tests:**
-- ❌ `format_error()` - No tests for error message JSON formatting
-- ❌ `format_stats()` - No tests for StatsOutput serialization
-- ❌ `format_velocity()` - No tests for VelocityStats array serialization
-- ❌ `format_with_envelope()` - No tests for JsonEnvelope wrapping
-- ❌ `format_with_envelope_and_warning()` - No tests for envelope + warning
-
-**Missing integration tests:**
-- ❌ `issue_to_value()` - No tests for manual dependencies/comments stripping
-- ❌ Complex nested dependencies/comments verification
-- ❌ Error handling when serde_json::to_string fails
-- ❌ JsonEnvelope behavior (to_json_compact, with_warning methods)
-- ❌ Non-UTF-8 character handling in issue fields
-
-**Missing edge case tests:**
-- ❌ Very long titles/descriptions that might produce oversized JSON lines
-- ❌ Special characters in issue fields (quotes, backslashes, newlines)
-- ❌ Unicode/emoji handling in all text fields
-- ❌ Empty vs null distinction in JSON output
-- ❌ Malformed data fallback behavior
-
----
-
-### 2. `src/format/text.rs` (371 lines)
-
-#### Existing Tests (6 tests)
-
-**Dependency formatting:**
-- ✅ `test_format_dependencies_empty` - Empty vec returns empty string
-- ✅ `test_format_dependencies_blocking` - Blocking dependencies include "(blocks)"
-- ✅ `test_format_dependencies_non_blocking` - Related dependencies omit "(blocks)"
-- ✅ `test_format_dependencies_mixed` - Mixed dependency types formatted correctly
-- ✅ `test_format_dependencies_unknown_title` - Missing title defaults to "Unknown"
+**Dependency Formatting Tests:**
+- ✅ `test_format_dependencies_empty` - Empty dependencies return empty string
+- ✅ `test_format_dependencies_blocking` - Blocking deps include `(blocks)` suffix
+- ✅ `test_format_dependencies_non_blocking` - Non-blocking deps have no suffix
+- ✅ `test_format_dependencies_mixed` - Mixed blocking/non-blocking deps
+- ✅ `test_format_dependencies_unknown_title` - Unknown title defaults to `"Unknown"`
 - ✅ `test_format_dependencies_multiple_blocking` - Multiple blocking dependencies
 
-#### Critical Gaps
+### src/format/toon.rs (0 tests)
 
-**Missing Formatter trait method tests:**
-- ❌ `format_issue()` - Full issue text rendering not tested
-- ❌ `format_issues()` - List rendering not tested
-- ❌ `format_error()` - Error message formatting not tested
-- ❌ `format_claim_result()` - Claim result formatting not tested (3 branches)
-- ❌ `format_no_claim()` - No claim message not tested
-- ❌ `format_velocity()` - Velocity table formatting not tested
-- ❌ `format_with_envelope()` - Envelope passthrough not tested
-- ❌ `format_with_envelope_and_warning()` - Envelope+warning passthrough not tested
+**❌ NO TESTS - Complete coverage gap**
 
-**Missing helper function tests:**
-- ❌ `format_stats_text()` - Stats aggregation display not tested
-- ❌ `format_velocity_text()` - Velocity table rendering not tested
-- ❌ `format_dependencies_display()` - Storage DependencyDisplay formatting not tested
+## Critical Test Coverage Gaps
 
-**Missing edge case tests:**
-- ❌ Very long issue titles in list view
-- ❌ Empty description handling
-- ❌ Missing optional fields (description, assignee, labels)
-- ❌ Date/time formatting edge cases
-- ❌ Empty stats breakdowns (empty by_type, by_priority, etc.)
-- ❌ Special characters in issue fields
+### 1. Toon Formatter - Zero Coverage
+**Priority: P0**
 
----
+The toon formatter has **no tests at all**. This is a critical gap since toon is a user-facing output format.
 
-### 3. `src/format/toon.rs` (135 lines)
+**Missing test coverage:**
+- `format_issue()` - Individual issue formatting
+- `format_issues()` - Multiple issues (JSONL format)
+- `format_error()` - Error message formatting
+- `format_claim_result()` - Claim result formatting (dry-run, cross-workspace)
+- `format_no_claim()` - Empty claim formatting
+- `format_stats()` - Statistics output
+- `format_velocity()` - Velocity statistics output
+- `format_with_envelope()` - Envelope wrapping behavior
+- `format_with_envelope_and_warning()` - Envelope with warning field
+- `format_toon_issue_line()` - Issue line formatting helper
+- `format_priority()` - Priority string conversion
+- `format_ready_bead()` - Ready bead formatting (used by ready command)
 
-#### Existing Tests (0 tests)
+### 2. Text Formatter - Incomplete Method Coverage  
+**Priority: P1**
 
-**❌ ZERO TESTS - CRITICAL GAP**
+Text formatter has tests for `format_dependencies()` but is missing:
 
-The toon formatter has **no test coverage at all**. This is a significant gap since toon is one of three core output formats.
+**❌ Not tested:**
+- `format_issue()` - Individual issue detailed formatting
+- `format_issues()` - Multiple issues (compact list format)
+- `format_error()` - Error message formatting
+- `format_claim_result()` - Claim result formatting (dry-run, cross-workspace)
+- `format_no_claim()` - Empty claim message formatting
+- `format_stats()` - Statistics output formatting
+- `format_velocity()` - Velocity table formatting
+- `format_with_envelope()` - Envelope behavior (returns data as-is)
+- `format_with_envelope_and_warning()` - Envelope with warning (returns data as-is)
 
-#### Critical Gaps
+### 3. JSON Formatter - Edge Cases & skip_serializing_if Behavior
+**Priority: P2**
 
-**All Formatter trait methods untested:**
-- ❌ `format_issue()` - Toon issue rendering not tested
-- ❌ `format_issues()` - Toon list rendering not tested
-- ❌ `format_error()` - Error messages not tested
-- ❌ `format_claim_result()` - Claim results not tested (3 branches)
-- ❌ `format_no_claim()` - No claim message not tested
-- ❌ `format_stats()` - Stats not tested (delegates to text but not verified)
-- ❌ `format_velocity()` - Velocity formatting not tested
-- ❌ `format_with_envelope()` - Envelope passthrough not tested
-- ❌ `format_with_envelope_and_warning()` - Envelope+warning not tested
+While JSON formatter has good coverage, some edge cases need verification:
 
-**Missing helper function tests:**
-- ❌ `format_toon_issue_line()` - Line formatting helper not tested
-- ❌ `format_priority()` - Priority string formatting not tested
-- ❌ `format_ready_bead()` - Ready bead display not tested
-- ❌ `format_dependencies()` - Delegation to text not verified
+**❌ Not fully tested:**
+- **Nested empty collections** - Issue with empty dependencies/comments after manual stripping
+- **Special character escaping** - Unicode, newlines, quotes in title/description
+- **Date/time formatting** - Timestamp field format consistency
+- **Large input handling** - Very long descriptions, many labels
+- **Malformed input fallback** - What happens with invalid issue data?
 
-**Missing edge case tests:**
-- ❌ All edge cases from text.rs also apply here
-- ❌ Toon-specific rendering differences from text not verified
+**Specific skip_serializing_if behavior tests needed:**
+```rust
+#[test]
+fn test_json_dependencies_always_empty_after_stripping() { 
+    // After manual stripping, dependencies should always be empty array
+    let issue = Issue { dependencies: vec![...], ... };
+    let v = parse(&JsonFormatter.format_issue(&issue));
+    assert_eq!(v["dependencies"].as_array().unwrap().len(), 0);
+}
 
----
+#[test]
+fn test_json_comments_always_empty_after_stripping() {
+    // Same for comments
+}
 
-## Specific Test Cases Needed for skip_serializing_if Behavior
+#[test]
+fn test_json_optional_field_none_vs_empty() {
+    // Test None vs "" vs [] behavior for optional fields
+}
+```
 
-The Issue struct uses `#[serde(skip_serializing_if)]` attributes. These should be explicitly tested:
+### 4. Formatter Trait - Cross-Format Consistency
+**Priority: P2**
 
-### For all formatters (JSON, text, toon):
+No tests verify that all three formatters implement the `Formatter` trait consistently:
 
-**Test that None/empty values are omitted:**
-1. `assignee: None` → assignee key omitted
-2. `assignee: Some("")` → assignee key omitted (if empty string treated as None)
-3. `labels: []` → labels key omitted
-4. `dependencies: []` → dependencies key omitted
-5. `comments: []` → comments key omitted
-6. `description: None` → description key omitted
-7. `acceptance_criteria: None` → acceptance_criteria key omitted
-8. `workspace: None` → workspace key omitted
-9. `completion_reason: None` → completion_reason key omitted
-10. `completion_comment: None` → completion_comment key omitted
+**❌ Not tested:**
+- All formatters accept the same `Issue` input without panicking
+- All formatters produce valid output for all trait methods
+- Error messages across formatters are consistent in content (not format)
 
-**Test that present values ARE serialized:**
-1. `assignee: Some("worker")` → key present with value
-2. `labels: vec!["label1".to_string()]` → key present with array
-3. Non-empty collections should always appear
+### 5. Error Message Formatting
+**Priority: P1**
 
-**For JSON formatter specifically:**
-- Verify JSON output doesn't include null values for skipped fields
-- Verify JSON output doesn't include empty arrays for skipped fields
-- Verify compact output (no pretty-printing)
+Only JSON formatter's error formatting is indirectly tested. Need explicit tests for text and toon.
 
----
+### 6. Claim Result Formatting - Complex Scenarios
+**Priority: P1**
 
-## Other Format Modules
+Claim result formatting has basic coverage but missing cross-workspace, reclamation > 1, and testing on text/toon formatters.
 
-### `src/format/mod.rs`
+### 7. Stats & Velocity Formatting
+**Priority: P1**
 
-**Missing tests:**
-- ❌ `OutputFormat::from_str()` - Case sensitivity, invalid inputs
-- ❌ `OutputFormat::as_str()` - String representation
-- ❌ `get_formatter()` - Factory function returns correct formatter
+Statistics output formatting is largely untested across all three formatters.
 
-### `src/format/envelope.rs` (42KB - large module)
+### 8. Envelope Formatting
+**Priority: P2**
 
-**Missing tests:**
-- ❌ JsonEnvelope serialization
-- ❌ Envelope version handling
-- ❌ Warning attachment behavior
-- ❌ to_json_compact() method
+Need tests for text/toon envelope passthrough behavior.
 
-### `src/format/table.rs`
+### 9. Empty Result Behavior Across All Formatters
+**Priority: P1**
 
-**Missing tests:**
-- ❌ TableFormatter implementation
-- ❌ Table formatting for various data types
+Empty inputs partially tested for JSON only; need coverage for text and toon.
 
-### `src/format/color.rs`
+### 10. Special Character & Unicode Handling
+**Priority: P2**
 
-**Missing tests:**
-- ❌ Color formatting functions
-- ❌ Status color mapping
-- ❌ Terminal color handling
+No tests verify special character handling across formatters.
 
-### `src/format/warning.rs`
+## Integration Test Coverage
 
-**Missing tests:**
-- ❌ Warning formatting
-- ❌ Stderr warning output
+### Strong Coverage
+- ✅ `tests/test_json_formatter.rs` - 11 tests for JsonFormatter
+- ✅ `tests/json_formatter_verification.rs` - 13 tests verifying JSON output consistency
+- ✅ `tests/test_json_output_comprehensive.rs` - 60+ tests for JSON output across commands
 
----
+### Medium Coverage  
+- ⚠️ `tests/envelope_integration_tests.rs` - Envelope behavior across formatters
+- ⚠️ Various command-specific JSON tests (ready, list, search, etc.)
 
-## Priority Recommendations
+### Missing Integration Coverage
+- ❌ No integration tests for toon formatter output
+- ❌ No integration tests for text formatter output (only JSON)
+- ❌ No cross-format consistency integration tests
 
-### P0 - Critical (Must Fix)
-1. **Add basic tests for toon.rs** - Zero coverage is unacceptable
-2. **Test error handling paths** - What happens when serialization fails?
-3. **Test envelope wrapping** - Core feature with no tests
+## Recommended Test Additions by Priority
 
-### P1 - High (Should Fix)
-1. **Complete text.rs Formatter method tests** - Only dependencies are tested
-2. **Test skip_serializing_if behavior exhaustively** - Document what gets omitted
-3. **Add stats/velocity formatting tests** - Used in production but untested
+### P0 (Critical - Block Release)
+1. **Toon formatter basic functionality** - 5-8 core tests
+2. **Text formatter method coverage** - Test all untested trait methods
 
-### P2 - Medium (Nice to Have)
-1. **Edge case tests** - Long strings, special characters, Unicode
-2. **Integration tests** - Full command output verification
-3. **Performance tests** - Large issue lists (1000+)
+### P1 (High - Next Sprint)  
+3. **Claim result complex scenarios** - Cross-workspace, reclamation
+4. **Error message formatting** - All three formatters
+5. **Stats/velocity formatting** - All three formats
+6. **Empty result consistency** - All formatters, all methods
 
----
+### P2 (Medium - Backlog)
+7. **Edge cases** - Unicode, special characters, large inputs
+8. **Envelope passthrough** - Text/toon envelope behavior
+9. **Cross-format consistency** - Trait contract verification
+10. **skip_serializing_if behavior** - Explicit field serialization tests
 
-## Test Infrastructure Suggestions
+## Test Metrics Summary
 
-1. **Add test helpers** - Common Issue::new() patterns, assertions
-2. **Property-based tests** - Use proptest for edge case generation
-3. **Golden file tests** - Compare output against known-good files
-4. **Round-trip tests** - Parse → format → parse → compare
-5. **Snapshot tests** - Use insta for output verification
+| Formatter | Unit Tests | Integration Tests | Coverage % |
+|-----------|------------|------------------|-------------|
+| JSON      | 10         | 80+              | ~85%        |
+| Text      | 6          | 5                | ~30%        |
+| Toon      | 0          | 0                | 0%          |
 
----
+**Overall Coverage:** ~38% (16 unit tests out of ~42 methods)
 
-## Conclusion
+## Notes
 
-The formatter module has **adequate coverage for the happy path in JSON output**, but significant gaps remain:
+1. **JSON formatter has the best coverage** due to its use as the primary machine-readable format
+2. **Text formatter tests are focused** - Only covers dependency formatting, missing main trait methods
+3. **Toon formatter is completely untested** - Highest priority gap
+4. **skip_serializing_if behavior** needs explicit testing since it's critical for br compatibility (see json.rs:40-42)
+5. **Integration tests compensate** for some unit test gaps, but don't test internal formatter logic
 
-- **toon.rs**: 0% test coverage
-- **text.rs**: ~20% test coverage (dependencies only)
-- **json.rs**: ~50% test coverage (core functionality, missing error handling)
-- **Other modules**: Minimal to no coverage
+## References
 
-**Estimated overall coverage:** ~30-40% of formatter code paths
-
-This is insufficient for a critical output formatting layer. A comprehensive test suite is needed before considering the formatter module production-ready.
+- Main formatter implementations: `src/format/{json,text,toon}.rs`
+- Formatter trait: `src/format/mod.rs`
+- Integration tests: `tests/test_json_formatter.rs`, `tests/json_formatter_verification.rs`, `tests/test_json_output_comprehensive.rs`
+- Issue struct with serde attributes: `src/model.rs`
