@@ -149,14 +149,24 @@ CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
 CREATE INDEX IF NOT EXISTS idx_events_actor ON events(actor) WHERE actor != '';"#
 }
 
-/// Labels table - reference data for label definitions
+/// Labels table - direct issue-to-label mapping
+/// Stores labels as strings attached directly to issues
 pub const fn labels_table() -> &'static str {
     r#"CREATE TABLE IF NOT EXISTS labels (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    color TEXT,
-    description TEXT,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    issue_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    PRIMARY KEY (issue_id, label),
+    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+)"#
+}
+
+/// Bead labels table - alternative label storage
+/// Provides a separate table for bead-specific label storage
+pub const fn bead_labels_table() -> &'static str {
+    r#"CREATE TABLE IF NOT EXISTS bead_labels (
+    bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    label    TEXT NOT NULL,
+    PRIMARY KEY (bead_id, label)
 )"#
 }
 
@@ -284,9 +294,16 @@ CREATE INDEX IF NOT EXISTS idx_bead_annotations_bead_id
     ON bead_annotations (bead_id);"#
 }
 
-/// Labels table indexes (minimal - PK and UNIQUE constraints sufficient)
+/// Labels table indexes
 pub const fn labels_indexes() -> &'static str {
-    ""
+    r#"CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label);
+CREATE INDEX IF NOT EXISTS idx_labels_issue ON labels(issue_id);"#
+}
+
+/// Bead labels table indexes
+pub const fn bead_labels_indexes() -> &'static str {
+    r#"CREATE INDEX IF NOT EXISTS idx_bead_labels_label ON bead_labels(label);
+CREATE INDEX IF NOT EXISTS idx_bead_labels_issue ON bead_labels(bead_id);"#
 }
 
 /// Priorities table indexes (minimal - PK and UNIQUE constraints sufficient)
@@ -451,14 +468,28 @@ CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
 CREATE INDEX IF NOT EXISTS idx_events_actor ON events(actor) WHERE actor != '';
 
--- Labels reference table
+-- Labels table - direct issue-to-label mapping
 CREATE TABLE IF NOT EXISTS labels (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    color TEXT,
-    description TEXT,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    issue_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    PRIMARY KEY (issue_id, label),
+    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
 );
+
+-- Labels indexes
+CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label);
+CREATE INDEX IF NOT EXISTS idx_labels_issue ON labels(issue_id);
+
+-- Bead labels table - alternative label storage
+CREATE TABLE IF NOT EXISTS bead_labels (
+    bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    label    TEXT NOT NULL,
+    PRIMARY KEY (bead_id, label)
+);
+
+-- Bead labels indexes
+CREATE INDEX IF NOT EXISTS idx_bead_labels_label ON bead_labels(label);
+CREATE INDEX IF NOT EXISTS idx_bead_labels_issue ON bead_labels(bead_id);
 
 -- Issue labels junction table
 CREATE TABLE IF NOT EXISTS issue_labels (

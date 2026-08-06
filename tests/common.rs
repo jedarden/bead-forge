@@ -83,8 +83,8 @@ impl TempWorkspace {
     }
 
     /// Open the storage backend for this workspace.
-    pub fn storage(&self) -> anyhow::Result<bead_forge::Storage> {
-        bead_forge::Storage::open(&self.db_path)
+    pub fn storage(&self) -> anyhow::Result<bead_forge::storage::Storage> {
+        bead_forge::storage::Storage::open(&self.db_path).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Get the workspace path (parent of .beads).
@@ -118,7 +118,7 @@ impl TempWorkspace {
     pub fn create_bead(&self, id: &str, title: &str) -> anyhow::Result<()> {
         let storage = self.storage()?;
         let bead = bead_forge::Issue::new(id.to_string(), title.to_string(), ".".to_string());
-        storage.create_issue(&bead)
+        storage.create_issue(&bead).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Create a test bead from a fully-specified Issue, preserving issue_type,
@@ -128,7 +128,7 @@ impl TempWorkspace {
     /// beyond id/title — `create_bead` persists a default (task-type) Issue.
     pub fn create_issue(&self, issue: &bead_forge::Issue) -> anyhow::Result<()> {
         let storage = self.storage()?;
-        storage.create_issue(issue)
+        storage.create_issue(issue).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Create a test bead with custom labels.
@@ -158,25 +158,25 @@ impl TempWorkspace {
             labels: labels.iter().map(|s| s.to_string()).collect(),
             ..Default::default()
         };
-        storage.create_issue(&bead)
+        storage.create_issue(&bead).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Get a bead by ID.
     pub fn get_bead(&self, id: &str) -> anyhow::Result<Option<bead_forge::Issue>> {
         let storage = self.storage()?;
-        storage.get_issue(id)
+        storage.get_issue(id).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// List all beads in the workspace.
     pub fn list_beads(&self) -> anyhow::Result<Vec<bead_forge::Issue>> {
         let storage = self.storage()?;
-        storage.list_all_issues()
+        storage.list_all_issues().map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Count beads in the workspace.
     pub fn count_beads(&self) -> anyhow::Result<usize> {
         let storage = self.storage()?;
-        storage.count_issues()
+        storage.count_issues().map_err(|e| anyhow::anyhow!(e))
     }
 }
 
