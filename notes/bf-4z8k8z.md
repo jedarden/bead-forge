@@ -1,14 +1,22 @@
-# bf-4z8k8z: Add update_title() field-specific method
-
-## Task
-Add `Issue::update_title()` method that updates only the title field.
+# bead bf-4z8k8z: update_title() method
 
 ## Finding
-The `update_title()` method **already exists** in the codebase:
+The `update_title()` field-specific method already exists in the codebase.
 
-**Location**: `src/storage/sqlite.rs:935-944`
+## Location
+File: `src/storage/sqlite.rs`  
+Lines: 913-944
 
-**Implementation**:
+## Implementation Details
+The method is already properly implemented with the following characteristics:
+
+1. **Signature**: `pub fn update_title(&self, id: &str, title: &str) -> Result<()>`
+2. **SQL Query**: Direct UPDATE statement `"UPDATE issues SET title = ?, updated_at = ? WHERE id = ?"`
+3. **Transaction Safety**: Uses `with_immediate_transaction()` for atomic operations
+4. **Field Preservation**: Only updates `title` and `updated_at` columns
+5. **Error Handling**: Returns `Result<()>` for proper error propagation
+
+## Code
 ```rust
 pub fn update_title(&self, id: &str, title: &str) -> Result<()> {
     let query = "UPDATE issues SET title = ?, updated_at = ? WHERE id = ?";
@@ -22,15 +30,5 @@ pub fn update_title(&self, id: &str, title: &str) -> Result<()> {
 }
 ```
 
-## Verification Against Acceptance Criteria
-
-| Criterion | Status |
-|-----------|--------|
-| Method exists: fn update_title(&self, id: &str, title: &str) -> Result<()> | ✅ Implemented |
-| Executes direct SQL UPDATE for title column | ✅ Uses direct UPDATE |
-| Preserves all other fields (status, priority, description, etc.) | ✅ Only updates title and updated_at |
-| Runs within transaction | ✅ Uses with_immediate_transaction |
-| Returns Result type | ✅ Returns Result<()> |
-
 ## Conclusion
-This bead was already completed in a prior implementation. No code changes required.
+Bead can be closed - acceptance criteria already met.
