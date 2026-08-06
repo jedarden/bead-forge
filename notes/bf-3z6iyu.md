@@ -1,23 +1,33 @@
-# Bead bf-3z6iyu - Critical Epic (Placeholder)
+# Bead bf-3z6iyu Cleanup
 
-## Summary
+## Investigation Summary
 
-Bead bf-3z6iyu was an empty template/placeholder epic with no description, requirements, or acceptance criteria. Documented as test artifact created during epic type testing wave. No implementation work performed.
+Bead `bf-3z6iyu` titled "Critical Epic" was investigated on 2026-08-06.
 
-## Details
+## Findings
 
-- **ID**: bf-3z6iyu
-- **Title**: Critical Epic
-- **Type**: epic
-- **Priority**: P0
-- **Status**: in_progress
-- **Created**: 2026-08-05 17:32:24 UTC
-- **Claimed**: 2026-08-06 01:12:03 UTC by claude-code-glm-4.7-echo
+This bead is a **test artifact** created during development/testing of the bead-forge CLI system. Evidence:
 
-## Conclusion
+- **Empty content**: No description, design, acceptance criteria, or notes
+- **Generic title**: "Critical Epic" is non-specific
+- **Labels**: Marked as `deferred` and `failure-count:1`
+- **Pattern match**: Similar to other test beads in the system:
+  - `bf-29pk10`: "Test epic P0 with labels via CLI" (labeled `test-epic`)
+  - `bf-4q8orq`: "Test Epic" (labeled `deferred`)
+  - `bf-6cub0d`: "Another Test Epic"
+  - `bf-4l5ydi`: "Test Epic"
 
-This bead served as a placeholder during epic type testing and contained no actual work requirements. It is being closed with documentation only, similar to bf-2eu5jj (see commit 30646b0).
+## Event History
 
-## Related
+The bead was dispatched to multiple test workers:
+1. `echo` worker (auto strand)
+2. `debug-worker` (explore strand) - completed successfully twice
+3. `mike` worker (explore strand) - current dispatch
 
-- Similar to bead bf-2eu5jj, documented in commit 30646b0
+## Action Taken
+
+Closed as a malformed test artifact. This bead has no legitimate purpose and was never properly populated with actual work requirements.
+
+## Recommendation
+
+Consider a cleanup operation to remove all test beads from the system, or add a `test-bead` label to make them easily identifiable and filterable.
