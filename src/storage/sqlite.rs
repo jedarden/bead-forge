@@ -943,6 +943,36 @@ impl Storage {
         })
     }
 
+    /// Update the status of an issue.
+    ///
+    /// Updates only the status field and the updated_at timestamp.
+    /// All other fields remain unchanged.
+    pub fn update_status(&self, id: &str, status: Status) -> Result<()> {
+        let query = "UPDATE issues SET status = ?, updated_at = ? WHERE id = ?";
+        let now = Utc::now();
+
+        // Execute within a BEGIN IMMEDIATE transaction for atomicity
+        self.with_immediate_transaction(|tx| {
+            tx.execute(query, params![status.as_str(), now.to_rfc3339(), id])?;
+            Ok(())
+        })
+    }
+
+    /// Update the priority of an issue.
+    ///
+    /// Updates only the priority field and the updated_at timestamp.
+    /// All other fields remain unchanged.
+    pub fn update_priority(&self, id: &str, priority: Priority) -> Result<()> {
+        let query = "UPDATE issues SET priority = ?, updated_at = ? WHERE id = ?";
+        let now = Utc::now();
+
+        // Execute within a BEGIN IMMEDIATE transaction for atomicity
+        self.with_immediate_transaction(|tx| {
+            tx.execute(query, params![priority, now.to_rfc3339(), id])?;
+            Ok(())
+        })
+    }
+
     /// Update an issue from JSONL import data.
     ///
     /// This replaces all fields of the existing issue with the imported data,
