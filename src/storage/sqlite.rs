@@ -825,6 +825,91 @@ impl Storage {
         })
     }
 
+    /// Base issue update method for simple field updates.
+    ///
+    /// This method handles basic UPDATE operations for the three core updatable
+    /// fields: title, status, and priority. It builds a dynamic SET clause based
+    /// on which fields are present in the `IssueUpdate` struct.
+    ///
+    /// For more complex updates including labels, annotations, or actor tracking,
+    /// use the full `update_issue` method with `IssueChanges` instead.
+    ///
+    /// # Arguments
+    /// * `id` - The issue ID to update
+    /// * `updates` - The fields to update (None fields are ignored)
+    ///
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    ///
+    /// # Examples
+    /// ```no_run
+    /// # use bead_forge::model::{IssueUpdate, Status, Priority};
+    /// # use bead_forge::storage::sqlite::Storage;
+    /// # fn example(storage: &Storage) -> anyhow::Result<()> {
+    /// // Update just the title
+    /// storage.update_issue("bf-123", IssueUpdate {
+    ///     title: Some("New title".to_string()),
+    ///     ..Default::default()
+    /// })?;
+    ///
+    /// // Update status and priority
+    /// storage.update_issue("bf-123", IssueUpdate {
+    ///     status: Some(Status::InProgress),
+    ///     priority: Some(Priority::HIGH),
+    ///     ..Default::default()
+    /// })?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn update_issue(&self, id: &str, updates: IssueUpdate) -> Result<()> {
+        // Build the SET clause dynamically based on which fields are Some
+        let mut set_clauses = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if let Some(ref title) = updates.title {
+            set_clauses.push("title = ?");
+            params.push(Box::new(title.clone()));
+        }
+
+        if let Some(ref status) = updates.status {
+            set_clauses.push("status = ?");
+            params.push(Box::new(status.to_string()));
+        }
+
+        if let Some(priority) = updates.priority {
+            set_clauses.push("priority = ?");
+            params.push(Box::new(priority.0)); // Priority is a tuple struct with i32
+        }
+
+        // Always update updated_at timestamp when any change is made
+        if !set_clauses.is_empty() {
+            set_clauses.push("updated_at = ?");
+            params.push(Box::new(Utc::now().to_rfc3339()));
+        }
+
+        // If no fields to update, return early
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        // Build the full UPDATE query
+        let query = format!(
+            "UPDATE issues SET {} WHERE id = ?",
+            set_clauses.join(", ")
+        );
+
+        // Add the id parameter last
+        params.push(Box::new(id.to_string()));
+
+        // Execute within a BEGIN IMMEDIATE transaction for atomicity
+        self.with_immediate_transaction(|tx| {
+            let param_refs: Vec<&dyn rusqlite::ToSql> =
+                params.iter().map(|p| p.as_ref()).collect();
+            tx.execute(&query, param_refs.as_slice())?;
+            Ok(())
+        })
+    }
+
     /// Update an issue from JSONL import data.
     ///
     /// This replaces all fields of the existing issue with the imported data,

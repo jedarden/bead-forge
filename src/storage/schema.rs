@@ -579,7 +579,6 @@ pub fn ensure_wal_mode(conn: &Connection) -> anyhow::Result<()> {
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA foreign_keys = ON;
-         PRAGMA busy_timeout = 30000;
          PRAGMA cache_size = -8000;
          PRAGMA synchronous = NORMAL;",
     )?;

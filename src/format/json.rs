@@ -318,4 +318,261 @@ mod tests {
     fn no_claim_is_empty_object() {
         assert_eq!(JsonFormatter.format_no_claim(), "{}");
     }
+
+    // Skip serializing if tests for Vec fields
+
+    #[test]
+    fn dependencies_skipped_when_empty() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        // dependencies is manually stripped to empty by issue_to_value(), then skipped by serde
+        assert_eq!(v.get("dependencies"), None, "dependencies should be omitted when empty");
+    }
+
+    #[test]
+    fn comments_skipped_when_empty() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        // comments is manually stripped to empty by issue_to_value(), then skipped by serde
+        assert_eq!(v.get("comments"), None, "comments should be omitted when empty");
+    }
+
+    #[test]
+    fn events_skipped_when_empty() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        // events uses standard serde skip_serializing_if = "Vec::is_empty"
+        assert_eq!(v.get("events"), None, "events should be omitted when empty");
+    }
+
+    #[test]
+    fn labels_skipped_when_empty() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        // labels uses standard serde skip_serializing_if = "Vec::is_empty"
+        assert_eq!(v.get("labels"), None, "labels should be omitted when empty");
+    }
+
+    // Skip serializing if tests for Option fields
+
+    #[test]
+    fn description_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("description"), None, "description should be omitted when None");
+    }
+
+    #[test]
+    fn design_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("design"), None, "design should be omitted when None");
+    }
+
+    #[test]
+    fn acceptance_criteria_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("acceptance_criteria"), None, "acceptance_criteria should be omitted when None");
+    }
+
+    #[test]
+    fn notes_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("notes"), None, "notes should be omitted when None");
+    }
+
+    #[test]
+    fn owner_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("owner"), None, "owner should be omitted when None");
+    }
+
+    #[test]
+    fn estimated_minutes_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("estimated_minutes"), None, "estimated_minutes should be omitted when None");
+    }
+
+    #[test]
+    fn created_by_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("created_by"), None, "created_by should be omitted when None");
+    }
+
+    #[test]
+    fn closed_at_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("closed_at"), None, "closed_at should be omitted when None");
+    }
+
+    #[test]
+    fn close_reason_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("close_reason"), None, "close_reason should be omitted when None");
+    }
+
+    #[test]
+    fn closed_by_session_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("closed_by_session"), None, "closed_by_session should be omitted when None");
+    }
+
+    #[test]
+    fn due_at_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("due_at"), None, "due_at should be omitted when None");
+    }
+
+    #[test]
+    fn defer_until_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("defer_until"), None, "defer_until should be omitted when None");
+    }
+
+    #[test]
+    fn external_ref_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("external_ref"), None, "external_ref should be omitted when None");
+    }
+
+    #[test]
+    fn source_system_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("source_system"), None, "source_system should be omitted when None");
+    }
+
+    #[test]
+    fn deleted_at_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("deleted_at"), None, "deleted_at should be omitted when None");
+    }
+
+    #[test]
+    fn deleted_by_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("deleted_by"), None, "deleted_by should be omitted when None");
+    }
+
+    #[test]
+    fn delete_reason_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("delete_reason"), None, "delete_reason should be omitted when None");
+    }
+
+    #[test]
+    fn original_type_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("original_type"), None, "original_type should be omitted when None");
+    }
+
+    #[test]
+    fn compacted_at_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("compacted_at"), None, "compacted_at should be omitted when None");
+    }
+
+    #[test]
+    fn compacted_at_commit_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("compacted_at_commit"), None, "compacted_at_commit should be omitted when None");
+    }
+
+    #[test]
+    fn original_size_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("original_size"), None, "original_size should be omitted when None");
+    }
+
+    #[test]
+    fn sender_skipped_when_none() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("sender"), None, "sender should be omitted when None");
+    }
+
+    #[test]
+    fn annotations_skipped_when_empty() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        // annotations uses BTreeMap with skip_serializing_if = "BTreeMap::is_empty"
+        assert_eq!(v.get("annotations"), None, "annotations should be omitted when empty");
+    }
+
+    // Tests to verify fields ARE present when populated
+
+    #[test]
+    fn description_present_when_some() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.description = Some("A description".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("description").and_then(|d| d.as_str()), Some("A description"));
+    }
+
+    #[test]
+    fn design_present_when_some() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.design = Some("Design notes".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("design").and_then(|d| d.as_str()), Some("Design notes"));
+    }
+
+    #[test]
+    fn acceptance_criteria_present_when_some() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.acceptance_criteria = Some("Criteria".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("acceptance_criteria").and_then(|d| d.as_str()), Some("Criteria"));
+    }
+
+    #[test]
+    fn notes_present_when_some() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.notes = Some("Some notes".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("notes").and_then(|d| d.as_str()), Some("Some notes"));
+    }
+
+    #[test]
+    fn owner_present_when_some() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.owner = Some("owner-name".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("owner").and_then(|d| d.as_str()), Some("owner-name"));
+    }
+
+    #[test]
+    fn estimated_minutes_present_when_some() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.estimated_minutes = Some(120);
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("estimated_minutes").and_then(|d| d.as_i64()), Some(120));
+    }
+
+    #[test]
+    fn annotations_present_when_populated() {
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.annotations.insert("key".to_string(), "value".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert!(v.get("annotations").is_some(), "annotations should be present when populated");
+        assert_eq!(v.get("annotations").and_then(|a| a.get("key")).and_then(|v| v.as_str()), Some("value"));
+    }
 }
