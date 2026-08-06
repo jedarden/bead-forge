@@ -66,6 +66,11 @@ name = "test_claim_with_dependencies"
 path = "tests/test_claim_with_dependencies.rs"
 required-features = []
 
+[[test]]
+name = "test_p0_label_add"
+path = "tests/test_p0_label_add.rs"
+required-features = []
+
 [profile.release]
 opt-level = 3
 lto = true
