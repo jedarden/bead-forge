@@ -4,6 +4,7 @@
 //! including corruption detection and JSONL-based repair.
 
 use crate::config::{find_beads_dir, load_metadata};
+use crate::error::BeadForgeError;
 use crate::jsonl::stream_issues;
 use crate::model::Issue;
 use crate::recovery;
@@ -574,7 +575,7 @@ pub fn reconcile(workspace_dir: &Path) -> Result<ReconcileReport> {
         }
         report.normalized_assignees = empty;
 
-        Ok::<_, anyhow::Error>(report)
+        Ok(report)
     })?;
 
     // Reopened beads no longer belong in the display-facing blocked cache. Cheap and
@@ -1118,7 +1119,7 @@ fn restore_dirty_snapshot(db_path: &Path, snapshot: &[Issue]) -> Result<usize> {
                 rusqlite::params![issue.id, now],
             )?;
         }
-        Ok::<_, anyhow::Error>(())
+        Ok(())
     })?;
     Ok(snapshot.len())
 }
@@ -1331,7 +1332,7 @@ pub fn reclaim_stale(workspace_dir: &Path, ttl_minutes: i64) -> Result<usize> {
             rusqlite::params![chrono::Utc::now().to_rfc3339(), stale_cutoff.to_rfc3339()],
         )?;
 
-        Ok::<_, anyhow::Error>(reclaimed)
+        Ok(reclaimed)
     })?;
 
     Ok(reclaimed)

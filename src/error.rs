@@ -239,6 +239,24 @@ impl From<anyhow::Error> for BeadForgeError {
     }
 }
 
+// Forward SecretError to Secret variant (SecretError is local to sqlite.rs)
+impl From<crate::storage::sqlite::SecretError> for BeadForgeError {
+    fn from(err: crate::storage::sqlite::SecretError) -> Self {
+        BeadForgeError::Secret(err.0)
+    }
+}
+
+// chrono::ParseError conversion
+impl From<chrono::ParseError> for BeadForgeError {
+    fn from(err: chrono::ParseError) -> Self {
+        BeadForgeError::Parsing {
+            message: format!("Date/time parsing failed: {}", err),
+            format: ParsingFormat::Custom,
+            source: None,
+        }
+    }
+}
+
 // ============================================================================
 // Constructor methods for each error variant
 // ============================================================================

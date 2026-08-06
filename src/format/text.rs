@@ -367,4 +367,53 @@ mod tests {
         let result = format_dependencies(&deps);
         assert_eq!(result, "Depends: bf-blocker1 (First blocker) (blocks), bf-blocker2 (Second blocker) (blocks)");
     }
+
+    // ==================== Helper functions ====================
+
+    fn create_test_issue(id: &str, title: &str) -> Issue {
+        Issue {
+            id: id.to_string(),
+            title: title.to_string(),
+            status: Status::Open,
+            priority: Priority::MEDIUM,
+            issue_type: IssueType::Task,
+            description: None,
+            assignee: None,
+            labels: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            // Default/None for all other fields
+            content_hash: None,
+            design: None,
+            acceptance_criteria: None,
+            notes: None,
+            owner: None,
+            estimated_minutes: None,
+            created_by: None,
+            closed_at: None,
+            close_reason: None,
+            closed_by_session: None,
+            due_at: None,
+            defer_until: None,
+            external_ref: None,
+            source_system: None,
+            source_repo: None,
+            deleted_at: None,
+            deleted_by: None,
+            delete_reason: None,
+            original_type: None,
+            compaction_level: None,
+            compacted_at: None,
+            compacted_at_commit: None,
+            original_size: None,
+            sender: None,
+            ephemeral: false,
+            pinned: false,
+            is_template: false,
+            dependencies: vec![],
+            comments: vec![],
+            events: vec![],
+            annotations: std::collections::BTreeMap::new(),
+        }
+    }
 }

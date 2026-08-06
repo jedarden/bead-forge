@@ -32,6 +32,15 @@ pub enum LabelsFormat {
     Json,
 }
 
+impl std::fmt::Display for LabelsFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LabelsFormat::Text => write!(f, "text"),
+            LabelsFormat::Json => write!(f, "json"),
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "bf")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
@@ -579,8 +588,8 @@ pub enum Commands {
         id: Option<String>,
 
         /// Output format (text, json)
-        #[arg(short, long, default_value = "text")]
-        format: String,
+        #[arg(short, long, default_value_t = LabelsFormat::Text)]
+        format: LabelsFormat,
 
         /// Output JSON (alias for --format json)
         #[arg(long)]
@@ -1447,8 +1456,16 @@ pub fn run(cli: Cli) -> Result<()> {
             format,
         } => cmd_velocity(&beads_dir, model, harness, &format),
         Commands::Labels { id, format, json } => {
-            let format = if json { "json".to_string() } else { format };
-            cmd_labels(&beads_dir, id.as_deref(), &format)
+            let format_str = if json {
+                "json".to_string()
+            } else {
+                // Convert LabelsFormat enum to lowercase string
+                match format {
+                    LabelsFormat::Text => "text".to_string(),
+                    LabelsFormat::Json => "json".to_string(),
+                }
+            };
+            cmd_labels(&beads_dir, id.as_deref(), &format_str)
         }
         Commands::Annotate(annotate) => cmd_annotate(&beads_dir, annotate, no_auto_flush),
         Commands::Log {

@@ -1,4 +1,5 @@
 use crate::critical_path::{compute_all_critical_paths, invalidate_cache};
+use crate::error::{BeadForgeError, Result};
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
     Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter,
@@ -7,7 +8,6 @@ use crate::model::{
 use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
 use anyhow::anyhow;
-use crate::error::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::BTreeMap;
@@ -778,7 +778,7 @@ impl Storage {
                              WHERE depends_on_id = ?1
                              AND type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')",
                         )?.query_map(params![id], |row| row.get::<_, String>(0))?
-                        .collect::<Result<Vec<_>, _>>()?;
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
 
                         // For each dependent, check if ALL its blocking dependencies are now closed
                         for dependent_id in dependents {
@@ -1956,7 +1956,7 @@ impl Storage {
     pub fn add_label(&self, issue_id: &str, label: &str) -> Result<()> {
         let trimmed_label = label.trim();
         if trimmed_label.is_empty() {
-            return Err(anyhow::anyhow!("Label cannot be empty or whitespace only"));
+            return Err(BeadForgeError::validation("Label cannot be empty or whitespace only"));
         }
 
         self.with_immediate_transaction(|tx| {
@@ -1976,7 +1976,7 @@ impl Storage {
     pub fn remove_label(&self, issue_id: &str, label: &str) -> Result<()> {
         let trimmed_label = label.trim();
         if trimmed_label.is_empty() {
-            return Err(anyhow::anyhow!("Label cannot be empty or whitespace only"));
+            return Err(BeadForgeError::validation("Label cannot be empty or whitespace only"));
         }
 
         self.with_immediate_transaction(|tx| {
