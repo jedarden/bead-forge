@@ -3,7 +3,7 @@ use crate::error::{BeadForgeError, Result};
 use crate::jsonl::{export_jsonl, export_jsonl_dirty, import_jsonl, ImportResult, UpsertResult};
 use crate::model::{
     Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges, IssueFilter,
-    IssueType, IssueUpdate, Status,
+    IssueType, IssueUpdate, Priority, Status,
 };
 use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
