@@ -5,6 +5,7 @@
 //! by directly testing the CLI structs with clap::Parser::try_parse_from().
 
 use bead_forge::cli::{Cli, Commands};
+use clap::Parser;
 use std::path::PathBuf;
 
 /// Test: Verify clap::Parser::try_parse_from() works for basic CLI parsing
@@ -541,9 +542,10 @@ fn test_close_subcommand_parsing() {
 
     match result {
         Ok(cli) => {
-            if let Some(Commands::Close { id, reason }) = cli.command {
+            if let Some(Commands::Close { id, reason, json }) = cli.command {
                 assert_eq!(id, "bf-abc123");
                 assert_eq!(reason, "Test completed");
+                assert_eq!(json, false);
             } else {
                 panic!("Expected Close command");
             }
