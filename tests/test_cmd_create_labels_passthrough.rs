@@ -2,10 +2,10 @@
 // This test verifies that labels parsed from CLI arguments are correctly passed to cmd_create function
 
 use bead_forge::cli::{Cli, Commands};
+use clap::Parser;
 use bead_forge::config::{load_config, Config};
 use bead_forge::model::{Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
-use clap::Parser;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
