@@ -475,7 +475,7 @@ fn test_p0_empty_comment() {
     let bead_id = extract_bead_id(&stdout);
 
     // Try to add empty comment (should fail or be handled gracefully)
-    let (_, stderr, result) = run_bf_command(workspace, &["comments", "add", &bead_id, ""]);
+    let (_, _stderr, _result) = run_bf_command(workspace, &["comments", "add", &bead_id, ""]);
 
     // Empty comment should either fail or add an empty string
     // We just verify it doesn't crash
