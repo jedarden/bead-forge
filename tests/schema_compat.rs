@@ -29,7 +29,7 @@ fn test_schema_matches_br_column_order() {
                 let type_: String = row.get(1)?;
                 cols.push((name, type_));
             }
-            Ok::<_, anyhow::Error>(cols)
+            Ok(cols)
         })
         .unwrap();
 
@@ -250,7 +250,7 @@ fn test_bf_worker_sessions_table_structure() {
             while let Some(row) = rows.next()? {
                 result.push((row.get(0)?, row.get(1)?, row.get(2)?));
             }
-            Ok::<_, anyhow::Error>(result)
+            Ok(result)
         })
         .unwrap();
 
@@ -285,7 +285,7 @@ fn test_bf_velocity_stats_table_structure() {
                     &Utc::now().to_rfc3339(),
                 ],
             )?;
-            Ok::<_, anyhow::Error>(())
+            Ok(())
         })
         .unwrap();
 
@@ -299,7 +299,7 @@ fn test_bf_velocity_stats_table_structure() {
             while let Some(row) = rows.next()? {
                 result.push((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?));
             }
-            Ok::<_, anyhow::Error>(result)
+            Ok(result)
         })
         .unwrap();
 
@@ -317,7 +317,7 @@ fn test_migration_lock_table_structure() {
     let storage = ws.storage().unwrap();
 
     // Try to insert multiple rows - should fail due to CHECK constraint
-    let result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+    let result = storage.with_immediate_transaction(|tx| {
         use chrono::Utc;
 
         tx.execute(
@@ -349,7 +349,7 @@ fn test_foreign_keys_enforced() {
     let storage = ws.storage().unwrap();
 
     // Try to insert a label for non-existent issue - should fail
-    let result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+    let result = storage.with_immediate_transaction(|tx| {
         tx.execute(
             "INSERT INTO labels (issue_id, label) VALUES (?, ?)",
             ["non-existent", "bug"],
@@ -401,7 +401,7 @@ fn test_critical_path_cache_table_structure() {
             tx.query_row("SELECT COUNT(*) FROM critical_path_cache", [], |row| {
                 row.get(0)
             })
-            .map_err(|e| anyhow::anyhow!(e))
+            .map_err(|e| e.into())
         })
         .unwrap();
 
@@ -417,7 +417,7 @@ fn test_critical_path_cache_table_structure() {
             while let Some(row) = rows.next()? {
                 cols.push(row.get(0)?);
             }
-            Ok::<_, anyhow::Error>(cols)
+            Ok(cols)
         })
         .unwrap();
 
@@ -437,7 +437,7 @@ fn test_wal_mode_enabled() {
     let journal_mode: String = storage
         .with_immediate_transaction(|tx| {
             tx.query_row("PRAGMA journal_mode", [], |row| row.get(0))
-                .map_err(|e| anyhow::anyhow!(e))
+                .map_err(|e| e.into())
         })
         .unwrap();
 
@@ -467,7 +467,7 @@ fn test_indexes_created() {
                     &[index_name],
                     |row| row.get::<_, i64>(0).map(|n| n > 0),
                 )
-                .map_err(|e| anyhow::anyhow!(e))
+                .map_err(|e| e.into())
             })
             .unwrap();
 
@@ -482,7 +482,7 @@ fn test_br_check_constraint_on_closed_at() {
     let storage = ws.storage().unwrap();
 
     // Try to create a closed bead without closed_at - should fail
-    let result: Result<(), anyhow::Error> = storage
+    let result = storage
         .with_immediate_transaction(|tx| {
             tx.execute(
                 "INSERT INTO issues (id, title, status, priority, issue_type, created_at, updated_at, source_repo)
@@ -498,7 +498,7 @@ fn test_br_check_constraint_on_closed_at() {
     );
 
     // Creating a closed bead with closed_at should succeed
-    let result: Result<(), anyhow::Error> = storage
+    let result = storage
         .with_immediate_transaction(|tx| {
             tx.execute(
                 "INSERT INTO issues (id, title, status, priority, issue_type, created_at, updated_at, closed_at, source_repo)
