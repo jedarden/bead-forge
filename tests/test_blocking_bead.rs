@@ -43,12 +43,11 @@ mod blocking_bead_tests {
         let storage = Storage::open(temp_file.path()).unwrap();
 
         // Configure secret scanner for testing
-        use bead_forge::secrets::SecretScanner;
-        let scanner = SecretScanner::from_config(&bead_forge::config::SecretProtection {
+        use bead_forge::secrets::{SecretScanner, SecretProtectionConfig};
+        let scanner = SecretScanner::from_config(&SecretProtectionConfig {
             enabled: true,
-            patterns: vec!["SK_TEST_".to_string()],
-            allowlist_paths: vec![],
-            allowlist_patterns: vec![],
+            custom_patterns: vec!["SK_TEST_".to_string()],
+            allowlist: vec![],
         }).unwrap();
 
         storage.set_secret_scanner(scanner);
@@ -227,13 +226,13 @@ mod blocking_bead_tests {
 
     /// Verify that a bead is in the ready candidates list
     fn assert_ready(storage: &Storage, bead_id: &str) {
-        let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None)).unwrap();
+        let candidates = storage.with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?)).unwrap();
         assert!(candidates.iter().any(|c| c.id == bead_id), "Bead {} should be in ready candidates", bead_id);
     }
 
     /// Verify that a bead is NOT in the ready candidates list
     fn assert_not_ready(storage: &Storage, bead_id: &str) {
-        let candidates = storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None)).unwrap();
+        let candidates = storage.with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?)).unwrap();
         assert!(!candidates.iter().any(|c| c.id == bead_id), "Bead {} should not be in ready candidates", bead_id);
     }
 
@@ -284,7 +283,6 @@ mod blocking_bead_tests {
         let blocked_count = storage.with_immediate_transaction(|tx| {
             let mut stmt = tx.prepare("SELECT COUNT(*) FROM blocked_issues_cache WHERE issue_id = ?").unwrap();
             stmt.query_row([bead_id], |row| row.get::<_, i64>(0))
-                .map_err(|e| anyhow::anyhow!("Failed to query blocked cache: {}", e))
         }).unwrap();
 
         assert_eq!(blocked_count, 1, "Bead {} should appear in blocked_issues_cache", bead_id);
@@ -344,7 +342,7 @@ mod blocking_bead_tests {
 
         // Get ready candidates - dependent should NOT appear
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -398,7 +396,7 @@ mod blocking_bead_tests {
 
         // Dependent should now be available for claiming
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -488,7 +486,6 @@ mod blocking_bead_tests {
                     .prepare("SELECT COUNT(*) FROM blocked_issues_cache WHERE issue_id = ?")
                     .unwrap();
                 stmt.query_row(["bf-dependent"], |row| row.get::<_, i64>(0))
-                    .map_err(|e| anyhow::anyhow!("Failed to query blocked cache: {}", e))
             })
             .unwrap();
 
@@ -548,7 +545,7 @@ mod blocking_bead_tests {
 
         // Both should be claimable since RelatesTo is not a blocking type
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -624,7 +621,7 @@ mod blocking_bead_tests {
 
         // Only A should be claimable
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert_eq!(
@@ -851,7 +848,7 @@ mod blocking_bead_tests {
 
         // Verify neither is claimable due to circular dependency
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -898,7 +895,7 @@ mod blocking_bead_tests {
 
         // The bead should not be claimable
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -1017,7 +1014,7 @@ mod blocking_bead_tests {
 
         // The dependent should be claimable (since it's not blocked)
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -1070,7 +1067,7 @@ mod blocking_bead_tests {
         assert_eq!(blocker.status, Status::Open, "Blocker should remain open");
 
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -1117,7 +1114,7 @@ mod blocking_bead_tests {
 
         // Verify none are claimable
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
