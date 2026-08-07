@@ -1507,3 +1507,63 @@ fn test_p0_epic_without_labels() {
     assert_eq!(labels.len(), 0, "should have no labels");
 }
 
+#[test]
+fn test_p0_bead_description_update() {
+    let (_t, ws) = setup();
+
+    // Create a P0 bead with initial description
+    let (id_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &[
+            "create",
+            "--title",
+            "P0 Bead Description Test",
+            "--type",
+            "task",
+            "--priority",
+            "0",
+            "--description",
+            "Initial description for P0 bead",
+        ],
+    );
+    assert!(ok, "create P0 bead should succeed");
+
+    let id = id_stdout.trim();
+
+    // Verify initial description and P0 priority
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok, "show should succeed");
+
+    let bead_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    assert_eq!(get_string(&bead_json, "description"), "Initial description for P0 bead");
+    assert_eq!(get_number(&bead_json, "priority"), 0, "priority should be P0");
+
+    // Update the description
+    let (_stdout, _stderr, ok) = run_bf(
+        &ws,
+        &["update", &id, "--description", "Updated description for P0 bead"],
+    );
+    assert!(ok, "update description should succeed");
+
+    // Verify description was updated and P0 priority is preserved
+    let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
+    assert!(ok, "show should succeed");
+
+    let updated_json = parse_json(stdout.trim().trim_start_matches('[').trim_end_matches(']'));
+    assert_eq!(
+        get_string(&updated_json, "description"),
+        "Updated description for P0 bead",
+        "description should be updated"
+    );
+    assert_eq!(
+        get_number(&updated_json, "priority"),
+        0,
+        "P0 priority should be preserved after description update"
+    );
+    assert_eq!(
+        get_string(&updated_json, "issue_type"),
+        "task",
+        "type should remain unchanged"
+    );
+}
+
