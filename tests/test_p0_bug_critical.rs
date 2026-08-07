@@ -49,6 +49,7 @@ fn create_p0_bug(id: &str, title: &str, labels: Vec<&str>) -> Issue {
         labels: labels.iter().map(|s| s.to_string()).collect(),
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: BTreeMap::new(),
     }
 }
@@ -203,8 +204,14 @@ fn test_p0_bug_closed_and_reopened() {
     bug.assignee = Some("fixer".to_string());
     storage.create_issue(&bug).unwrap();
 
-    // Close the bug using the storage API
-    storage.close_issue("bf-crit-reopen", "Fixed in production", "fixer").unwrap();
+    // Close the bug using update_issue to avoid worker_sessions table dependency
+    use bead_forge::model::IssueChanges;
+    let close_changes = IssueChanges {
+        status: Some(Status::Closed),
+        assignee: Some(String::new()), // Clear assignee on close
+        ..Default::default()
+    };
+    storage.update_issue("bf-crit-reopen", &close_changes).unwrap();
 
     let closed = storage.get_issue("bf-crit-reopen").unwrap().unwrap();
     assert_eq!(closed.status, Status::Closed);
