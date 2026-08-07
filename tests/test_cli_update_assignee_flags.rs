@@ -6,6 +6,7 @@
 // 3. Clear error messages when both flags are provided
 
 use bead_forge::cli::{Cli, Commands};
+use clap::Parser;
 
 #[test]
 fn test_update_clear_assignee_and_assignee_mutual_exclusion() {
@@ -19,20 +20,23 @@ fn test_update_clear_assignee_and_assignee_mutual_exclusion() {
         "foo",
     ];
 
-    let result = std::panic::catch_unwind(|| {
-        Cli::parse_from(args);
-    });
+    let result = Cli::try_parse_from(args);
 
     // The parse should fail due to conflict
     assert!(result.is_err(), "Parsing should fail when both --clear-assignee and --assignee are provided");
 
     // Verify the error message mentions the conflict
-    let error_msg = result.unwrap_err().to_string();
-    assert!(
-        error_msg.contains("--clear-assignee") && error_msg.contains("--assignee"),
-        "Error message should mention both conflicting flags. Got: {}",
-        error_msg
-    );
+    match result {
+        Ok(_) => panic!("Expected parse to fail due to conflicting flags"),
+        Err(error) => {
+            let error_msg = error.to_string();
+            assert!(
+                error_msg.contains("--clear-assignee") && error_msg.contains("--assignee"),
+                "Error message should mention both conflicting flags. Got: {}",
+                error_msg
+            );
+        }
+    }
 }
 
 #[test]
