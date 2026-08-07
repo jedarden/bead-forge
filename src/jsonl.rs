@@ -224,7 +224,7 @@ where
 /// The IDs are sorted by marked_at timestamp (oldest first) to provide predictable ordering.
 pub fn get_dirty_issue_ids(conn: &rusqlite::Connection) -> Result<Vec<String>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT issue_id FROM dirty_issues ORDER BY marked_at ASC"
+        "SELECT bead_id FROM dirty_issues ORDER BY marked_at ASC"
     )?;
 
     let mut rows = stmt.query([])?;
@@ -265,7 +265,7 @@ pub fn incremental_flush(storage: &crate::storage::sqlite::Storage, path: &Path)
                     i.sender, i.ephemeral, i.pinned, i.is_template,
                     GROUP_CONCAT(bl.label) AS labels
              FROM issues i
-             INNER JOIN dirty_issues d ON i.id = d.issue_id
+             INNER JOIN dirty_issues d ON i.id = d.bead_id
              LEFT JOIN bead_labels bl ON i.id = bl.bead_id
              GROUP BY i.id
              ORDER BY i.id",
@@ -1679,17 +1679,17 @@ not json at all
 
         // Mark some beads as dirty
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-1')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-1')",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-2')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-2')",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-3')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-3')",
             [],
         )
         .unwrap();
@@ -1733,7 +1733,7 @@ not json at all
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-1')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-1')",
             [],
         )
         .unwrap();
@@ -1804,7 +1804,7 @@ not json at all
             // Only mark bf-2 as dirty
             if i == 2 {
                 conn.execute(
-                    "INSERT INTO dirty_issues (issue_id) VALUES (?1)",
+                    "INSERT INTO dirty_issues (bead_id) VALUES (?1)",
                     [id],
                 )
                 .unwrap();
@@ -1886,7 +1886,7 @@ not json at all
 
         // Mark as dirty
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-rel')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-rel')",
             [],
         )
         .unwrap();
@@ -1924,7 +1924,7 @@ not json at all
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-fail')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-fail')",
             [],
         )
         .unwrap();
@@ -1985,7 +1985,7 @@ not json at all
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-2')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-2')",
             [],
         )
         .unwrap();
@@ -2042,7 +2042,7 @@ not json at all
             // Mark beads 2, 3, 4 as dirty
             if i >= 2 && i <= 4 {
                 conn.execute(
-                    "INSERT INTO dirty_issues (issue_id) VALUES (?1)",
+                    "INSERT INTO dirty_issues (bead_id) VALUES (?1)",
                     [id],
                 )
                 .unwrap();
@@ -2082,7 +2082,7 @@ not json at all
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-warn')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-warn')",
             [],
         )
         .unwrap();
@@ -2131,7 +2131,7 @@ not json at all
         .unwrap();
 
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-labels')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-labels')",
             [],
         )
         .unwrap();
@@ -2173,7 +2173,7 @@ not json at all
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO dirty_issues (issue_id) VALUES ('bf-new')",
+            "INSERT INTO dirty_issues (bead_id) VALUES ('bf-new')",
             [],
         )
         .unwrap();

@@ -283,7 +283,7 @@ pub fn claim(
 
             // Step 6: Mark as dirty
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at)
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at)
                  VALUES (?, ?)",
                 params![&bead_id, now.to_rfc3339()],
             )?;
@@ -367,7 +367,7 @@ pub fn claim(
 
             // Step 6: Mark as dirty
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at)
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at)
                  VALUES (?, ?)",
                 params![&bead_id, now.to_rfc3339()],
             )?;
@@ -754,7 +754,7 @@ mod tests {
 
         // Claim with 30 min TTL - should reclaim the stale one
         let result = storage
-            .with_immediate_transaction(|tx| claim(tx, "worker_new", 30, Utc::now(), None))
+            .with_immediate_transaction(|tx| Ok(claim(tx, "worker_new", 30, Utc::now(), None)?))
             .unwrap();
 
         assert!(result.is_some());
@@ -804,7 +804,7 @@ mod tests {
             let handle = thread::spawn(move || {
                 let result = storage_clone
                     .with_immediate_transaction(|tx| {
-                        claim(tx, &format!("worker-{}", worker_id), 30, Utc::now(), None)
+                        Ok(claim(tx, &format!("worker-{}", worker_id), 30, Utc::now(), None)?)
                     })
                     .unwrap();
 
@@ -926,7 +926,7 @@ mod tests {
 
         // Get ready candidates - should be ordered by critical path bonus
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         // bf-critical should be first (bonus=1000.0/1=1000)
@@ -994,7 +994,7 @@ mod tests {
 
         // Get ready candidates
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert_eq!(candidates.len(), 2);
@@ -1022,7 +1022,7 @@ mod tests {
 
         // limit=0 means unlimited - omit LIMIT clause in SQL
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 0, None, None)?))
             .unwrap();
 
         // All 15 beads should be returned (unlimited behavior)

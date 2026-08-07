@@ -375,7 +375,7 @@ impl Storage {
                     i.sender, i.ephemeral, i.pinned, i.is_template,
                     GROUP_CONCAT(bl.label) AS labels
              FROM issues i
-             INNER JOIN dirty_issues d ON i.id = d.issue_id
+             INNER JOIN dirty_issues d ON i.id = d.bead_id
              LEFT JOIN bead_labels bl ON i.id = bl.bead_id
              GROUP BY i.id
              ORDER BY i.id",
@@ -400,7 +400,7 @@ impl Storage {
     /// Returns an empty vector if the table is empty.
     pub fn query_dirty_issues(&self) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare_cached("SELECT issue_id FROM dirty_issues ORDER BY marked_at ASC")?;
+        let mut stmt = conn.prepare_cached("SELECT bead_id FROM dirty_issues ORDER BY marked_at ASC")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         let mut bead_ids = Vec::new();
         for bead_id in rows {
@@ -504,7 +504,7 @@ impl Storage {
             }
             // Mark as dirty for export (new beads need to be flushed to JSONL)
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                 params![&issue.id, chrono::Utc::now().to_rfc3339()],
             )?;
             // Invalidate critical path cache: new beads may add dependencies
@@ -762,7 +762,7 @@ impl Storage {
             // Mark as dirty for export (if any changes were made)
             if !updates.is_empty() || changes.labels.is_some() || changes.annotations.is_some() {
                 tx.execute(
-                    "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                    "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                     params![id, now.to_rfc3339()],
                 )?;
             }
@@ -1097,7 +1097,7 @@ impl Storage {
                 params![id, actor, reason, now.to_rfc3339()],
             )?;
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                 params![id, now.to_rfc3339()],
             )?;
             // Update worker session with close time and duration for velocity tracking
@@ -1152,7 +1152,7 @@ impl Storage {
                         params![&dep_id, now.to_rfc3339()],
                     )?;
                     tx.execute(
-                        "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                        "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                         params![&dep_id, now.to_rfc3339()],
                     )?;
                 }
@@ -1213,7 +1213,7 @@ impl Storage {
                 params![id, now.to_rfc3339()],
             )?;
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                 params![id, now.to_rfc3339()],
             )?;
 
@@ -1228,7 +1228,7 @@ impl Storage {
         self.with_immediate_transaction(|tx| {
             let now = Utc::now().to_rfc3339();
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                 params![id, now],
             )?;
             Ok(())
@@ -2759,7 +2759,7 @@ pub struct Stats {
 /// transaction as the mutation, so the dirty mark and the change commit atomically.
 fn mark_dirty_tx(tx: &Connection, id: &str) -> Result<()> {
     tx.execute(
-        "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+        "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
         params![id, Utc::now().to_rfc3339()],
     )?;
     Ok(())

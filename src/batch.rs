@@ -442,7 +442,7 @@ pub fn execute_batch(
 /// with the change itself — a rollback drops both together.
 fn mark_dirty_tx(tx: &Connection, id: &str) -> Result<()> {
     tx.execute(
-        "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+        "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
         rusqlite::params![id, Utc::now().to_rfc3339()],
     )?;
     Ok(())

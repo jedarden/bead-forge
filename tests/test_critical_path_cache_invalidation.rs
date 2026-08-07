@@ -37,7 +37,9 @@ fn test_critical_path_cache_invalidated_on_claim() {
 
     // Compute critical path - all beads should have float = 0
     let result = storage
-        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .with_immediate_transaction(|tx| {
+            compute_all_critical_paths(tx).map_err(|e| bead_forge::BeadForgeError::Other(e.to_string()))
+        })
         .unwrap();
     assert_eq!(result.beads.len(), 3);
     for bead in &result.beads {
@@ -58,7 +60,9 @@ fn test_critical_path_cache_invalidated_on_claim() {
     // After claim, bf-a is in_progress so it's no longer an open root
     // The critical path should only have bf-b and bf-c (since bf-a is in_progress)
     let result = storage
-        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .with_immediate_transaction(|tx| {
+            compute_all_critical_paths(tx).map_err(|e| bead_forge::BeadForgeError::Other(e.to_string()))
+        })
         .unwrap();
 
     // The cache should still have all 3 beads (compute_all_critical_paths computes all)
@@ -86,7 +90,9 @@ fn test_critical_path_cache_invalidated_on_reclaim() {
 
     // Compute initial critical path
     let result = storage
-        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .with_immediate_transaction(|tx| {
+            compute_all_critical_paths(tx).map_err(|e| bead_forge::BeadForgeError::Other(e.to_string()))
+        })
         .unwrap();
     assert_eq!(result.beads.len(), 1);
 
@@ -185,7 +191,9 @@ fn test_critical_path_cache_invalidated_on_dependency_remove() {
 
     // Compute initial critical path
     let result = storage
-        .with_immediate_transaction(|tx| compute_all_critical_paths(tx))
+        .with_immediate_transaction(|tx| {
+            compute_all_critical_paths(tx).map_err(|e| bead_forge::BeadForgeError::Other(e.to_string()))
+        })
         .unwrap();
     assert_eq!(result.beads.len(), 2);
 

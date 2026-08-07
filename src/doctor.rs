@@ -527,7 +527,7 @@ pub fn reconcile(workspace_dir: &Path) -> Result<ReconcileReport> {
                 rusqlite::params![id, &now],
             )?;
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                 rusqlite::params![id, &now],
             )?;
         }
@@ -569,7 +569,7 @@ pub fn reconcile(workspace_dir: &Path) -> Result<ReconcileReport> {
                 rusqlite::params![id, &now],
             )?;
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                 rusqlite::params![id, &now],
             )?;
         }
@@ -761,7 +761,7 @@ fn get_unflushed_ids(db_path: &Path) -> Result<Vec<String>> {
         return Ok(Vec::new());
     }
 
-    let mut stmt = conn.prepare("SELECT issue_id FROM dirty_issues ORDER BY issue_id")?;
+    let mut stmt = conn.prepare("SELECT bead_id FROM dirty_issues ORDER BY issue_id")?;
     let mut rows = stmt.query([])?;
 
     let mut ids = Vec::new();
@@ -1115,7 +1115,7 @@ fn restore_dirty_snapshot(db_path: &Path, snapshot: &[Issue]) -> Result<usize> {
             }
             // Re-mark dirty: these beads are still unflushed relative to JSONL.
             tx.execute(
-                "INSERT OR REPLACE INTO dirty_issues (issue_id, marked_at) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO dirty_issues (bead_id, marked_at) VALUES (?1, ?2)",
                 rusqlite::params![issue.id, now],
             )?;
         }

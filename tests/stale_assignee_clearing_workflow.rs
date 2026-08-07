@@ -395,6 +395,7 @@ fn test_programmatic_clear_assignee_workflow() {
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 

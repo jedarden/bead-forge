@@ -128,7 +128,7 @@ fn test_seed_velocity_from_closed_events() {
              VALUES (?1, 'closed', 'model-a', 'Done', '2024-01-01T01:00:00Z')",
                 rusqlite::params!["bf-vel1"],
             )?;
-            Ok::<(), anyhow::Error>(())
+            Ok(())
         })
         .unwrap();
 

@@ -53,6 +53,7 @@ fn test_ready_limit_zero_returns_all() {
             labels: vec![],
             dependencies: vec![],
             comments: vec![],
+            events: vec![],
             content_hash: None,
             annotations: Default::default(),
         };
@@ -140,6 +141,7 @@ fn test_ready_limit_zero_direct_sql_check() {
             labels: vec![],
             dependencies: vec![],
             comments: vec![],
+            events: vec![],
             content_hash: None,
             annotations: Default::default(),
         };

@@ -174,7 +174,7 @@ fn claim_marks_dirty() {
     reset_dirty(&storage);
 
     let result = storage
-        .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+        .with_immediate_transaction(|tx| Ok(claim(tx, "worker1", 30, Utc::now(), None)?))
         .unwrap();
     assert!(result.is_some(), "expected an open bead to claim");
     assert!(dirty_ids(temp.path()).contains("bf-claim1"));

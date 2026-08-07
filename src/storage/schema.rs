@@ -335,6 +335,7 @@ pub const fn dirty_issues_indexes() -> &'static str {
 pub const fn dirty_issues_table() -> &'static str {
     r#"CREATE TABLE IF NOT EXISTS dirty_issues (
     bead_id TEXT NOT NULL PRIMARY KEY,
+    marked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
 )"#
 }
@@ -591,6 +592,7 @@ CREATE INDEX IF NOT EXISTS idx_bead_annotations_bead_id
 -- Dirty issues table (tracks beads that need flushing to JSONL)
 CREATE TABLE IF NOT EXISTS dirty_issues (
     bead_id TEXT NOT NULL PRIMARY KEY,
+    marked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
 );
 "#;

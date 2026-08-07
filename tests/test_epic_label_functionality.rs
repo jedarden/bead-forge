@@ -67,6 +67,7 @@ fn create_epic_with_labels(storage: &Storage, title: &str, labels: &[&str]) -> I
         labels: labels.iter().map(|s| s.to_string()).collect(),
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: BTreeMap::new(),
     };
     storage.create_issue(&epic).expect("Failed to create epic");

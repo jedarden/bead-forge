@@ -465,7 +465,7 @@ fn test_claim_fallback_to_1800s_when_velocity_stats_empty() {
     let storage = workspace.storage().unwrap();
     let claim_result = storage
         .with_immediate_transaction(|tx| {
-            bead_forge::claim::claim(tx, "test-worker", 30, Utc::now(), Some(&worker_metadata))
+            Ok(bead_forge::claim::claim(tx, "test-worker", 30, Utc::now(), Some(&worker_metadata))?)
         })
         .unwrap();
 

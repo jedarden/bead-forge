@@ -52,7 +52,7 @@ fn test_seed_velocity_from_events() {
             )
             .unwrap();
         }
-        Ok::<_, anyhow::Error>(())
+        Ok::<_, bead_forge::BeadForgeError>(())
     })
     .unwrap();
 
@@ -61,7 +61,7 @@ fn test_seed_velocity_from_events() {
 
     // Verify velocity stats were created correctly
     let stats: Vec<(String, String, String, i64, Option<i64>, Option<i64>, Option<f64>)> = storage
-        .with_immediate_transaction(|tx| {
+        .with_immediate_transaction(|tx| -> Result<_, bead_forge::BeadForgeError> {
             let mut stmt = tx
                 .prepare(
                     "SELECT model, harness, issue_type, sample_count, p50_seconds, p90_seconds, avg_seconds
