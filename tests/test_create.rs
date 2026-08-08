@@ -184,6 +184,84 @@ mod tests {
     }
 
     #[test]
+    fn test_create_basic() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that create works with just --title flag (no explicit type/priority)
+        let (stdout, stderr, success) = run_create(&beads_dir, &["--title", "Basic test bead"]);
+
+        assert!(success, "Create command with just --title should succeed. stderr: {}", stderr);
+        assert!(!stdout.is_empty(), "Output should contain bead ID");
+
+        let bead_id = stdout.trim();
+        println!("Created bead with just --title: {}", bead_id);
+
+        // Verify the bead was created and can be shown
+        let list_output = run_list(&beads_dir);
+        assert!(list_output.contains(bead_id), "Bead should be in list");
+        assert!(list_output.contains("Basic test bead"), "Title should be in list");
+    }
+
+    #[test]
+    fn test_create_default_values() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that creating with just --title gives correct defaults
+        let (stdout, stderr, success) = run_create(&beads_dir, &["--title", "Default values test"]);
+
+        assert!(success, "Create command should succeed. stderr: {}", stderr);
+
+        let bead_id = stdout.trim();
+
+        // Query the database to verify default values
+        let db_path = beads_dir.join("beads.db");
+        let conn = Connection::open(&db_path).expect("Failed to open database for verification");
+
+        let mut stmt = conn
+            .prepare("SELECT status, priority, issue_type FROM issues WHERE id = ?1")
+            .expect("Failed to prepare statement");
+
+        let mut rows = stmt.query(&[bead_id]).expect("Failed to execute query");
+
+        let row = rows
+            .next()
+            .expect("Failed to get row")
+            .expect("No bead found with given ID");
+
+        let status: String = row.get(0).expect("Failed to get status");
+        let priority: i32 = row.get(1).expect("Failed to get priority");
+        let issue_type: String = row.get(2).expect("Failed to get issue_type");
+
+        assert_eq!(status, "open", "Default status should be 'open'");
+        assert_eq!(priority, 2, "Default priority should be 2 (medium)");
+        assert_eq!(issue_type, "task", "Default type should be 'task'");
+    }
+
+    #[test]
+    fn test_create_output_format() {
+        let (_temp_dir, beads_dir) = setup_test_workspace();
+
+        // Test that output is just the bead ID, no extra text
+        let (stdout, stderr, success) = run_create(&beads_dir, &["--title", "Output format test"]);
+
+        assert!(success, "Create command should succeed. stderr: {}", stderr);
+
+        let output = stdout.trim();
+
+        // Output should be just the ID (no extra text, labels, etc.)
+        assert!(!output.is_empty(), "Output should not be empty");
+        assert!(!output.contains(' '), "Output should be just the ID with no spaces");
+        assert!(!output.contains('\n'), "Output should be a single line");
+        assert!(!output.contains("ID:"), "Output should not contain 'ID:' prefix");
+        assert!(!output.contains("Created"), "Output should not contain 'Created' prefix");
+
+        // Verify it's a valid bead ID format (prefix-random)
+        assert!(output.starts_with("test-"), "Output should start with prefix");
+        assert!(output.len() > 5, "Output should be longer than just prefix");
+        assert!(output.len() < 20, "Output should be a reasonable ID length");
+    }
+
+    #[test]
     fn test_create_with_description() {
         let (_temp_dir, beads_dir) = setup_test_workspace();
 
