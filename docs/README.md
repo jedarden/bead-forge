@@ -415,6 +415,8 @@ Most commands accept `--format json|text|toon` for output and a global `-w/--wor
 # ── Lifecycle ────────────────────────────────────────────────────────────────
 bf create        --title "..." [--type <t>] [--priority <N>] [--description "..."]
                  [--assignee <a>] [--label <l> ...]
+                 # Multiple labels: repeat --label flag
+                 # Example: bf create --title "Fix bug" --label bug --label urgent --label priority
 bf list          [--status <s>] [--type <t>] [--assignee <a>] [--priority <N>]
                  [--annotation k=v] [--limit <N>] [--all] [--format json|text|toon] [--json]
 bf show          <id> [--format json|text|toon] [--json]
@@ -537,6 +539,48 @@ bf update bf-abc123 --assignee worker-8
 ```
 
 The `--clear-assignee` flag is specifically for **unassigning** (making available for any worker), not for reassigning to a specific worker.
+
+### Multi-Label Usage
+
+The `--label` flag can be repeated to attach multiple labels to a bead when creating or updating it. Labels are free-form strings used for grouping and filtering.
+
+```bash
+# Single label
+bf create --title "Fix login bug" --label bug
+
+# Multiple labels (repeat the flag)
+bf create --title "Fix authentication" --label bug --label urgent --label backend
+
+# Labels with spaces must be quoted
+bf create --title "Performance issue" --label "performance" --label "high priority"
+
+# Adding labels to existing beads
+bf label add bf-abc123 -l enhancement -l priority
+
+# Removing labels from existing beads
+bf label remove bf-abc123 -l deprecated
+```
+
+**Viewing labels:**
+```bash
+# Show all labels for a specific bead
+bf labels bf-abc123
+
+# Show all beads with their labels
+bf labels
+
+# Filter beads by label
+bf list --label urgent
+bf search --label bug --label enhancement
+```
+
+**Label storage:** Labels are stored in the `labels` column as a JSON array. When using `--format json` output, labels are always present (empty array `[]` when no labels are set).
+
+**Multi-label examples in batch operations:**
+```json
+{"op": "create", "title": "Fix auth bug", "labels": ["bug", "urgent", "security"]}
+{"op": "label_add", "id": "bf-123", "labels": ["enhancement", "priority"]}
+```
 
 ---
 
