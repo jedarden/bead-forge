@@ -179,8 +179,7 @@ pub const fn issue_labels_table() -> &'static str {
     label_id TEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (issue_id, label_id),
-    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE,
-    FOREIGN KEY (label_id) REFERENCES labels(id) ON DELETE CASCADE
+    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
 )"#
 }
 
@@ -539,8 +538,7 @@ CREATE TABLE IF NOT EXISTS issue_labels (
     label_id TEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (issue_id, label_id),
-    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE,
-    FOREIGN KEY (label_id) REFERENCES labels(id) ON DELETE CASCADE
+    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
 );
 
 -- Issue labels indexes
