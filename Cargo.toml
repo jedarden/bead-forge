@@ -4,7 +4,7 @@ version = "0.4.0"
 edition = "2021"
 authors = ["jedarden"]
 description = "Drop-in replacement for beads_rust (br) with SQLite primary store and atomic claiming"
-license = "MIT"
+license-file = "LICENSE"
 repository = "https://github.com/jedarden/bead-forge"
 
 [dependencies]

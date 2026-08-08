@@ -1,0 +1,20 @@
+bead-forge
+Copyright 2026 Jed Arden and contributors
+
+bead-forge is a cleanly diverged implementation compatible with the data
+formats and command surface of beads_rust (`br`). It incorporates and adapts
+ideas, data-model definitions, serialization contracts, schema behavior, and
+selected implementation behavior from beads_rust.
+
+Upstream project:
+  beads_rust
+  Copyright 2026 Jeffrey Emanuel and contributors
+  https://github.com/Dicklesworthstone/beads_rust
+
+The upstream license is preserved verbatim in `LICENSE`, including its
+OpenAI/Anthropic rider. That license is not the standard OSI MIT License, so
+package metadata deliberately uses `license-file` rather than the SPDX
+expression `MIT`.
+
+The Git history and source comments provide more granular attribution for
+specific compatibility work and upstream behavior studied during development.
