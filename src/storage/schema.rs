@@ -6,7 +6,8 @@
 use rusqlite::Connection;
 
 /// Issues table - core bead data
-/// All 35 columns with br-compatible types, defaults, and CHECK constraints.
+/// All 36 columns with br-compatible types, defaults, and CHECK constraints.
+/// Includes manual_status for derived blocked status (Phase 7.8).
 pub const fn issues_table() -> &'static str {
     r#"CREATE TABLE IF NOT EXISTS issues (
     id TEXT PRIMARY KEY,
@@ -45,6 +46,7 @@ pub const fn issues_table() -> &'static str {
     ephemeral INTEGER NOT NULL DEFAULT 0,
     pinned INTEGER NOT NULL DEFAULT 0,
     is_template INTEGER NOT NULL DEFAULT 0,
+    manual_status TEXT DEFAULT NULL,
     CHECK (
         (status = 'closed' AND closed_at IS NOT NULL) OR
         (status = 'tombstone') OR
@@ -340,7 +342,45 @@ pub const fn dirty_issues_table() -> &'static str {
 )"#
 }
 
-/// Complete SQL schema for all 14 tables
+/// Blocked issues cache table - materialized view for derived blocked status (Phase 7.8)
+pub const fn blocked_issues_cache_table() -> &'static str {
+    r#"CREATE TABLE IF NOT EXISTS blocked_issues_cache (
+    issue_id TEXT NOT NULL PRIMARY KEY,
+    blocked_by INTEGER NOT NULL DEFAULT 0,
+    blocked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+)"#
+}
+
+/// Blocked issues cache indexes
+pub const fn blocked_issues_cache_indexes() -> &'static str {
+    r#"CREATE INDEX IF NOT EXISTS idx_blocked_issues_cache_blocked_at
+    ON blocked_issues_cache (blocked_at);"#
+}
+
+/// Critical path cache table (already defined elsewhere, adding reference for completeness)
+pub const fn critical_path_cache_table() -> &'static str {
+    r#"CREATE TABLE IF NOT EXISTS critical_path_cache (
+    bead_id TEXT NOT NULL PRIMARY KEY,
+    epic_id TEXT,
+    es INTEGER NOT NULL DEFAULT 0,
+    ls INTEGER NOT NULL DEFAULT 0,
+    float INTEGER NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE,
+    FOREIGN KEY (epic_id) REFERENCES issues(id) ON DELETE CASCADE
+)"#
+}
+
+/// Critical path cache indexes
+pub const fn critical_path_cache_indexes() -> &'static str {
+    r#"CREATE INDEX IF NOT EXISTS idx_critical_path_cache_epic_id
+    ON critical_path_cache (epic_id);
+CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float
+    ON critical_path_cache (float);"#
+}
+
+/// Complete SQL schema for all 16 tables
 pub const SCHEMA_SQL: &str = r#"
 -- Issues table
 CREATE TABLE IF NOT EXISTS issues (
@@ -380,6 +420,7 @@ CREATE TABLE IF NOT EXISTS issues (
     ephemeral INTEGER NOT NULL DEFAULT 0,
     pinned INTEGER NOT NULL DEFAULT 0,
     is_template INTEGER NOT NULL DEFAULT 0,
+    manual_status TEXT DEFAULT NULL,
     CHECK (
         (status = 'closed' AND closed_at IS NOT NULL) OR
         (status = 'tombstone') OR
@@ -595,6 +636,36 @@ CREATE TABLE IF NOT EXISTS dirty_issues (
     marked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
 );
+
+-- Critical path cache table (stores computed CPM float values for beads)
+CREATE TABLE IF NOT EXISTS critical_path_cache (
+    bead_id TEXT NOT NULL PRIMARY KEY,
+    epic_id TEXT,
+    es INTEGER NOT NULL DEFAULT 0,
+    ls INTEGER NOT NULL DEFAULT 0,
+    float INTEGER NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE,
+    FOREIGN KEY (epic_id) REFERENCES issues(id) ON DELETE CASCADE
+);
+
+-- Critical path cache indexes
+CREATE INDEX IF NOT EXISTS idx_critical_path_cache_epic_id
+    ON critical_path_cache (epic_id);
+CREATE INDEX IF NOT EXISTS idx_critical_path_cache_float
+    ON critical_path_cache (float);
+
+-- Blocked issues cache table (materialized view of blocked beads for Phase 7.8)
+CREATE TABLE IF NOT EXISTS blocked_issues_cache (
+    issue_id TEXT NOT NULL PRIMARY KEY,
+    blocked_by INTEGER NOT NULL DEFAULT 0,
+    blocked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+);
+
+-- Blocked issues cache indexes
+CREATE INDEX IF NOT EXISTS idx_blocked_issues_cache_blocked_at
+    ON blocked_issues_cache (blocked_at);
 "#;
 
 /// Execute multiple SQL statements separated by semicolons.
@@ -684,7 +755,7 @@ pub const fn table_bead_annotations() -> &'static str {
     bead_annotations_table()
 }
 
-/// All table DDL strings - returns all 14 table definitions in dependency order
+/// All table DDL strings - returns all 16 table definitions in dependency order
 pub fn all_tables() -> Vec<&'static str> {
     vec![
         issues_table(),
@@ -701,6 +772,8 @@ pub fn all_tables() -> Vec<&'static str> {
         issue_assignees_table(),
         bead_annotations_table(),
         dirty_issues_table(),
+        blocked_issues_cache_table(),
+        critical_path_cache_table(),
     ]
 }
 
@@ -721,5 +794,7 @@ pub fn all_indexes() -> Vec<&'static str> {
         issue_assignees_indexes(),
         bead_annotations_indexes(),
         dirty_issues_indexes(),
+        blocked_issues_cache_indexes(),
+        critical_path_cache_indexes(),
     ]
 }
