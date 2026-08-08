@@ -20,6 +20,7 @@ pub mod merge;
 pub mod migrate;
 pub mod module_test;
 pub mod model;
+pub mod progress;
 pub mod recovery;
 pub mod reopen;
 pub mod robot_docs;

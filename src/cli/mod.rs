@@ -62,6 +62,11 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub envelope: bool,
 
+    /// Disable progress indicators for this invocation. Useful for scripted
+    /// environments or CI pipelines where visual progress output is unwanted.
+    #[arg(long, global = true)]
+    pub no_progress: bool,
+
     /// Print version information ("bf <version>") and exit 0.
     ///
     /// Declared by hand rather than via clap's built-in version flag (see
@@ -1180,6 +1185,10 @@ pub fn run(cli: Cli) -> Result<()> {
     // `autoflush::after_mutation_with_config` (see child 1, bf-37xjd).
     let no_auto_flush = cli.no_auto_flush;
     let workspace = cli.workspace.unwrap_or_else(|| PathBuf::from("."));
+
+    // Enable progress indicators unless --no-progress flag is set.
+    // This is a process-wide setting that affects all progress output.
+    crate::progress::set_quiet_mode(cli.no_progress);
 
     // Enable envelope wrapping for this process if --envelope flag is set.
     // This is a process-wide setting that affects all JSON formatting.
