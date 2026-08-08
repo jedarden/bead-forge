@@ -2129,12 +2129,20 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
         OutputFormat::Toon => {
             // Use the formatter to ensure consistent output
             let output = formatter.format_issues(&issues);
-            print!("{}", output);
+            if output.is_empty() {
+                println!("No ready candidates");
+            } else {
+                print!("{}", output);
+            }
         }
         OutputFormat::Text => {
             // Use the formatter to ensure consistent output
             let output = formatter.format_issues(&issues);
-            print!("{}", output);
+            if output.is_empty() {
+                println!("No ready candidates");
+            } else {
+                print!("{}", output);
+            }
         }
     }
 
