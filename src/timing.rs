@@ -99,7 +99,7 @@ impl TimerState {
 /// even across process crashes and restarts.
 pub struct ExecutionTimer {
     /// In-memory start time (for calculating duration within this process)
-    local_start: Instant,
+    _local_start: Instant,
     /// Persistent timer state
     state: TimerState,
     /// Path where the state file is stored
@@ -163,7 +163,7 @@ impl ExecutionTimer {
             .with_context(|| format!("Failed to write timer state to: {}", state_path.display()))?;
 
         Ok(Self {
-            local_start: Instant::now(),
+            _local_start: Instant::now(),
             state,
             state_path: state_path.to_path_buf(),
         })
@@ -215,7 +215,7 @@ impl ExecutionTimer {
         })?;
 
         Ok(Self {
-            local_start: Instant::now(),
+            _local_start: Instant::now(),
             state,
             state_path: state_path.to_path_buf(),
         })
@@ -314,7 +314,7 @@ impl ExecutionTimer {
     ///
     /// # Returns
     /// * `Result<crate::trace::TraceMetadata>` - Populated trace metadata
-    pub fn complete_with_metadata(mut self, bead_id: &str) -> Result<crate::trace::TraceMetadata> {
+    pub fn complete_with_metadata(self, bead_id: &str) -> Result<crate::trace::TraceMetadata> {
         // Store the start time before consuming self
         let start_time = self.state.start_time.clone();
         let duration_ms = self.stop()?;
