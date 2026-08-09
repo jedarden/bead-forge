@@ -761,7 +761,7 @@ fn get_unflushed_ids(db_path: &Path) -> Result<Vec<String>> {
         return Ok(Vec::new());
     }
 
-    let mut stmt = conn.prepare("SELECT bead_id FROM dirty_issues ORDER BY issue_id")?;
+    let mut stmt = conn.prepare("SELECT bead_id FROM dirty_issues ORDER BY marked_at")?;
     let mut rows = stmt.query([])?;
 
     let mut ids = Vec::new();
