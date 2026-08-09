@@ -674,6 +674,28 @@ fn execute_batch(conn: &Connection, sql: &str) -> anyhow::Result<()> {
 
 pub fn apply_schema(conn: &Connection) -> anyhow::Result<()> {
     execute_batch(conn, SCHEMA_SQL)?;
+    migrate_legacy_columns(conn)?;
+    Ok(())
+}
+
+/// Rename columns left over from schema revisions that predate the current
+/// `CREATE TABLE IF NOT EXISTS` definitions.
+///
+/// `apply_schema()` is a no-op for tables that already exist, so a column
+/// rename in the DDL above never reaches a database created before the
+/// rename landed. `dirty_issues` was originally created with an `issue_id`
+/// primary key column; every write path (claim.rs, batch.rs) now names it
+/// `bead_id` explicitly, so an unmigrated database fails every claim/release
+/// with "table dirty_issues has no column named bead_id" — not corruption,
+/// just a schema that was never brought forward. This runs on every
+/// `Storage::open()` (via `apply_schema`) and is a no-op once migrated.
+fn migrate_legacy_columns(conn: &Connection) -> anyhow::Result<()> {
+    let has_legacy_issue_id: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('dirty_issues') WHERE name = 'issue_id'")?
+        .exists([])?;
+    if has_legacy_issue_id {
+        conn.execute_batch("ALTER TABLE dirty_issues RENAME COLUMN issue_id TO bead_id;")?;
+    }
     Ok(())
 }
 
