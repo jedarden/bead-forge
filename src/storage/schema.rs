@@ -635,6 +635,62 @@ CREATE TABLE IF NOT EXISTS dirty_issues (
     FOREIGN KEY (bead_id) REFERENCES issues(id) ON DELETE CASCADE
 );
 
+-- Worker sessions table (claim.rs/velocity.rs record every claim/close here for
+-- velocity stats). Was missing from SCHEMA_SQL entirely — every write path
+-- assumed it existed, but nothing ever created it for a fresh `bf init`, so a
+-- brand-new database crashed on the first claim: "no such table: worker_sessions".
+CREATE TABLE IF NOT EXISTS worker_sessions (
+    worker_id TEXT NOT NULL,
+    model TEXT,
+    harness TEXT,
+    harness_version TEXT,
+    claimed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    bead_id TEXT REFERENCES issues(id) ON DELETE SET NULL,
+    workspace_path TEXT NOT NULL,
+    closed_at DATETIME,
+    duration_seconds INTEGER,
+    PRIMARY KEY (worker_id, claimed_at)
+);
+
+-- Export hashes table (sync.rs tracks per-issue content hash on every JSONL
+-- export, to skip re-exporting unchanged issues). Also missing from SCHEMA_SQL
+-- entirely — a fresh `bf init` degraded auto-flush to a silent warning
+-- ("no such table: export_hashes") on every create/claim/close instead of
+-- crashing outright, so it went unnoticed longer than worker_sessions did.
+CREATE TABLE IF NOT EXISTS export_hashes (
+    issue_id TEXT PRIMARY KEY,
+    content_hash TEXT NOT NULL,
+    exported_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+);
+
+-- Velocity stats table (velocity.rs upserts p50/p90/avg duration per
+-- model+harness+issue_type, used to score claim priority by expected_seconds).
+-- Same missing-from-SCHEMA_SQL bug as worker_sessions and export_hashes.
+CREATE TABLE IF NOT EXISTS velocity_stats (
+    model TEXT NOT NULL,
+    harness TEXT NOT NULL,
+    issue_type TEXT NOT NULL,
+    sample_count INTEGER DEFAULT 0,
+    p50_seconds INTEGER,
+    p90_seconds INTEGER,
+    avg_seconds REAL,
+    last_updated DATETIME,
+    PRIMARY KEY (model, harness, issue_type)
+);
+
+-- Migration lock table (claim.rs checks this before claiming, migrate.rs
+-- acquires/releases it — a single-row advisory lock guarding concurrent
+-- migrations). Same missing-from-SCHEMA_SQL bug — this one is on the claim
+-- hot path, so a database missing it fails "no such table: migration_lock"
+-- on the very first claim, same failure class as worker_sessions.
+CREATE TABLE IF NOT EXISTS migration_lock (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    locked_by TEXT NOT NULL,
+    locked_at DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL
+);
+
 -- Critical path cache table (stores computed CPM float values for beads)
 CREATE TABLE IF NOT EXISTS critical_path_cache (
     bead_id TEXT NOT NULL PRIMARY KEY,
