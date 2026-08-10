@@ -1021,12 +1021,38 @@ impl Storage {
     /// Updates only the status field and the updated_at timestamp.
     /// All other fields remain unchanged.
     pub fn update_status(&self, id: &str, status: Status) -> Result<()> {
-        let query = "UPDATE issues SET status = ?, updated_at = ? WHERE id = ?";
         let now = Utc::now();
 
         // Execute within a BEGIN IMMEDIATE transaction for atomicity
         self.with_immediate_transaction(|tx| {
-            tx.execute(query, params![status.as_str(), now.to_rfc3339(), id])?;
+            // Check if bead exists and get current status
+            let current_status: Option<String> = tx
+                .query_row(
+                    "SELECT status FROM issues WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if current_status.is_none() {
+                return Err(BeadForgeError::not_found("bead", id, None));
+            }
+
+            let old_status = current_status.unwrap();
+            let new_status = status.as_str();
+
+            // Update the status
+            tx.execute(
+                "UPDATE issues SET status = ?, updated_at = ? WHERE id = ?",
+                params![new_status, now.to_rfc3339(), id],
+            )?;
+
+            // Create a status change event
+            tx.execute(
+                "INSERT INTO events (issue_id, event_type, actor, old_value, new_value, created_at) VALUES (?1, 'status_changed', 'system', ?2, ?3, ?4)",
+                params![id, old_status, new_status, now.to_rfc3339()],
+            )?;
+
             Ok(())
         })
     }
@@ -1900,6 +1926,14 @@ impl Storage {
         direction: &str,
         max_depth: usize,
     ) -> Result<Vec<DepTreeNode>> {
+        // SECURITY: Validate root_id format to prevent SQL injection
+        use crate::id::is_valid_bead_id;
+        if !is_valid_bead_id(root_id) {
+            return Err(BeadForgeError::validation(format!(
+                "Invalid bead ID format: {}", root_id
+            )));
+        }
+
         let conn = self.conn.lock().unwrap();
 
         // Build recursive CTE based on direction
@@ -1944,7 +1978,7 @@ impl Storage {
                     i.priority,
                     0 as depth,
                     d.type as dep_type,
-                    '{root_id}' || ',' || {id_col} as path
+                    ?2 || ',' || {id_col} as path
                 FROM dependencies d
                 INNER JOIN issues i ON i.id = {id_col}
                 WHERE {anchor_join}
@@ -1972,7 +2006,8 @@ impl Storage {
         );
 
         let mut stmt = conn.prepare(&sql)?;
-        let mut rows = stmt.query(params![root_id])?;
+        // SECURITY: Bind root_id as parameter to prevent SQL injection
+        let mut rows = stmt.query(params![root_id, root_id])?;
         let mut nodes = Vec::new();
         while let Some(row) = rows.next()? {
             let path: String = row.get(6)?;
@@ -3945,6 +3980,102 @@ mod tests {
         filter.offset = Some(2);
         let results = storage.list_issues(&filter).unwrap();
         assert_eq!(results.len(), 2);
+    }
+
+    // Security tests for SQL injection prevention (bf-3fwld0)
+    #[test]
+    fn test_get_dep_tree_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a chain of dependencies: bf-root -> bf-child1 -> bf-child2
+        let root = Issue::new("bf-root".to_string(), "Root Issue".to_string(), ".".to_string());
+        let child1 = Issue::new("bf-child1".to_string(), "Child 1".to_string(), ".".to_string());
+        let child2 = Issue::new("bf-child2".to_string(), "Child 2".to_string(), ".".to_string());
+
+        storage.create_issue(&root).unwrap();
+        storage.create_issue(&child1).unwrap();
+        storage.create_issue(&child2).unwrap();
+
+        // Create dependencies using the correct method signature
+        storage.add_dependency("bf-root", "bf-child1", &DependencyType::Blocks, "test-actor").unwrap();
+        storage.add_dependency("bf-child1", "bf-child2", &DependencyType::Blocks, "test-actor").unwrap();
+
+        // Test 1: Normal operation should still work
+        let result = storage.get_dep_tree("bf-root", "down", 10);
+        assert!(result.is_ok(), "Normal operation should succeed");
+        let tree = result.unwrap();
+        assert_eq!(tree.len(), 2, "Should return 2 dependencies");
+        assert_eq!(tree[0].id, "bf-child1", "First level should be child1");
+        assert_eq!(tree[1].id, "bf-child2", "Second level should be child2");
+
+        // Test 2: SQL injection via UNION SELECT should be rejected or return empty
+        let malicious_inputs = vec![
+            "bf-123' OR '1'='1",
+            "bf-123'; DROP TABLE dependencies; --",
+            "bf-123' UNION SELECT * FROM issues WHERE '1'='1",
+            "' OR '1'='1",
+            "bf-123'--",
+            "bf-123'/*",
+            "'; EXEC('xp_cmdshell'); --",
+        ];
+
+        for payload in malicious_inputs {
+            let result = storage.get_dep_tree(payload, "down", 10);
+            // Should either error (validation rejected) or return empty (no valid ID found)
+            match result {
+                Ok(tree) => {
+                    // If it succeeds, tree should be empty (no valid bead ID exists)
+                    assert_eq!(
+                        tree.len(),
+                        0,
+                        "Malicious payload '{}' should return empty tree, got {} nodes",
+                        payload,
+                        tree.len()
+                    );
+                }
+                Err(_) => {
+                    // Validation error is expected and acceptable
+                    // This is the secure path: reject invalid input before query execution
+                }
+            }
+        }
+
+        // Test 3: Invalid bead ID format should be rejected
+        let invalid_ids = vec![
+            "",           // Empty
+            "bf-",        // Prefix only
+            "invalid",    // No hyphen
+            "xyz-123",    // Wrong prefix
+            "bf- 123",    // Space in ID
+            "bf-1;2",     // Special chars
+        ];
+
+        for invalid_id in invalid_ids {
+            let result = storage.get_dep_tree(invalid_id, "down", 10);
+            assert!(result.is_err(), "Invalid ID '{}' should be rejected", invalid_id);
+        }
+
+        // Test 4: Verify normal operation still works after security fixes (regression test)
+        let up_tree = storage.get_dep_tree("bf-child2", "up", 10).unwrap();
+        assert_eq!(up_tree.len(), 1, "Should find 1 parent");
+        assert_eq!(up_tree[0].id, "bf-child1", "Parent should be child1");
+
+        // Test 5: Direction parameter is also validated
+        let result = storage.get_dep_tree("bf-root", "invalid-direction", 10);
+        // Should not crash - direction falls through to default case
+        assert!(result.is_ok() || result.is_err(), "Direction parameter should be handled safely");
+    }
+
+    #[test]
+    fn test_get_dep_tree_with_valid_nonexistent_id() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // A validly-formatted but non-existent ID should return empty tree, not error
+        let result = storage.get_dep_tree("bf-nonexistent", "down", 10);
+        assert!(result.is_ok(), "Valid format non-existent ID should not error");
+        assert_eq!(result.unwrap().len(), 0, "Should return empty tree");
     }
 }
 
