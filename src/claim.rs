@@ -412,6 +412,9 @@ pub fn get_ready_candidates(
 
     let mut stmt = if let (Some(_m), Some(_h)) = (model, harness) {
         // Velocity-aware scoring: divide combined score by expected seconds
+        // Priority-based ordering: P0 first, then P1, P2, P3, P4
+        // Within same priority, older beads first (FIFO)
+        // NULL priority treated as 999 (lowest, after all valid priorities)
         let sql = if unlimited {
             "SELECT i.id, i.title, i.status, i.priority,
                     COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
@@ -431,14 +434,8 @@ pub fn get_ready_candidates(
                AND i.deleted_at IS NULL
                AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
-             ORDER BY (
-                 COALESCE(COUNT(d.issue_id), 0) * 3.0
-                 + (4 - i.priority) * 2.0
-                 + 1000.0 / (COALESCE(c.float, 999) + 1)
-             ) / COALESCE(vs.p50_seconds, 1800) DESC,
-                 downstream_impact DESC,
-                 critical_path_bonus DESC,
-                 i.priority ASC,
+             ORDER BY
+                 COALESCE(i.priority, 999) ASC,
                  i.created_at ASC"
         } else {
             "SELECT i.id, i.title, i.status, i.priority,
@@ -459,20 +456,17 @@ pub fn get_ready_candidates(
                AND i.deleted_at IS NULL
                AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
-             ORDER BY (
-                 COALESCE(COUNT(d.issue_id), 0) * 3.0
-                 + (4 - i.priority) * 2.0
-                 + 1000.0 / (COALESCE(c.float, 999) + 1)
-             ) / COALESCE(vs.p50_seconds, 1800) DESC,
-                 downstream_impact DESC,
-                 critical_path_bonus DESC,
-                 i.priority ASC,
+             ORDER BY
+                 COALESCE(i.priority, 999) ASC,
                  i.created_at ASC
              LIMIT ?3"
         };
         tx.prepare_cached(sql)?
     } else {
         // Standard scoring without velocity data
+        // Priority-based ordering: P0 first, then P1, P2, P3, P4
+        // Within same priority, older beads first (FIFO)
+        // NULL priority treated as 999 (lowest, after all valid priorities)
         let sql = if unlimited {
             "SELECT i.id, i.title, i.status, i.priority,
                     COALESCE(COUNT(d.issue_id), 0) as downstream_impact,
@@ -489,9 +483,7 @@ pub fn get_ready_candidates(
                AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
              ORDER BY
-                 downstream_impact DESC,
-                 critical_path_bonus DESC,
-                 i.priority ASC,
+                 COALESCE(i.priority, 999) ASC,
                  i.created_at ASC"
         } else {
             "SELECT i.id, i.title, i.status, i.priority,
@@ -509,9 +501,7 @@ pub fn get_ready_candidates(
                AND i.id NOT IN (SELECT issue_id FROM blocked_issues_cache)
              GROUP BY i.id
              ORDER BY
-                 downstream_impact DESC,
-                 critical_path_bonus DESC,
-                 i.priority ASC,
+                 COALESCE(i.priority, 999) ASC,
                  i.created_at ASC
              LIMIT ?1"
         };
@@ -1248,5 +1238,142 @@ mod tests {
             vec!["bf-blocker-open", "bf-standalone-a", "bf-standalone-b"],
             "ready set must be exactly the unblocked open-status beads"
         );
+    }
+
+    #[test]
+    fn test_priority_ordering_p0_before_p1() {
+        let (_temp, mut storage) = setup_test_db();
+
+        // Create beads with different priorities
+        let mut p1_bead = Issue::new(
+            "bf-p1-older".to_string(),
+            "P1 bead".to_string(),
+            ".".to_string(),
+        );
+        p1_bead.priority = crate::model::Priority(1);
+        storage.create_issue(&p1_bead).unwrap();
+
+        let mut p0_bead = Issue::new(
+            "bf-p0-newer".to_string(),
+            "P0 bead".to_string(),
+            ".".to_string(),
+        );
+        p0_bead.priority = crate::model::Priority(0);
+        // Make P0 bead newer (created after P1)
+        p0_bead.created_at = Utc::now() + Duration::seconds(1);
+        storage.create_issue(&p0_bead).unwrap();
+
+        let mut p2_bead = Issue::new(
+            "bf-p2".to_string(),
+            "P2 bead".to_string(),
+            ".".to_string(),
+        );
+        p2_bead.priority = crate::model::Priority(2);
+        storage.create_issue(&p2_bead).unwrap();
+
+        let candidates = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 0, None, None)?))
+            .unwrap();
+
+        // P0 should be first, even though it's newer than P1
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].id, "bf-p0-newer");
+        assert_eq!(candidates[0].priority, 0);
+        assert_eq!(candidates[1].id, "bf-p1-older");
+        assert_eq!(candidates[1].priority, 1);
+        assert_eq!(candidates[2].id, "bf-p2");
+        assert_eq!(candidates[2].priority, 2);
+    }
+
+    #[test]
+    fn test_priority_ordering_same_priority_fifo() {
+        let (_temp, mut storage) = setup_test_db();
+
+        let base_time = Utc::now();
+
+        // Create three P1 beads with different creation times
+        let mut p1_oldest = Issue::new(
+            "bf-p1-oldest".to_string(),
+            "Oldest P1".to_string(),
+            ".".to_string(),
+        );
+        p1_oldest.priority = crate::model::Priority(1);
+        p1_oldest.created_at = base_time;
+        storage.create_issue(&p1_oldest).unwrap();
+
+        let mut p1_middle = Issue::new(
+            "bf-p1-middle".to_string(),
+            "Middle P1".to_string(),
+            ".".to_string(),
+        );
+        p1_middle.priority = crate::model::Priority(1);
+        p1_middle.created_at = base_time + Duration::seconds(10);
+        storage.create_issue(&p1_middle).unwrap();
+
+        let mut p1_newest = Issue::new(
+            "bf-p1-newest".to_string(),
+            "Newest P1".to_string(),
+            ".".to_string(),
+        );
+        p1_newest.priority = crate::model::Priority(1);
+        p1_newest.created_at = base_time + Duration::seconds(20);
+        storage.create_issue(&p1_newest).unwrap();
+
+        let candidates = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 0, None, None)?))
+            .unwrap();
+
+        // All P1, should be ordered by creation time (oldest first)
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].id, "bf-p1-oldest");
+        assert_eq!(candidates[1].id, "bf-p1-middle");
+        assert_eq!(candidates[2].id, "bf-p1-newest");
+    }
+
+    #[test]
+    fn test_priority_ordering_default_priority_is_p2() {
+        let (_temp, mut storage) = setup_test_db();
+
+        // The schema has `priority INTEGER NOT NULL DEFAULT 2`, so all beads
+        // will have a priority value. The COALESCE(i.priority, 999) in the ORDER BY
+        // is defensive but never actually needed since priority cannot be NULL.
+        // This test verifies that default priority (2) is ordered correctly.
+
+        let mut p0_bead = Issue::new(
+            "bf-p0".to_string(),
+            "P0 bead".to_string(),
+            ".".to_string(),
+        );
+        p0_bead.priority = crate::model::Priority(0);
+        storage.create_issue(&p0_bead).unwrap();
+
+        // Create a bead without explicitly setting priority - should default to 2
+        let default_bead = Issue::new(
+            "bf-default".to_string(),
+            "Default priority bead".to_string(),
+            ".".to_string(),
+        );
+        storage.create_issue(&default_bead).unwrap();
+
+        let mut p3_bead = Issue::new(
+            "bf-p3".to_string(),
+            "P3 bead".to_string(),
+            ".".to_string(),
+        );
+        p3_bead.priority = crate::model::Priority(3);
+        storage.create_issue(&p3_bead).unwrap();
+
+        let candidates = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 0, None, None)?))
+            .unwrap();
+
+        // Default priority (2) should be between P1 and P3
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].id, "bf-p0");
+        assert_eq!(candidates[0].priority, 0);
+        assert_eq!(candidates[1].id, "bf-default");
+        assert_eq!(candidates[1].priority, 2); // Default is P2
+        assert_eq!(candidates[2].id, "bf-p3");
+        assert_eq!(candidates[2].priority, 3);
     }
 }
