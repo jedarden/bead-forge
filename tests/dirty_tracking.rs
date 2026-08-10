@@ -23,7 +23,7 @@ use tempfile::NamedTempFile;
 /// assertion does not depend on any library accessor's join/filter behavior.
 fn dirty_ids(db_path: &Path) -> HashSet<String> {
     let conn = Connection::open(db_path).unwrap();
-    let mut stmt = conn.prepare("SELECT issue_id FROM dirty_issues").unwrap();
+    let mut stmt = conn.prepare("SELECT bead_id FROM dirty_issues").unwrap();
     let ids = stmt
         .query_map([], |row| row.get::<_, String>(0))
         .unwrap()
