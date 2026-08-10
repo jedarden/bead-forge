@@ -3007,12 +3007,9 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
 
         let labels = storage.get_labels(issue_id)?;
         if format == "json" {
-            // Output JSON structure: {"id": "...", "labels": ["label1", "label2"]}
-            let obj = serde_json::json!({
-                "id": issue_id,
-                "labels": labels
-            });
-            println!("{}", serde_json::to_string(&obj)?);
+            // Use LabelsOutput for consistent JSON formatting
+            let output = crate::format::LabelsOutput::new(issue_id, labels);
+            println!("{}", output.to_json());
         } else {
             for label in &labels {
                 println!("{}", label);
@@ -3027,18 +3024,14 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
         issues.sort_by(|a, b| a.id.cmp(&b.id));
 
         if format == "json" {
-            // Output JSONL (one {id, title, labels} object per line)
+            // Output JSONL (one {id, labels} object per line)
             // Empty bead set prints [] (matches list/ready convention)
             if issues.is_empty() {
                 println!("[]");
             } else {
                 for issue in &issues {
-                    let obj = serde_json::json!({
-                        "id": issue.id,
-                        "title": issue.title,
-                        "labels": issue.labels
-                    });
-                    println!("{}", serde_json::to_string(&obj)?);
+                    let output = crate::format::LabelsOutput::from_issue(issue);
+                    println!("{}", output.to_json());
                 }
             }
         } else {
