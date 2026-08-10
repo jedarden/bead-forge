@@ -1795,16 +1795,10 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
 
     match format {
         "json" => {
-            // Strip dependencies/comments before serializing: NEEDLE's BrDependency
-            // format ({id, title, status, priority, dependency_type}) differs from
-            // bead-forge's Dependency format ({issue_id, depends_on_id, type, ...}).
-            // NEEDLE has #[serde(default)] on the deps field so empty is fine.
-            let mut out = issue;
-            out.dependencies = vec![];
-            out.comments = vec![];
-            // Serialize to JSON
+            // Serialize to JSON with dependencies and comments included
+            // The JSON formatter adds status_transitions from the events history
             let formatter = get_formatter(OutputFormat::Json);
-            let json_str = formatter.format_issue(&out);
+            let json_str = formatter.format_issue(&issue);
             if envelope {
                 // Wrap in envelope with kind="show"
                 println!("{}", formatter.format_with_envelope("show", &json_str));

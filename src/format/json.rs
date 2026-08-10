@@ -13,72 +13,23 @@ impl JsonFormatter {
     }
 }
 
-/// Serialize a single issue to a JSON object, stripping the bulky
-/// dependencies/comments relations for `br` compatibility.
+/// Serialize a single issue to a JSON object, keeping the full issue data
+/// including dependencies and comments. Empty collections are automatically
+/// skipped by serde's `skip_serializing_if = "Vec::is_empty"` attributes.
 ///
-/// ## Why Manual Stripping is Necessary (Cannot Use #[serde(skip)])
+/// ## Status Transitions History
 ///
-/// The manual stripping of `dependencies` and `comments` in this function
-/// is intentional and CANNOT be replaced with serde `#[serde(skip)]` attributes
-/// on the Issue struct fields. Here's why:
-///
-/// 1. **Selective Exclusion**: We want to exclude relations ONLY in JSON formatter
-///    output (list/ready/search commands), but preserve them for:
-///    - JSONL export/import roundtrips (src/jsonl.rs)
-///    - API responses that include full issue data
-///    - Debug/inspection commands that need complete issue state
-///
-/// 2. **br Compatibility**: The original `br` tool strips these relations in its
-///    JSON output to keep lines short and readable. Breaking this would be a
-///    breaking format change.
-///
-/// 3. **JSONL Line Length**: dependencies/comments can be deeply nested and very
-///    large. Including them would make JSONL lines extremely long and harder to
-///    work with (grep, jq, etc.).
-///
-/// 4. **Skip Serializing If is Not Enough**: The Issue struct already has
-///    `#[serde(skip_serializing_if = "Vec::is_empty")]` on these fields, which
-///    skips them when empty. But we need to ALWAYS skip them for JSON formatter
-///    output, even when they're populated.
-///
-/// ## Alternative Approaches Considered
-///
-/// - `#[serde(skip)]` on dependencies/comments fields: Would prevent serialization
-///   in ALL contexts, breaking JSONL export/import and API responses.
-///
-/// - Custom serde serializer for Issue: Would be more complex than this simple
-///   manual stripping and harder to maintain.
-///
-/// - Separate struct for JSON output: Would require duplicating the entire Issue
-///   struct or complex conversion logic.
-///
-/// Manual stripping is the simplest and most maintainable solution for this
-/// selective exclusion requirement.
-///
-/// ## Uses the Standard Issue Serde Attributes
-///
-/// After stripping relations, serialization uses the standard Issue serde
-/// attributes, which skip empty collections and None values for compact output.
-/// This ensures consistency with storage and other export paths.
-///
-/// ## Adds Status Transitions History
-///
-/// This function also adds a `status_transitions` field that contains the
+/// This function adds a `status_transitions` field that contains the
 /// history of status changes extracted from the issue's events. This is
 /// JSON-only output and not included in text format.
+///
+/// ## Dependencies and Comments
+///
+/// Dependencies and comments are included in the output when present.
+/// Empty collections are automatically skipped by serde attributes on the
+/// Issue struct fields.
 fn issue_to_value(issue: &Issue) -> Value {
-    let mut stripped = issue.clone();
-    stripped.dependencies = vec![];
-    stripped.comments = vec![];
-
-    // Only include closed_at and close_reason when status is Closed
-    if stripped.status != crate::model::Status::Closed {
-        stripped.closed_at = None;
-        stripped.close_reason = None;
-    }
-
-    // Serialize to Value
-    let mut value = serde_json::to_value(&stripped).unwrap_or(Value::Null);
+    let mut value = serde_json::to_value(issue).unwrap_or(Value::Null);
 
     // Add status_transitions field (JSON-only feature)
     if let Some(obj) = value.as_object_mut() {
