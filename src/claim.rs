@@ -1111,7 +1111,7 @@ mod tests {
             .unwrap();
 
         let candidates_after = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None)?)
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 0, None, None)?))
             .unwrap();
         assert!(
             candidates_after.iter().any(|c| c.id == "bf-dependent"),
@@ -1214,7 +1214,7 @@ mod tests {
             .unwrap();
 
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 0, None, None)?)
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 0, None, None)?))
             .unwrap();
 
         // Core invariant: zero-dependency open beads are present.

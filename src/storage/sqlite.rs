@@ -3948,6 +3948,9 @@ mod tests {
     }
 }
 
+// Include comprehensive storage tests
+include!("sqlite_tests.rs");
+
 #[cfg(test)]
 mod parse_datetime_tests {
     use super::*;
@@ -4030,3 +4033,6 @@ fn format_secret_matches(matches: &[SecretMatch]) -> String {
 
     msg
 }
+
+#[cfg(test)]
+mod ready_queue_tests;
