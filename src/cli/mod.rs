@@ -1630,8 +1630,8 @@ fn cmd_create(
     }
     if !created {
         return Err(last_err.map_or_else(
-            || anyhow::anyhow!("ID collision retries exhausted"),
-            |e| anyhow::anyhow!(e.to_string()),
+            || anyhow::anyhow!("ID collision retries exhausted").into(),
+            |e| anyhow::anyhow!(e.to_string()).into(),
         ));
     }
 
