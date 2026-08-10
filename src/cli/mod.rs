@@ -14,7 +14,8 @@ use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, Rotat
 use crate::storage::Storage;
 use crate::update;
 use crate::validation::{normalize_assignee, validate_priority};
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
+use crate::Result;
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::Value;
@@ -1163,7 +1164,7 @@ pub fn run(cli: Cli) -> Result<()> {
             // If we reach here, it means no valid flag was provided
             return Err(anyhow!(
                 "No command provided. Use 'bf --help' for usage information."
-            ));
+            ).into());
         }
         Some(cmd) => cmd,
     };
@@ -1581,13 +1582,13 @@ fn cmd_create(
     // Validate title is not empty or only whitespace
     let title_trimmed = title.trim();
     if title_trimmed.is_empty() {
-        return Err(anyhow!("Title cannot be empty or only whitespace"));
+        return Err(anyhow!("Title cannot be empty or only whitespace").into());
     }
 
     // Validate type is not empty or only whitespace
     let type_trimmed = type_.trim();
     if type_trimmed.is_empty() {
-        return Err(anyhow!("Type cannot be empty or only whitespace"));
+        return Err(anyhow!("Type cannot be empty or only whitespace").into());
     }
 
     // Validate priority is in range 0-4
@@ -1678,7 +1679,7 @@ fn cmd_list(
         Some(ref ann) => {
             let parts: Vec<&str> = ann.splitn(2, '=').collect();
             if parts.len() != 2 {
-                return Err(anyhow!("Invalid annotation format. Use key=value"));
+                return Err(anyhow!("Invalid annotation format. Use key=value").into());
             }
             Some((parts[0].to_string(), parts[1].to_string()))
         }
@@ -2654,7 +2655,7 @@ fn cmd_batch(
     } else if stdin {
         parse_stdin()?
     } else {
-        return Err(anyhow!("Must provide --file, --json, or --stdin"));
+        return Err(anyhow!("Must provide --file, --json, or --stdin").into());
     };
 
     let results = execute_batch(&storage, ops, beads_dir, no_auto_flush)?;
@@ -2889,7 +2890,7 @@ fn cmd_dep(beads_dir: &PathBuf, dep: DepCommands, no_auto_flush: bool) -> Result
                     return Err(anyhow!(
                         "Invalid direction: {}. Use 'down', 'up', or 'both'",
                         direction
-                    ))
+                    ).into())
                 }
             };
 
@@ -3004,7 +3005,7 @@ fn cmd_labels(beads_dir: &PathBuf, id: Option<&str>, format: &str) -> Result<()>
         // Check if bead exists first
         let bead_exists = storage.get_issue(issue_id)?.is_some();
         if !bead_exists {
-            return Err(anyhow!("Bead not found: {}", issue_id));
+            return Err(anyhow!("Bead not found: {}", issue_id).into());
         }
 
         let labels = storage.get_labels(issue_id)?;
@@ -3287,7 +3288,7 @@ fn cmd_config(beads_dir: &PathBuf, config: ConfigCommands) -> Result<()> {
                 ["checkpoint", "enabled"] => cfg.checkpoint.enabled.to_string(),
                 ["checkpoint", "interval_minutes"] => cfg.checkpoint.interval_minutes.to_string(),
                 ["checkpoint", "push"] => cfg.checkpoint.push.to_string(),
-                _ => return Err(anyhow!("Unknown config key: {}", key)),
+                _ => return Err(anyhow!("Unknown config key: {}", key).into()),
             };
             println!("{}", value);
         }
@@ -3427,7 +3428,7 @@ fn cmd_velocity(
     let storage = Storage::open(&db_path)?;
 
     let stats = storage.with_immediate_transaction(|tx| {
-        Ok(crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref())?)
+        crate::velocity::get_velocity_stats(tx, model.as_deref(), harness.as_deref()).map_err(|e| e.into())
     })?;
 
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
@@ -3543,7 +3544,7 @@ fn cmd_log(
             Err(_) => {
                 return Err(anyhow::anyhow!(
                     "Invalid --since date format. Use RFC3339 format, e.g., 2026-05-01T00:00:00Z"
-                ));
+                ).into());
             }
         }
     }
@@ -3632,7 +3633,7 @@ fn cmd_critical_path(beads_dir: &PathBuf, id: &str, _max_depth: usize, format: &
     let storage = Storage::open(&db_path)?;
 
     // Compute critical path for the epic
-    let result = storage.with_immediate_transaction(|tx| Ok(compute_epic_critical_path(tx, id)?))?;
+    let result = storage.with_immediate_transaction(|tx| compute_epic_critical_path(tx, id).map_err(|e| e.into()))?;
 
     match format {
         "json" => {
@@ -3768,7 +3769,7 @@ fn parse_time_period(period: &str) -> Result<DateTime<Utc>> {
         return Err(anyhow!(
             "Invalid time period format: '{}'. Expected format like '1h', '24h', '7d', '4w'",
             period
-        ));
+        ).into());
     }
 
     let value: i64 = num_str
@@ -3776,7 +3777,7 @@ fn parse_time_period(period: &str) -> Result<DateTime<Utc>> {
         .map_err(|_| anyhow!("Invalid number in time period: '{}'", period))?;
 
     if value <= 0 {
-        return Err(anyhow!("Time period must be positive: '{}'", period));
+        return Err(anyhow!("Time period must be positive: '{}'", period).into());
     }
 
     let duration = match unit {
@@ -3785,7 +3786,7 @@ fn parse_time_period(period: &str) -> Result<DateTime<Utc>> {
         "h" | "hour" | "hours" => chrono::Duration::hours(value),
         "d" | "day" | "days" => chrono::Duration::days(value),
         "w" | "week" | "weeks" => chrono::Duration::weeks(value),
-        _ => return Err(anyhow!("Unknown time unit in '{}'. Supported: s/sec/seconds, m/min/minutes, h/hours, d/days, w/weeks", period)),
+        _ => return Err(anyhow!("Unknown time unit in '{}'. Supported: s/sec/seconds, m/min/minutes, h/hours, d/days, w/weeks", period).into()),
     };
 
     Ok(Utc::now() - duration)
@@ -3878,7 +3879,7 @@ fn cmd_robot_docs(format: &str) -> Result<()> {
             println!("{}", docs.to_json()?);
         }
         _ => {
-            return Err(anyhow!("Invalid format '{}'. robot-docs only supports 'json' output", format));
+            return Err(anyhow!("Invalid format '{}'. robot-docs only supports 'json' output", format).into());
         }
     }
 
