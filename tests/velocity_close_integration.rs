@@ -29,7 +29,7 @@ fn test_velocity_update_on_close() {
             ["worker1", "claude-4.7", "cli", bead_id, &claimed_at.to_rfc3339(), "."],
         ).unwrap();
 
-        Ok::<_, anyhow::Error>(())
+        Ok(())
     }).unwrap();
 
     // Close the bead - this should trigger velocity stats update

@@ -704,8 +704,10 @@ impl Storage {
             if let Some(ref status) = changes.status {
                 updates.push("status = ?");
                 params.push(Box::new(status.to_string()));
-                // Clear closed fields when transitioning from closed/tombstone to open
-                if !matches!(status, Status::Closed | Status::Tombstone) {
+                // Clear closed fields when transitioning FROM closed/tombstone TO open
+                if matches!(current_status, Some(Status::Closed | Status::Tombstone))
+                    && !matches!(status, Status::Closed | Status::Tombstone)
+                {
                     updates.push("closed_at = NULL");
                     updates.push("close_reason = NULL");
                     updates.push("closed_by_session = NULL");
@@ -4044,11 +4046,13 @@ mod tests {
         // Test 3: Invalid bead ID format should be rejected
         let invalid_ids = vec![
             "",           // Empty
-            "bf-",        // Prefix only
-            "invalid",    // No hyphen
-            "xyz-123",    // Wrong prefix
-            "bf- 123",    // Space in ID
-            "bf-1;2",     // Special chars
+            "bf-",        // Prefix only (no hash part)
+            "invalid",    // No hyphen (single part)
+            "a",          // Too short
+            "bf- 123",    // Space in ID (invalid character)
+            "bf-1;2",     // Special chars (semicolon not alphanumeric)
+            "bf-1 2",     // Space in hash part
+            "bf-1@2",     // Special char @
         ];
 
         for invalid_id in invalid_ids {
@@ -4056,10 +4060,28 @@ mod tests {
             assert!(result.is_err(), "Invalid ID '{}' should be rejected", invalid_id);
         }
 
+        // Test 3a: Valid format but non-existent prefix should return empty (not error)
+        // This validates that the format check passes but no data is found
+        let valid_format_unknown = vec![
+            "xyz-123",    // Valid format, unknown prefix (will return empty)
+            "abc-1def",   // Valid format, unknown prefix
+        ];
+
+        for unknown_id in valid_format_unknown {
+            let result = storage.get_dep_tree(unknown_id, "down", 10);
+            // Should succeed but return empty tree (no beads with that prefix exist)
+            assert!(result.is_ok(), "Valid format ID '{}' should not error", unknown_id);
+            let tree = result.unwrap();
+            assert_eq!(tree.len(), 0, "Unknown ID '{}' should return empty tree", unknown_id);
+        }
+
         // Test 4: Verify normal operation still works after security fixes (regression test)
+        // Query "up" from bf-child2 should find issues that depend on it
         let up_tree = storage.get_dep_tree("bf-child2", "up", 10).unwrap();
-        assert_eq!(up_tree.len(), 1, "Should find 1 parent");
-        assert_eq!(up_tree[0].id, "bf-child1", "Parent should be child1");
+        // Should find 2 nodes: bf-child1 (direct dependent) and bf-root (indirect dependent)
+        assert_eq!(up_tree.len(), 2, "Should find 2 nodes in up tree (bf-child1 and bf-root)");
+        assert_eq!(up_tree[0].id, "bf-child1", "First level should be child1");
+        assert_eq!(up_tree[1].id, "bf-root", "Second level should be root");
 
         // Test 5: Direction parameter is also validated
         let result = storage.get_dep_tree("bf-root", "invalid-direction", 10);

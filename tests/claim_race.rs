@@ -171,7 +171,7 @@ fn test_concurrent_claim_priority_preserved() {
                         priorities.push(priority);
                     }
                 }
-                Ok::<(), anyhow::Error>(())
+                Ok(())
             });
         });
 
@@ -250,7 +250,7 @@ fn test_concurrent_claim_with_dependencies() {
                     let mut ids = ids_clone.lock().unwrap();
                     ids.push(claimed.bead_id);
                 }
-                Ok::<(), anyhow::Error>(())
+                Ok(())
             });
         });
 
@@ -298,7 +298,7 @@ fn test_concurrent_stale_reclamation() {
                 "UPDATE issues SET status = 'in_progress', assignee = 'stale-worker', updated_at = ? WHERE id IN ('bf-00', 'bf-01')",
                 [&stale_time_str],
             )?;
-            Ok::<_, anyhow::Error>(())
+            Ok(())
         })
         .unwrap();
 
@@ -324,7 +324,7 @@ fn test_concurrent_stale_reclamation() {
                     let mut count = count_clone.lock().unwrap();
                     *count += 1;
                 }
-                Ok::<(), anyhow::Error>(())
+                Ok(())
             });
         });
 
@@ -393,7 +393,7 @@ fn test_concurrent_claim_empty_workspace() {
                 )? {
                     *claims_clone.lock().unwrap() += 1;
                 }
-                Ok::<(), anyhow::Error>(())
+                Ok(())
             });
         });
 
@@ -448,7 +448,7 @@ fn test_rapid_claim_release_cycle() {
                             Utc::now(),
                             None,
                         )? {
-                            Ok::<Option<String>, anyhow::Error>(Some(claimed.bead_id))
+                            Ok(Some(claimed.bead_id))
                         } else {
                             Ok(None)
                         }
@@ -530,7 +530,7 @@ fn test_concurrent_claim_with_pinned_beads() {
                     let mut ids = ids_clone.lock().unwrap();
                     ids.push(claimed.bead_id);
                 }
-                Ok::<(), anyhow::Error>(())
+                Ok(())
             });
         });
 
@@ -595,7 +595,7 @@ fn test_concurrent_claim_with_ephemeral_beads() {
                     let mut ids = ids_clone.lock().unwrap();
                     ids.push(claimed.bead_id);
                 }
-                Ok::<(), anyhow::Error>(())
+                Ok(())
             });
         });
 
@@ -651,7 +651,7 @@ fn test_high_frequency_claim_attempts() {
                     )? {
                         *total_clone.lock().unwrap() += 1;
                     }
-                    Ok::<(), anyhow::Error>(())
+                    Ok(())
                 });
             }
         });

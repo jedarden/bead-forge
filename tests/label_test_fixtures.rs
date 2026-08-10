@@ -226,7 +226,7 @@ claim_ttl_minutes: 30
     /// Result indicating success or error.
     pub fn remove_label(&self, issue_id: &str, label: &str) -> anyhow::Result<()> {
         let storage = self.storage()?;
-        storage.remove_label(issue_id, label)
+        Ok(storage.remove_label(issue_id, label)?)
     }
 
     /// Get all labels for a bead.
@@ -249,7 +249,7 @@ claim_ttl_minutes: 30
     /// ```
     pub fn get_labels(&self, issue_id: &str) -> anyhow::Result<Vec<String>> {
         let storage = self.storage()?;
-        storage.get_labels(issue_id)
+        Ok(storage.get_labels(issue_id)?)
     }
 
     /// List all labels across all beads in the workspace.

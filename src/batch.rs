@@ -595,7 +595,7 @@ fn execute_create(
 /// # Direction
 /// Creates: id depends on blocker (blocker blocks id)
 /// This matches: `bf dep add <blocker> --blocks <id>`
-fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<()> {
+pub fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<()> {
     // Verify both beads exist
     let id_exists: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM issues WHERE id = ?1)",

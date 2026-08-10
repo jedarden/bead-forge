@@ -97,6 +97,7 @@ fn create_test_bead_with_assignee(
         dependencies: vec![],
         comments: vec![],
         annotations: Default::default(),
+        events: vec![],
     };
 
     storage.create_issue(&issue).unwrap();

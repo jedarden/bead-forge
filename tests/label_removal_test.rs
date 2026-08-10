@@ -54,6 +54,7 @@ fn create_test_issue(id: &str, labels: Vec<&str>) -> Issue {
         labels: labels.iter().map(|s| s.to_string()).collect(),
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: BTreeMap::new(),
     }
 }

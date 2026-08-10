@@ -195,7 +195,7 @@ mod self_blocking_tests {
         // Verify the bead is still claimable (not permanently blocked)
         use bead_forge::claim::get_ready_candidates;
         let candidates = storage.with_immediate_transaction(|tx| {
-            get_ready_candidates(tx, 10, None, None)
+            Ok(get_ready_candidates(tx, 10, None, None)?)
         }).unwrap();
 
         assert!(

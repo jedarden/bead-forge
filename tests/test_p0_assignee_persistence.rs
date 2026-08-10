@@ -98,6 +98,7 @@ fn create_p0_bead_with_assignee(
         labels: vec!["critical".to_string(), "p0".to_string()],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 

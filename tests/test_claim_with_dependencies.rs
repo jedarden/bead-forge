@@ -215,7 +215,7 @@ mod claim_with_dependencies_tests {
 
         // Now the dependent should be available for claiming
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 10, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
             .unwrap();
 
         assert!(
@@ -225,7 +225,7 @@ mod claim_with_dependencies_tests {
 
         // And we should be able to claim it
         let result = storage
-            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+            .with_immediate_transaction(|tx| Ok(claim(tx, "worker1", 30, Utc::now(), None)?))
             .unwrap();
 
         assert!(result.is_some());

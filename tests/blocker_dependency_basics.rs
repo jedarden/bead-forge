@@ -64,7 +64,7 @@ mod blocker_basics_tests {
 
         // Verify dependent cannot be claimed (not in ready candidates)
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
             .unwrap();
 
         assert!(
@@ -131,7 +131,7 @@ mod blocker_basics_tests {
 
         // Verify dependent is now in ready candidates
         let candidates = storage
-            .with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None))
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
             .unwrap();
 
         assert!(
@@ -141,7 +141,7 @@ mod blocker_basics_tests {
 
         // Verify we can successfully claim the dependent
         let result = storage
-            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+            .with_immediate_transaction(|tx| Ok(claim(tx, "worker1", 30, Utc::now(), None)?))
             .unwrap();
 
         assert!(

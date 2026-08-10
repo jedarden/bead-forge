@@ -52,6 +52,7 @@ fn create_test_bead(id: &str, title: &str, status: Status) -> Issue {
         dependencies: vec![],
         comments: vec![],
         annotations: std::collections::BTreeMap::new(),
+        events: vec![],
     }
 }
 

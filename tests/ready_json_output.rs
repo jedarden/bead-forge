@@ -1069,8 +1069,5 @@ fn test_ready_json_with_envelope_wrapper() {
 
     // First bead should have our test bead
     let first_bead = &data_array[0];
-    assert_eq!(
-        get_string(first_bead, "id"),
-        "bf-envelope-test"
-    );
+    assert_eq!(get_string(first_bead, "id"), "bf-envelope-test");
 }

@@ -282,7 +282,7 @@ mod blocking_bead_tests {
     fn assert_in_blocked_cache(storage: &Storage, bead_id: &str) {
         let blocked_count = storage.with_immediate_transaction(|tx| {
             let mut stmt = tx.prepare("SELECT COUNT(*) FROM blocked_issues_cache WHERE issue_id = ?").unwrap();
-            stmt.query_row([bead_id], |row| row.get::<_, i64>(0))
+            Ok(stmt.query_row([bead_id], |row| row.get::<_, i64>(0))?)
         }).unwrap();
 
         assert_eq!(blocked_count, 1, "Bead {} should appear in blocked_issues_cache", bead_id);
@@ -485,7 +485,7 @@ mod blocking_bead_tests {
                 let mut stmt = tx
                     .prepare("SELECT COUNT(*) FROM blocked_issues_cache WHERE issue_id = ?")
                     .unwrap();
-                stmt.query_row(["bf-dependent"], |row| row.get::<_, i64>(0))
+                Ok(stmt.query_row(["bf-dependent"], |row| row.get::<_, i64>(0))?)
             })
             .unwrap();
 
@@ -515,7 +515,7 @@ mod blocking_bead_tests {
 
         // Try to claim - should get blocker, not dependent
         let result = storage
-            .with_immediate_transaction(|tx| claim(tx, "worker1", 30, Utc::now(), None))
+            .with_immediate_transaction(|tx| Ok(claim(tx, "worker1", 30, Utc::now(), None)?))
             .unwrap();
 
         assert!(result.is_some(), "Should be able to claim blocker");

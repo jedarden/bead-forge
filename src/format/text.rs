@@ -451,7 +451,7 @@ mod tests {
     #[test]
     fn format_error_with_special_characters() {
         let formatter = TextFormatter;
-        let result = formatter.format_error("Error: file not found: <test> & 'quotes'");
+        let result = formatter.format_error("file not found: <test> & 'quotes'");
         assert_eq!(result, "Error: file not found: <test> & 'quotes'\n");
     }
 
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn format_error_unicode() {
         let formatter = TextFormatter;
-        let result = formatter.format_error("Error: emoji test 🚀 🔥 💻");
+        let result = formatter.format_error("emoji test 🚀 🔥 💻");
         assert_eq!(result, "Error: emoji test 🚀 🔥 💻\n");
     }
 

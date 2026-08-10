@@ -31,6 +31,7 @@ mod ready_queue_filtering_tests {
         // Create a closed bead
         let mut closed_bead = Issue::new("bf-closed".to_string(), "Closed bead".to_string(), ".".to_string());
         closed_bead.status = Status::Closed;
+        closed_bead.closed_at = Some(Utc::now());
         storage.create_issue(&closed_bead).unwrap();
 
         // Get ready candidates
@@ -239,6 +240,7 @@ mod ready_queue_filtering_tests {
         // Create a closed blocker and dependent
         let mut blocker = Issue::new("bf-blocker".to_string(), "Closed blocker".to_string(), ".".to_string());
         blocker.status = Status::Closed;
+        blocker.closed_at = Some(Utc::now());
         storage.create_issue(&blocker).unwrap();
 
         let dependent = Issue::new("bf-dependent".to_string(), "Dependent with closed blocker".to_string(), ".".to_string());
@@ -361,6 +363,7 @@ mod ready_queue_filtering_tests {
 
         let mut closed_blocker = Issue::new("bf-closed-blocker".to_string(), "Closed blocker".to_string(), ".".to_string());
         closed_blocker.status = Status::Closed;
+        closed_blocker.closed_at = Some(Utc::now());
         storage.create_issue(&closed_blocker).unwrap();
 
         let dependent = Issue::new("bf-dependent".to_string(), "Dependent".to_string(), ".".to_string());
@@ -385,10 +388,12 @@ mod ready_queue_filtering_tests {
         // Create two closed blockers
         let mut blocker1 = Issue::new("bf-blocker1".to_string(), "Closed blocker 1".to_string(), ".".to_string());
         blocker1.status = Status::Closed;
+        blocker1.closed_at = Some(Utc::now());
         storage.create_issue(&blocker1).unwrap();
 
         let mut blocker2 = Issue::new("bf-blocker2".to_string(), "Closed blocker 2".to_string(), ".".to_string());
         blocker2.status = Status::Closed;
+        blocker2.closed_at = Some(Utc::now());
         storage.create_issue(&blocker2).unwrap();
 
         let dependent = Issue::new("bf-dependent".to_string(), "Dependent".to_string(), ".".to_string());
@@ -728,6 +733,7 @@ mod ready_queue_filtering_tests {
         for i in 1..=5 {
             let mut bead = Issue::new(format!("bf-closed-{}", i), format!("Closed bead {}", i), ".".to_string());
             bead.status = Status::Closed;
+            bead.closed_at = Some(Utc::now());
             storage.create_issue(&bead).unwrap();
         }
 

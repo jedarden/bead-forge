@@ -216,7 +216,7 @@ fn test_bf_velocity_stats_isolation() {
                     &Utc::now().to_rfc3339(),
                 ],
             )?;
-            Ok::<_, anyhow::Error>(())
+            Ok(())
         })
         .unwrap();
 
@@ -245,7 +245,7 @@ fn test_bf_migration_lock_isolation() {
     // Try to acquire migration lock
     use chrono::{Duration, Utc};
 
-    let lock_result: Result<(), anyhow::Error> = storage.with_immediate_transaction(|tx| {
+    let lock_result: Result<(), bead_forge::error::BeadForgeError> = storage.with_immediate_transaction(|tx| {
         let now = Utc::now();
         let expires = now + Duration::minutes(5);
 

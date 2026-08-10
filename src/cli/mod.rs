@@ -84,7 +84,7 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Create a new bead
     ///
@@ -872,7 +872,7 @@ pub enum Commands {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum DepCommands {
     /// Add a dependency
     ///
@@ -938,7 +938,7 @@ pub enum DepCommands {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum LabelCommands {
     /// Add label(s) to an issue
     ///
@@ -991,7 +991,7 @@ pub enum LabelCommands {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum CommentsCommands {
     /// Add a comment
     ///
@@ -1024,7 +1024,7 @@ pub enum CommentsCommands {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum ConfigCommands {
     /// List all config values
     ///
@@ -1058,7 +1058,7 @@ pub enum ConfigCommands {
     Path,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum AnnotateCommands {
     /// Set an annotation
     ///
