@@ -42,3 +42,4 @@ redirect
 
 # Bead execution traces (stdout/stderr logs) — local artifacts, not source
 traces/
+events.jsonl
