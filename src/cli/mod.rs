@@ -1841,7 +1841,7 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             }
             // Use formatted dependencies with titles
             if !dependencies_display.is_empty() {
-                println!("Dependencies:");
+                println!("Blocked by:");
                 let formatted = crate::format::format_dependencies_display(&dependencies_display[..]);
                 for line in formatted.lines() {
                     println!("  {}", line);
@@ -1863,7 +1863,7 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             }
             // Use formatted dependencies with titles
             if !dependencies_display.is_empty() {
-                println!("Dependencies:");
+                println!("Blocked by:");
                 let formatted = crate::format::format_dependencies_display(&dependencies_display[..]);
                 for line in formatted.lines() {
                     println!("  {}", line);

@@ -1039,4 +1039,205 @@ mod tests {
         assert!(!display.contains("None")); // Not "None" with capital N
         assert!(!display.contains("NONE")); // Not "NONE" in all caps
     }
+
+    // Comprehensive separator formatting tests for exact equals count
+
+    #[test]
+    fn test_separator_exact_count_format_exit_code() {
+        // Test that format_exit_code produces exactly 3 equals signs on each side
+        let test_cases = vec![
+            (Some(ExitCode::Code(0)), "=== Exit Code: 0 ==="),
+            (Some(ExitCode::Code(1)), "=== Exit Code: 1 ==="),
+            (Some(ExitCode::Code(42)), "=== Exit Code: 42 ==="),
+            (Some(ExitCode::Code(255)), "=== Exit Code: 255 ==="),
+            (Some(ExitCode::Signal("SIGTERM".to_string())), "=== Signal: SIGTERM ==="),
+            (Some(ExitCode::Signal("SIGKILL".to_string())), "=== Signal: SIGKILL ==="),
+            (Some(ExitCode::None), "=== Exit Code: (none) ==="),
+        ];
+
+        for (input, expected) in test_cases {
+            let result = format_exit_code(input.clone());
+            assert_eq!(result, expected, "format_exit_code({:?}) should produce exact format", input);
+
+            // Verify exactly 3 equals at start
+            assert!(result.starts_with("==="), "Should start with exactly 3 equals");
+            assert!(!result.starts_with("===="), "Should not start with 4 equals");
+
+            // Verify exactly 3 equals at end
+            assert!(result.ends_with("==="), "Should end with exactly 3 equals");
+            assert!(!result.ends_with("===="), "Should not end with 4 equals");
+
+            // Count equals signs at the start
+            let start_equals = result.chars().take_while(|&c| c == '=').count();
+            assert_eq!(start_equals, 3, "Should have exactly 3 equals at start, got {}", start_equals);
+
+            // Count equals signs at the end
+            let end_equals = result.chars().rev().take_while(|&c| c == '=').count();
+            assert_eq!(end_equals, 3, "Should have exactly 3 equals at end, got {}", end_equals);
+        }
+
+        // Test None case separately since it doesn't need cloning
+        let result = format_exit_code(None);
+        assert_eq!(result, "=== Exit Code: (none) ===");
+        assert!(result.starts_with("==="));
+        assert!(result.ends_with("==="));
+    }
+
+    #[test]
+    fn test_separator_exact_count_process_termination() {
+        // Test that ProcessTermination::format produces exactly 3 equals signs on each side
+        let test_cases = vec![
+            (ProcessTermination::ExitCode(0), "=== Exit Code: 0 ==="),
+            (ProcessTermination::ExitCode(1), "=== Exit Code: 1 ==="),
+            (ProcessTermination::Signal("SIGTERM".to_string()), "=== Signal: SIGTERM ==="),
+            (ProcessTermination::Signal("SIGKILL".to_string()), "=== Signal: SIGKILL ==="),
+            (ProcessTermination::Unknown, "=== Exit Code: unknown ==="),
+        ];
+
+        for (input, expected) in test_cases {
+            let result = input.format();
+            assert_eq!(result, expected, "ProcessTermination::format() should produce exact format");
+
+            // Verify exactly 3 equals at start
+            assert!(result.starts_with("==="), "Should start with exactly 3 equals");
+            assert!(!result.starts_with("===="), "Should not start with 4 equals");
+
+            // Verify exactly 3 equals at end
+            assert!(result.ends_with("==="), "Should end with exactly 3 equals");
+            assert!(!result.ends_with("===="), "Should not end with 4 equals");
+
+            // Count equals signs at the start
+            let start_equals = result.chars().take_while(|&c| c == '=').count();
+            assert_eq!(start_equals, 3, "Should have exactly 3 equals at start, got {}", start_equals);
+
+            // Count equals signs at the end
+            let end_equals = result.chars().rev().take_while(|&c| c == '=').count();
+            assert_eq!(end_equals, 3, "Should have exactly 3 equals at end, got {}", end_equals);
+        }
+    }
+
+    #[test]
+    fn test_separator_positioning_in_output() {
+        // Test that separators are positioned correctly within the full output string
+
+        // Test format_exit_code positioning
+        let formatted = format_exit_code(Some(ExitCode::Code(42)));
+        let lines: Vec<&str> = formatted.split('\n').collect();
+        assert_eq!(lines.len(), 1, "format_exit_code should produce a single line");
+
+        // Verify separator at the beginning
+        assert!(lines[0].starts_with("==="), "Separator should be at the start of the line");
+
+        // Verify separator at the end
+        assert!(lines[0].ends_with("==="), "Separator should be at the end of the line");
+
+        // Verify content between separators
+        assert!(lines[0].contains("Exit Code: 42"), "Content should be between separators");
+    }
+
+    #[test]
+    fn test_separator_in_append_exit_code_to_log() {
+        // Test separator positioning when appended to log content
+        let log = "Line 1\nLine 2\nLine 3";
+        let result = append_exit_code_to_log(log, Some(0));
+
+        let lines: Vec<&str> = result.split('\n').collect();
+
+        // Find the exit code line
+        let exit_code_line = lines.iter().find(|line| line.contains("Exit Code:"));
+        assert!(exit_code_line.is_some(), "Should contain an exit code line");
+
+        let exit_line = exit_code_line.unwrap();
+
+        // Verify exact equals count in the appended line
+        assert!(exit_line.starts_with("==="), "Appended line should start with 3 equals");
+        assert!(exit_line.ends_with("==="), "Appended line should end with 3 equals");
+        assert!(!exit_line.starts_with("===="), "Appended line should not start with 4 equals");
+        assert!(!exit_line.ends_with("===="), "Appended line should not end with 4 equals");
+    }
+
+    #[test]
+    fn test_separator_format_matches_specification() {
+        // Test that all separator formatting matches the exact specification: === content ===
+
+        let specifications = vec![
+            ("=== Exit Code: 0 ===", Some(ExitCode::Code(0))),
+            ("=== Exit Code: 1 ===", Some(ExitCode::Code(1))),
+            ("=== Signal: SIGTERM ===", Some(ExitCode::Signal("SIGTERM".to_string()))),
+            ("=== Exit Code: (none) ===", Some(ExitCode::None)),
+        ];
+
+        for (expected_spec, input) in specifications {
+            let result = format_exit_code(input.clone());
+            assert_eq!(result, expected_spec, "Separator format must match specification exactly");
+        }
+
+        // Test None case separately
+        let result = format_exit_code(None);
+        assert_eq!(result, "=== Exit Code: (none) ===");
+    }
+
+    #[test]
+    fn test_separator_no_extra_equals_in_middle() {
+        // Test that equals signs only appear at the start and end, not in the middle
+
+        let result = format_exit_code(Some(ExitCode::Code(42)));
+
+        // Remove the leading and trailing ===
+        let middle = &result[3..result.len() - 3];
+
+        // The middle part should not contain any equals signs
+        assert!(!middle.contains('='), "Middle content should not contain equals signs");
+    }
+
+    #[test]
+    fn test_separator_consistency_across_all_variants() {
+        // Test that all ExitCode and ProcessTermination variants use consistent separator format
+
+        let exit_code_cases = vec![
+            format_exit_code(Some(ExitCode::Code(0))),
+            format_exit_code(Some(ExitCode::Code(1))),
+            format_exit_code(Some(ExitCode::Signal("SIGTERM".to_string()))),
+            format_exit_code(Some(ExitCode::None)),
+            format_exit_code(None),
+        ];
+
+        for formatted in exit_code_cases {
+            // All should have exactly 3 equals at start
+            let start_equals = formatted.chars().take_while(|&c| c == '=').count();
+            assert_eq!(start_equals, 3, "All variants must have exactly 3 equals at start");
+
+            // All should have exactly 3 equals at end
+            let end_equals = formatted.chars().rev().take_while(|&c| c == '=').count();
+            assert_eq!(end_equals, 3, "All variants must have exactly 3 equals at end");
+
+            // All should match the pattern === content ===
+            assert!(formatted.starts_with("===") && formatted.ends_with("==="));
+        }
+    }
+
+    #[test]
+    fn test_separator_with_various_content_lengths() {
+        // Test separator formatting with various content lengths
+
+        // Short content
+        let short = format_exit_code(Some(ExitCode::Code(0)));
+        assert!(short.starts_with("===") && short.ends_with("==="));
+
+        // Medium content
+        let medium = format_exit_code(Some(ExitCode::Signal("SIGTERM".to_string())));
+        assert!(medium.starts_with("===") && medium.ends_with("==="));
+
+        // Long content (via ProcessTermination with potentially long signal names)
+        let long = ProcessTermination::Signal("SIGSTKFLT".to_string()).format();
+        assert!(long.starts_with("===") && long.ends_with("==="));
+
+        // All should maintain exactly 3 equals regardless of content length
+        for formatted in vec![short, medium, long] {
+            let start_equals = formatted.chars().take_while(|&c| c == '=').count();
+            let end_equals = formatted.chars().rev().take_while(|&c| c == '=').count();
+            assert_eq!(start_equals, 3, "Equals count should be independent of content length");
+            assert_eq!(end_equals, 3, "Equals count should be independent of content length");
+        }
+    }
 }

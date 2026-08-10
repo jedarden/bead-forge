@@ -1,6 +1,4 @@
-use anyhow::Result;
-
-fn main() -> Result<()> {
+fn main() -> bead_forge::Result<()> {
     // --version / -V is a normal CLI flag handled by `cli::run`, which prints
     // "bf <version>" to stdout and returns Ok (exit 0), so there is no
     // pre-parse hook here.

@@ -3,88 +3,63 @@
 //! This module implements the core update functionality, ensuring that
 //! exactly one field is updated at a time, preserving all other fields.
 
-use crate::model::{IssueChanges, Priority, Status};
+use crate::error::{BeadForgeError, Result};
+use crate::model::{Priority, Status};
 use crate::storage::Storage;
-use anyhow::{anyhow, Result};
 
 /// Update a single field on a bead.
 ///
-/// This function ensures that exactly one field is being updated.
-/// If multiple fields are provided, it returns an error.
+/// This function ensures that exactly one field is being updated and calls
+/// the appropriate storage method. All other fields are preserved unchanged.
 ///
 /// # Arguments
 ///
 /// * `storage` - The storage backend
 /// * `id` - The bead ID to update
-/// * `title` - Optional new title
-/// * `status` - Optional new status
-/// * `priority` - Optional new priority
+/// * `title` - Optional new title (if Some, all other fields must be None)
+/// * `status` - Optional new status (if Some, all other fields must be None)
+/// * `priority` - Optional new priority (if Some, all other fields must be None)
 ///
 /// # Returns
 ///
 /// * `Ok(())` if the update succeeded
-/// * `Err(anyhow::Error)` if:
-///   - No field was provided
-///   - Multiple fields were provided
-///   - The bead doesn't exist
-///   - Priority is out of range (0-4)
-///   - Status is invalid
+/// * `Err(BeadForgeError::Validation)` - Multiple fields provided or none provided
+/// * `Err(BeadForgeError::NotFound)` - Bead does not exist
+/// * `Err(BeadForgeError::Database)` - Storage operation failed
 pub fn update(
     storage: &Storage,
     id: &str,
-    title: Option<String>,
-    status: Option<String>,
-    priority: Option<i32>,
+    title: Option<&str>,
+    status: Option<Status>,
+    priority: Option<Priority>,
 ) -> Result<()> {
-    // Count how many fields were provided
-    let field_count = [
-        title.is_some(),
-        status.is_some(),
-        priority.is_some(),
-    ]
-    .iter()
-    .filter(|&&x| x)
-    .count();
+    // Count how many fields are being updated
+    let fields_count = [title.is_some(), status.is_some(), priority.is_some()]
+        .iter()
+        .filter(|&&x| x)
+        .count();
 
-    // Require exactly one field
-    if field_count == 0 {
-        return Err(anyhow!(
-            "No field provided. Use --title, --status, or --priority to update a field."
+    // Validate that exactly one field is provided
+    if fields_count == 0 {
+        return Err(BeadForgeError::validation(
+            "At least one field must be provided for update (title, status, or priority)",
         ));
     }
 
-    if field_count > 1 {
-        return Err(anyhow!(
-            "Only one field can be updated at a time. \
-             Use exactly one of: --title, --status, --priority"
+    if fields_count > 1 {
+        return Err(BeadForgeError::validation(
+            "Only one field can be updated at a time (title, status, or priority)",
         ));
     }
 
-    // Validate priority range if provided
-    if let Some(p) = priority {
-        if p < 0 || p > 4 {
-            return Err(anyhow!("Priority must be between 0 and 4 (inclusive), got {}", p));
-        }
+    // Call the appropriate update method based on which field is set
+    if let Some(new_title) = title {
+        storage.update_title(id, new_title)?;
+    } else if let Some(new_status) = status {
+        storage.update_status(id, new_status)?;
+    } else if let Some(new_priority) = priority {
+        storage.update_priority(id, new_priority)?;
     }
-
-    // Parse status if provided
-    let status_parsed = match status {
-        Some(s) => {
-            Some(Status::from_str(&s).map_err(|e| anyhow!("Invalid status '{}': {}", s, e))?)
-        }
-        None => None,
-    };
-
-    // Build changes struct with exactly one field
-    let changes = IssueChanges {
-        title,
-        status: status_parsed,
-        priority: priority.map(Priority),
-        ..Default::default()
-    };
-
-    // Perform the update
-    storage.update_issue(id, &changes)?;
 
     Ok(())
 }
@@ -93,14 +68,10 @@ pub fn update(
 mod tests {
     use super::*;
     use crate::model::Issue;
-    use chrono::Utc;
-    use std::path::PathBuf;
-    use tempfile::TempDir;
 
-    fn setup_test_storage() -> (Storage, TempDir, String) {
-        let temp_dir = TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test.db");
-        let storage = Storage::open(&db_path).unwrap();
+    fn setup_test_storage() -> (tempfile::NamedTempFile, Storage, String) {
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
 
         // Create a test bead
         let issue = Issue::new(
@@ -110,38 +81,41 @@ mod tests {
         );
         storage.create_issue(&issue).unwrap();
 
-        (storage, temp_dir, issue.id)
+        (temp_file, storage, issue.id)
     }
 
     #[test]
     fn test_update_requires_exactly_one_field() {
-        let (storage, _temp, id) = setup_test_storage();
+        let (_temp, storage, id) = setup_test_storage();
 
         // No fields provided
         let result = update(&storage, &id, None, None, None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No field provided"));
+        match result.unwrap_err() {
+            BeadForgeError::Validation { .. } => {}
+            _ => panic!("Expected validation error"),
+        }
 
         // Multiple fields provided
         let result = update(
             &storage,
             &id,
-            Some("New title".to_string()),
-            Some("open".to_string()),
+            Some("New title"),
+            Some(Status::InProgress),
             None,
         );
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Only one field can be updated"));
+        match result.unwrap_err() {
+            BeadForgeError::Validation { .. } => {}
+            _ => panic!("Expected validation error"),
+        }
     }
 
     #[test]
     fn test_update_title() {
-        let (storage, _temp, id) = setup_test_storage();
+        let (_temp, storage, id) = setup_test_storage();
 
-        let result = update(&storage, &id, Some("Updated title".to_string()), None, None);
+        let result = update(&storage, &id, Some("Updated title"), None, None);
         assert!(result.is_ok());
 
         let updated = storage.get_issue(&id).unwrap().unwrap();
@@ -150,9 +124,9 @@ mod tests {
 
     #[test]
     fn test_update_status() {
-        let (storage, _temp, id) = setup_test_storage();
+        let (_temp, storage, id) = setup_test_storage();
 
-        let result = update(&storage, &id, None, Some("in_progress".to_string()), None);
+        let result = update(&storage, &id, None, Some(Status::InProgress), None);
         assert!(result.is_ok());
 
         let updated = storage.get_issue(&id).unwrap().unwrap();
@@ -161,46 +135,58 @@ mod tests {
 
     #[test]
     fn test_update_priority() {
-        let (storage, _temp, id) = setup_test_storage();
+        let (_temp, storage, id) = setup_test_storage();
 
-        let result = update(&storage, &id, None, None, Some(0));
+        let result = update(&storage, &id, None, None, Some(Priority::CRITICAL));
         assert!(result.is_ok());
 
         let updated = storage.get_issue(&id).unwrap().unwrap();
-        assert_eq!(updated.priority, Priority(0));
+        assert_eq!(updated.priority, Priority::CRITICAL);
     }
 
     #[test]
     fn test_update_nonexistent_bead() {
-        let (storage, _temp, _) = setup_test_storage();
+        let (_temp, storage, _) = setup_test_storage();
 
         let result = update(
             &storage,
             "bf-nonexistent",
-            Some("New title".to_string()),
+            Some("New title"),
             None,
             None,
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Bead not found"));
     }
 
     #[test]
-    fn test_update_priority_out_of_range() {
-        let (storage, _temp, id) = setup_test_storage();
+    fn test_update_custom_status() {
+        let (_temp, storage, id) = setup_test_storage();
 
-        let result = update(&storage, &id, None, None, Some(5));
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Priority must be between 0 and 4"));
-    }
-
-    #[test]
-    fn test_update_invalid_status() {
-        let (storage, _temp, id) = setup_test_storage();
-
-        let result = update(&storage, &id, None, Some("invalid_status".to_string()), None);
-        // Status parsing is permissive, so this should not error
-        // Custom statuses are allowed
+        let result = update(&storage, &id, None, Some(Status::Custom("in-review".to_string())), None);
         assert!(result.is_ok());
+
+        let updated = storage.get_issue(&id).unwrap().unwrap();
+        assert_eq!(updated.status, Status::Custom("in-review".to_string()));
+    }
+
+    #[test]
+    fn test_update_preserves_other_fields() {
+        let (_temp, storage, _id) = setup_test_storage();
+
+        // Create a bead with specific values
+        let mut issue = Issue::new("bf-preserve".to_string(), "Original title".to_string(), ".".to_string());
+        issue.status = Status::Blocked;
+        issue.priority = Priority::CRITICAL;
+        storage.create_issue(&issue).unwrap();
+
+        // Update only title
+        let result = update(&storage, "bf-preserve", Some("Updated title"), None, None);
+        assert!(result.is_ok());
+
+        // Verify all other fields are preserved
+        let updated = storage.get_issue("bf-preserve").unwrap().unwrap();
+        assert_eq!(updated.title, "Updated title");
+        assert_eq!(updated.status, Status::Blocked); // Preserved
+        assert_eq!(updated.priority, Priority::CRITICAL); // Preserved
     }
 }

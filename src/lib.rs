@@ -9,6 +9,7 @@ pub mod config;
 pub mod critical_path;
 pub mod doctor;
 pub mod error;
+pub mod events;
 pub mod exit_code;
 pub mod format;
 pub mod git_log;
@@ -31,6 +32,7 @@ pub mod subprocess;
 pub mod sync;
 pub mod timing;
 pub mod trace;
+pub mod update;
 pub mod validation;
 pub mod velocity;
 
@@ -68,4 +70,7 @@ pub use timing::{
 };
 pub use velocity::*;
 pub use trace::{BeadTestResult, CargoTestResult, TraceManager, TraceMetadata};
+pub use events::{
+    EventProcessor, ExitCodeInfo, GNU_TIMEOUT_EXIT_CODE, TimeoutStats, TimeoutType, WorkerEvent, WorkerEventType,
+};
 pub use exit_code::{append_exit_code_to_log, format_exit_code, format_exit_code_to_log, ExitCode, ExitStatus, ProcessTermination};

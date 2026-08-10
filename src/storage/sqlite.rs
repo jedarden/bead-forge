@@ -1964,7 +1964,7 @@ impl Storage {
     pub fn get_dependencies_display(&self, parent_id: &str) -> Result<Vec<DependencyDisplay>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
-            "SELECT d.type, i.id, i.title
+            "SELECT d.type, d.depends_on_id, i.title
              FROM dependencies d
              LEFT JOIN issues i ON d.depends_on_id = i.id
              WHERE d.issue_id = ?1",
@@ -1975,7 +1975,39 @@ impl Storage {
                 Ok(DependencyDisplay {
                     dep_type: row.get(0)?,
                     bead_id: row.get(1)?,
-                    title: row.get(2)?,
+                    title: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        Ok(result)
+    }
+
+    /// Get dependents with display information (title) by joining with issues table.
+    ///
+    /// Returns dependent bead ID, title, and dependency type for each bead that depends
+    /// on the given bead. Returns empty Vec for beads with no dependents.
+    ///
+    /// # Arguments
+    /// * `depends_on_id` - The ID of the bead to get dependents for
+    ///
+    /// # Returns
+    /// Vector of DependencyDisplay structs containing bead ID, title, and dependency type
+    pub fn get_dependents_display(&self, depends_on_id: &str) -> Result<Vec<DependencyDisplay>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare_cached(
+            "SELECT d.issue_id, i.title, d.type
+             FROM dependencies d
+             LEFT JOIN issues i ON d.issue_id = i.id
+             WHERE d.depends_on_id = ?1",
+        )?;
+
+        let result = stmt
+            .query_map(params![depends_on_id], |row| {
+                Ok(DependencyDisplay {
+                    dep_type: row.get(2)?,
+                    bead_id: row.get(0)?,
+                    title: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;

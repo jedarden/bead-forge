@@ -257,6 +257,17 @@ impl From<chrono::ParseError> for BeadForgeError {
     }
 }
 
+// shell_words::ParseError conversion
+impl From<shell_words::ParseError> for BeadForgeError {
+    fn from(err: shell_words::ParseError) -> Self {
+        BeadForgeError::Parsing {
+            message: format!("Shell word parsing failed: {}", err),
+            format: ParsingFormat::Custom,
+            source: None,
+        }
+    }
+}
+
 // ============================================================================
 // Constructor methods for each error variant
 // ============================================================================

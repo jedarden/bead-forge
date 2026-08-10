@@ -98,7 +98,7 @@ const ISSUE_SCHEMA: IssueSchema = IssueSchema {
 };
 
 /// Validate that a JSON object conforms to the Issue schema
-fn validate_issue_schema(json: &serde_json::Value, context: &str) -> Result<(), String> {
+fn validate_issue_schema(json: &serde_json::Value, context: &str) -> std::result::Result<(), String> {
     if !json.is_object() {
         return Err(format!("{}: Expected object, got {}", context, json));
     }
@@ -117,7 +117,7 @@ fn validate_issue_schema(json: &serde_json::Value, context: &str) -> Result<(), 
 }
 
 /// Validate that all fields in an Issue object have correct types
-fn validate_field_types(json: &serde_json::Value, context: &str) -> Result<(), String> {
+fn validate_field_types(json: &serde_json::Value, context: &str) -> std::result::Result<(), String> {
     // id: string
     if let Some(id) = json.get("id") {
         if !id.is_string() {

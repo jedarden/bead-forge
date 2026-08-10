@@ -325,4 +325,150 @@ mod tests {
         // Long title should be truncated with "..."
         assert!(result.contains("..."));
     }
+
+    // ==================== Separator formatting tests ====================
+
+    #[test]
+    fn test_separator_exact_equals_count() {
+        let formatter = TableFormatter::new();
+        let issue = Issue::new("bf-test".to_string(), "Test Issue".to_string(), ".".to_string());
+        let result = formatter.format_issue_detail(&issue);
+
+        // Find the separator line (should be exactly 80 equals signs)
+        let lines: Vec<&str> = result.lines().collect();
+        let separator_line = lines.get(1).expect("Should have a separator line");
+
+        // Count the exact number of equals signs
+        let equals_count = separator_line.chars().filter(|&c| c == '=').count();
+        assert_eq!(equals_count, 80, "Separator should have exactly 80 equals signs, got {}", equals_count);
+
+        // Verify it's all equals signs (no other characters except newline)
+        assert!(separator_line.chars().all(|c| c == '='), "Separator should contain only equals signs");
+    }
+
+    #[test]
+    fn test_separator_positioning_in_detail_output() {
+        let formatter = TableFormatter::new();
+        let issue = Issue::new("bf-abc123".to_string(), "Issue Title Here".to_string(), ".".to_string());
+        let result = formatter.format_issue_detail(&issue);
+
+        let lines: Vec<&str> = result.lines().collect();
+
+        // Separator should be on line 2 (index 1) - between title and first field
+        assert!(lines.len() > 1, "Should have at least 2 lines");
+        let separator_line = lines[1];
+
+        // Verify it's a separator
+        assert!(separator_line.chars().all(|c| c == '='), "Line 2 should be separator with only equals");
+
+        // Verify line before separator contains ID and title
+        let header_line = lines[0];
+        assert!(header_line.contains("bf-abc123"), "Line 1 should contain ID");
+        assert!(header_line.contains("Issue Title Here"), "Line 1 should contain title");
+
+        // Verify line after separator starts with "Status:"
+        let first_field_line = lines.get(2).expect("Should have content after separator");
+        assert!(first_field_line.starts_with("Status:"), "Line 3 should start with 'Status:'");
+    }
+
+    #[test]
+    fn test_table_separator_construction() {
+        let formatter = TableFormatter::new();
+        let issue1 = Issue::new("bf-1".to_string(), "First".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-2".to_string(), "Second".to_string(), ".".to_string());
+        let result = formatter.format_issues(&[issue1, issue2]);
+
+        let lines: Vec<&str> = result.lines().collect();
+
+        // Find separator line (should be after header)
+        let separator_line = lines.get(1).expect("Should have separator after header");
+
+        // Verify separator pattern: dashes separated by "+-+"
+        assert!(separator_line.contains("-+-"), "Separator should contain '-+-' separators");
+
+        // Verify it starts and ends with dashes
+        assert!(separator_line.starts_with('-'), "Separator should start with dashes");
+        assert!(separator_line.ends_with('-'), "Separator should end with dashes");
+
+        // Verify separator contains only dashes and plus signs
+        assert!(separator_line.chars().all(|c| c == '-' || c == '+'),
+                "Separator should contain only dashes and plus signs");
+    }
+
+    #[test]
+    fn test_separator_width_matches_column_widths() {
+        let formatter = TableFormatter::new();
+
+        // Create issues with specific ID lengths to test separator width adaptation
+        let issue1 = Issue::new("bf-short".to_string(), "Title".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-very-long-id".to_string(), "Another Title".to_string(), ".".to_string());
+
+        let result = formatter.format_issues(&[issue1, issue2]);
+        let lines: Vec<&str> = result.lines().collect();
+
+        let header_line = lines[0];
+        let separator_line = lines[1];
+
+        // Split both lines by " | " to get column widths
+        let header_columns: Vec<&str> = header_line.split(" | ").collect();
+        let separator_parts: Vec<&str> = separator_line.split("-+-").collect();
+
+        // Verify number of separator parts matches number of header columns
+        assert_eq!(separator_parts.len(), header_columns.len(),
+                   "Separator parts count should match header columns count");
+
+        // Verify each separator part matches corresponding header width
+        for (i, (sep_part, header_col)) in separator_parts.iter().zip(header_columns.iter()).enumerate() {
+            assert_eq!(sep_part.len(), header_col.len(),
+                      "Separator part {} width should match header column width", i);
+        }
+    }
+
+    #[test]
+    fn test_separator_with_varied_content_widths() {
+        let formatter = TableFormatter::new();
+
+        // Create issues with varying field widths
+        let issue1 = Issue::new("bf-a".to_string(), "Short".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-very-long-issue-id".to_string(), "This is a much longer title".to_string(), ".".to_string());
+
+        let result = formatter.format_issues(&[issue1, issue2]);
+        let lines: Vec<&str> = result.lines().collect();
+
+        let separator_line = lines[1];
+
+        // Count separator components
+        let dash_count = separator_line.chars().filter(|&c| c == '-').count();
+        let plus_count = separator_line.chars().filter(|&c| c == '+').count();
+
+        // Should have exactly 5 plus signs (6 columns -> 5 separators)
+        assert_eq!(plus_count, 5, "Should have 5 plus signs for 6-column table");
+
+        // Should have more dashes than minimum due to long content
+        assert!(dash_count > 20, "Should have substantial dash count for column widths");
+    }
+
+    #[test]
+    fn test_no_separator_for_empty_issues() {
+        let formatter = TableFormatter::new();
+        let result = formatter.format_issues(&[]);
+
+        // Empty result should have no separator
+        assert_eq!(result, "", "Empty issues should produce empty output with no separator");
+    }
+
+    #[test]
+    fn test_single_issue_has_separator() {
+        let formatter = TableFormatter::new();
+        let issue = Issue::new("bf-single".to_string(), "Single Issue".to_string(), ".".to_string());
+        let result = formatter.format_issues(&[issue]);
+
+        let lines: Vec<&str> = result.lines().collect();
+
+        // Should have header and separator at minimum
+        assert!(lines.len() >= 2, "Should have header and separator");
+
+        let separator_line = lines[1];
+        assert!(separator_line.contains("-+-"), "Single issue should still have separator");
+    }
 }

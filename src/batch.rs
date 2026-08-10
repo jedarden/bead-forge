@@ -1,8 +1,9 @@
 use crate::autoflush;
 use crate::config::{find_beads_dir, get_default_prefix, load_config};
+use crate::error::{BeadForgeError, Result};
 use crate::model::{DependencyType, Issue, IssueType, Priority};
 use crate::storage::Storage;
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use chrono::Utc;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -165,12 +166,12 @@ fn get_allowed_fields(op_name: &str) -> &'static [&'static str] {
 fn validate_op_fields(value: &serde_json::Value) -> Result<()> {
     let obj = value
         .as_object()
-        .ok_or_else(|| anyhow!("Operation must be a JSON object"))?;
+        .ok_or_else(|| BeadForgeError::validation("Operation must be a JSON object"))?;
 
     let op_name = obj
         .get("op")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("Operation must have an 'op' field"))?;
+        .ok_or_else(|| BeadForgeError::validation("Operation must have an 'op' field"))?;
 
     let allowed = get_allowed_fields(op_name);
 
@@ -181,7 +182,7 @@ fn validate_op_fields(value: &serde_json::Value) -> Result<()> {
                 key,
                 op_name,
                 allowed.join(", ")
-            ));
+            ).into());
         }
     }
 
@@ -563,7 +564,7 @@ fn execute_create(
         return Err(anyhow!(
             "ID collision retries exhausted: {}",
             last_err.map(|e| e.to_string()).unwrap_or_default()
-        ));
+        ).into());
     }
 
     // Insert labels
@@ -609,10 +610,10 @@ fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<(
     )?;
 
     if !id_exists {
-        return Err(anyhow!("Bead not found: {}", id));
+        return Err(anyhow!("Bead not found: {}", id).into());
     }
     if !blocker_exists {
-        return Err(anyhow!("Bead not found: {}", blocker));
+        return Err(anyhow!("Bead not found: {}", blocker).into());
     }
 
     // Prevent self-blocking: a bead cannot depend on itself for blocking dependency types
@@ -620,7 +621,7 @@ fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<(
         return Err(anyhow!(
             "Cannot add self-blocking dependency: bead '{}' cannot block itself",
             id
-        ));
+        ).into());
     }
 
     // Check for duplicate dependency
@@ -635,7 +636,7 @@ fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<(
             "Dependency already exists: {} depends on {}",
             id,
             blocker
-        ));
+        ).into());
     }
 
     // Check for circular dependency (id -> blocker and blocker -> id)
@@ -650,7 +651,7 @@ fn execute_dep_add_blocker(tx: &Connection, id: &str, blocker: &str) -> Result<(
             "Circular dependency detected: {} <-> {}",
             id,
             blocker
-        ));
+        ).into());
     }
 
     // Add dependency (id depends on blocker, so blocker blocks id)
@@ -684,7 +685,7 @@ fn execute_close(tx: &Connection, id: &str, reason: &str) -> Result<()> {
     )?;
 
     if !exists {
-        return Err(anyhow!("Bead not found: {}", id));
+        return Err(anyhow!("Bead not found: {}", id).into());
     }
 
     // Check if already closed for idempotence
@@ -812,7 +813,7 @@ fn execute_update(
     )?;
 
     if !exists {
-        return Err(anyhow!("Bead not found: {}", id));
+        return Err(anyhow!("Bead not found: {}", id).into());
     }
 
     let mut updates = Vec::new();
@@ -903,10 +904,10 @@ fn execute_dep_remove(tx: &Connection, id: &str, depends_on: &str) -> Result<()>
     )?;
 
     if !id_exists {
-        return Err(anyhow!("Bead not found: {}", id));
+        return Err(anyhow!("Bead not found: {}", id).into());
     }
     if !depends_on_exists {
-        return Err(anyhow!("Bead not found: {}", depends_on));
+        return Err(anyhow!("Bead not found: {}", depends_on).into());
     }
 
     // Check if dependency exists
@@ -921,7 +922,7 @@ fn execute_dep_remove(tx: &Connection, id: &str, depends_on: &str) -> Result<()>
             "Dependency does not exist: {} depends on {}",
             id,
             depends_on
-        ));
+        ).into());
     }
 
     // Remove dependency
@@ -963,7 +964,7 @@ fn execute_label_add(tx: &Connection, id: &str, labels: &[String]) -> Result<()>
     )?;
 
     if !exists {
-        return Err(anyhow!("Bead not found: {}", id));
+        return Err(anyhow!("Bead not found: {}", id).into());
     }
 
     // Add labels (INSERT OR IGNORE handles duplicates)
@@ -990,7 +991,7 @@ fn execute_label_remove(tx: &Connection, id: &str, labels: &[String]) -> Result<
     )?;
 
     if !exists {
-        return Err(anyhow!("Bead not found: {}", id));
+        return Err(anyhow!("Bead not found: {}", id).into());
     }
 
     // Remove labels
@@ -1017,7 +1018,7 @@ fn execute_comment(tx: &Connection, id: &str, author: &str, text: &str) -> Resul
     )?;
 
     if !exists {
-        return Err(anyhow!("Bead not found: {}", id));
+        return Err(anyhow!("Bead not found: {}", id).into());
     }
 
     // Generate comment ID (using current timestamp)
@@ -1162,7 +1163,7 @@ pub fn parse_stdin() -> Result<Vec<BatchOp>> {
         }
         // Now parse the validated JSON
         return serde_json::from_str::<Vec<BatchOp>>(&input)
-            .map_err(|e| anyhow!("JSON parse error: {}", e));
+            .map_err(|e| anyhow!("JSON parse error: {}", e).into());
     }
 
     // Fall back to CLI-style parsing (one op per line)
@@ -1191,7 +1192,7 @@ pub fn parse_stdin() -> Result<Vec<BatchOp>> {
         } else if let Some(rest) = line.strip_prefix("close ") {
             ops.push(parse_close(rest)?);
         } else {
-            return Err(anyhow!("Unknown operation: {}", line));
+            return Err(anyhow!("Unknown operation: {}", line).into());
         }
     }
 
@@ -1258,7 +1259,7 @@ fn parse_dep_add(input: &str) -> Result<BatchOp> {
     if parts.len() != 2 {
         return Err(anyhow!(
             "dep add-blocker requires <id> <blocker>. Usage: dep add-blocker <blocked-bead> <blocking-bead>"
-        ));
+        ).into());
     }
     Ok(BatchOp::DepAddBlocker {
         id: parts[0].to_string(),      // bead being blocked
@@ -1286,7 +1287,7 @@ fn parse_update(input: &str) -> Result<BatchOp> {
     // Simple parsing: update <id> --status X --priority Y --assignee Z
     let parts = shell_words::split(input)?;
     if parts.is_empty() {
-        return Err(anyhow!("Missing ID for update operation"));
+        return Err(BeadForgeError::validation("Missing ID for update operation"));
     }
 
     let id = parts[0].clone();
@@ -1347,7 +1348,7 @@ fn parse_update(input: &str) -> Result<BatchOp> {
 fn parse_dep_remove(input: &str) -> Result<BatchOp> {
     let parts: Vec<&str> = input.split_whitespace().collect();
     if parts.len() != 2 {
-        return Err(anyhow!(
+        return Err(BeadForgeError::validation(
             "dep remove requires <id> <depends_on>. Usage: dep remove <bead> <depends-on-bead>"
         ));
     }
@@ -1360,7 +1361,7 @@ fn parse_dep_remove(input: &str) -> Result<BatchOp> {
 fn parse_label_add(input: &str) -> Result<BatchOp> {
     let parts: Vec<&str> = input.split_whitespace().collect();
     if parts.len() < 2 {
-        return Err(anyhow!(
+        return Err(BeadForgeError::validation(
             "label add requires <id> <label>... Usage: label add <bead> <label1> <label2> ..."
         ));
     }
@@ -1372,7 +1373,7 @@ fn parse_label_add(input: &str) -> Result<BatchOp> {
 fn parse_label_remove(input: &str) -> Result<BatchOp> {
     let parts: Vec<&str> = input.split_whitespace().collect();
     if parts.len() < 2 {
-        return Err(anyhow!(
+        return Err(BeadForgeError::validation(
             "label remove requires <id> <label>... Usage: label remove <bead> <label1> <label2> ..."
         ));
     }
@@ -1385,7 +1386,7 @@ fn parse_comment(input: &str) -> Result<BatchOp> {
     // comment <id> <text...>
     let parts: Vec<&str> = input.split_whitespace().collect();
     if parts.len() < 2 {
-        return Err(anyhow!(
+        return Err(BeadForgeError::validation(
             "comment requires <id> <text>. Usage: comment <bead> <comment text>"
         ));
     }
