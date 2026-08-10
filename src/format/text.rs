@@ -792,4 +792,331 @@ mod tests {
 
         assert!(result.contains("Type: bug"));
     }
+
+    // ==================== Separator formatting tests ====================
+
+    #[test]
+    fn test_velocity_separator_exact_dash_count() {
+        let stats = vec![
+            VelocityStats {
+                model: "claude-sonnet-5".to_string(),
+                harness: "needle".to_string(),
+                issue_type: "task".to_string(),
+                sample_count: 10,
+                p50_seconds: Some(120.0),
+                p90_seconds: Some(300.0),
+                avg_seconds: Some(150.0),
+            },
+        ];
+
+        let result = format_velocity_text(&stats);
+        let lines: Vec<&str> = result.lines().collect();
+
+        // Find the separator line (should be after header)
+        let separator_line = lines.iter()
+            .find(|line| line.chars().all(|c| c == '-'))
+            .expect("Should have a separator line with only dashes");
+
+        // Count exact number of dashes
+        let dash_count = separator_line.chars().count();
+        assert_eq!(dash_count, 85, "Velocity separator should have exactly 85 dashes, got {}", dash_count);
+    }
+
+    #[test]
+    fn test_velocity_separator_positioning() {
+        let stats = vec![
+            VelocityStats {
+                model: "claude-sonnet-5".to_string(),
+                harness: "needle".to_string(),
+                issue_type: "task".to_string(),
+                sample_count: 10,
+                p50_seconds: Some(120.0),
+                p90_seconds: Some(300.0),
+                avg_seconds: Some(150.0),
+            },
+        ];
+
+        let result = format_velocity_text(&stats);
+        let lines: Vec<&str> = result.lines().collect();
+
+        // Find header and separator lines
+        let header_line = lines.iter().find(|line| line.contains("Model")).expect("Should have header");
+        let separator_line = lines.iter()
+            .find(|line| line.chars().all(|c| c == '-'))
+            .expect("Should have separator line");
+
+        let header_idx = lines.iter().position(|l| *l == header_line).unwrap();
+        let separator_idx = lines.iter().position(|l| *l == separator_line).unwrap();
+
+        // Separator should come immediately after header
+        assert_eq!(separator_idx, header_idx + 1, "Separator should be immediately after header");
+
+        // There should be content after separator
+        assert!(lines.len() > separator_idx + 1, "Should have content after separator");
+    }
+
+    #[test]
+    fn test_velocity_separator_with_no_stats() {
+        let stats: Vec<VelocityStats> = vec![];
+        let result = format_velocity_text(&stats);
+
+        // When no stats, should show message but no separator
+        assert!(result.contains("No velocity statistics available yet"));
+        assert!(!result.chars().any(|c| c == '-'), "Should have no separator when no stats");
+    }
+
+    #[test]
+    fn test_velocity_separator_matches_header_width() {
+        let stats = vec![
+            VelocityStats {
+                model: "claude-sonnet-5".to_string(),
+                harness: "needle".to_string(),
+                issue_type: "task".to_string(),
+                sample_count: 10,
+                p50_seconds: Some(120.0),
+                p90_seconds: Some(300.0),
+                avg_seconds: Some(150.0),
+            },
+        ];
+
+        let result = format_velocity_text(&stats);
+        let lines: Vec<&str> = result.lines().collect();
+
+        let header_line = lines.iter().find(|line| line.contains("Model")).expect("Should have header");
+        let separator_line = lines.iter()
+            .find(|line| line.chars().all(|c| c == '-'))
+            .expect("Should have separator line");
+
+        // Both should have same width
+        assert_eq!(header_line.len(), separator_line.len(),
+                   "Separator width should match header width");
+    }
+
+    #[test]
+    fn test_velocity_separator_with_multiple_stats() {
+        let stats = vec![
+            VelocityStats {
+                model: "claude-sonnet-5".to_string(),
+                harness: "needle".to_string(),
+                issue_type: "task".to_string(),
+                sample_count: 10,
+                p50_seconds: Some(120.0),
+                p90_seconds: Some(300.0),
+                avg_seconds: Some(150.0),
+            },
+            VelocityStats {
+                model: "claude-opus-5".to_string(),
+                harness: "claude-code".to_string(),
+                issue_type: "bug".to_string(),
+                sample_count: 5,
+                p50_seconds: Some(90.0),
+                p90_seconds: Some(180.0),
+                avg_seconds: Some(110.0),
+            },
+        ];
+
+        let result = format_velocity_text(&stats);
+        let lines: Vec<&str> = result.lines().collect();
+
+        // Count separator lines - should be exactly 1
+        let separator_count = lines.iter()
+            .filter(|line| line.chars().all(|c| c == '-'))
+            .count();
+
+        assert_eq!(separator_count, 1, "Should have exactly one separator line");
+
+        // All separators (if any) should have 85 dashes
+        for line in lines.iter() {
+            if line.chars().all(|c| c == '-') {
+                assert_eq!(line.len(), 85, "Each separator should be exactly 85 characters");
+            }
+        }
+    }
+
+    // ==================== format_dependencies_display tests ====================
+
+    #[test]
+    fn test_format_dependencies_display_empty() {
+        let deps: Vec<crate::storage::sqlite::DependencyDisplay> = vec![];
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_format_dependencies_display_single_blocking() {
+        let deps = vec![crate::storage::sqlite::DependencyDisplay {
+            dep_type: "blocks".to_string(),
+            bead_id: "bf-blocker".to_string(),
+            title: "Blocker task".to_string(),
+        }];
+
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "Depends: bf-blocker (Blocker task) (blocks)");
+    }
+
+    #[test]
+    fn test_format_dependencies_display_single_non_blocking() {
+        let deps = vec![crate::storage::sqlite::DependencyDisplay {
+            dep_type: "related".to_string(),
+            bead_id: "bf-related".to_string(),
+            title: "Related task".to_string(),
+        }];
+
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "Depends: bf-related (Related task)");
+    }
+
+    #[test]
+    fn test_format_dependencies_display_multiple_mixed() {
+        let deps = vec![
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "blocks".to_string(),
+                bead_id: "bf-blocker".to_string(),
+                title: "Blocker task".to_string(),
+            },
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "related".to_string(),
+                bead_id: "bf-related".to_string(),
+                title: "Related task".to_string(),
+            },
+        ];
+
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "Depends: bf-blocker (Blocker task) (blocks), bf-related (Related task)");
+    }
+
+    #[test]
+    fn test_format_dependencies_display_special_characters() {
+        let deps = vec![
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "blocks".to_string(),
+                bead_id: "bf-001".to_string(),
+                title: "Task with <quotes> & \"double\" & 'single'".to_string(),
+            },
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "related".to_string(),
+                bead_id: "bf-002".to_string(),
+                title: "Task with emoji 🚀 🔥".to_string(),
+            },
+        ];
+
+        let result = format_dependencies_display(&deps);
+        assert!(result.contains("<quotes>"));
+        assert!(result.contains("🚀"));
+        assert!(result.contains("(blocks)"));
+    }
+
+    #[test]
+    fn test_format_dependencies_display_multiple_blocking() {
+        let deps = vec![
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "blocks".to_string(),
+                bead_id: "bf-blocker1".to_string(),
+                title: "First blocker".to_string(),
+            },
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "blocks".to_string(),
+                bead_id: "bf-blocker2".to_string(),
+                title: "Second blocker".to_string(),
+            },
+        ];
+
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "Depends: bf-blocker1 (First blocker) (blocks), bf-blocker2 (Second blocker) (blocks)");
+    }
+
+    #[test]
+    fn test_format_dependencies_display_long_title() {
+        let long_title = "A".repeat(500);
+        let deps = vec![crate::storage::sqlite::DependencyDisplay {
+            dep_type: "blocks".to_string(),
+            bead_id: "bf-long".to_string(),
+            title: long_title.clone(),
+        }];
+
+        let result = format_dependencies_display(&deps);
+        assert!(result.contains("bf-long"));
+        assert!(result.contains(&long_title));
+    }
+
+    #[test]
+    fn test_format_dependencies_display_unicode_title() {
+        let deps = vec![crate::storage::sqlite::DependencyDisplay {
+            dep_type: "blocks".to_string(),
+            bead_id: "bf-unicode".to_string(),
+            title: "Tâsk with spëcial çharacters 日本語 中文".to_string(),
+        }];
+
+        let result = format_dependencies_display(&deps);
+        assert!(result.contains("Tâsk"));
+        assert!(result.contains("日本語"));
+        assert!(result.contains("中文"));
+    }
+
+    #[test]
+    fn test_format_dependencies_display_multiple_non_blocking() {
+        let deps = vec![
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "related".to_string(),
+                bead_id: "bf-related1".to_string(),
+                title: "First related".to_string(),
+            },
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "related".to_string(),
+                bead_id: "bf-related2".to_string(),
+                title: "Second related".to_string(),
+            },
+        ];
+
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "Depends: bf-related1 (First related), bf-related2 (Second related)");
+    }
+
+    #[test]
+    fn test_format_dependencies_display_empty_title() {
+        let deps = vec![crate::storage::sqlite::DependencyDisplay {
+            dep_type: "blocks".to_string(),
+            bead_id: "bf-empty".to_string(),
+            title: "".to_string(),
+        }];
+
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "Depends: bf-empty () (blocks)");
+    }
+
+    #[test]
+    fn test_format_dependencies_display_newlines_in_title() {
+        let deps = vec![crate::storage::sqlite::DependencyDisplay {
+            dep_type: "blocks".to_string(),
+            bead_id: "bf-newlines".to_string(),
+            title: "Line 1\nLine 2\nLine 3".to_string(),
+        }];
+
+        let result = format_dependencies_display(&deps);
+        assert!(result.contains("Line 1\nLine 2\nLine 3"));
+    }
+
+    #[test]
+    fn test_format_dependencies_display_three_dependencies() {
+        let deps = vec![
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "blocks".to_string(),
+                bead_id: "bf-1".to_string(),
+                title: "First".to_string(),
+            },
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "related".to_string(),
+                bead_id: "bf-2".to_string(),
+                title: "Second".to_string(),
+            },
+            crate::storage::sqlite::DependencyDisplay {
+                dep_type: "blocks".to_string(),
+                bead_id: "bf-3".to_string(),
+                title: "Third".to_string(),
+            },
+        ];
+
+        let result = format_dependencies_display(&deps);
+        assert_eq!(result, "Depends: bf-1 (First) (blocks), bf-2 (Second), bf-3 (Third) (blocks)");
+    }
 }
