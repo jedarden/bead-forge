@@ -60,12 +60,38 @@ impl JsonFormatter {
 /// After stripping relations, serialization uses the standard Issue serde
 /// attributes, which skip empty collections and None values for compact output.
 /// This ensures consistency with storage and other export paths.
+///
+/// ## Adds Status Transitions History
+///
+/// This function also adds a `status_transitions` field that contains the
+/// history of status changes extracted from the issue's events. This is
+/// JSON-only output and not included in text format.
 fn issue_to_value(issue: &Issue) -> Value {
     let mut stripped = issue.clone();
     stripped.dependencies = vec![];
     stripped.comments = vec![];
 
-    serde_json::to_value(&stripped).unwrap_or(Value::Null)
+    // Only include closed_at and close_reason when status is Closed
+    if stripped.status != crate::model::Status::Closed {
+        stripped.closed_at = None;
+        stripped.close_reason = None;
+    }
+
+    // Serialize to Value
+    let mut value = serde_json::to_value(&stripped).unwrap_or(Value::Null);
+
+    // Add status_transitions field (JSON-only feature)
+    if let Some(obj) = value.as_object_mut() {
+        let transitions = issue.status_transitions();
+        if !transitions.is_empty() {
+            obj.insert(
+                "status_transitions".to_string(),
+                serde_json::to_value(&transitions).unwrap_or(Value::Null),
+            );
+        }
+    }
+
+    value
 }
 
 impl Formatter for JsonFormatter {
@@ -566,5 +592,140 @@ mod tests {
         let v = parse(&JsonFormatter.format_issue(&issue));
         assert!(v.get("annotations").is_some(), "annotations should be present when populated");
         assert_eq!(v.get("annotations").and_then(|a| a.get("key")).and_then(|v| v.as_str()), Some("value"));
+    }
+
+    #[test]
+    fn status_transitions_present_when_events_exist() {
+        use crate::model::{Event, EventType};
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+
+        // Add a status change event
+        issue.events.push(Event {
+            id: 1,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::StatusChanged,
+            actor: "test-user".to_string(),
+            old_value: Some("open".to_string()),
+            new_value: Some("in_progress".to_string()),
+            comment: None,
+            created_at: chrono::Utc::now(),
+        });
+
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert!(v.get("status_transitions").is_some(), "status_transitions should be present when events exist");
+
+        let transitions = v.get("status_transitions").and_then(|t| t.as_array()).unwrap();
+        assert_eq!(transitions.len(), 1, "should have one transition");
+
+        let first = &transitions[0];
+        assert_eq!(first.get("old_status").and_then(|s| s.as_str()), Some("open"));
+        assert_eq!(first.get("new_status").and_then(|s| s.as_str()), Some("in_progress"));
+        assert_eq!(first.get("actor").and_then(|s| s.as_str()), Some("test-user"));
+        assert!(first.get("timestamp").is_some(), "transition should have timestamp");
+    }
+
+    #[test]
+    fn status_transitions_omitted_when_empty() {
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        assert_eq!(v.get("status_transitions"), None, "status_transitions should be omitted when empty");
+    }
+
+    #[test]
+    fn status_transitions_filters_only_status_events() {
+        use crate::model::{Event, EventType};
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+
+        // Add a status change event
+        issue.events.push(Event {
+            id: 1,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::StatusChanged,
+            actor: "user1".to_string(),
+            old_value: Some("open".to_string()),
+            new_value: Some("in_progress".to_string()),
+            comment: None,
+            created_at: chrono::Utc::now(),
+        });
+
+        // Add a non-status event (should be filtered out)
+        issue.events.push(Event {
+            id: 2,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::Commented,
+            actor: "user2".to_string(),
+            old_value: None,
+            new_value: None,
+            comment: Some("A comment".to_string()),
+            created_at: chrono::Utc::now(),
+        });
+
+        // Add another status change
+        issue.events.push(Event {
+            id: 3,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::Closed,
+            actor: "user1".to_string(),
+            old_value: Some("in_progress".to_string()),
+            new_value: Some("closed".to_string()),
+            comment: None,
+            created_at: chrono::Utc::now(),
+        });
+
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        let transitions = v.get("status_transitions").and_then(|t| t.as_array()).unwrap();
+        assert_eq!(transitions.len(), 2, "should have two status transitions (commented event filtered out)");
+    }
+
+    #[test]
+    fn status_transitions_closed_event_formatting() {
+        use crate::model::{Event, EventType};
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+
+        // Add a closed event
+        issue.events.push(Event {
+            id: 1,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::Closed,
+            actor: "closer".to_string(),
+            old_value: Some("in_progress".to_string()),
+            new_value: None, // Closed events don't have new_value in the usual sense
+            comment: None,
+            created_at: chrono::Utc::now(),
+        });
+
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        let transitions = v.get("status_transitions").and_then(|t| t.as_array()).unwrap();
+        assert_eq!(transitions.len(), 1);
+
+        let first = &transitions[0];
+        assert_eq!(first.get("new_status").and_then(|s| s.as_str()), Some("closed"),
+                   "Closed events should have new_status='closed'");
+    }
+
+    #[test]
+    fn status_transitions_reopened_event_formatting() {
+        use crate::model::{Event, EventType};
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+
+        // Add a reopened event
+        issue.events.push(Event {
+            id: 1,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::Reopened,
+            actor: "reopener".to_string(),
+            old_value: Some("closed".to_string()),
+            new_value: None,
+            comment: None,
+            created_at: chrono::Utc::now(),
+        });
+
+        let v = parse(&JsonFormatter.format_issue(&issue));
+        let transitions = v.get("status_transitions").and_then(|t| t.as_array()).unwrap();
+        assert_eq!(transitions.len(), 1);
+
+        let first = &transitions[0];
+        assert_eq!(first.get("new_status").and_then(|s| s.as_str()), Some("open"),
+                   "Reopened events should have new_status='open'");
     }
 }
