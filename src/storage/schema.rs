@@ -818,3 +818,386 @@ pub fn all_indexes() -> Vec<&'static str> {
         critical_path_cache_indexes(),
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_issues_table_ddl() {
+        let ddl = issues_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS issues"));
+        assert!(ddl.contains("id TEXT PRIMARY KEY"));
+        assert!(ddl.contains("title TEXT NOT NULL CHECK(length(title) <= 500)"));
+        assert!(ddl.contains("status TEXT NOT NULL DEFAULT 'open'"));
+        assert!(ddl.contains("priority INTEGER NOT NULL DEFAULT 2 CHECK(priority >= 0 AND priority <= 4)"));
+        assert!(ddl.contains("manual_status TEXT DEFAULT NULL"));
+    }
+
+    #[test]
+    fn test_dependencies_table_ddl() {
+        let ddl = dependencies_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS dependencies"));
+        assert!(ddl.contains("issue_id TEXT NOT NULL"));
+        assert!(ddl.contains("depends_on_id TEXT NOT NULL"));
+        assert!(ddl.contains("type TEXT NOT NULL DEFAULT 'blocks'"));
+        assert!(ddl.contains("PRIMARY KEY (issue_id, depends_on_id)"));
+        assert!(ddl.contains("FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE"));
+    }
+
+    #[test]
+    fn test_comments_table_ddl() {
+        let ddl = comments_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS comments"));
+        assert!(ddl.contains("id INTEGER PRIMARY KEY AUTOINCREMENT"));
+        assert!(ddl.contains("issue_id TEXT NOT NULL"));
+        assert!(ddl.contains("author TEXT NOT NULL"));
+        assert!(ddl.contains("text TEXT NOT NULL"));
+    }
+
+    #[test]
+    fn test_events_table_ddl() {
+        let ddl = events_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS events"));
+        assert!(ddl.contains("id INTEGER PRIMARY KEY AUTOINCREMENT"));
+        assert!(ddl.contains("issue_id TEXT NOT NULL"));
+        assert!(ddl.contains("event_type TEXT NOT NULL"));
+        assert!(ddl.contains("actor TEXT NOT NULL DEFAULT ''"));
+    }
+
+    #[test]
+    fn test_labels_table_ddl() {
+        let ddl = labels_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS labels"));
+        assert!(ddl.contains("issue_id TEXT NOT NULL"));
+        assert!(ddl.contains("label TEXT NOT NULL"));
+        assert!(ddl.contains("PRIMARY KEY (issue_id, label)"));
+    }
+
+    #[test]
+    fn test_bead_annotations_table_ddl() {
+        let ddl = bead_annotations_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS bead_annotations"));
+        assert!(ddl.contains("bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE"));
+        assert!(ddl.contains("key     TEXT NOT NULL"));
+        assert!(ddl.contains("value   TEXT NOT NULL"));
+        assert!(ddl.contains("PRIMARY KEY (bead_id, key)"));
+    }
+
+    #[test]
+    fn test_blocked_issues_cache_table_ddl() {
+        let ddl = blocked_issues_cache_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS blocked_issues_cache"));
+        assert!(ddl.contains("issue_id TEXT NOT NULL PRIMARY KEY"));
+        assert!(ddl.contains("blocked_by INTEGER NOT NULL DEFAULT 0"));
+        assert!(ddl.contains("blocked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"));
+    }
+
+    #[test]
+    fn test_critical_path_cache_table_ddl() {
+        let ddl = critical_path_cache_table();
+        assert!(ddl.contains("CREATE TABLE IF NOT EXISTS critical_path_cache"));
+        assert!(ddl.contains("bead_id TEXT NOT NULL PRIMARY KEY"));
+        assert!(ddl.contains("epic_id TEXT"));
+        assert!(ddl.contains("es INTEGER NOT NULL DEFAULT 0"));
+        assert!(ddl.contains("ls INTEGER NOT NULL DEFAULT 0"));
+        assert!(ddl.contains("float INTEGER NOT NULL DEFAULT 0"));
+    }
+
+    #[test]
+    fn test_issues_indexes_ddl() {
+        let ddl = issues_indexes();
+        assert!(ddl.contains("CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status)"));
+        assert!(ddl.contains("CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority)"));
+        assert!(ddl.contains("CREATE INDEX IF NOT EXISTS idx_issues_ready"));
+        assert!(ddl.contains("WHERE status = 'open'"));
+        assert!(ddl.contains("CREATE UNIQUE INDEX IF NOT EXISTS idx_issues_external_ref_unique"));
+    }
+
+    #[test]
+    fn test_dependencies_indexes_ddl() {
+        let ddl = dependencies_indexes();
+        assert!(ddl.contains("CREATE INDEX IF NOT EXISTS idx_dependencies_issue ON dependencies(issue_id)"));
+        assert!(ddl.contains("CREATE INDEX IF NOT EXISTS idx_dependencies_depends_on ON dependencies(depends_on_id)"));
+        assert!(ddl.contains("CREATE INDEX IF NOT EXISTS idx_dependencies_blocking"));
+        assert!(ddl.contains("WHERE (type = 'blocks' OR type = 'parent-child'"));
+    }
+
+    #[test]
+    fn test_all_tables_count() {
+        let tables = all_tables();
+        assert_eq!(tables.len(), 16, "Should have 16 table definitions");
+
+        // Verify critical tables are present
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS issues")));
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS dependencies")));
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS comments")));
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS events")));
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS bead_annotations")));
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS blocked_issues_cache")));
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS critical_path_cache")));
+    }
+
+    #[test]
+    fn test_all_indexes_count() {
+        let indexes = all_indexes();
+        assert_eq!(indexes.len(), 16, "Should have 16 index definition groups");
+
+        // Verify critical index groups are present
+        assert!(indexes.iter().any(|i| i.contains("idx_issues_status")));
+        assert!(indexes.iter().any(|i| i.contains("idx_dependencies_issue")));
+        assert!(indexes.iter().any(|i| i.contains("idx_comments_issue")));
+        assert!(indexes.iter().any(|i| i.contains("idx_events_issue")));
+    }
+
+    #[test]
+    fn test_table_aliases_match_base_functions() {
+        // Test that all alias functions return the same DDL as their base functions
+        assert_eq!(table_issues(), issues_table());
+        assert_eq!(table_dependencies(), dependencies_table());
+        assert_eq!(table_comments(), comments_table());
+        assert_eq!(table_events(), events_table());
+        assert_eq!(table_labels(), labels_table());
+        assert_eq!(table_issue_labels(), issue_labels_table());
+        assert_eq!(table_assignees(), assignees_table());
+        assert_eq!(table_issue_assignees(), issue_assignees_table());
+        assert_eq!(table_issue_relations(), issue_relations_table());
+        assert_eq!(table_priorities(), priorities_table());
+        assert_eq!(table_statuses(), statuses_table());
+        assert_eq!(table_issue_types(), issue_types_table());
+        assert_eq!(table_bead_annotations(), bead_annotations_table());
+    }
+
+    #[test]
+    fn test_apply_schema_creates_all_tables() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Apply the schema
+        apply_schema(&conn).unwrap();
+
+        // Verify all tables were created
+        let tables = all_tables();
+        for table_ddl in tables {
+            let table_name = extract_table_name(table_ddl);
+            let mut stmt = conn.prepare(&format!(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='{}'",
+                table_name
+            )).unwrap();
+
+            let table_exists: bool = stmt.exists([]).unwrap();
+            assert!(table_exists, "Table '{}' should exist after schema application", table_name);
+        }
+    }
+
+    #[test]
+    fn test_apply_schema_is_idempotent() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Apply schema twice
+        apply_schema(&conn).unwrap();
+        apply_schema(&conn).unwrap();
+
+        // Verify tables still exist (no errors on second application)
+        let mut stmt = conn.prepare("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").unwrap();
+        let count: i64 = stmt.query_row([], |row| row.get(0)).unwrap();
+        assert!(count >= 16, "Should have at least 16 tables after double schema application");
+    }
+
+    #[test]
+    fn test_ensure_wal_mode() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Ensure WAL mode
+        ensure_wal_mode(&conn).unwrap();
+
+        // Verify WAL mode is set
+        let wal_mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(wal_mode.to_lowercase(), "wal");
+
+        // Verify foreign keys are enabled
+        let fk_enabled: String = conn
+            .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(fk_enabled, "1");
+    }
+
+    #[test]
+    fn test_schema_sql_constant_completeness() {
+        // Verify SCHEMA_SQL contains all tables and indexes
+        let schema = SCHEMA_SQL;
+
+        // Check for all 16 tables
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS issues"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS dependencies"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS comments"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS events"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS labels"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS issue_labels"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS priorities"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS statuses"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS issue_types"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS issue_relations"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS assignees"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS issue_assignees"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS bead_annotations"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS dirty_issues"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS blocked_issues_cache"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS critical_path_cache"));
+
+        // Check for key indexes
+        assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_issues_status"));
+        assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_dependencies_issue"));
+        assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_comments_issue"));
+        assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_events_issue"));
+    }
+
+    #[test]
+    fn test_issues_table_check_constraints() {
+        let ddl = issues_table();
+
+        // Verify title length constraint
+        assert!(ddl.contains("CHECK(length(title) <= 500)"));
+
+        // Verify priority range constraint
+        assert!(ddl.contains("CHECK(priority >= 0 AND priority <= 4)"));
+
+        // Verify status/closed_at consistency constraint
+        assert!(ddl.contains("CHECK ("));
+        assert!(ddl.contains("(status = 'closed' AND closed_at IS NOT NULL)"));
+        assert!(ddl.contains("(status = 'tombstone')"));
+        assert!(ddl.contains("(status NOT IN ('closed', 'tombstone') AND closed_at IS NULL)"));
+    }
+
+    #[test]
+    fn test_foreign_key_constraints() {
+        // Test that tables with foreign keys have proper constraints
+        let dep_ddl = dependencies_table();
+        assert!(dep_ddl.contains("FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE"));
+
+        let comments_ddl = comments_table();
+        assert!(comments_ddl.contains("FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE"));
+
+        let events_ddl = events_table();
+        assert!(events_ddl.contains("FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE"));
+    }
+
+    #[test]
+    fn test_partial_indexes() {
+        let issues_indexes = issues_indexes();
+
+        // Verify partial indexes (WHERE clauses)
+        assert!(issues_indexes.contains("WHERE assignee IS NOT NULL"));
+        assert!(issues_indexes.contains("WHERE external_ref IS NOT NULL"));
+        assert!(issues_indexes.contains("WHERE ephemeral = 1"));
+        assert!(issues_indexes.contains("WHERE pinned = 1"));
+        assert!(issues_indexes.contains("WHERE status = 'tombstone'"));
+        assert!(issues_indexes.contains("WHERE due_at IS NOT NULL"));
+        assert!(issues_indexes.contains("WHERE defer_until IS NOT NULL"));
+    }
+
+    #[test]
+    fn test_composite_indexes() {
+        let issues_indexes = issues_indexes();
+
+        // Verify composite indexes
+        assert!(issues_indexes.contains("idx_issues_ready"));
+        assert!(issues_indexes.contains("ON issues(status, priority, created_at)"));
+
+        assert!(issues_indexes.contains("idx_issues_list_active_order"));
+        assert!(issues_indexes.contains("ON issues(priority, created_at DESC)"));
+    }
+
+    #[test]
+    fn test_unique_indexes() {
+        let issues_indexes = issues_indexes();
+
+        // Verify unique index on external_ref
+        assert!(issues_indexes.contains("CREATE UNIQUE INDEX IF NOT EXISTS idx_issues_external_ref_unique"));
+    }
+
+    #[test]
+    fn test_migrate_legacy_columns() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create dirty_issues table with legacy column name
+        conn.execute_batch(
+            "CREATE TABLE dirty_issues (
+                issue_id TEXT NOT NULL PRIMARY KEY,
+                marked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );"
+        ).unwrap();
+
+        // Verify legacy column exists
+        let has_legacy: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('dirty_issues') WHERE name = 'issue_id'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_legacy, "Legacy column should exist before migration");
+
+        // Run migration
+        migrate_legacy_columns(&conn).unwrap();
+
+        // Verify column was renamed
+        let has_legacy_after: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('dirty_issues') WHERE name = 'issue_id'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(!has_legacy_after, "Legacy column should not exist after migration");
+
+        let has_new_column: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('dirty_issues') WHERE name = 'bead_id'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_new_column, "New column should exist after migration");
+    }
+
+    #[test]
+    fn test_migrate_legacy_columns_idempotent() {
+        // Create a temporary database
+        let temp_file = NamedTempFile::new().unwrap();
+        let conn = Connection::open(temp_file.path()).unwrap();
+
+        // Create dirty_issues table with new column name
+        conn.execute_batch(
+            "CREATE TABLE dirty_issues (
+                bead_id TEXT NOT NULL PRIMARY KEY,
+                marked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );"
+        ).unwrap();
+
+        // Run migration twice
+        migrate_legacy_columns(&conn).unwrap();
+        migrate_legacy_columns(&conn).unwrap();
+
+        // Verify table still exists and has correct column
+        let has_new_column: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('dirty_issues') WHERE name = 'bead_id'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_new_column, "Column should still exist after double migration");
+    }
+
+    /// Helper function to extract table name from DDL
+    fn extract_table_name(ddl: &str) -> &str {
+        // Extract table name from "CREATE TABLE IF NOT EXISTS <table_name>"
+        let ddl_start = ddl.find("CREATE TABLE IF NOT EXISTS ").unwrap();
+        let name_start = ddl_start + "CREATE TABLE IF NOT EXISTS ".len();
+        let name_end = ddl[name_start..].find('(').unwrap();
+        ddl[name_start..name_start + name_end].trim()
+    }
+}

@@ -22,6 +22,14 @@ impl Formatter for TextFormatter {
         }
         s.push_str(&format!("Created at: {}\n", issue.created_at.format("%Y-%m-%d %H:%M:%S UTC")));
         s.push_str(&format!("Updated at: {}\n", issue.updated_at.format("%Y-%m-%d %H:%M:%S UTC")));
+        if issue.status == crate::model::Status::Closed {
+            if let Some(closed_at) = &issue.closed_at {
+                s.push_str(&format!("Closed at: {}\n", closed_at.format("%Y-%m-%d %H:%M:%S UTC")));
+            }
+            if let Some(reason) = &issue.close_reason {
+                s.push_str(&format!("Close reason: {}\n", reason));
+            }
+        }
         if !issue.labels.is_empty() {
             s.push_str(&format!("Labels: {}\n", issue.labels.join(", ")));
         }
@@ -813,6 +821,7 @@ mod tests {
                 p50_seconds: Some(120),
                 p90_seconds: Some(300),
                 avg_seconds: Some(150.0),
+                last_updated: Some("2024-01-01T00:00:00Z".to_string()),
             },
         ];
 
@@ -840,6 +849,7 @@ mod tests {
                 p50_seconds: Some(120),
                 p90_seconds: Some(300),
                 avg_seconds: Some(150.0),
+                last_updated: Some("2024-01-01T00:00:00Z".to_string()),
             },
         ];
 
@@ -852,8 +862,8 @@ mod tests {
             .find(|line| line.chars().all(|c| c == '-'))
             .expect("Should have separator line");
 
-        let header_idx = lines.iter().position(|l| *l == header_line).unwrap();
-        let separator_idx = lines.iter().position(|l| *l == separator_line).unwrap();
+        let header_idx = lines.iter().position(|l| l == header_line).unwrap();
+        let separator_idx = lines.iter().position(|l| l == separator_line).unwrap();
 
         // Separator should come immediately after header
         assert_eq!(separator_idx, header_idx + 1, "Separator should be immediately after header");
@@ -883,6 +893,7 @@ mod tests {
                 p50_seconds: Some(120),
                 p90_seconds: Some(300),
                 avg_seconds: Some(150.0),
+                last_updated: Some("2024-01-01T00:00:00Z".to_string()),
             },
         ];
 
@@ -910,6 +921,7 @@ mod tests {
                 p50_seconds: Some(120),
                 p90_seconds: Some(300),
                 avg_seconds: Some(150.0),
+                last_updated: Some("2026-01-01T00:00:00Z".to_string()),
             },
             VelocityStats {
                 model: "claude-opus-5".to_string(),
@@ -919,6 +931,7 @@ mod tests {
                 p50_seconds: Some(90),
                 p90_seconds: Some(180),
                 avg_seconds: Some(110.0),
+                last_updated: Some("2026-01-01T00:00:00Z".to_string()),
             },
         ];
 

@@ -231,7 +231,10 @@ mod labels_output_tests {
         assert_eq!(parsed.get("id").and_then(|v| v.as_str()), Some("bf-test"));
         assert_eq!(
             parsed.get("labels").and_then(|v| v.as_array()),
-            Some(&vec!["urgent".to_string(), "backend".to_string()])
+            Some(&vec![
+                serde_json::Value::String("urgent".to_string()),
+                serde_json::Value::String("backend".to_string())
+            ])
         );
     }
 
@@ -259,7 +262,7 @@ mod labels_output_tests {
         assert_eq!(parsed.get("id").and_then(|v| v.as_str()), Some("bf-single"));
         assert_eq!(
             parsed.get("labels").and_then(|v| v.as_array()),
-            Some(&vec!["priority".to_string()])
+            Some(&vec![serde_json::Value::String("priority".to_string())])
         );
     }
 
@@ -275,7 +278,10 @@ mod labels_output_tests {
         assert_eq!(parsed.get("id").and_then(|v| v.as_str()), Some("bf-from-issue"));
         assert_eq!(
             parsed.get("labels").and_then(|v| v.as_array()),
-            Some(&vec!["phase-1".to_string(), "model".to_string()])
+            Some(&vec![
+                serde_json::Value::String("phase-1".to_string()),
+                serde_json::Value::String("model".to_string())
+            ])
         );
     }
 
@@ -414,7 +420,7 @@ mod labels_output_tests {
         assert_eq!(labels.len(), 50);
 
         for (i, label) in labels.iter().enumerate() {
-            assert_eq!(label.as_str(), Some(&many_labels[i]));
+            assert_eq!(label.as_str(), Some(many_labels[i].as_str()));
         }
     }
 

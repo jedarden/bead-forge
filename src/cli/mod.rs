@@ -1827,8 +1827,13 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             }
             println!("Created at: {}", issue.created_at.format("%Y-%m-%d %H:%M:%S UTC"));
             println!("Updated at: {}", issue.updated_at.format("%Y-%m-%d %H:%M:%S UTC"));
-            if let Some(reason) = &issue.close_reason {
-                println!("Close reason: {}", reason);
+            if issue.status == crate::model::Status::Closed {
+                if let Some(closed_at) = &issue.closed_at {
+                    println!("Closed at: {}", closed_at.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
+                if let Some(reason) = &issue.close_reason {
+                    println!("Close reason: {}", reason);
+                }
             }
             if !issue.labels.is_empty() {
                 println!("Labels: {}", issue.labels.join(", "));
@@ -1839,12 +1844,19 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
                     println!("  {}: {}", key, value);
                 }
             }
-            // Use formatted dependencies with titles
+            // Display dependencies with proper formatting
             if !dependencies_display.is_empty() {
                 println!("Blocked by:");
-                let formatted = crate::format::format_dependencies_display(&dependencies_display[..]);
-                for line in formatted.lines() {
-                    println!("  {}", line);
+                for dep in &dependencies_display {
+                    let is_blocking = matches!(
+                        dep.dep_type.as_str(),
+                        "blocks" | "parent-child" | "conditional-blocks" | "waits-for"
+                    );
+                    if is_blocking {
+                        println!("  {} ({}) (blocks)", dep.bead_id, dep.title);
+                    } else {
+                        println!("  {} ({})", dep.bead_id, dep.title);
+                    }
                 }
             }
         }
@@ -1852,8 +1864,13 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             // Use the text formatter for consistency
             let formatter = get_formatter(OutputFormat::Text);
             println!("{}", formatter.format_issue(&issue));
-            if let Some(reason) = &issue.close_reason {
-                println!("Close reason: {}", reason);
+            if issue.status == crate::model::Status::Closed {
+                if let Some(closed_at) = &issue.closed_at {
+                    println!("Closed at: {}", closed_at.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
+                if let Some(reason) = &issue.close_reason {
+                    println!("Close reason: {}", reason);
+                }
             }
             if !issue.annotations.is_empty() {
                 println!("Annotations:");

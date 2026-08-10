@@ -665,6 +665,38 @@ impl Issue {
         format!("{:x}", hash)
     }
 
+    /// Extract status transitions from the issue's event history.
+    ///
+    /// Returns a vector of status transitions sorted chronologically, including
+    /// all status-related events (StatusChanged, Closed, Reopened). Each transition
+    /// includes the timestamp, old status, new status, and actor who performed the change.
+    #[must_use]
+    pub fn status_transitions(&self) -> Vec<StatusTransition> {
+        self.events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.event_type,
+                    EventType::StatusChanged | EventType::Closed | EventType::Reopened
+                )
+            })
+            .map(|event| {
+                let new_status = match &event.event_type {
+                    EventType::Closed => "closed".to_string(),
+                    EventType::Reopened => "open".to_string(),
+                    _ => event.new_value.clone().unwrap_or_else(|| "unknown".to_string()),
+                };
+
+                StatusTransition {
+                    timestamp: event.created_at,
+                    old_status: event.old_value.clone(),
+                    new_status,
+                    actor: event.actor.clone(),
+                }
+            })
+            .collect()
+    }
+
     /// Compare two issues using sync semantics instead of raw struct equality.
     ///
     /// This ignores derived or volatile audit fields that would otherwise make
@@ -930,6 +962,19 @@ pub struct Comment {
     #[serde(rename = "text")]
     pub body: String,
     pub created_at: DateTime<Utc>,
+}
+
+/// A status transition extracted from event history.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StatusTransition {
+    /// Timestamp when the status transition occurred
+    pub timestamp: DateTime<Utc>,
+    /// Previous status value
+    pub old_status: Option<String>,
+    /// New status value
+    pub new_status: String,
+    /// Actor who performed the transition
+    pub actor: String,
 }
 
 /// An event in the issue's history (audit log).
@@ -2118,5 +2163,110 @@ mod tests {
         let custom_type = IssueType::Custom("spike".to_string());
         assert!(!custom_type.is_standard(),
                 "Custom issue type should not be recognized as standard");
+    }
+
+    #[test]
+    fn test_status_transitions_from_events() {
+        use chrono::TimeZone;
+        let mut issue = Issue {
+            id: "bf-test".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+
+        // Add status change events
+        issue.events.push(Event {
+            id: 1,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::StatusChanged,
+            actor: "alice".to_string(),
+            old_value: Some("open".to_string()),
+            new_value: Some("in_progress".to_string()),
+            comment: None,
+            created_at: Utc.timestamp_opt(1_700_000_100, 0).unwrap(),
+        });
+
+        issue.events.push(Event {
+            id: 2,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::Closed,
+            actor: "bob".to_string(),
+            old_value: Some("in_progress".to_string()),
+            new_value: None,
+            comment: None,
+            created_at: Utc.timestamp_opt(1_700_000_200, 0).unwrap(),
+        });
+
+        // Add non-status event (should be filtered)
+        issue.events.push(Event {
+            id: 3,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::Commented,
+            actor: "charlie".to_string(),
+            old_value: None,
+            new_value: None,
+            comment: Some("A comment".to_string()),
+            created_at: Utc.timestamp_opt(1_700_000_300, 0).unwrap(),
+        });
+
+        let transitions = issue.status_transitions();
+
+        assert_eq!(transitions.len(), 2, "should extract 2 status transitions");
+
+        // Check first transition
+        assert_eq!(transitions[0].old_status.as_deref(), Some("open"));
+        assert_eq!(transitions[0].new_status, "in_progress");
+        assert_eq!(transitions[0].actor, "alice");
+        assert_eq!(transitions[0].timestamp, Utc.timestamp_opt(1_700_000_100, 0).unwrap());
+
+        // Check second transition (Closed event)
+        assert_eq!(transitions[1].old_status.as_deref(), Some("in_progress"));
+        assert_eq!(transitions[1].new_status, "closed");
+        assert_eq!(transitions[1].actor, "bob");
+        assert_eq!(transitions[1].timestamp, Utc.timestamp_opt(1_700_000_200, 0).unwrap());
+    }
+
+    #[test]
+    fn test_status_transitions_empty_when_no_events() {
+        let issue = Issue {
+            id: "bf-test".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+
+        let transitions = issue.status_transitions();
+        assert!(transitions.is_empty(), "should have no transitions when no events exist");
+    }
+
+    #[test]
+    fn test_status_transitions_reopened_formatting() {
+        use chrono::TimeZone;
+        let mut issue = Issue {
+            id: "bf-test".to_string(),
+            title: "Test".to_string(),
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+            ..Default::default()
+        };
+
+        issue.events.push(Event {
+            id: 1,
+            issue_id: "bf-test".to_string(),
+            event_type: EventType::Reopened,
+            actor: "user".to_string(),
+            old_value: Some("closed".to_string()),
+            new_value: None,
+            comment: None,
+            created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
+        });
+
+        let transitions = issue.status_transitions();
+        assert_eq!(transitions.len(), 1);
+        assert_eq!(transitions[0].old_status.as_deref(), Some("closed"));
+        assert_eq!(transitions[0].new_status, "open", "Reopened events should format new_status as 'open'");
     }
 }

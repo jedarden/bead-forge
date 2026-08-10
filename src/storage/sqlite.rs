@@ -338,6 +338,79 @@ impl Storage {
         Ok(issues)
     }
 
+    /// Get beads that are ready to be claimed (open, unblocked beads).
+    ///
+    /// Returns beads that:
+    /// - Have status='open'
+    /// - Are not ephemeral, pinned, template, or deleted
+    /// - Have no unclosed blocking dependencies
+    /// - Are sorted by priority (ASC) and created_at (ASC)
+    pub fn get_ready_candidates(&self) -> Result<Vec<Issue>> {
+        let conn = self.conn.lock().unwrap();
+
+        // Query for open, unblocked beads
+        // A bead is blocked if there EXISTS a dependency of blocking type
+        // where the blocker is NOT in a terminal state
+        let query = r#"
+            SELECT i.id, i.content_hash, i.title, i.description, i.design, i.acceptance_criteria, i.notes,
+                   i.status, i.priority, i.issue_type, i.assignee, i.owner, i.estimated_minutes,
+                   i.created_at, i.created_by, i.updated_at, i.closed_at, i.close_reason,
+                   i.closed_by_session, i.due_at, i.defer_until, i.external_ref, i.source_system,
+                   i.source_repo, i.deleted_at, i.deleted_by, i.delete_reason, i.original_type,
+                   i.compaction_level, i.compacted_at, i.compacted_at_commit, i.original_size,
+                   i.sender, i.ephemeral, i.pinned, i.is_template,
+                   GROUP_CONCAT(bl.label) AS labels
+            FROM issues i
+            LEFT JOIN bead_labels bl ON i.id = bl.bead_id
+            WHERE i.status = 'open'
+              AND i.ephemeral = 0
+              AND i.pinned = 0
+              AND i.is_template = 0
+              AND i.deleted_at IS NULL
+              AND NOT EXISTS (
+                  -- Exclude beads with unclosed blocking dependencies
+                  SELECT 1
+                  FROM dependencies d
+                  INNER JOIN issues blocker ON blocker.id = d.depends_on_id
+                  WHERE d.issue_id = i.id
+                    AND d.type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')
+                    AND blocker.status NOT IN ('closed', 'tombstone', 'done', 'completed')
+              )
+            GROUP BY i.id
+            ORDER BY i.priority ASC, i.created_at ASC
+        "#;
+
+        let mut stmt = conn.prepare_cached(query)?;
+        let mut rows = stmt.query([])?;
+
+        // Collect all issue data first (without deps/comments/annotations)
+        let mut issues_data: Vec<(String, Issue)> = Vec::new();
+        while let Some(row) = rows.next()? {
+            let id: String = row.get(0)?;
+            let issue = Self::row_to_issue_partial(row)?;
+            issues_data.push((id, issue));
+        }
+
+        // Collect all IDs for batch loading
+        let issue_ids: Vec<&String> = issues_data.iter().map(|(id, _)| id).collect();
+
+        // Batch load all dependencies, comments, and annotations
+        let all_dependencies = Self::batch_load_dependencies(&conn, &issue_ids)?;
+        let all_comments = Self::batch_load_comments(&conn, &issue_ids)?;
+        let all_annotations = Self::batch_load_annotations(&conn, &issue_ids)?;
+
+        // Combine into final Issue structs
+        let mut issues = Vec::new();
+        for (id, mut issue) in issues_data {
+            issue.dependencies = all_dependencies.get(&id).cloned().unwrap_or_default();
+            issue.comments = all_comments.get(&id).cloned().unwrap_or_default();
+            issue.annotations = all_annotations.get(&id).cloned().unwrap_or_default();
+            issues.push(issue);
+        }
+
+        Ok(issues)
+    }
+
     pub fn list_all_issues(&self) -> Result<Vec<Issue>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
@@ -3181,6 +3254,697 @@ mod tests {
         assert_eq!(assignee_event.old_value.as_deref(), Some("alice"));
         assert_eq!(assignee_event.new_value, None);
         assert_eq!(assignee_event.actor, "test-actor");
+    }
+
+    #[test]
+    fn test_create_and_get_issue() {
+        // Test basic CRUD: create an issue and retrieve it
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let mut issue = Issue::new("bf-crud-1".to_string(), "Test CRUD operations".to_string(), ".".to_string());
+        issue.description = Some("Test description".to_string());
+        issue.status = Status::Open;
+        issue.priority = Priority::HIGH;
+        issue.issue_type = IssueType::Bug;
+        issue.assignee = Some("alice".to_string());
+        issue.estimated_minutes = Some(120);
+
+        storage.create_issue(&issue).unwrap();
+
+        // Retrieve and verify
+        let retrieved = storage.get_issue("bf-crud-1").unwrap();
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+
+        assert_eq!(retrieved.id, "bf-crud-1");
+        assert_eq!(retrieved.title, "Test CRUD operations");
+        assert_eq!(retrieved.description.as_deref(), Some("Test description"));
+        assert_eq!(retrieved.status, Status::Open);
+        assert_eq!(retrieved.priority, Priority::HIGH);
+        assert_eq!(retrieved.issue_type, IssueType::Bug);
+        assert_eq!(retrieved.assignee.as_deref(), Some("alice"));
+        assert_eq!(retrieved.estimated_minutes, Some(120));
+    }
+
+    #[test]
+    fn test_get_nonexistent_issue_returns_none() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        let result = storage.get_issue("bf-does-not-exist");
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[test]
+    fn test_update_issue_fields() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create initial issue
+        let mut issue = Issue::new("bf-update-1".to_string(), "Original title".to_string(), ".".to_string());
+        issue.status = Status::Open;
+        issue.priority = Priority::MEDIUM;
+        storage.create_issue(&issue).unwrap();
+
+        // Update multiple fields
+        let mut changes = IssueChanges::default();
+        changes.title = Some("Updated title".to_string());
+        changes.description = Some("Updated description".to_string());
+        changes.priority = Some(Priority::CRITICAL.0);
+        changes.assignee = Some("bob".to_string());
+        changes.actor = Some("test-actor".to_string());
+
+        storage.update_issue("bf-update-1", &changes).unwrap();
+
+        // Verify updates
+        let retrieved = storage.get_issue("bf-update-1").unwrap().unwrap();
+        assert_eq!(retrieved.title, "Updated title");
+        assert_eq!(retrieved.description.as_deref(), Some("Updated description"));
+        assert_eq!(retrieved.priority, Priority::CRITICAL);
+        assert_eq!(retrieved.assignee.as_deref(), Some("bob"));
+    }
+
+    #[test]
+    fn test_list_issues_with_filters() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test issues with different properties
+        let mut issue1 = Issue::new("bf-list-1".to_string(), "Issue 1".to_string(), ".".to_string());
+        issue1.status = Status::Open;
+        issue1.priority = Priority::HIGH;
+        issue1.assignee = Some("alice".to_string());
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-list-2".to_string(), "Issue 2".to_string(), ".".to_string());
+        issue2.status = Status::InProgress;
+        issue2.priority = Priority::MEDIUM;
+        issue2.assignee = Some("bob".to_string());
+        storage.create_issue(&issue2).unwrap();
+
+        // Test filter by status
+        let mut filter = IssueFilter::default();
+        filter.status = Some(Status::Open);
+        let results = storage.list_issues(&filter).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "bf-list-1");
+
+        // Test filter by assignee
+        let mut filter = IssueFilter::default();
+        filter.assignee = Some("alice".to_string());
+        let results = storage.list_issues(&filter).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "bf-list-1");
+    }
+
+    #[test]
+    fn test_close_and_reopen_issue() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an open issue
+        let mut issue = Issue::new("bf-close-1".to_string(), "Test close/reopen".to_string(), ".".to_string());
+        issue.status = Status::Open;
+        issue.assignee = Some("alice".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Close the issue
+        storage.close_issue("bf-close-1", "Completed successfully", "test-actor").unwrap();
+
+        // Verify closed state
+        let closed = storage.get_issue("bf-close-1").unwrap().unwrap();
+        assert_eq!(closed.status, Status::Closed);
+        assert_eq!(closed.close_reason.as_deref(), Some("Completed successfully"));
+        assert_eq!(closed.closed_by_session.as_deref(), Some("test-actor"));
+        assert!(closed.closed_at.is_some());
+        assert_eq!(closed.assignee, None); // assignee cleared on close
+
+        // Reopen the issue
+        storage.reopen_issue("bf-close-1").unwrap();
+
+        // Verify reopened state
+        let reopened = storage.get_issue("bf-close-1").unwrap().unwrap();
+        assert_eq!(reopened.status, Status::Open);
+        assert!(reopened.closed_at.is_none());
+        assert_eq!(reopened.assignee, None); // assignee stays NULL after reopen
+    }
+
+    #[test]
+    fn test_add_and_remove_dependencies() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create two issues
+        let mut issue1 = Issue::new("bf-dep-1".to_string(), "Issue with dependency".to_string(), ".".to_string());
+        issue1.status = Status::Open;
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-dep-2".to_string(), "Dependency issue".to_string(), ".".to_string());
+        issue2.status = Status::Open;
+        storage.create_issue(&issue2).unwrap();
+
+        // Add dependency
+        storage.add_dependency("bf-dep-1", "bf-dep-2", &DependencyType::Blocks, "test-actor").unwrap();
+
+        // Verify dependency was added
+        let deps = storage.get_dependencies("bf-dep-1").unwrap();
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].depends_on_id, "bf-dep-2");
+        assert_eq!(deps[0].dep_type, DependencyType::Blocks);
+
+        // Verify dependent was blocked (since blocker is open)
+        let dependent = storage.get_issue("bf-dep-1").unwrap().unwrap();
+        assert_eq!(dependent.status, Status::Blocked);
+
+        // Remove dependency
+        storage.remove_dependency("bf-dep-1", "bf-dep-2").unwrap();
+
+        // Verify dependency was removed
+        let deps = storage.get_dependencies("bf-dep-1").unwrap();
+        assert_eq!(deps.len(), 0);
+    }
+
+    #[test]
+    fn test_add_and_remove_label() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let mut issue = Issue::new("bf-label-1".to_string(), "Test labels".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Add label
+        storage.add_label("bf-label-1", "urgent").unwrap();
+
+        // Verify label was added
+        let labels = storage.get_labels("bf-label-1").unwrap();
+        assert_eq!(labels.len(), 1);
+        assert!(labels.contains(&"urgent".to_string()));
+
+        // Add another label
+        storage.add_label("bf-label-1", "backend").unwrap();
+
+        let labels = storage.get_labels("bf-label-1").unwrap();
+        assert_eq!(labels.len(), 2);
+
+        // Remove label
+        storage.remove_label("bf-label-1", "urgent").unwrap();
+
+        // Verify label was removed
+        let labels = storage.get_labels("bf-label-1").unwrap();
+        assert_eq!(labels.len(), 1);
+        assert!(!labels.contains(&"urgent".to_string()));
+    }
+
+    #[test]
+    fn test_add_comment() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let mut issue = Issue::new("bf-comment-1".to_string(), "Test comments".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Add comment
+        let comment_id = storage.add_comment("bf-comment-1", "alice", "This is a test comment").unwrap();
+        assert!(comment_id > 0);
+
+        // Verify comment was added
+        let comments = storage.list_comments("bf-comment-1").unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].author, "alice");
+        assert_eq!(comments[0].body, "This is a test comment");
+    }
+
+    #[test]
+    fn test_search_issues() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test issues
+        let mut issue1 = Issue::new("bf-search-1".to_string(), "Fix authentication bug".to_string(), ".".to_string());
+        issue1.status = Status::Open;
+        issue1.priority = Priority::HIGH;
+        issue1.labels = vec!["bug".to_string(), "auth".to_string()];
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-search-2".to_string(), "Add new feature".to_string(), ".".to_string());
+        issue2.status = Status::InProgress;
+        issue2.priority = Priority::MEDIUM;
+        issue2.labels = vec!["feature".to_string()];
+        storage.create_issue(&issue2).unwrap();
+
+        // Search by query
+        let results = storage.search_issues(
+            Some("authentication"),
+            &[],
+            &[],
+            None,
+            &[],
+            None,
+            None,
+            10
+        ).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].title.contains("authentication"));
+
+        // Search by priority range
+        let results = storage.search_issues(
+            None,
+            &[],
+            &[],
+            None,
+            &[],
+            Some(0),  // min priority
+            Some(1),  // max priority
+            10
+        ).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].priority, Priority::HIGH);
+    }
+
+    #[test]
+    fn test_get_stats() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test issues with different statuses
+        let mut issue1 = Issue::new("bf-stats-1".to_string(), "Open issue".to_string(), ".".to_string());
+        issue1.status = Status::Open;
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-stats-2".to_string(), "In progress issue".to_string(), ".".to_string());
+        issue2.status = Status::InProgress;
+        storage.create_issue(&issue2).unwrap();
+
+        let mut issue3 = Issue::new("bf-stats-3".to_string(), "Closed issue".to_string(), ".".to_string());
+        issue3.status = Status::Closed;
+        storage.create_issue(&issue3).unwrap();
+
+        // Get stats
+        let stats = storage.get_stats().unwrap();
+        assert_eq!(stats.total, 3);
+        assert_eq!(stats.open, 1);
+        assert_eq!(stats.in_progress, 1);
+        assert_eq!(stats.closed, 1);
+    }
+
+    #[test]
+    fn test_count_issues() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Initially empty
+        assert_eq!(storage.count_issues().unwrap(), 0);
+
+        // Add some issues
+        let issue1 = Issue::new("bf-count-1".to_string(), "Issue 1".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+
+        let issue2 = Issue::new("bf-count-2".to_string(), "Issue 2".to_string(), ".".to_string());
+        storage.create_issue(&issue2).unwrap();
+
+        assert_eq!(storage.count_issues().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_mark_dirty_and_clear_dirty() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let issue = Issue::new("bf-dirty-1".to_string(), "Test dirty tracking".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Mark as dirty
+        storage.mark_dirty("bf-dirty-1").unwrap();
+
+        // Check it's in dirty list
+        let dirty_issues = storage.query_dirty_issues().unwrap();
+        assert_eq!(dirty_issues.len(), 1);
+        assert!(dirty_issues.contains(&"bf-dirty-1".to_string()));
+
+        // Clear dirty list
+        storage.clear_dirty().unwrap();
+
+        // Verify it's cleared
+        let dirty_issues = storage.query_dirty_issues().unwrap();
+        assert_eq!(dirty_issues.len(), 0);
+    }
+
+    #[test]
+    fn test_set_and_get_annotations() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let issue = Issue::new("bf-annot-1".to_string(), "Test annotations".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Set annotation
+        storage.set_annotation("bf-annot-1", "key1", "value1").unwrap();
+
+        // Get annotations
+        let annotations = storage.get_annotations("bf-annot-1").unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations.get("key1"), Some(&"value1".to_string()));
+
+        // Update annotation
+        storage.set_annotation("bf-annot-1", "key1", "updated_value1").unwrap();
+
+        let annotations = storage.get_annotations("bf-annot-1").unwrap();
+        assert_eq!(annotations.get("key1"), Some(&"updated_value1".to_string()));
+
+        // Add another annotation
+        storage.set_annotation("bf-annot-1", "key2", "value2").unwrap();
+
+        let annotations = storage.get_annotations("bf-annot-1").unwrap();
+        assert_eq!(annotations.len(), 2);
+
+        // Remove annotation
+        storage.remove_annotation("bf-annot-1", "key1").unwrap();
+
+        let annotations = storage.get_annotations("bf-annot-1").unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert!(!annotations.contains_key("key1"));
+
+        // Clear all annotations
+        storage.clear_annotations("bf-annot-1").unwrap();
+
+        let annotations = storage.get_annotations("bf-annot-1").unwrap();
+        assert_eq!(annotations.len(), 0);
+    }
+
+    #[test]
+    fn test_list_all_issues() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create multiple issues
+        let issue1 = Issue::new("bf-all-1".to_string(), "Issue 1".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+
+        let issue2 = Issue::new("bf-all-2".to_string(), "Issue 2".to_string(), ".".to_string());
+        storage.create_issue(&issue2).unwrap();
+
+        // List all issues
+        let all_issues = storage.list_all_issues().unwrap();
+        assert_eq!(all_issues.len(), 2);
+    }
+
+    #[test]
+    fn test_issue_update_with_annotations() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let issue = Issue::new("bf-annot-update".to_string(), "Test annotation updates".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Update with annotations
+        let mut changes = IssueChanges::default();
+        let mut annotations = std::collections::BTreeMap::new();
+        annotations.insert("key1".to_string(), "value1".to_string());
+        annotations.insert("key2".to_string(), "value2".to_string());
+        changes.annotations = Some(annotations);
+        changes.actor = Some("test-actor".to_string());
+
+        storage.update_issue("bf-annot-update", &changes).unwrap();
+
+        // Verify annotations were set
+        let retrieved = storage.get_issue("bf-annot-update").unwrap().unwrap();
+        assert_eq!(retrieved.annotations.len(), 2);
+        assert_eq!(retrieved.annotations.get("key1"), Some(&"value1".to_string()));
+        assert_eq!(retrieved.annotations.get("key2"), Some(&"value2".to_string()));
+    }
+
+    #[test]
+    fn test_update_status_creates_event() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let mut issue = Issue::new("bf-status-event".to_string(), "Test status events".to_string(), ".".to_string());
+        issue.status = Status::Open;
+        storage.create_issue(&issue).unwrap();
+
+        // Get initial event count
+        let initial_events = storage.list_events("bf-status-event").unwrap();
+        let initial_count = initial_events.len();
+
+        // Update status
+        let mut changes = IssueChanges::default();
+        changes.status = Some(Status::InProgress);
+        changes.actor = Some("test-actor".to_string());
+        storage.update_issue("bf-status-event", &changes).unwrap();
+
+        // Verify new event was created (status_changed event)
+        let final_events = storage.list_events("bf-status-event").unwrap();
+        assert_eq!(final_events.len(), initial_count + 1);
+    }
+
+    #[test]
+    fn test_with_immediate_transaction_retry_logic() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Test that the transaction helper works correctly
+        let result = storage.with_immediate_transaction(|tx| {
+            // Create an issue within the transaction
+            let issue = Issue::new("bf-tx-1".to_string(), "Transaction test".to_string(), ".".to_string());
+            Storage::create_issue_tx(tx, &issue)?;
+            Ok::<(), BeadForgeError>(())
+        });
+
+        assert!(result.is_ok());
+
+        // Verify the issue was created
+        let retrieved = storage.get_issue("bf-tx-1").unwrap();
+        assert!(retrieved.is_some());
+    }
+
+    #[test]
+    fn test_rebuild_blocked_cache() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create issues with blocking dependencies
+        let mut issue1 = Issue::new("bf-block-1".to_string(), "Blocker issue".to_string(), ".".to_string());
+        issue1.status = Status::Open;
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-block-2".to_string(), "Blocked issue".to_string(), ".".to_string());
+        issue2.status = Status::Open;
+        storage.create_issue(&issue2).unwrap();
+
+        // Add blocking dependency
+        storage.add_dependency("bf-block-2", "bf-block-1", &DependencyType::Blocks, "test-actor").unwrap();
+
+        // Rebuild cache
+        storage.rebuild_blocked_cache().unwrap();
+
+        // Get blocked issues
+        let blocked = storage.get_blocked_issues().unwrap();
+        assert!(!blocked.is_empty());
+
+        // Find our blocked issue
+        let blocked_pair = blocked.iter().find(|(id, _)| id == "bf-block-2");
+        assert!(blocked_pair.is_some());
+    }
+
+    #[test]
+    fn test_get_dependencies_display() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create two issues
+        let mut issue1 = Issue::new("bf-dep-disp-1".to_string(), "Parent issue".to_string(), ".".to_string());
+        issue1.status = Status::Open;
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-dep-disp-2".to_string(), "Dependency issue".to_string(), ".".to_string());
+        issue2.status = Status::Open;
+        storage.create_issue(&issue2).unwrap();
+
+        // Add dependency
+        storage.add_dependency("bf-dep-disp-1", "bf-dep-disp-2", &DependencyType::Blocks, "test-actor").unwrap();
+
+        // Get dependencies with display info
+        let deps = storage.get_dependencies_display("bf-dep-disp-1").unwrap();
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].bead_id, "bf-dep-disp-2");
+        assert_eq!(deps[0].title, "Dependency issue");
+        assert_eq!(deps[0].dep_type, "blocks");
+    }
+
+    #[test]
+    fn test_list_all_labels() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create issues with different labels
+        let mut issue1 = Issue::new("bf-labels-1".to_string(), "Issue 1".to_string(), ".".to_string());
+        issue1.labels = vec!["backend".to_string(), "urgent".to_string()];
+        storage.create_issue(&issue1).unwrap();
+
+        let mut issue2 = Issue::new("bf-labels-2".to_string(), "Issue 2".to_string(), ".".to_string());
+        issue2.labels = vec!["backend".to_string(), "frontend".to_string()];
+        storage.create_issue(&issue2).unwrap();
+
+        // List all labels with counts
+        let all_labels = storage.list_all_labels().unwrap();
+        assert!(!all_labels.is_empty());
+
+        // Check that backend appears twice
+        let backend_count = all_labels.iter()
+            .find(|(label, _)| label == "backend")
+            .map(|(_, count)| *count);
+        assert_eq!(backend_count, Some(2));
+    }
+
+    #[test]
+    fn test_dependency_prevents_self_blocking() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let mut issue = Issue::new("bf-self-block".to_string(), "Self blocking test".to_string(), ".".to_string());
+        issue.status = Status::Open;
+        storage.create_issue(&issue).unwrap();
+
+        // Try to add self-blocking dependency
+        let result = storage.add_dependency("bf-self-block", "bf-self-block", &DependencyType::Blocks, "test-actor");
+
+        // Should fail
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Cannot add self-blocking dependency"));
+    }
+
+    #[test]
+    fn test_empty_label_validation() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let issue = Issue::new("bf-empty-label".to_string(), "Empty label test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Try to add empty label
+        let result = storage.add_label("bf-empty-label", "");
+        assert!(result.is_err());
+
+        // Try to add whitespace-only label
+        let result = storage.add_label("bf-empty-label", "   ");
+        assert!(result.is_err());
+
+        // Try to remove empty label
+        let result = storage.remove_label("bf-empty-label", "");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_updated_at_timestamp_changes_on_update() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let issue = Issue::new("bf-timestamp-1".to_string(), "Timestamp test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Get initial updated_at
+        let initial = storage.get_issue("bf-timestamp-1").unwrap().unwrap();
+        let initial_updated_at = initial.updated_at;
+
+        // Small delay to ensure timestamp difference
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Update the issue
+        let mut changes = IssueChanges::default();
+        changes.title = Some("Updated title".to_string());
+        storage.update_issue("bf-timestamp-1", &changes).unwrap();
+
+        // Verify updated_at changed
+        let updated = storage.get_issue("bf-timestamp-1").unwrap().unwrap();
+        assert!(updated.updated_at > initial_updated_at);
+    }
+
+    #[test]
+    fn test_content_hash_computation() {
+        // Test that content_hash is computed correctly
+        let mut issue = Issue::new("bf-hash-1".to_string(), "Hash test".to_string(), ".".to_string());
+        issue.description = Some("Test description".to_string());
+        issue.status = Status::Open;
+        issue.priority = Priority::MEDIUM;
+
+        let hash1 = issue.content_hash();
+
+        // Change a field and verify hash changes
+        issue.title = "Different title".to_string();
+        let hash2 = issue.content_hash();
+
+        assert_ne!(hash1, hash2);
+
+        // Verify same content produces same hash
+        let issue2 = issue.clone();
+        let hash3 = issue2.content_hash();
+        assert_eq!(hash2, hash3);
+    }
+
+    #[test]
+    fn test_list_issues_with_updated_since_filter() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create an issue
+        let issue1 = Issue::new("bf-since-1".to_string(), "Issue 1".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+
+        // Get its creation time
+        let created = storage.get_issue("bf-since-1").unwrap().unwrap().created_at;
+
+        // Small delay
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Create another issue
+        let issue2 = Issue::new("bf-since-2".to_string(), "Issue 2".to_string(), ".".to_string());
+        storage.create_issue(&issue2).unwrap();
+
+        // Filter by updated_since - should only return the second issue
+        let mut filter = IssueFilter::default();
+        filter.updated_since = Some(created);
+        let results = storage.list_issues(&filter).unwrap();
+
+        assert!(results.len() >= 1);
+        assert!(!results.iter().any(|i| i.id == "bf-since-1"));
+    }
+
+    #[test]
+    fn test_list_issues_with_limit_and_offset() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create multiple issues
+        for i in 1..=5 {
+            let issue = Issue::new(format!("bf-limit-{}", i), format!("Issue {}", i), ".".to_string());
+            storage.create_issue(&issue).unwrap();
+        }
+
+        // Test limit
+        let mut filter = IssueFilter::default();
+        filter.limit = Some(2);
+        let results = storage.list_issues(&filter).unwrap();
+        assert_eq!(results.len(), 2);
+
+        // Test offset
+        let mut filter = IssueFilter::default();
+        filter.limit = Some(2);
+        filter.offset = Some(2);
+        let results = storage.list_issues(&filter).unwrap();
+        assert_eq!(results.len(), 2);
     }
 }
 
