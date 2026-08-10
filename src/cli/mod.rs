@@ -12,6 +12,7 @@ use crate::reopen::reopen_bead;
 use crate::robot_docs::RobotDocs;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
+use crate::update;
 use crate::validation::{normalize_assignee, validate_priority};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
@@ -188,12 +189,8 @@ pub enum Commands {
 
     /// Update a bead
     ///
-    /// Changes only the fields you pass. `--description` and
-    /// `--acceptance-criteria` edit those fields directly (closing the old
-    /// "add a comment instead" gap). For long/multiline descriptions pass
-    /// `--description-file <path>` instead — it reads the file's contents and
-    /// sets the description, and conflicts with `--description`.
-    /// --due-at expects an RFC3339 timestamp (e.g. 2025-01-01T00:00:00Z).
+    /// Updates a single field on a bead. Exactly one of --title, --status,
+    /// or --priority must be provided. All other fields are preserved unchanged.
     Update {
         /// Bead ID
         id: String,
@@ -209,43 +206,6 @@ pub enum Commands {
         /// New priority
         #[arg(long)]
         priority: Option<i32>,
-
-        /// New assignee
-        #[arg(long)]
-        assignee: Option<String>,
-
-        /// Clear the assignee (set to unassigned). Equivalent to --assignee ""
-        /// but more discoverable; useful for freeing an open bead that still
-        /// carries a stale assignee from a dead worker. Conflicts with
-        /// --assignee.
-        #[arg(long, conflicts_with = "assignee")]
-        clear_assignee: bool,
-
-        /// New description
-        #[arg(long)]
-        description: Option<String>,
-
-        /// Read the new description from a file. Useful for long or multiline
-        /// bodies that are awkward to pass on the shell. Conflicts with
-        /// --description (which wins for short inline text).
-        #[arg(long, conflicts_with = "description")]
-        description_file: Option<PathBuf>,
-
-        /// New acceptance criteria
-        #[arg(long)]
-        acceptance_criteria: Option<String>,
-
-        /// New notes
-        #[arg(long)]
-        notes: Option<String>,
-
-        /// New design
-        #[arg(long)]
-        design: Option<String>,
-
-        /// New due date (RFC3339 format, e.g., 2025-01-01T00:00:00Z)
-        #[arg(long)]
-        due_at: Option<String>,
 
         /// Output JSON
         #[arg(long)]
@@ -1284,53 +1244,16 @@ pub fn run(cli: Cli) -> Result<()> {
             title,
             status,
             priority,
-            assignee,
-            clear_assignee,
-            description,
-            description_file,
-            acceptance_criteria,
-            notes,
-            design,
-            due_at,
             json,
-        } => {
-            // --clear-assignee is sugar for --assignee "": both flow the
-            // empty-string "clear to NULL" signal into update_issue. clap
-            // guarantees the two flags are mutually exclusive.
-            let assignee = if clear_assignee {
-                Some(String::new())
-            } else {
-                assignee
-            };
-            // --description-file resolves into `description` here (the REAL
-            // update path — cmd_update -> update_issue writes the column).
-            // clap's conflicts_with("description") guarantees only one is set.
-            let description = match description_file {
-                Some(path) => Some(std::fs::read_to_string(&path).map_err(|e| {
-                    anyhow!(
-                        "Failed to read --description-file {}: {}",
-                        path.display(),
-                        e
-                    )
-                })?),
-                None => description,
-            };
-            cmd_update(
-                &beads_dir,
-                &id,
-                title,
-                status,
-                priority,
-                assignee,
-                description,
-                acceptance_criteria,
-                notes,
-                design,
-                due_at,
-                no_auto_flush,
-                json,
-            )
-        }
+        } => cmd_update(
+            &beads_dir,
+            &id,
+            title,
+            status,
+            priority,
+            no_auto_flush,
+            json,
+        ),
         Commands::Close { id, reason, json } => cmd_close(&beads_dir, &id, &reason, no_auto_flush, json),
         Commands::Reopen { id } => cmd_reopen(&beads_dir, &id, no_auto_flush),
         Commands::Delete { id } => cmd_delete(&beads_dir, &id, no_auto_flush),
@@ -1706,7 +1629,10 @@ fn cmd_create(
         }
     }
     if !created {
-        return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("ID collision retries exhausted").into()).into());
+        return Err(last_err.map_or_else(
+            || anyhow::anyhow!("ID collision retries exhausted"),
+            |e| anyhow::anyhow!(e.to_string()),
+        ));
     }
 
     // Incremental flush of the just-created bead (best effort; never fatal).
@@ -1954,12 +1880,6 @@ fn cmd_update(
     title: Option<String>,
     status: Option<String>,
     priority: Option<i32>,
-    assignee: Option<String>,
-    description: Option<String>,
-    acceptance_criteria: Option<String>,
-    notes: Option<String>,
-    design: Option<String>,
-    due_at: Option<String>,
     no_auto_flush: bool,
     json: bool,
 ) -> Result<()> {
@@ -1968,41 +1888,23 @@ fn cmd_update(
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open_with_config(&db_path, &config)?;
 
-    // Note: an empty/whitespace `--assignee` is intentionally NOT rejected here.
-    // It flows through to update_issue, whose storage layer maps it to
-    // `assignee = NULL` (clearing the assignee). Normalizing to None at this
-    // layer would erase the "clear" intent (None means "leave unchanged").
-
     // Validate priority if provided
     if let Some(p) = priority {
         validate_priority(p).to_result().map_err(|e| anyhow!(e))?;
     }
 
-    // Parse due_at if provided
-    let due_at_parsed = match due_at {
-        Some(date_str) => {
-            let dt = DateTime::parse_from_rfc3339(&date_str).map_err(|_| {
-                anyhow!("Invalid --due-at format. Use RFC3339 format, e.g., 2025-01-01T00:00:00Z")
-            })?;
-            Some(dt.with_timezone(&Utc))
-        }
-        None => None,
-    };
+    // Parse status if provided
+    let status_parsed = status.map(|s| Status::from_str(&s)).transpose().map_err(|e| anyhow!(e))?;
 
-    let changes = IssueChanges {
-        title,
-        status: status.map(|s| Status::from_str(&s).ok()).flatten(),
-        priority,
-        assignee,
-        description,
-        acceptance_criteria,
-        notes,
-        design,
-        due_at: due_at_parsed,
-        ..Default::default()
-    };
+    // Use the update module which enforces single-field semantics
+    crate::update::update(
+        &storage,
+        id,
+        title.as_deref(),
+        status_parsed,
+        priority.map(Priority),
+    )?;
 
-    storage.update_issue(id, &changes)?;
     let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
 
     if json {
