@@ -1994,7 +1994,7 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
 
     // --limit 0 means unlimited (get_ready_candidates omits LIMIT clause when limit == 0)
     let candidates =
-        storage.with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, limit, None, None)?))?;
+        storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None).map_err(|e| e.into()))?;
 
     // Use the common formatter pattern for consistency with other commands
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
@@ -2121,7 +2121,7 @@ fn cmd_claim(
                     if let Ok(local_storage) = Storage::open(&local_db_path) {
                         if let Ok(local_candidates) =
                             local_storage.with_immediate_transaction(|tx| {
-                                Ok(get_ready_candidates(tx, 1, None, None)?)
+                                get_ready_candidates(tx, 1, None, None).map_err(|e| e.into())
                             })
                         {
                             for c in local_candidates {
@@ -2145,7 +2145,7 @@ fn cmd_claim(
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
             let candidates =
-                storage.with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 1, None, None)?))?;
+                storage.with_immediate_transaction(|tx| get_ready_candidates(tx, 1, None, None).map_err(|e| e.into()))?;
             candidates
                 .into_iter()
                 .map(|c| (beads_dir.parent().unwrap_or(beads_dir).to_path_buf(), c))
@@ -2199,7 +2199,8 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            Ok(claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))?)
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
+                .map_err(|e| e.into())
         })?;
 
         match result {
@@ -2247,7 +2248,8 @@ fn cmd_claim(
         let storage = Storage::open(&db_path)?;
 
         let result = storage.with_immediate_transaction(|tx| {
-            Ok(claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))?)
+            claim(tx, assignee, claim_ttl, Utc::now(), Some(&worker_metadata))
+                .map_err(|e| e.into())
         })?;
 
         match result {
