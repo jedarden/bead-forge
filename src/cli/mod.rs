@@ -1743,7 +1743,17 @@ fn cmd_list(
 
     match output_format {
         OutputFormat::Json => {
-            let jsonl = formatter.format_issues(&issues);
+            let jsonl = issues
+                .iter()
+                .map(|issue| {
+                    resolve_dependencies_for_json(
+                        &storage,
+                        issue,
+                        &formatter.format_issue(issue),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
             if envelope {
                 // Wrap in envelope with kind="list"
                 // Convert JSONL to JSON array for envelope wrapping
@@ -1773,6 +1783,48 @@ fn cmd_list(
     Ok(())
 }
 
+/// Resolve an issue's dependency *edges* (issue_id, depends_on_id, type) to
+/// the target bead's own {id, title, status, priority} plus dependency_type,
+/// and splice the result into `json_line`'s "dependencies" field in place of
+/// the raw edge shape. Used by `show`, `list`, `ready`, and `search` JSON
+/// output — NEEDLE's BrDependency struct requires the resolved shape (it
+/// needs the dependency's own status/priority to reason about it without a
+/// second lookup), and the raw edge shape has no `id` field, which is what
+/// broke `bf show`/`bf list`/`bf ready`/`bf search` for any bead carrying
+/// real dependencies once "Remove dependency/comment stripping from JSON
+/// formatter" (261a0e8e) stopped stripping the field.
+fn resolve_dependencies_for_json(storage: &Storage, issue: &Issue, json_line: &str) -> String {
+    let mut value: serde_json::Value = match serde_json::from_str(json_line) {
+        Ok(v) => v,
+        Err(_) => return json_line.to_string(),
+    };
+    if let Some(obj) = value.as_object_mut() {
+        let resolved: Vec<serde_json::Value> = issue
+            .dependencies
+            .iter()
+            .filter_map(|dep| {
+                storage.get_issue(&dep.depends_on_id).ok().flatten().map(
+                    |target| {
+                        serde_json::json!({
+                            "id": target.id,
+                            "title": target.title,
+                            "status": target.status,
+                            "priority": target.priority,
+                            "dependency_type": dep.dep_type,
+                        })
+                    },
+                )
+            })
+            .collect();
+        if resolved.is_empty() {
+            obj.remove("dependencies");
+        } else {
+            obj.insert("dependencies".to_string(), serde_json::Value::Array(resolved));
+        }
+    }
+    serde_json::to_string(&value).unwrap_or_else(|_| json_line.to_string())
+}
+
 fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Result<()> {
     let metadata = load_metadata(beads_dir)?;
     let db_path = beads_dir.join(&metadata.database);
@@ -1799,6 +1851,7 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             // The JSON formatter adds status_transitions from the events history
             let formatter = get_formatter(OutputFormat::Json);
             let json_str = formatter.format_issue(&issue);
+            let json_str = resolve_dependencies_for_json(&storage, &issue, &json_str);
             if envelope {
                 // Wrap in envelope with kind="show"
                 println!("{}", formatter.format_with_envelope("show", &json_str));
@@ -1815,6 +1868,15 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             println!("Type: {}", issue.issue_type);
             if let Some(desc) = &issue.description {
                 println!("Description: {}", desc);
+            }
+            if let Some(design) = &issue.design {
+                println!("Design: {}", design);
+            }
+            if let Some(acceptance_criteria) = &issue.acceptance_criteria {
+                println!("Acceptance Criteria: {}", acceptance_criteria);
+            }
+            if let Some(notes) = &issue.notes {
+                println!("Notes: {}", notes);
             }
             if let Some(assignee) = &issue.assignee {
                 println!("Assignee: {}", assignee);
@@ -2026,7 +2088,17 @@ fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) ->
 
     match output_format {
         OutputFormat::Json => {
-            let jsonl = formatter.format_issues(&issues);
+            let jsonl = issues
+                .iter()
+                .map(|issue| {
+                    resolve_dependencies_for_json(
+                        &storage,
+                        issue,
+                        &formatter.format_issue(issue),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
             if envelope {
                 // Wrap in envelope with kind="ready"
                 // Convert JSONL to JSON array for the envelope data field
@@ -3138,7 +3210,17 @@ fn cmd_search(
     let formatter = get_formatter(output_format);
     match output_format {
         OutputFormat::Json => {
-            let jsonl = formatter.format_issues(&issues);
+            let jsonl = issues
+                .iter()
+                .map(|issue| {
+                    resolve_dependencies_for_json(
+                        &storage,
+                        issue,
+                        &formatter.format_issue(issue),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
             // Empty search results produce no output (JSONL: 0 lines)
             if !jsonl.is_empty() {
                 println!("{}", jsonl);
@@ -3871,7 +3953,17 @@ fn cmd_recent(
     let formatter = get_formatter(output_format);
     match output_format {
         OutputFormat::Json => {
-            let json_str = formatter.format_issues(&issues);
+            let json_str = issues
+                .iter()
+                .map(|issue| {
+                    resolve_dependencies_for_json(
+                        &storage,
+                        issue,
+                        &formatter.format_issue(issue),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
             println!("{}", formatter.format_with_envelope("recent", &json_str));
         }
         _ => {
