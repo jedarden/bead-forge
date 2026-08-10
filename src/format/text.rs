@@ -235,7 +235,14 @@ pub fn format_dependencies_display(dependencies: &[crate::storage::sqlite::Depen
     let parts: Vec<String> = dependencies
         .iter()
         .map(|dep| {
-            if dep.dep_type == "blocks" {
+            // Check for all blocking dependency types, not just "blocks"
+            // Blocking types: blocks, parent-child, conditional-blocks, waits-for
+            let is_blocking = matches!(
+                dep.dep_type.as_str(),
+                "blocks" | "parent-child" | "conditional-blocks" | "waits-for"
+            );
+
+            if is_blocking {
                 format!("{} ({}) (blocks)", dep.bead_id, dep.title)
             } else {
                 format!("{} ({})", dep.bead_id, dep.title)
