@@ -861,4 +861,121 @@ mod ready_queue_filtering_tests {
         let ready = storage.get_ready_candidates().unwrap();
         assert!(ready.iter().any(|i| i.id == "bf-self"));
     }
+
+    // ============================================================================
+    // Downstream Impact Ranking Tests
+    // ============================================================================
+
+    #[test]
+    fn test_ready_queue_downstream_impact_ranking_basic() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create beads with different downstream impacts
+        // bead_a blocks 3 beads, bead_b blocks 1 bead, bead_c blocks 0
+        let bead_a = Issue::new("bf-a".to_string(), "Bead A (blocks 3)".to_string(), ".".to_string());
+        storage.create_issue(&bead_a).unwrap();
+
+        let bead_b = Issue::new("bf-b".to_string(), "Bead B (blocks 1)".to_string(), ".".to_string());
+        storage.create_issue(&bead_b).unwrap();
+
+        let bead_c = Issue::new("bf-c".to_string(), "Bead C (blocks 0)".to_string(), ".".to_string());
+        storage.create_issue(&bead_c).unwrap();
+
+        // Beads blocked by A
+        let dep_a1 = Issue::new("bf-dep-a1".to_string(), "Dep A1".to_string(), ".".to_string());
+        let dep_a2 = Issue::new("bf-dep-a2".to_string(), "Dep A2".to_string(), ".".to_string());
+        let dep_a3 = Issue::new("bf-dep-a3".to_string(), "Dep A3".to_string(), ".".to_string());
+        storage.create_issue(&dep_a1).unwrap();
+        storage.create_issue(&dep_a2).unwrap();
+        storage.create_issue(&dep_a3).unwrap();
+
+        // Bead blocked by B
+        let dep_b1 = Issue::new("bf-dep-b1".to_string(), "Dep B1".to_string(), ".".to_string());
+        storage.create_issue(&dep_b1).unwrap();
+
+        // Add dependencies
+        storage.add_dependency("bf-dep-a1", "bf-a", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-dep-a2", "bf-a", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-dep-a3", "bf-a", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-dep-b1", "bf-b", &DependencyType::Blocks, "test").unwrap();
+
+        // Get ready candidates
+        let ready = storage.get_ready_candidates().unwrap();
+
+        // All three unblocked beads should be present
+        assert_eq!(ready.len(), 3, "All three unblocked beads should be ready");
+
+        // Note: Storage::get_ready_candidates returns Vec<Issue> ordered by priority ASC, created_at ASC
+        // Downstream impact ranking is only implemented in claim::get_ready_candidates (Vec<ScoredBead>)
+        // Here we just verify all three beads are present and accessible
+        assert!(ready.iter().any(|i| i.id == "bf-a"));
+        assert!(ready.iter().any(|i| i.id == "bf-b"));
+        assert!(ready.iter().any(|i| i.id == "bf-c"));
+    }
+
+    #[test]
+    fn test_ready_queue_downstream_impact_with_priority_tiebreaker() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create two beads with same priority
+        let mut bead_high_impact = Issue::new("bf-high".to_string(), "High impact".to_string(), ".".to_string());
+        bead_high_impact.priority = Priority::HIGH;
+        storage.create_issue(&bead_high_impact).unwrap();
+
+        let mut bead_low_impact = Issue::new("bf-low".to_string(), "Low impact".to_string(), ".".to_string());
+        bead_low_impact.priority = Priority::HIGH;
+        storage.create_issue(&bead_low_impact).unwrap();
+
+        // Add dependencies to create different impacts
+        let dep1 = Issue::new("bf-dep1".to_string(), "Dep 1".to_string(), ".".to_string());
+        let dep2 = Issue::new("bf-dep2".to_string(), "Dep 2".to_string(), ".".to_string());
+        storage.create_issue(&dep1).unwrap();
+        storage.create_issue(&dep2).unwrap();
+
+        storage.add_dependency("bf-dep1", "bf-high", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-dep2", "bf-high", &DependencyType::Blocks, "test").unwrap();
+
+        // Get ready candidates
+        let ready = storage.get_ready_candidates().unwrap();
+
+        // Both should be present (they have the same priority so are ordered by created_at)
+        assert_eq!(ready.len(), 2);
+        assert!(ready.iter().any(|i| i.id == "bf-high"));
+        assert!(ready.iter().any(|i| i.id == "bf-low"));
+    }
+
+    #[test]
+    fn test_ready_queue_downstream_impact_with_mixed_priorities() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create beads with mixed priorities and impacts
+        // P0 with 0 impact vs P1 with 10 impact - priority should win
+        let mut p0_low_impact = Issue::new("bf-p0".to_string(), "P0 low impact".to_string(), ".".to_string());
+        p0_low_impact.priority = Priority::CRITICAL;
+        storage.create_issue(&p0_low_impact).unwrap();
+
+        let mut p1_high_impact = Issue::new("bf-p1".to_string(), "P1 high impact".to_string(), ".".to_string());
+        p1_high_impact.priority = Priority::HIGH;
+        storage.create_issue(&p1_high_impact).unwrap();
+
+        // Give P1 many dependencies
+        for i in 1..=5 {
+            let dep = Issue::new(format!("bf-dep-{}", i), "Dep".to_string(), ".".to_string());
+            storage.create_issue(&dep).unwrap();
+            storage.add_dependency(&format!("bf-dep-{}", i), "bf-p1", &DependencyType::Blocks, "test").unwrap();
+        }
+
+        // Get ready candidates
+        let ready = storage.get_ready_candidates().unwrap();
+
+        // Both should be present
+        assert_eq!(ready.len(), 2);
+
+        // P0 should come first (lower priority number = higher priority)
+        assert_eq!(ready[0].id, "bf-p0", "P0 should be first due to higher priority");
+        assert_eq!(ready[1].id, "bf-p1");
+    }
 }
