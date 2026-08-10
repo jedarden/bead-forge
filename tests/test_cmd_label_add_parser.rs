@@ -15,6 +15,7 @@
 //! - Missing required label flag (should fail parsing)
 //! - Positional argument order validation
 
+use clap::Parser;
 use bead_forge::cli::{Cli, Commands, LabelCommands};
 
 /// Helper to parse CLI args and extract the Label::Add command with its ID and labels
