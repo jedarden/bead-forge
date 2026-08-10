@@ -3,6 +3,8 @@ use crate::claim::{
     claim, claim_any, find_workspaces, get_ready_candidates, ClaimResult, WorkerMetadata,
 };
 use crate::close::close_bead;
+// Ready command module
+pub mod ready;
 use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
@@ -2062,86 +2064,8 @@ fn cmd_delete(beads_dir: &PathBuf, id: &str, no_auto_flush: bool) -> Result<()> 
 }
 
 fn cmd_ready(beads_dir: &PathBuf, limit: usize, format: &str, envelope: bool) -> Result<()> {
-    let metadata = load_metadata(beads_dir)?;
-    let db_path = beads_dir.join(&metadata.database);
-    let storage = Storage::open(&db_path)?;
-
-    // --limit 0 means unlimited (get_ready_candidates omits LIMIT clause when limit == 0)
-    let candidates =
-        storage.with_immediate_transaction(|tx| get_ready_candidates(tx, limit, None, None).map_err(|e| e.into()))?;
-
-    // Use the common formatter pattern for consistency with other commands
-    let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);
-    let formatter = get_formatter(output_format);
-
-    // Convert each ScoredBead to ReadyCandidate, then to Issue.
-    // This ensures ReadyCandidate structs are converted to Issue before formatting
-    // for all output formats, not just JSON.
-    let issues: Vec<Issue> = candidates
-        .iter()
-        .filter_map(|c| {
-            ReadyCandidate::from_scored_bead(c)
-                .ok()
-                .map(|candidate| candidate.to_issue())
-        })
-        .collect();
-
-    match output_format {
-        OutputFormat::Json => {
-            let jsonl = issues
-                .iter()
-                .map(|issue| {
-                    resolve_dependencies_for_json(
-                        &storage,
-                        issue,
-                        &formatter.format_issue(issue),
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            if envelope {
-                // Wrap in envelope with kind="ready"
-                // Convert JSONL to JSON array for the envelope data field
-                let data = if jsonl.is_empty() {
-                    "[]".to_string()
-                } else {
-                    let objects: Vec<Value> = jsonl
-                        .lines()
-                        .filter_map(|line| serde_json::from_str(line).ok())
-                        .collect();
-                    serde_json::to_string(&objects).unwrap_or_else(|_| "[]".to_string())
-                };
-                println!("{}", formatter.format_with_envelope("ready", &data));
-            } else {
-                // Raw JSONL output; empty ready prints `[]` as a special case
-                if jsonl.is_empty() {
-                    println!("[]");
-                } else {
-                    println!("{}", jsonl);
-                }
-            }
-        }
-        OutputFormat::Toon => {
-            // Use the formatter to ensure consistent output
-            let output = formatter.format_issues(&issues);
-            if output.is_empty() {
-                println!("No ready candidates");
-            } else {
-                print!("{}", output);
-            }
-        }
-        OutputFormat::Text => {
-            // Use the formatter to ensure consistent output
-            let output = formatter.format_issues(&issues);
-            if output.is_empty() {
-                println!("No ready candidates");
-            } else {
-                print!("{}", output);
-            }
-        }
-    }
-
-    Ok(())
+    // Delegate to the ready command module
+    ready::run_ready(beads_dir, limit, format, envelope)
 }
 
 fn cmd_claim(
