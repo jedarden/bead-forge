@@ -281,21 +281,37 @@ pub fn incremental_flush(storage: &crate::storage::sqlite::Storage, path: &Path)
         Ok(issues)
     };
 
-    // Clear dirty marks after successful export
-    let clear_dirty = || -> Result<()> {
-        let conn = storage.conn.lock().unwrap();
-        conn.execute("DELETE FROM dirty_issues", [])?;
-        drop(conn);
-        Ok(())
+    // Listing itself is unrecoverable if it fails (nothing to export), so it
+    // still propagates via `?`; only the write step below degrades to a warning.
+    let issues = list_dirty()?;
+
+    // Export failures degrade to a warning with flushed=0 rather than
+    // propagating: a transient write failure (e.g. destination path
+    // temporarily unwritable) should not crash the caller, and dirty marks
+    // must stay set so the next flush attempt retries these beads.
+    let flushed = match export_jsonl_merge(path, &issues, &[]) {
+        Ok(result) => result.count,
+        Err(e) => {
+            return Ok(FlushResult {
+                flushed: 0,
+                warnings: vec![format!("JSONL export failed: {e}")],
+            });
+        }
     };
 
-    // Use export_jsonl_dirty for the actual export
-    let result = export_jsonl_dirty(path, list_dirty, clear_dirty)?;
+    // The export itself succeeded, so clear dirty marks — but a failure here
+    // must not be reported as an export failure (the beads did flush) and
+    // must not silently look like success either, since the dirty marks
+    // staying set means these beads will be re-exported next time.
+    let mut warnings = Vec::new();
+    {
+        let conn = storage.conn.lock().unwrap();
+        if let Err(e) = conn.execute("DELETE FROM dirty_issues", []) {
+            warnings.push(format!("failed to clear dirty marks: {e}"));
+        }
+    }
 
-    Ok(FlushResult {
-        flushed: result.count,
-        warnings: Vec::new(), // No warnings in current implementation
-    })
+    Ok(FlushResult { flushed, warnings })
 }
 
 #[cfg(test)]
@@ -967,7 +983,7 @@ not json at all
 
         // Simulate an upsert function that fails
         let result = import_jsonl(&path, |_issue| {
-            Err::<UpsertResult, anyhow::Error>(anyhow::anyhow!("Database error"))
+            Err(anyhow::anyhow!("Database error").into())
         });
 
         assert!(
@@ -1745,7 +1761,8 @@ not json at all
         assert_eq!(count, 1, "should have 1 dirty issue");
 
         // Flush
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 1, "should flush 1 bead");
         assert!(result.warnings.is_empty(), "should have no warnings on success");
@@ -1774,7 +1791,8 @@ not json at all
             .unwrap();
 
         // Flush with no dirty issues
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 0, "should flush 0 beads");
         assert!(result.warnings.is_empty(), "should have no warnings");
@@ -1812,7 +1830,8 @@ not json at all
         }
 
         // Flush - only bf-2 should be written
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 1, "should flush only 1 dirty bead");
         assert!(result.warnings.is_empty(), "should have no warnings");
@@ -1850,12 +1869,12 @@ not json at all
 
         // Add labels
         conn.execute(
-            "INSERT INTO labels (issue_id, label) VALUES ('bf-rel', 'phase-1')",
+            "INSERT INTO bead_labels (bead_id, label) VALUES ('bf-rel', 'phase-1')",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO labels (issue_id, label) VALUES ('bf-rel', 'critical')",
+            "INSERT INTO bead_labels (bead_id, label) VALUES ('bf-rel', 'critical')",
             [],
         )
         .unwrap();
@@ -1892,7 +1911,8 @@ not json at all
         .unwrap();
 
         // Flush
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 1, "should flush 1 bead");
         assert!(result.warnings.is_empty(), "should have no warnings");
@@ -1933,7 +1953,8 @@ not json at all
         std::fs::create_dir(&jsonl_path).unwrap();
 
         // Flush should fail gracefully
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 0, "should flush 0 beads on failure");
         assert!(!result.warnings.is_empty(), "should have warnings on failure");
@@ -1991,7 +2012,8 @@ not json at all
         .unwrap();
 
         // Flush - should only replace bf-2 line
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 1, "should flush 1 bead");
         assert!(result.warnings.is_empty(), "should have no warnings");
@@ -2050,7 +2072,8 @@ not json at all
         }
 
         // Flush - should flush 3 beads
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 3, "should flush 3 dirty beads");
         assert!(result.warnings.is_empty(), "should have no warnings");
@@ -2087,11 +2110,21 @@ not json at all
         )
         .unwrap();
 
-        // Manually drop the dirty_issues table to cause DELETE to fail
-        conn.execute("DROP TABLE dirty_issues", []).unwrap();
+        // Block only DELETE against dirty_issues, via a trigger, rather than
+        // dropping the table. incremental_flush reads dirty_issues (to list
+        // what to export) before it clears it — dropping the table breaks
+        // that read too, so the function never reaches the clear step this
+        // test means to exercise. A DELETE-only trigger leaves the read path
+        // intact and fails exactly the step under test.
+        conn.execute_batch(
+            "CREATE TRIGGER block_dirty_delete BEFORE DELETE ON dirty_issues
+             BEGIN SELECT RAISE(ABORT, 'simulated clear_dirty failure'); END;",
+        )
+        .unwrap();
 
         // Flush should succeed export but warn about clear_dirty failure
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 1, "should flush 1 bead");
         assert!(!result.warnings.is_empty(), "should have warnings");
@@ -2120,12 +2153,12 @@ not json at all
         .unwrap();
 
         conn.execute(
-            "INSERT INTO labels (issue_id, label) VALUES ('bf-labels', 'phase-1')",
+            "INSERT INTO bead_labels (bead_id, label) VALUES ('bf-labels', 'phase-1')",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO labels (issue_id, label) VALUES ('bf-labels', 'storage')",
+            "INSERT INTO bead_labels (bead_id, label) VALUES ('bf-labels', 'storage')",
             [],
         )
         .unwrap();
@@ -2137,7 +2170,8 @@ not json at all
         .unwrap();
 
         // Flush
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 1, "should flush 1 bead");
         assert!(result.warnings.is_empty(), "should have no warnings");
@@ -2179,7 +2213,8 @@ not json at all
         .unwrap();
 
         // Flush
-        let result = incremental_flush(&conn, &jsonl_path).unwrap();
+        let storage_for_flush = crate::storage::sqlite::Storage::open(&db_path).unwrap();
+        let result = incremental_flush(&storage_for_flush, &jsonl_path).unwrap();
 
         assert_eq!(result.flushed, 1, "should flush 1 bead");
         assert!(result.warnings.is_empty(), "should have no warnings");
