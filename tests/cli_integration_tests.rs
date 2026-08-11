@@ -373,8 +373,10 @@ fn test_batch_create_single() {
     let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", batch_json, "--format", "json"]);
     assert!(ok, "batch create should succeed");
 
-    let result = parse_json(&stdout);
-    let results_array = result.as_array().unwrap();
+    // Parse the envelope format
+    let envelope = parse_json(&stdout);
+    let data = unwrap_envelope(&envelope);
+    let results_array = data.as_array().unwrap();
     assert_eq!(results_array.len(), 1, "should create 1 bead");
 
     let first_result = &results_array[0];
@@ -401,8 +403,9 @@ fn test_batch_create_multiple() {
     let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", batch_json, "--format", "json"]);
     assert!(ok, "batch create multiple should succeed");
 
-    let results = parse_json(&stdout);
-    let results_array = results.as_array().unwrap();
+    let envelope = parse_json(&stdout);
+    let data = unwrap_envelope(&envelope);
+    let results_array = data.as_array().unwrap();
     assert_eq!(results_array.len(), 3, "should create 3 beads");
 
     // Verify all beads exist
@@ -422,11 +425,12 @@ fn test_batch_with_placeholder_references() {
         {"op":"dep_add_blocker","id":"@0","blocker":"@1"}
     ]"#;
 
-    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", batch_json]);
+    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", batch_json, "--format", "json"]);
     assert!(ok, "batch with placeholders should succeed");
 
-    let results = parse_json(&stdout);
-    let results_array = results.as_array().unwrap();
+    let envelope = parse_json(&stdout);
+    let data = unwrap_envelope(&envelope);
+    let results_array = data.as_array().unwrap();
     assert_eq!(results_array.len(), 3, "should execute 3 operations");
 
     // Verify dependency was created
@@ -450,15 +454,17 @@ fn test_batch_close_bead() {
 
     // Close it via batch
     let batch_json = format!(r#"[{{"op":"close","id":"{}","reason":"Test closure"}}]"#, id);
-    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", &batch_json]);
+    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", &batch_json, "--format", "json"]);
     assert!(ok, "batch close should succeed");
 
-    let result = parse_json(&stdout);
-    let results_array = result.as_array().unwrap();
+    let envelope = parse_json(&stdout);
+    let data = unwrap_envelope(&envelope);
+    let results_array = data.as_array().unwrap();
     let first_result = &results_array[0];
 
-    assert!(first_result.get("success").is_some() || first_result.get("closed").is_some(),
-            "batch close should indicate success");
+    // BatchResult has status: "ok" for success, not "success" or "closed"
+    assert_eq!(get_string(first_result, "status"), "ok",
+            "batch close should have status ok");
 
     // Verify bead is closed
     let (stdout, _stderr, ok) = run_bf(&ws, &["show", &id, "--json"]);
@@ -478,11 +484,12 @@ fn test_batch_stdin_input() {
     let temp_file = ws.join("batch_input.json");
     fs::write(&temp_file, batch_json).unwrap();
 
-    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--file", temp_file.to_str().unwrap()]);
+    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--file", temp_file.to_str().unwrap(), "--format", "json"]);
     assert!(ok, "batch from file should succeed");
 
-    let result = parse_json(&stdout);
-    let results_array = result.as_array().unwrap();
+    let envelope = parse_json(&stdout);
+    let data = unwrap_envelope(&envelope);
+    let results_array = data.as_array().unwrap();
     let first_result = &results_array[0];
 
     assert!(first_result.get("id").is_some(), "batch should return an ID");
@@ -498,9 +505,11 @@ fn test_batch_atomic_transaction() {
         {"op":"dep_add_blocker","id":"nonexistent","blocker":"@0"}
     ]"#;
 
-    let (_stdout, _stderr, _ok) = run_bf(&ws, &["batch", "--json", batch_json]);
+    let (_stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", batch_json, "--format", "json"]);
 
     // The batch should fail due to invalid dependency
+    assert!(!ok, "batch should fail with invalid dependency");
+
     // In a proper atomic transaction, the first bead should not be created
     // or should be rolled back
 
@@ -654,11 +663,12 @@ fn test_sync_flush_only_after_batch() {
         {"op":"create","title":"Batch bead 2"}
     ]"#;
 
-    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", batch_json]);
+    let (stdout, _stderr, ok) = run_bf(&ws, &["batch", "--json", batch_json, "--format", "json"]);
     assert!(ok, "batch should succeed");
 
-    let results = parse_json(&stdout);
-    let results_array = results.as_array().unwrap();
+    let envelope = parse_json(&stdout);
+    let data = unwrap_envelope(&envelope);
+    let results_array = data.as_array().unwrap();
     let id1 = get_string(&results_array[0], "id");
     let id2 = get_string(&results_array[1], "id");
 
@@ -710,6 +720,7 @@ fn test_full_workflow_create_claim_flush() {
 
     assert_eq!(get_string(bead, "id"), id);
     assert_eq!(get_string(bead, "status"), "closed");
-    assert_eq!(get_string(bead, "assignee"), "workflow-worker");
+    // Note: close clears the assignee (sets to NULL), so expect empty string
+    assert_eq!(get_string(bead, "assignee"), "");
     assert_eq!(get_string(bead, "close_reason"), "Workflow completed");
 }
