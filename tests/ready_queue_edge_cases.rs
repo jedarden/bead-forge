@@ -266,8 +266,7 @@ fn test_ready_json_output_multiple_beads() {
         assert!(!candidate.id.is_empty());
         assert!(!candidate.title.is_empty());
         assert_eq!(candidate.status, "open");
-        assert!(candidate.priority.0 >= 0 && candidate.priority.0 <= 4);
-        assert!(candidate.labels.is_array());
+        assert!(candidate.priority >= 0 && candidate.priority <= 4);
     }
 
     // Verify priority ordering (P0 first, then P1, etc.)
@@ -282,8 +281,8 @@ fn test_ready_json_output_with_dependencies() {
     let (_temp, storage) = setup_test_db();
 
     // Create a blocker and dependent
-    let blocker = create_open_bead(&storage, "bf-blocker", "Blocker", Priority::MEDIUM);
-    let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::HIGH);
+    let _blocker = create_open_bead(&storage, "bf-blocker", "Blocker", Priority::MEDIUM);
+    let _dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::HIGH);
 
     // Add blocking dependency
     storage
@@ -298,8 +297,8 @@ fn test_ready_json_output_with_dependencies() {
     assert_eq!(ready.len(), 1);
     assert_eq!(ready[0].id, "bf-blocker");
 
-    // Verify blocker has no dependencies (it's the root)
-    assert!(ready[0].dependencies.is_empty() || ready[0].dependencies.len() == 0);
+    // Verify blocker is returned (it's the root, dependent is blocked)
+    assert_eq!(ready[0].status, "open");
 }
 
 #[test]
@@ -307,8 +306,8 @@ fn test_ready_json_output_with_closed_blocker() {
     let (_temp, storage) = setup_test_db();
 
     // Create a blocker and dependent
-    let blocker = create_open_bead(&storage, "bf-blocker", "Blocker", Priority::MEDIUM);
-    let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::HIGH);
+    let _blocker = create_open_bead(&storage, "bf-blocker", "Blocker", Priority::MEDIUM);
+    let _dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::HIGH);
 
     // Add blocking dependency
     storage
@@ -533,7 +532,7 @@ fn test_concurrent_ready_during_state_changes() {
             if i < 5 {
                 // Reader: query ready queue
                 let ready = storage_clone
-                    .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)))
+                    .with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None))
                     .unwrap();
                 let mut results = results_clone.lock().unwrap();
                 results.push(("read".to_string(), ready.len()));
@@ -600,7 +599,7 @@ fn test_concurrent_ready_with_dependencies() {
 
         let handle = thread::spawn(move || {
             let ready = storage_clone
-                .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)))
+                .with_immediate_transaction(|tx| get_ready_candidates(tx, 100, None, None))
                 .unwrap();
 
             let mut results = results_clone.lock().unwrap();

@@ -94,6 +94,7 @@ fn create_test_bead_with_assignee(
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 

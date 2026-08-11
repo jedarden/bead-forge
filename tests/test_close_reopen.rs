@@ -151,6 +151,7 @@ fn test_close_already_closed_bead() {
         labels: Vec::new(),
         dependencies: Vec::new(),
         comments: Vec::new(),
+        events: vec![],
         annotations: Default::default(),
     };
 
@@ -209,6 +210,7 @@ fn test_reopen_in_progress_bead() {
         labels: Vec::new(),
         dependencies: Vec::new(),
         comments: Vec::new(),
+        events: vec![],
         annotations: Default::default(),
     };
 

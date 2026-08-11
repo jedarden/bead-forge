@@ -97,6 +97,7 @@ fn create_test_bead(storage: &Storage, title: &str) -> Issue {
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 
@@ -353,6 +354,7 @@ fn test_close_preserves_other_fields() {
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 
@@ -428,6 +430,7 @@ fn test_reopen_clears_assignee() {
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 

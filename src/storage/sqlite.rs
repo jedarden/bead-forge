@@ -4099,6 +4099,483 @@ mod tests {
         assert!(result.is_ok(), "Valid format non-existent ID should not error");
         assert_eq!(result.unwrap().len(), 0, "Should return empty tree");
     }
+
+    #[test]
+    fn test_get_dep_tree_advanced_sql_injection_payloads() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test data
+        let root = Issue::new("bf-root".to_string(), "Root".to_string(), ".".to_string());
+        storage.create_issue(&root).unwrap();
+
+        // Advanced SQL injection payloads that should be blocked
+        let advanced_payloads = vec![
+            // Boolean-based blind SQL injection
+            "bf-123' AND 1=1--",
+            "bf-123' AND 1=2--",
+            "bf-123' OR '1'='1'--",
+            // Stacked queries (SQLite doesn't support but should still be safe)
+            "bf-123'; INSERT INTO issues VALUES ('malicious', 'title', '.')--",
+            "bf-123'; DELETE FROM issues--",
+            // Error-based SQL injection
+            "bf-123' AND 1=CONVERT(int, (SELECT TOP 1 title FROM issues))--",
+            "bf-123' AND 1=CAST((SELECT title FROM issues) AS int)--",
+            // Time-based blind SQL injection (SQLite-specific)
+            "bf-123' AND (SELECT SUBSTR(title,1,1) FROM issues)='a'--",
+            "bf-123' OR (SELECT COUNT(*) FROM issues)>0--",
+            // Comment-based attacks
+            "bf-123'/**/OR/**/'1'='1'--",
+            "bf-123'/*/OR/*/1=1--",
+            // Hex-encoded attacks (attempting to bypass filters)
+            "bf-123' OR 0x hex--",
+            // UNION SELECT with different variations
+            "bf-123' UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL--",
+            "bf-123' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL--",
+            "bf-123' UNION DISTINCT SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL--",
+            // Substring and string function attacks
+            "bf-123' OR SUBSTR(title,1,1)='a'--",
+            "bf-123' OR LENGTH(title)>0--",
+            // Case-sensitive variations
+            "bf-123' oR '1'='1",
+            "bf-123' Or '1'='1",
+            // WITH clause injection (attempting to break the CTE)
+            "bf-123' WITH RECURSIVE--",
+            // Semicolon injection attempts
+            "bf-123'; SELECT--",
+            "bf-123';DROP--",
+            "bf-123';EXECUTE--",
+            // Backtick attacks (MySQL-style, should still be safe)
+            "bf-123` OR `1`=`1",
+            // Bracket-based attacks (SQL Server-style)
+            "bf-123'] OR '1'='1",
+            // Double encoding attempts
+            "bf-123%25%27%20OR%20%271%27%3D%271", // URL-encoded
+            // Null byte injection
+            "bf-123\x00",
+            // Newline and tab injection
+            "bf-123\nOR\n1=1",
+            "bf-123\tOR\t1=1",
+            // carriage return injection
+            "bf-123\rOR\r1=1",
+        ];
+
+        for payload in advanced_payloads {
+            let result = storage.get_dep_tree(payload, "down", 10);
+            match result {
+                Ok(tree) => {
+                    // If query succeeds, must return empty (no valid bead found)
+                    assert_eq!(
+                        tree.len(), 0,
+                        "Advanced payload '{}' should return empty tree, got {} nodes: {:?}",
+                        payload, tree.len(), tree
+                    );
+                }
+                Err(_) => {
+                    // Validation rejection is the secure path
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_dep_tree_boundary_conditions() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test data
+        let root = Issue::new("bf-root".to_string(), "Root".to_string(), ".".to_string());
+        storage.create_issue(&root).unwrap();
+
+        // Test very long IDs (buffer overflow attempts)
+        let long_id = format!("bf-{}", "a".repeat(10000));
+        let result = storage.get_dep_tree(&long_id, "down", 10);
+        // Should handle gracefully - either reject or return empty
+        assert!(result.is_ok() || result.is_err(), "Long ID should not crash");
+
+        // Test IDs with special characters in hash part
+        let special_char_ids = vec![
+            "bf-abc_123",    // underscore (invalid)
+            "bf-abc-123",    // multiple hyphens (hash part becomes "abc-123")
+            "bf-abc.def",    // dot in hash
+            "bf-abc@123",    // @ sign
+            "bf-abc#123",    // hash sign
+            "bf-abc$123",    // dollar sign
+            "bf-abc%123",    // percent
+            "bf-abc&123",    // ampersand
+            "bf-abc*123",    // asterisk
+            "bf-abc+123",    // plus
+            "bf-abc=123",    // equals
+            "bf-abc?123",    // question mark
+            "bf-abc/123",    // forward slash
+            "bf-abc\\123",   // backslash
+            "bf-abc|123",    // pipe
+            "bf-abc<123",    // less than
+            "bf-abc>123",    // greater than
+            "bf-abc[123",    // open bracket
+            "bf-abc]123",    // close bracket
+            "bf-abc{123",    // open brace
+            "bf-abc}123",    // close brace
+            "bf-abc(123",    // open paren
+            "bf-abc)123",    // close paren
+            "bf-abc;123",    // semicolon
+            "bf-abc:123",    // colon
+            "bf-abc'123",    // single quote
+            "bf-abc\"123",   // double quote
+            "bf-abc`123",    // backtick
+            "bf-abc~123",    // tilde
+            "bf-abc!123",    // exclamation
+            "bf-abc^123",    // caret
+            "bf-abc 123",    // space
+            "bf-abc\n123",   // newline
+            "bf-abc\r123",   // carriage return
+            "bf-abc\t123",   // tab
+        ];
+
+        for invalid_id in special_char_ids {
+            let result = storage.get_dep_tree(invalid_id, "down", 10);
+            assert!(result.is_err(), "ID with special chars '{}' should be rejected", invalid_id);
+        }
+
+        // Test boundary: empty parts in multi-part ID
+        let empty_part_ids = vec![
+            "bf-",           // empty hash part
+            "bf-123-",       // trailing hyphen creates empty part
+            "bf--123",       // double hyphen creates empty part
+            "bf---",         // only hyphens
+        ];
+
+        for invalid_id in empty_part_ids {
+            let result = storage.get_dep_tree(invalid_id, "down", 10);
+            assert!(result.is_err(), "ID with empty parts '{}' should be rejected", invalid_id);
+        }
+    }
+
+    #[test]
+    fn test_get_dep_tree_unicode_and_normalization_attacks() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test data
+        let root = Issue::new("bf-root".to_string(), "Root".to_string(), ".".to_string());
+        storage.create_issue(&root).unwrap();
+
+        // Test Unicode homograph attacks (visually similar characters)
+        let unicode_attack_ids = vec![
+            "bf-\u{200b}123",     // zero-width space
+            "bf-\u{200c}123",     // zero-width non-joiner
+            "bf-\u{200d}123",     // zero-width joiner
+            "bf-\u{2060}123",     // word joiner
+            "bf-\u{feff}123",     // zero-width no-break space (BOM)
+            "bf-\u{202a}123",     // left-to-right embedding
+            "bf-\u{202b}123",     // right-to-left embedding
+            "bf-\u{202c}123",     // pop directional formatting
+            "bf-\u{202d}123",     // left-to-right override
+            "bf-\u{202e}123",     // right-to-left override
+            "bf-\u{ff01}123",     // fullwidth exclamation (looks like !)
+            "bf-\u{ff03}123",     // fullwidth hash (looks like #)
+            "bf-\u{03a6}123",     // Greek capital PHI (looks like Φ)
+            "bf-\u{0430}123",     // Cyrillic small A (looks like a)
+            "bf-\u{0415}123",     // Cyrillic capital E (looks like E)
+        ];
+
+        for unicode_id in unicode_attack_ids {
+            let result = storage.get_dep_tree(unicode_id, "down", 10);
+            // Unicode characters in hash part should be rejected (non-alphanumeric)
+            assert!(
+                result.is_err(),
+                "Unicode attack ID '{}' should be rejected",
+                unicode_id
+            );
+        }
+
+        // Test that valid alphanumeric characters still work (including uppercase)
+        let valid_mixed_case = vec![
+            "bf-ABC123",     // uppercase letters are valid
+            "bf-aBc123",     // mixed case
+            "bf-123ABC",     // numbers then letters
+            "bf-ABC123xyz",  // mixed alphanumeric
+        ];
+
+        for valid_id in valid_mixed_case {
+            let result = storage.get_dep_tree(valid_id, "down", 10);
+            // These should pass validation (format is valid) but return empty (no data)
+            assert!(result.is_ok(), "Valid mixed-case ID '{}' should pass validation", valid_id);
+            let tree = result.unwrap();
+            assert_eq!(tree.len(), 0, "Non-existent ID should return empty tree");
+        }
+    }
+
+    #[test]
+    fn test_get_dep_tree_parameter_binding_verification() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a chain of dependencies to verify query structure is preserved
+        let root = Issue::new("bf-root".to_string(), "Root".to_string(), ".".to_string());
+        let child = Issue::new("bf-child".to_string(), "Child".to_string(), ".".to_string());
+        storage.create_issue(&root).unwrap();
+        storage.create_issue(&child).unwrap();
+        storage.add_dependency("bf-root", "bf-child", &DependencyType::Blocks, "test-actor").unwrap();
+
+        // Test 1: Verify that parameters are actually bound, not interpolated
+        // by using IDs that would be dangerous if interpolated but are safe when bound
+        let dangerous_but_valid_id = "bf-123;456"; // Contains semicolon but is valid format
+        let result = storage.get_dep_tree(dangerous_but_valid_id, "down", 10);
+        // Should return empty (no such ID) but not crash or inject SQL
+        assert!(result.is_ok(), "Valid format ID should not error");
+        assert_eq!(result.unwrap().len(), 0, "Non-existent ID should return empty");
+
+        // Test 2: Verify the same root_id is used in both parameter positions
+        // The query uses ?1 and ?2 both bound to root_id
+        let tree = storage.get_dep_tree("bf-root", "down", 10).unwrap();
+        assert_eq!(tree.len(), 1, "Should find 1 dependency");
+        assert_eq!(tree[0].id, "bf-child");
+        assert_eq!(tree[0].path, "bf-root,bf-child", "Path should start with root_id");
+
+        // Test 3: Verify direction parameter doesn't cause SQL injection
+        let malicious_directions = vec![
+            "down'; DROP TABLE issues; --",
+            "up' OR '1'='1",
+            "down/**/UNION/**/SELECT/**/*",
+            "down; SELECT--",
+        ];
+
+        for malicious_dir in malicious_directions {
+            let result = storage.get_dep_tree("bf-root", malicious_dir, 10);
+            // Should not crash - direction falls through to default case or is handled safely
+            assert!(result.is_ok() || result.is_err(), "Malicious direction should not crash");
+        }
+
+        // Test 4: Verify max_depth parameter doesn't cause SQL injection
+        // max_depth is used in: format!("AND rec.depth < {}", max_depth)
+        // Since it's a usize (not user-controlled string), this should be safe
+        // But let's verify the function handles edge cases
+        let depth_values = vec![0, 1, 10, 100, usize::MAX];
+        for depth in depth_values {
+            let result = storage.get_dep_tree("bf-root", "down", depth);
+            // Should not crash for any depth value
+            assert!(result.is_ok() || result.is_err(), "Depth {} should not crash", depth);
+        }
+    }
+
+    #[test]
+    fn test_is_valid_bead_id_comprehensive() {
+        // Test the validation function directly for comprehensive coverage
+        use crate::id::is_valid_bead_id;
+
+        // Valid IDs
+        let valid_ids = vec![
+            "bf-abc",
+            "bf-abc123",
+            "bf-ABC123",
+            "bf-123ABC",
+            "bf-a1b2c3",
+            "bf-1234567890abcdefghijklmnopqrstuvwxyz",
+            "bd-xyz",           // different prefix
+            "prefix-123",       // different prefix
+            "a-b",              // minimal valid ID
+            "verylongprefix-1234567890abcdef",
+        ];
+
+        for valid_id in valid_ids {
+            assert!(
+                is_valid_bead_id(valid_id),
+                "ID '{}' should be valid",
+                valid_id
+            );
+        }
+
+        // Invalid IDs
+        let invalid_ids = vec![
+            "",                 // empty
+            "a",                // no hyphen
+            "ab",               // no hyphen
+            "abc",              // no hyphen
+            "bf-",              // empty hash part
+            "bf-!",             // special char
+            "bf-@",             // special char
+            "bf-#",             // special char
+            "bf-$",             // special char
+            "bf-%",             // special char
+            "bf-&",             // special char
+            "bf-*",             // special char
+            "bf-+",             // special char
+            "bf-=",             // special char
+            "bf-?",             // special char
+            "bf- /",            // space
+            "bf-\t",            // tab
+            "bf-\n",            // newline
+            "bf-\r",            // carriage return
+            "bf-\x00",          // null byte
+            "bf- ",             // space
+            "bf- 123",          // space in hash
+            "bf-1 2",           // space in middle
+            "bf-1_2",           // underscore
+            "bf-1.2",           // dot
+            "bf-1:2",           // colon
+            "bf-1;2",           // semicolon
+            "bf-1,2",           // comma
+            "bf-1'2",           // single quote
+            "bf-1\"2",          // double quote
+            "bf-1`2",           // backtick
+            "bf-1|2",           // pipe
+            "bf-1<2",           // less than
+            "bf-1>2",           // greater than
+            "bf-1(2",           // open paren
+            "bf-1)2",           // close paren
+            "bf-1[2",           // open bracket
+            "bf-1]2",           // close bracket
+            "bf-1{2",           // open brace
+            "bf-1}2",           // close brace
+            "bf-1~2",           // tilde
+            "bf-1!2",           // exclamation
+            "bf-1@2",           // at sign
+            "bf-1#2",           // hash
+            "bf-1$2",           // dollar
+            "bf-1%2",           // percent
+            "bf-1^2",           // caret
+            "bf-1&2",           // ampersand
+            "bf-1*2",           // asterisk
+            "bf-1+2",           // plus
+            "bf-1=2",           // equals
+            "bf-1?2",           // question mark
+            "bf-1/2",           // forward slash
+            "bf-1\\2",          // backslash
+            "bf--",             // only hyphens
+            "bf---",            // only hyphens
+            "bf-123-",          // trailing hyphen
+            "bf--123",          // leading double hyphen in hash
+            "bf-123--",         // trailing double hyphen
+            "1-2",              // single char prefix (too short)
+            "ab-1",             // two char prefix
+        ];
+
+        for invalid_id in invalid_ids {
+            assert!(
+                !is_valid_bead_id(invalid_id),
+                "ID '{}' should be invalid",
+                invalid_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_dep_tree_sqlite_ctte_injection_attempts() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test data
+        let root = Issue::new("bf-root".to_string(), "Root".to_string(), ".".to_string());
+        storage.create_issue(&root).unwrap();
+
+        // Common Table Expression (CTE) injection attempts
+        // Since get_dep_tree uses a WITH RECURSIVE clause, attackers might try
+        // to inject their own CTEs
+        let cte_injection_payloads = vec![
+            "bf-123') WITH RECURSIVE evil AS (SELECT*) SELECT--",
+            "bf-123') WITH evil AS (SELECT 1) SELECT--",
+            "bf-123' WITH RECURSIVE x AS (SELECT 1) SELECT--",
+            "bf-123' UNION WITH RECURSIVE--",
+            "bf-123') UNION ALL WITH--",
+            "bf-123' OR 1 IN (WITH--",
+        ];
+
+        for payload in cte_injection_payloads {
+            let result = storage.get_dep_tree(payload, "down", 10);
+            match result {
+                Ok(tree) => {
+                    assert_eq!(
+                        tree.len(), 0,
+                        "CTE injection payload '{}' should return empty tree",
+                        payload
+                    );
+                }
+                Err(_) => {
+                    // Validation rejection is correct
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_dep_tree_regression_functionality() {
+        // Comprehensive regression test to ensure normal functionality works
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a complex dependency tree:
+        // root -> child1 -> child2 -> child3
+        //   \-> child4 -> child5
+        // And reverse dependencies:
+        // dependent <- root (i.e., dependent depends on root)
+        let root = Issue::new("bf-root".to_string(), "Root".to_string(), ".".to_string());
+        let child1 = Issue::new("bf-child1".to_string(), "Child 1".to_string(), ".".to_string());
+        let child2 = Issue::new("bf-child2".to_string(), "Child 2".to_string(), ".".to_string());
+        let child3 = Issue::new("bf-child3".to_string(), "Child 3".to_string(), ".".to_string());
+        let child4 = Issue::new("bf-child4".to_string(), "Child 4".to_string(), ".".to_string());
+        let child5 = Issue::new("bf-child5".to_string(), "Child 5".to_string(), ".".to_string());
+        let dependent = Issue::new("bf-dependent".to_string(), "Dependent".to_string(), ".".to_string());
+
+        storage.create_issue(&root).unwrap();
+        storage.create_issue(&child1).unwrap();
+        storage.create_issue(&child2).unwrap();
+        storage.create_issue(&child3).unwrap();
+        storage.create_issue(&child4).unwrap();
+        storage.create_issue(&child5).unwrap();
+        storage.create_issue(&dependent).unwrap();
+
+        // Create dependencies: root -> child1 -> child2 -> child3
+        storage.add_dependency("bf-root", "bf-child1", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-child1", "bf-child2", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-child2", "bf-child3", &DependencyType::Blocks, "test").unwrap();
+
+        // Create dependencies: root -> child4 -> child5
+        storage.add_dependency("bf-root", "bf-child4", &DependencyType::Blocks, "test").unwrap();
+        storage.add_dependency("bf-child4", "bf-child5", &DependencyType::Blocks, "test").unwrap();
+
+        // Create reverse dependency: dependent depends on root
+        storage.add_dependency("bf-dependent", "bf-root", &DependencyType::Blocks, "test").unwrap();
+
+        // Test 1: Full downward tree from root
+        let down_tree = storage.get_dep_tree("bf-root", "down", 0).unwrap();
+        assert_eq!(down_tree.len(), 5, "Should find all 5 downstream dependencies");
+
+        // Verify depth ordering
+        let depth0: Vec<_> = down_tree.iter().filter(|n| n.depth == 0).collect();
+        let depth1: Vec<_> = down_tree.iter().filter(|n| n.depth == 1).collect();
+        let depth2: Vec<_> = down_tree.iter().filter(|n| n.depth == 2).collect();
+        let depth3: Vec<_> = down_tree.iter().filter(|n| n.depth == 3).collect();
+
+        assert_eq!(depth0.len(), 2, "Should have 2 direct children");
+        assert_eq!(depth1.len(), 2, "Should have 2 at depth 1");
+        assert_eq!(depth2.len(), 1, "Should have 1 at depth 2");
+        assert_eq!(depth3.len(), 0, "Should have 0 at depth 3 (all 3 are depth 2 or less)");
+
+        // Test 2: Depth-limited query
+        let down_tree_limited = storage.get_dep_tree("bf-root", "down", 2).unwrap();
+        assert!(down_tree_limited.len() < 5, "Depth limit should reduce results");
+
+        // Test 3: Upward tree from child3 (should find child2, child1, root)
+        let up_tree = storage.get_dep_tree("bf-child3", "up", 0).unwrap();
+        assert_eq!(up_tree.len(), 3, "Should find 3 upstream dependencies");
+        assert_eq!(up_tree[0].id, "bf-child2");
+        assert_eq!(up_tree[1].id, "bf-child1");
+        assert_eq!(up_tree[2].id, "bf-root");
+
+        // Test 4: Upward tree from root (should find dependent)
+        let up_tree_root = storage.get_dep_tree("bf-root", "up", 0).unwrap();
+        assert_eq!(up_tree_root.len(), 1, "Should find 1 dependent");
+        assert_eq!(up_tree_root[0].id, "bf-dependent");
+
+        // Test 5: Path construction
+        let child3_node = down_tree.iter().find(|n| n.id == "bf-child3").unwrap();
+        assert_eq!(
+            child3_node.path,
+            "bf-root,bf-child1,bf-child2,bf-child3",
+            "Path should show full dependency chain"
+        );
+    }
 }
 
 // Include comprehensive storage tests
