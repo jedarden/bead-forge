@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{BeadForgeError, Result};
 use chrono::{DateTime, Duration, Utc};
 use rusqlite::{params, Connection};
 use serde::Serialize;
@@ -636,8 +636,7 @@ fn get_beads_dir(workspace_path: &Path) -> Result<std::path::PathBuf> {
     } else if workspace_path.ends_with(".beads") {
         Ok(workspace_path.to_path_buf())
     } else {
-        use anyhow::bail;
-        bail!("No .beads directory found in {:?}", workspace_path)
+        return Err(BeadForgeError::not_found(".beads directory", workspace_path.display().to_string(), Some(workspace_path.to_path_buf())));
     }
 }
 

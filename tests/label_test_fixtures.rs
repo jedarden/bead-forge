@@ -99,7 +99,7 @@ claim_ttl_minutes: 30
     /// # Returns
     ///
     /// Result containing the storage instance or an error.
-    pub fn storage(&self) -> anyhow::Result<bead_forge::storage::Storage> {
+    pub fn storage(&self) -> bead_forge::error::Result<bead_forge::storage::Storage> {
         bead_forge::storage::Storage::open(&self.db_path)
     }
 
@@ -118,7 +118,7 @@ claim_ttl_minutes: 30
     pub fn create_bead(&self, id: &str, title: &str) -> anyhow::Result<()> {
         let storage = self.storage()?;
         let bead = bead_forge::Issue::new(id.to_string(), title.to_string(), ".".to_string());
-        storage.create_issue(&bead)
+        Ok(storage.create_issue(&bead)?)
     }
 
     /// Create a test bead with custom labels.
@@ -156,7 +156,7 @@ claim_ttl_minutes: 30
             labels: labels.iter().map(|s| s.to_string()).collect(),
             ..Default::default()
         };
-        storage.create_issue(&bead)
+        Ok(storage.create_issue(&bead)?)
     }
 
     /// Get a bead by ID.
@@ -170,7 +170,7 @@ claim_ttl_minutes: 30
     /// Result containing Option with the bead if found, or None.
     pub fn get_bead(&self, id: &str) -> anyhow::Result<Option<bead_forge::Issue>> {
         let storage = self.storage()?;
-        storage.get_issue(id)
+        Ok(storage.get_issue(id)?)
     }
 
     /// Add a single label to a bead.
@@ -185,7 +185,7 @@ claim_ttl_minutes: 30
     /// Result indicating success or error.
     pub fn add_label(&self, issue_id: &str, label: &str) -> anyhow::Result<()> {
         let storage = self.storage()?;
-        storage.add_label(issue_id, label)
+        Ok(storage.add_label(issue_id, label)?)
     }
 
     /// Add multiple labels to a bead.
@@ -261,7 +261,7 @@ claim_ttl_minutes: 30
     /// Result containing vector of (label, count) tuples.
     pub fn list_all_labels(&self) -> anyhow::Result<Vec<(String, i64)>> {
         let storage = self.storage()?;
-        storage.list_all_labels()
+        Ok(storage.list_all_labels()?)
     }
 
     /// Count labels for a specific bead.
@@ -341,7 +341,7 @@ claim_ttl_minutes: 30
             priority: bead_forge::Priority::CRITICAL,
             ..Default::default()
         };
-        storage.create_issue(&epic)
+        Ok(storage.create_issue(&epic)?)
     }
 
     /// Seed workspace with multiple beads having different labels.
@@ -400,7 +400,7 @@ claim_ttl_minutes: 30
     /// Result containing the number of exported beads.
     pub fn export_jsonl(&self, dirty_only: bool) -> anyhow::Result<usize> {
         let storage = self.storage()?;
-        storage.sync_to_jsonl(&self.jsonl_path, dirty_only)
+        Ok(storage.sync_to_jsonl(&self.jsonl_path, dirty_only)?)
     }
 
     /// Import beads from JSONL.
@@ -410,7 +410,7 @@ claim_ttl_minutes: 30
     /// Result containing import result with counts.
     pub fn import_jsonl(&self) -> anyhow::Result<bead_forge::jsonl::ImportResult> {
         let storage = self.storage()?;
-        storage.sync_from_jsonl(&self.jsonl_path)
+        Ok(storage.sync_from_jsonl(&self.jsonl_path)?)
     }
 }
 

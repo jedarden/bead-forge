@@ -64,21 +64,6 @@ fn test_close_and_reopen_bead() {
         events: vec![],
         annotations: Default::default(),
         content_hash: None,
-        delete_reason: None,
-        original_type: None,
-        compaction_level: None,
-        compacted_at: None,
-        compacted_at_commit: None,
-        original_size: None,
-        sender: None,
-        ephemeral: false,
-        pinned: false,
-        is_template: false,
-        content_hash: None,
-        labels: Vec::new(),
-        dependencies: Vec::new(),
-        comments: Vec::new(),
-        annotations: Default::default(),
     };
 
     // Insert the bead

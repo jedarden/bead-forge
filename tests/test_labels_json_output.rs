@@ -49,7 +49,7 @@ fn test_labels_output_empty_labels() {
 
     // Empty labels should be an empty array, not omitted
     let labels = parsed.get("labels").and_then(|v| v.as_array());
-    assert_eq!(labels, Some(&Vec::<String>::new()));
+    assert!(labels.is_some());
     assert!(labels.unwrap().is_empty());
 }
 

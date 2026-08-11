@@ -397,7 +397,7 @@ fn test_p0_batch_operations_with_labels() {
     use std::io::Write;
     let stdin = child.stdin.as_mut().unwrap();
     stdin.write_all(batch_json.as_bytes()).unwrap();
-    drop(stdin);
+    let _ = stdin; // Explicitly mark as used to avoid dropping reference warning
 
     let output = child.wait_with_output().unwrap();
     assert!(output.status.success());

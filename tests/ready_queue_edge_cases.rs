@@ -533,7 +533,7 @@ fn test_concurrent_ready_during_state_changes() {
             if i < 5 {
                 // Reader: query ready queue
                 let ready = storage_clone
-                    .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None))
+                    .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)))
                     .unwrap();
                 let mut results = results_clone.lock().unwrap();
                 results.push(("read".to_string(), ready.len()));
@@ -600,7 +600,7 @@ fn test_concurrent_ready_with_dependencies() {
 
         let handle = thread::spawn(move || {
             let ready = storage_clone
-                .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None))
+                .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)))
                 .unwrap();
 
             let mut results = results_clone.lock().unwrap();
@@ -669,7 +669,7 @@ fn test_ready_limit_with_blocked_beads() {
 
     // With limit=5, should get only 5
     let ready = storage
-        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 5, None, None)?)
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 5, None, None)?))
         .unwrap();
     assert_eq!(ready.len(), 5);
 

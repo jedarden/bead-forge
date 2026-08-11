@@ -37,9 +37,9 @@ fn test_label_add_parser_single_label_short_flag() {
         "bf",
         "label",
         "add",
-        "bf-123",
         "-l",
         "bug",
+        "bf-123",
     ];
 
     let (id, labels) = parse_label_add_command(&args).expect("Should parse Label::Add command");
@@ -62,13 +62,13 @@ fn test_label_add_parser_multiple_labels_short_flags() {
         "bf",
         "label",
         "add",
-        "bf-456",
         "-l",
         "bug",
         "-l",
         "urgent",
         "-l",
         "priority",
+        "bf-456",
     ];
 
     let (id, labels) = parse_label_add_command(&args).expect("Should parse Label::Add command");
@@ -98,9 +98,9 @@ fn test_label_add_parser_single_label_long_flag() {
         "bf",
         "label",
         "add",
-        "bf-789",
         "--label",
         "enhancement",
+        "bf-789",
     ];
 
     let (id, labels) = parse_label_add_command(&args).expect("Should parse Label::Add command");
@@ -123,13 +123,13 @@ fn test_label_add_parser_multiple_labels_long_flags() {
         "bf",
         "label",
         "add",
-        "bf-abc",
         "--label",
         "frontend",
         "--label",
         "backend",
         "--label",
         "database",
+        "bf-abc",
     ];
 
     let (id, labels) = parse_label_add_command(&args).expect("Should parse Label::Add command");

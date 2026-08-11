@@ -175,7 +175,7 @@ fn test_begin_immediate_prevents_races() {
         // Reset beads to open for this iteration
         storage.with_immediate_transaction(|tx| {
             tx.execute("UPDATE issues SET status = 'open', assignee = NULL WHERE status = 'in_progress'", [])?;
-            Ok::<(), anyhow::Error>(())
+            Ok::<(), bead_forge::error::BeadForgeError>(())
         }).unwrap();
 
         let mut handles = vec![];

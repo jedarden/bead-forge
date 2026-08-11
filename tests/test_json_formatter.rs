@@ -54,6 +54,7 @@ fn test_json_formatter_single_issue() {
         labels: vec!["test".to_string()],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 

@@ -49,6 +49,7 @@ fn create_p0_bead(id: &str, title: &str, label: &str) -> Issue {
         dependencies: vec![],
         comments: vec![],
         annotations: BTreeMap::new(),
+        events: vec![],
     }
 }
 

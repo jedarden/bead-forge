@@ -994,6 +994,72 @@ This enables velocity-aware routing (see §Velocity-Aware Scoring above).
 
 ---
 
+## Testing
+
+bead-forge has comprehensive test coverage including unit tests, integration tests, and concurrent claim stress tests. See `tests/README.md` for detailed test infrastructure documentation.
+
+### Running Tests Locally
+
+```bash
+# Run all tests
+cargo test
+
+# Run tests with output (useful for debugging)
+cargo test -- --nocapture
+
+# Run specific test file
+cargo test --test test_jsonl
+
+# Run specific test function
+cargo test test_temp_workspace_creation
+
+# Run tests in release mode (faster execution)
+cargo test --release
+```
+
+### Test Organization
+
+Tests are organized by functionality in the `tests/` directory:
+
+- **Core functionality**: `test_jsonl.rs`, `test_basic_workflow.rs`, `test_create*.rs`
+- **Labels**: `test_label*.rs`, `epic_labels*.rs`
+- **Epics**: `test_epic*.rs`, `epic_*.rs`
+- **Dependencies**: `blocker_dependency_basics.rs`, `test_blocking_bead.rs`
+- **CLI integration**: `cli_integration_tests.rs`, `cli_test.rs`
+- **Concurrent operations**: `claim_race.rs`, `concurrent_claim.rs`, `claim_stress.rs`
+- **Ready queue**: `ready_queue_*.rs`
+- **Serialization**: `json_formatter_verification.rs`, `test_jsonl.rs`
+
+### Common Test Infrastructure
+
+The `tests/common.rs` module provides reusable test utilities:
+
+- `TempWorkspace` - Isolated test workspace with automatic cleanup
+- JSONL fixture helpers - Create test data in JSONL format
+- P0 epic test infrastructure - Specialized support for P0 epic testing
+- Helper functions for common operations (create, list, get beads)
+
+See `tests/README.md` for detailed documentation of the test infrastructure and how to write new tests.
+
+### Coverage
+
+bead-forge maintains >70% code coverage. To generate a coverage report locally:
+
+```bash
+# Install tarpaulin if not already installed
+cargo install cargo-tarpaulin
+
+# Generate coverage report
+cargo tarpaulin --out Html --output-dir coverage
+
+# View the report
+firefox coverage/index.html  # or your preferred browser
+```
+
+The CI pipeline (Argo Workflows on `iad-ci`) runs all tests on every build via the `bead-forge-build` WorkflowTemplate in `jedarden/declarative-config`.
+
+---
+
 ## Build & Deploy
 
 ### Local Build

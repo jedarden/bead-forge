@@ -34,7 +34,7 @@ fn test_p0_label_add_duplicate_handling() {
 
     // Verify only one P0 label exists (no duplicate)
     let labels = ws.get_labels("bf-p0-002").unwrap();
-    let p0_count = labels.iter().filter(|l| l == "P0").count();
+    let p0_count = labels.iter().filter(|l| *l == "P0").count();
     assert_eq!(p0_count, 1, "P0 label should appear exactly once");
     assert_label_count("bf-p0-002", 1, &ws).unwrap();
 }

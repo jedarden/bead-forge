@@ -63,7 +63,7 @@ fn test_concurrent_claim_no_duplicates() {
     // Spawn 20 workers simultaneously
     for worker_id in 0..num_workers {
         let claimed_ids_clone = Arc::clone(&claimed_ids);
-        let errors_clone = Arc::clone(&worker_errors);
+        let _errors_clone = Arc::clone(&worker_errors);
         let storage_clone = Arc::clone(&storage);
 
         let handle = thread::spawn(move || {
@@ -232,7 +232,7 @@ fn test_concurrent_claim_stale_reclamation() {
             "UPDATE issues SET status = 'in_progress', assignee = 'stale-worker', updated_at = ? WHERE id IN ('bf-0000', 'bf-0001')",
             [&stale_time_str],
         )?;
-        Ok::<(), anyhow::Error>(())
+        Ok(())
     }).unwrap();
 
     // Now a new worker should be able to claim after stale reclamation
