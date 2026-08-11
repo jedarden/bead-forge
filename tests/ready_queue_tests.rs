@@ -643,3 +643,514 @@ mod core_ready_queue_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod dependency_and_blocker_tests {
+    use super::*;
+
+    // ============================================================================
+    // Dependency Type Tests
+    // ============================================================================
+
+    #[test]
+    fn test_blocks_dependency_type_blocks_bead() {
+        let (_temp, storage) = setup_test_db();
+
+        let blocker = create_open_bead(&storage, "bf-blocker", "Blocker", Priority::MEDIUM);
+        let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-dependent", "bf-blocker", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        assert!(!ready.iter().any(|b| b.id == "bf-dependent"));
+        assert!(ready.iter().any(|b| b.id == "bf-blocker"));
+    }
+
+    #[test]
+    fn test_parent_child_dependency_type_blocks_bead() {
+        let (_temp, storage) = setup_test_db();
+
+        let parent = create_open_bead(&storage, "bf-parent", "Parent", Priority::MEDIUM);
+        let child = create_open_bead(&storage, "bf-child", "Child", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-child", "bf-parent", &DependencyType::ParentChild, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        assert!(!ready.iter().any(|b| b.id == "bf-child"));
+        assert!(ready.iter().any(|b| b.id == "bf-parent"));
+    }
+
+    #[test]
+    fn test_conditional_blocks_dependency_type_blocks_bead() {
+        let (_temp, storage) = setup_test_db();
+
+        let blocker = create_open_bead(&storage, "bf-blocker", "Blocker", Priority::MEDIUM);
+        let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-dependent", "bf-blocker", &DependencyType::ConditionalBlocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        assert!(!ready.iter().any(|b| b.id == "bf-dependent"));
+        assert!(ready.iter().any(|b| b.id == "bf-blocker"));
+    }
+
+    #[test]
+    fn test_waits_for_dependency_type_blocks_bead() {
+        let (_temp, storage) = setup_test_db();
+
+        let waiter = create_open_bead(&storage, "bf-waiter", "Waiter", Priority::MEDIUM);
+        let blocking = create_open_bead(&storage, "bf-blocking", "Blocking", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-waiter", "bf-blocking", &DependencyType::WaitsFor, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        assert!(!ready.iter().any(|b| b.id == "bf-waiter"));
+        assert!(ready.iter().any(|b| b.id == "bf-blocking"));
+    }
+
+    #[test]
+    fn test_related_dependency_type_does_not_block() {
+        let (_temp, storage) = setup_test_db();
+
+        let bead_a = create_open_bead(&storage, "bf-a", "Bead A", Priority::MEDIUM);
+        let bead_b = create_open_bead(&storage, "bf-b", "Bead B", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-b", "bf-a", &DependencyType::Related, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Both should be ready since Related doesn't block
+        assert_eq!(ready.len(), 2);
+        assert!(ready.iter().any(|b| b.id == "bf-a"));
+        assert!(ready.iter().any(|b| b.id == "bf-b"));
+    }
+
+    // ============================================================================
+    // Multiple Blockers Tests
+    // ============================================================================
+
+    #[test]
+    fn test_bead_blocked_by_multiple_open_blockers() {
+        let (_temp, storage) = setup_test_db();
+
+        let blocker_a = create_open_bead(&storage, "bf-blocker-a", "Blocker A", Priority::MEDIUM);
+        let blocker_b = create_open_bead(&storage, "bf-blocker-b", "Blocker B", Priority::MEDIUM);
+        let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-dependent", "bf-blocker-a", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-dependent", "bf-blocker-b", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Only blockers should be ready
+        assert_eq!(ready.len(), 2);
+        assert!(!ready.iter().any(|b| b.id == "bf-dependent"));
+        assert!(ready.iter().any(|b| b.id == "bf-blocker-a"));
+        assert!(ready.iter().any(|b| b.id == "bf-blocker-b"));
+    }
+
+    #[test]
+    fn test_bead_with_multiple_blockers_becomes_ready_when_all_closed() {
+        let (_temp, storage) = setup_test_db();
+
+        let blocker_a = create_open_bead(&storage, "bf-blocker-a", "Blocker A", Priority::MEDIUM);
+        let blocker_b = create_open_bead(&storage, "bf-blocker-b", "Blocker B", Priority::MEDIUM);
+        let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-dependent", "bf-blocker-a", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-dependent", "bf-blocker-b", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        // Initially, dependent should not be ready
+        let ready_before = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+        assert!(!ready_before.iter().any(|b| b.id == "bf-dependent"));
+
+        // Close first blocker
+        let changes = IssueChanges {
+            status: Some(Status::Closed),
+            ..Default::default()
+        };
+        storage.update_issue("bf-blocker-a", &changes).unwrap();
+
+        // Still not ready because blocker-b is still open
+        let ready_after_first = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+        assert!(!ready_after_first.iter().any(|b| b.id == "bf-dependent"));
+
+        // Close second blocker
+        storage.update_issue("bf-blocker-b", &changes).unwrap();
+
+        // Now dependent should be ready
+        let ready_after_second = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+        assert!(ready_after_second.iter().any(|b| b.id == "bf-dependent"));
+    }
+
+    #[test]
+    fn test_bead_with_multiple_blockers_one_closed_one_open() {
+        let (_temp, storage) = setup_test_db();
+
+        // Create one closed blocker
+        let mut blocker_closed = Issue::new("bf-blocker-closed".to_string(), "Closed blocker".to_string(), ".".to_string());
+        blocker_closed.status = Status::Closed;
+        blocker_closed.closed_at = Some(Utc::now());
+        storage.create_issue(&blocker_closed).unwrap();
+
+        let blocker_open = create_open_bead(&storage, "bf-blocker-open", "Open blocker", Priority::MEDIUM);
+        let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-dependent", "bf-blocker-closed", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-dependent", "bf-blocker-open", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Dependent should NOT be ready because one blocker is still open
+        assert!(!ready.iter().any(|b| b.id == "bf-dependent"));
+        assert!(ready.iter().any(|b| b.id == "bf-blocker-open"));
+    }
+
+    // ============================================================================
+    // Transitive Blocker Tests
+    // ============================================================================
+
+    #[test]
+    fn test_transitive_blocking_chain() {
+        let (_temp, storage) = setup_test_db();
+
+        // Chain: A -> B -> C (A blocks B, B blocks C)
+        let blocker_a = create_open_bead(&storage, "bf-blocker-a", "Blocker A", Priority::MEDIUM);
+        let blocker_b = create_open_bead(&storage, "bf-blocker-b", "Blocker B", Priority::MEDIUM);
+        let dependent_c = create_open_bead(&storage, "bf-dependent-c", "Dependent C", Priority::MEDIUM);
+
+        // B depends on A
+        storage
+            .add_dependency("bf-blocker-b", "bf-blocker-a", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        // C depends on B
+        storage
+            .add_dependency("bf-dependent-c", "bf-blocker-b", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Only A should be ready (nothing blocks it)
+        // B is blocked by A
+        // C is blocked by B (transitive)
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].id, "bf-blocker-a");
+        assert!(!ready.iter().any(|b| b.id == "bf-blocker-b"));
+        assert!(!ready.iter().any(|b| b.id == "bf-dependent-c"));
+    }
+
+    #[test]
+    fn test_transitive_chain_unblocks_when_first_closes() {
+        let (_temp, storage) = setup_test_db();
+
+        // Chain: A -> B -> C
+        let blocker_a = create_open_bead(&storage, "bf-blocker-a", "Blocker A", Priority::MEDIUM);
+        let blocker_b = create_open_bead(&storage, "bf-blocker-b", "Blocker B", Priority::MEDIUM);
+        let dependent_c = create_open_bead(&storage, "bf-dependent-c", "Dependent C", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-blocker-b", "bf-blocker-a", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-dependent-c", "bf-blocker-b", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        // Initially only A is ready
+        let ready_before = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+        assert_eq!(ready_before.len(), 1);
+        assert_eq!(ready_before[0].id, "bf-blocker-a");
+
+        // Close A
+        let changes = IssueChanges {
+            status: Some(Status::Closed),
+            ..Default::default()
+        };
+        storage.update_issue("bf-blocker-a", &changes).unwrap();
+
+        // Now B should be ready (A is closed)
+        let ready_after = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+        assert_eq!(ready_after.len(), 1);
+        assert_eq!(ready_after[0].id, "bf-blocker-b");
+        assert!(!ready_after.iter().any(|b| b.id == "bf-dependent-c"));
+    }
+
+    #[test]
+    fn test_transitive_chain_three_levels() {
+        let (_temp, storage) = setup_test_db();
+
+        // Chain: A -> B -> C -> D
+        let blocker_a = create_open_bead(&storage, "bf-blocker-a", "Blocker A", Priority::MEDIUM);
+        let blocker_b = create_open_bead(&storage, "bf-blocker-b", "Blocker B", Priority::MEDIUM);
+        let blocker_c = create_open_bead(&storage, "bf-blocker-c", "Blocker C", Priority::MEDIUM);
+        let dependent_d = create_open_bead(&storage, "bf-dependent-d", "Dependent D", Priority::MEDIUM);
+
+        storage
+            .add_dependency("bf-blocker-b", "bf-blocker-a", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-blocker-c", "bf-blocker-b", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-dependent-d", "bf-blocker-c", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Only A should be ready
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].id, "bf-blocker-a");
+    }
+
+    // ============================================================================
+    // Downstream Impact Ranking Tests
+    // ============================================================================
+
+    #[test]
+    fn test_downstream_impact_high_blocks_more_beads() {
+        let (_temp, storage) = setup_test_db();
+
+        let base_time = Utc::now();
+
+        // Create high-impact bead (blocks 3 others)
+        let high_impact = create_open_bead(&storage, "bf-high-impact", "High impact", Priority::MEDIUM);
+
+        // Create low-impact bead (blocks 1 other)
+        let low_impact = create_open_bead(&storage, "bf-low-impact", "Low impact", Priority::MEDIUM);
+
+        // High-impact bead blocks 3 beads
+        for i in 1..=3 {
+            let dependent = create_open_bead(&storage, &format!("bf-dep-{}", i), &format!("Dependent {}", i), Priority::MEDIUM);
+            storage
+                .add_dependency(&format!("bf-dep-{}", i), "bf-high-impact", &DependencyType::Blocks, "test-user")
+                .unwrap();
+        }
+
+        // Low-impact bead blocks 1 bead
+        let single_dependent = create_open_bead(&storage, "bf-single-dep", "Single dependent", Priority::MEDIUM);
+        storage
+            .add_dependency("bf-single-dep", "bf-low-impact", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Both beads should be ready, but high-impact should be first
+        assert_eq!(ready.len(), 2);
+
+        // First bead should be high-impact (downstream_impact = 3)
+        assert_eq!(ready[0].id, "bf-high-impact");
+        assert_eq!(ready[0].downstream_impact, 3);
+
+        // Second bead should be low-impact (downstream_impact = 1)
+        assert_eq!(ready[1].id, "bf-low-impact");
+        assert_eq!(ready[1].downstream_impact, 1);
+    }
+
+    #[test]
+    fn test_downstream_impact_zero_vs_nonzero() {
+        let (_temp, storage) = setup_test_db();
+
+        let base_time = Utc::now();
+
+        // Create bead with dependencies (blocks others)
+        let with_dependents = create_open_bead(&storage, "bf-with-deps", "Has dependents", Priority::MEDIUM);
+
+        // Create bead with no dependents
+        let no_dependents = create_open_bead(&storage, "bf-no-deps", "No dependents", Priority::MEDIUM);
+
+        // Add a dependent to the first bead
+        let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::MEDIUM);
+        storage
+            .add_dependency("bf-dependent", "bf-with-deps", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // With-dependents should come first due to higher downstream_impact
+        assert_eq!(ready.len(), 2);
+        assert_eq!(ready[0].id, "bf-with-deps");
+        assert_eq!(ready[0].downstream_impact, 1);
+        assert_eq!(ready[1].id, "bf-no-deps");
+        assert_eq!(ready[1].downstream_impact, 0);
+    }
+
+    #[test]
+    fn test_downstream_impact_with_same_priority_older_first() {
+        let (_temp, storage) = setup_test_db();
+
+        let base_time = Utc::now();
+
+        // Create two beads with same priority and same downstream impact
+        let mut older_high_impact = Issue::new("bf-older".to_string(), "Older high impact".to_string(), ".".to_string());
+        older_high_impact.priority = Priority::MEDIUM;
+        older_high_impact.created_at = base_time - Duration::seconds(100);
+        storage.create_issue(&older_high_impact).unwrap();
+
+        let mut newer_high_impact = Issue::new("bf-newer".to_string(), "Newer high impact".to_string(), ".".to_string());
+        newer_high_impact.priority = Priority::MEDIUM;
+        newer_high_impact.created_at = base_time - Duration::seconds(50);
+        storage.create_issue(&newer_high_impact).unwrap();
+
+        // Both block the same number of beads
+        for (prefix, blocker) in [("dep1", "bf-older"), ("dep2", "bf-newer")] {
+            let dependent = create_open_bead(&storage, &format!("bf-{}", prefix), &format!("Dependent {}", prefix), Priority::MEDIUM);
+            storage
+                .add_dependency(&format!("bf-{}", prefix), blocker, &DependencyType::Blocks, "test-user")
+                .unwrap();
+        }
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Same priority and impact, so older should come first
+        assert_eq!(ready.len(), 2);
+        assert_eq!(ready[0].id, "bf-older");
+        assert_eq!(ready[1].id, "bf-newer");
+    }
+
+    #[test]
+    fn test_user_blocked_bead_not_in_ready_queue() {
+        let (_temp, storage) = setup_test_db();
+
+        // Create a bead with status=blocked (user explicitly blocked it)
+        let mut user_blocked = Issue::new("bf-user-blocked".to_string(), "User blocked".to_string(), ".".to_string());
+        user_blocked.status = Status::Blocked;
+        storage.create_issue(&user_blocked).unwrap();
+
+        let normal_bead = create_open_bead(&storage, "bf-normal", "Normal bead", Priority::MEDIUM);
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Only the normal bead should be ready
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].id, "bf-normal");
+        assert!(!ready.iter().any(|b| b.id == "bf-user-blocked"));
+    }
+
+    #[test]
+    fn test_user_blocked_bead_with_dependencies_not_ready() {
+        let (_temp, storage) = setup_test_db();
+
+        // Create a user-blocked bead
+        let mut user_blocked = Issue::new("bf-user-blocked".to_string(), "User blocked".to_string(), ".".to_string());
+        user_blocked.status = Status::Blocked;
+        storage.create_issue(&user_blocked).unwrap();
+
+        // Create a dependent that depends on the user-blocked bead
+        let dependent = create_open_bead(&storage, "bf-dependent", "Dependent", Priority::MEDIUM);
+        storage
+            .add_dependency("bf-dependent", "bf-user-blocked", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Neither should be ready (user-blocked isn't open, dependent is blocked)
+        assert_eq!(ready.len(), 0);
+        assert!(!ready.iter().any(|b| b.id == "bf-user-blocked"));
+        assert!(!ready.iter().any(|b| b.id == "bf-dependent"));
+    }
+
+    #[test]
+    fn test_complex_dependency_diamond() {
+        let (_temp, storage) = setup_test_db();
+
+        // Diamond dependency: A blocks both B and C, D depends on both B and C
+        //     B
+        //    / \
+        //   A   D
+        //    \ /
+        //     C
+
+        let blocker_a = create_open_bead(&storage, "bf-blocker-a", "Blocker A", Priority::MEDIUM);
+        let blocker_b = create_open_bead(&storage, "bf-blocker-b", "Blocker B", Priority::MEDIUM);
+        let blocker_c = create_open_bead(&storage, "bf-blocker-c", "Blocker C", Priority::MEDIUM);
+        let dependent_d = create_open_bead(&storage, "bf-dependent-d", "Dependent D", Priority::MEDIUM);
+
+        // A blocks B and C
+        storage
+            .add_dependency("bf-blocker-b", "bf-blocker-a", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-blocker-c", "bf-blocker-a", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        // D depends on both B and C
+        storage
+            .add_dependency("bf-dependent-d", "bf-blocker-b", &DependencyType::Blocks, "test-user")
+            .unwrap();
+        storage
+            .add_dependency("bf-dependent-d", "bf-blocker-c", &DependencyType::Blocks, "test-user")
+            .unwrap();
+
+        let ready = storage
+            .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 10, None, None)?))
+            .unwrap();
+
+        // Only A should be ready (B and C are blocked by A, D is blocked by both B and C)
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].id, "bf-blocker-a");
+    }
+}
