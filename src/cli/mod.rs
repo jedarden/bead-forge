@@ -1944,6 +1944,13 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
                     println!("  {}", line);
                 }
             }
+            // Display comments if present
+            if !issue.comments.is_empty() {
+                println!("Comments:");
+                for comment in &issue.comments {
+                    println!("  [{}] {}: {}", comment.id, comment.author, comment.body);
+                }
+            }
         }
     }
 
