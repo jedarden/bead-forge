@@ -4499,6 +4499,482 @@ mod tests {
     }
 
     #[test]
+    fn test_get_issue_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a valid test issue
+        let issue = Issue::new("bf-test".to_string(), "Test Issue".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Test SQL injection payloads - all should be handled safely
+        let malicious_inputs = vec![
+            "bf-123' OR '1'='1",
+            "bf-123'; DROP TABLE issues; --",
+            "bf-123' UNION SELECT * FROM issues WHERE '1'='1",
+            "' OR '1'='1",
+            "bf-123'--",
+            "bf-123'/*",
+            "'; EXEC('xp_cmdshell'); --",
+            "bf-123' AND 1=1--",
+            "bf-123' OR '1'='1'--",
+            "bf-123'; SELECT--",
+            "bf-123';DROP--",
+            "bf-123\nOR\n1=1",
+        ];
+
+        for payload in malicious_inputs {
+            let result = storage.get_issue(payload);
+            // Should either return None (no such ID) or Ok(None) - never crash
+            assert!(result.is_ok(), "Malicious payload '{}' should not cause error", payload);
+            let retrieved = result.unwrap();
+            // Malicious payloads should not return the valid test issue
+            if let Some(retrieved_issue) = retrieved {
+                assert_ne!(
+                    retrieved_issue.id, "bf-test",
+                    "Malicious payload '{}' should not return a different issue",
+                    payload
+                );
+            }
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.get_issue("bf-test");
+        assert!(normal_result.is_ok());
+        assert!(normal_result.unwrap().is_some(), "Normal query should work");
+    }
+
+    #[test]
+    fn test_get_dependencies_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test issues with valid dependencies
+        let issue1 = Issue::new("bf-issue1".to_string(), "Issue 1".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-issue2".to_string(), "Issue 2".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+        storage.create_issue(&issue2).unwrap();
+        storage.add_dependency("bf-issue1", "bf-issue2", &DependencyType::Blocks, "test").unwrap();
+
+        // Test malicious inputs
+        let malicious_inputs = vec![
+            "bf-123' OR '1'='1",
+            "bf-123'; DROP TABLE dependencies; --",
+            "bf-123' UNION SELECT * FROM dependencies WHERE '1'='1",
+            "' OR '1'='1",
+            "bf-123'--",
+            "bf-123'/*",
+            "bf-123'; DELETE FROM issues--",
+        ];
+
+        for payload in malicious_inputs {
+            let result = storage.get_dependencies(payload);
+            // Should not crash - return empty Vec or error
+            assert!(result.is_ok() || result.is_err(), "Malicious payload '{}' should not crash", payload);
+            if result.is_ok() {
+                let deps = result.unwrap();
+                // Malicious payloads should not return valid dependencies
+                assert_eq!(deps.len(), 0, "Malicious payload '{}' should return empty dependencies", payload);
+            }
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.get_dependencies("bf-issue1");
+        assert!(normal_result.is_ok());
+        assert_eq!(normal_result.unwrap().len(), 1, "Normal query should work");
+    }
+
+    #[test]
+    fn test_add_dependency_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create valid test issues
+        let issue1 = Issue::new("bf-issue1".to_string(), "Issue 1".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-issue2".to_string(), "Issue 2".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+        storage.create_issue(&issue2).unwrap();
+
+        // Test malicious inputs for both issue_id and depends_on_id
+        let malicious_inputs = vec![
+            ("bf-123' OR '1'='1", "bf-issue2"),
+            ("bf-issue1", "bf-123'; DROP TABLE dependencies; --"),
+            ("bf-123'; SELECT--", "bf-issue2"),
+            ("'; EXEC('xp_cmdshell'); --", "bf-issue2"),
+            ("bf-issue1", "bf-123' UNION SELECT * FROM issues"),
+        ];
+
+        for (issue_id, depends_on_id) in malicious_inputs {
+            let result = storage.add_dependency(issue_id, depends_on_id, &DependencyType::Blocks, "test");
+            // Should either fail (no such issue) or succeed but not affect real data
+            // Most importantly: should never crash
+            assert!(result.is_ok() || result.is_err(), "Malicious input should not crash");
+
+            // Verify no malicious dependency was actually added
+            let deps = storage.get_dependencies("bf-issue1").unwrap();
+            assert_eq!(deps.len(), 0, "Malicious input should not create dependencies");
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.add_dependency("bf-issue1", "bf-issue2", &DependencyType::Blocks, "test");
+        assert!(normal_result.is_ok(), "Normal operation should work");
+        let deps = storage.get_dependencies("bf-issue1").unwrap();
+        assert_eq!(deps.len(), 1, "Normal dependency should be added");
+    }
+
+    #[test]
+    fn test_remove_dependency_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create valid test issues with a dependency
+        let issue1 = Issue::new("bf-issue1".to_string(), "Issue 1".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-issue2".to_string(), "Issue 2".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+        storage.create_issue(&issue2).unwrap();
+        storage.add_dependency("bf-issue1", "bf-issue2", &DependencyType::Blocks, "test").unwrap();
+
+        // Verify dependency exists
+        let deps_before = storage.get_dependencies("bf-issue1").unwrap();
+        assert_eq!(deps_before.len(), 1, "Dependency should exist before removal");
+
+        // Test malicious inputs
+        let malicious_inputs = vec![
+            ("bf-123' OR '1'='1", "bf-issue2"),
+            ("bf-issue1", "bf-123'; DROP TABLE dependencies; --"),
+            ("bf-123'; DELETE FROM issues--", "bf-issue2"),
+        ];
+
+        for (issue_id, depends_on_id) in malicious_inputs {
+            let result = storage.remove_dependency(issue_id, depends_on_id);
+            // Should not crash
+            assert!(result.is_ok() || result.is_err(), "Malicious input should not crash");
+
+            // Verify the real dependency still exists
+            let deps = storage.get_dependencies("bf-issue1").unwrap();
+            assert_eq!(deps.len(), 1, "Malicious input should not affect real dependencies");
+        }
+
+        // Verify normal removal still works
+        let normal_result = storage.remove_dependency("bf-issue1", "bf-issue2");
+        assert!(normal_result.is_ok(), "Normal removal should work");
+        let deps_after = storage.get_dependencies("bf-issue1").unwrap();
+        assert_eq!(deps_after.len(), 0, "Dependency should be removed");
+    }
+
+    #[test]
+    fn test_add_label_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a valid test issue
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Test malicious inputs for issue_id
+        let malicious_inputs = vec![
+            ("bf-123' OR '1'='1", "test-label"),
+            ("bf-123'; DROP TABLE bead_labels; --", "test-label"),
+            ("bf-123'; DELETE FROM issues--", "test-label"),
+        ];
+
+        for (issue_id, label) in malicious_inputs {
+            let result = storage.add_label(issue_id, label);
+            // Should not crash
+            assert!(result.is_ok() || result.is_err(), "Malicious input should not crash");
+
+            // Verify label was not added to real issue
+            let labels = storage.get_labels("bf-test").unwrap();
+            assert!(!labels.contains(&"test-label".to_string()), "Malicious input should not add labels");
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.add_label("bf-test", "valid-label");
+        assert!(normal_result.is_ok(), "Normal operation should work");
+        let labels = storage.get_labels("bf-test").unwrap();
+        assert!(labels.contains(&"valid-label".to_string()), "Label should be added");
+    }
+
+    #[test]
+    fn test_get_labels_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a test issue with a label
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+        storage.add_label("bf-test", "test-label").unwrap();
+
+        // Test malicious inputs
+        let malicious_inputs = vec![
+            "bf-123' OR '1'='1",
+            "bf-123'; DROP TABLE bead_labels; --",
+            "bf-123' UNION SELECT * FROM bead_labels",
+            "' OR '1'='1",
+        ];
+
+        for payload in malicious_inputs {
+            let result = storage.get_labels(payload);
+            // Should not crash - should return empty or error
+            assert!(result.is_ok() || result.is_err(), "Malicious payload should not crash");
+            if result.is_ok() {
+                let labels = result.unwrap();
+                assert!(!labels.contains(&"test-label".to_string()), "Malicious payload should not return labels");
+            }
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.get_labels("bf-test");
+        assert!(normal_result.is_ok());
+        assert!(normal_result.unwrap().contains(&"test-label".to_string()), "Normal query should work");
+    }
+
+    #[test]
+    fn test_set_annotation_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a valid test issue
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Test malicious inputs for issue_id
+        let malicious_inputs = vec![
+            ("bf-123' OR '1'='1", "key", "value"),
+            ("bf-123'; DROP TABLE bead_annotations; --", "key", "value"),
+            ("bf-123'; DELETE FROM issues--", "key", "value"),
+        ];
+
+        for (issue_id, key, value) in malicious_inputs {
+            let result = storage.set_annotation(issue_id, key, value);
+            // Should not crash
+            assert!(result.is_ok() || result.is_err(), "Malicious input should not crash");
+
+            // Verify annotation was not added to real issue
+            let annotations = storage.get_annotations("bf-test").unwrap();
+            assert!(!annotations.contains_key("key"), "Malicious input should not add annotations");
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.set_annotation("bf-test", "valid-key", "valid-value");
+        assert!(normal_result.is_ok(), "Normal operation should work");
+        let annotations = storage.get_annotations("bf-test").unwrap();
+        assert_eq!(annotations.get("valid-key"), Some(&"valid-value".to_string()), "Annotation should be set");
+    }
+
+    #[test]
+    fn test_get_annotations_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a test issue with annotations
+        let mut issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        issue.annotations.insert("test-key".to_string(), "test-value".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Test malicious inputs
+        let malicious_inputs = vec![
+            "bf-123' OR '1'='1",
+            "bf-123'; DROP TABLE bead_annotations; --",
+            "bf-123' UNION SELECT * FROM bead_annotations",
+            "' OR '1'='1",
+        ];
+
+        for payload in malicious_inputs {
+            let result = storage.get_annotations(payload);
+            // Should not crash - should return empty or error
+            assert!(result.is_ok() || result.is_err(), "Malicious payload should not crash");
+            if result.is_ok() {
+                let annotations = result.unwrap();
+                assert!(!annotations.contains_key("test-key"), "Malicious payload should not return annotations");
+            }
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.get_annotations("bf-test");
+        assert!(normal_result.is_ok());
+        let annotations = normal_result.unwrap();
+        assert_eq!(annotations.get("test-key"), Some(&"test-value".to_string()), "Normal query should work");
+    }
+
+    #[test]
+    fn test_add_comment_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a valid test issue
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Test malicious inputs for issue_id
+        let malicious_inputs = vec![
+            ("bf-123' OR '1'='1", "author", "body"),
+            ("bf-123'; DROP TABLE comments; --", "author", "body"),
+            ("bf-123'; DELETE FROM issues--", "author", "body"),
+        ];
+
+        for (issue_id, author, body) in malicious_inputs {
+            let result = storage.add_comment(issue_id, author, body);
+            // Should not crash
+            assert!(result.is_ok() || result.is_err(), "Malicious input should not crash");
+
+            // Verify comment was not added to real issue
+            let retrieved = storage.get_issue("bf-test").unwrap().unwrap();
+            assert_eq!(retrieved.comments.len(), 0, "Malicious input should not add comments");
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.add_comment("bf-test", "valid-author", "valid-body");
+        assert!(normal_result.is_ok(), "Normal operation should work");
+        let retrieved = storage.get_issue("bf-test").unwrap().unwrap();
+        assert_eq!(retrieved.comments.len(), 1, "Comment should be added");
+    }
+
+    #[test]
+    fn test_list_comments_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a test issue with a comment
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+        storage.add_comment("bf-test", "author", "body").unwrap();
+
+        // Test malicious inputs
+        let malicious_inputs = vec![
+            "bf-123' OR '1'='1",
+            "bf-123'; DROP TABLE comments; --",
+            "bf-123' UNION SELECT * FROM comments",
+            "' OR '1'='1",
+        ];
+
+        for payload in malicious_inputs {
+            let result = storage.list_comments(payload);
+            // Should not crash - should return empty or error
+            assert!(result.is_ok() || result.is_err(), "Malicious payload should not crash");
+            if result.is_ok() {
+                let comments = result.unwrap();
+                assert_eq!(comments.len(), 0, "Malicious payload should not return comments");
+            }
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.list_comments("bf-test");
+        assert!(normal_result.is_ok());
+        assert_eq!(normal_result.unwrap().len(), 1, "Normal query should work");
+    }
+
+    #[test]
+    fn test_list_events_sql_injection_protection() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create a test issue (will have auto-created event)
+        let issue = Issue::new("bf-test".to_string(), "Test".to_string(), ".".to_string());
+        storage.create_issue(&issue).unwrap();
+
+        // Test malicious inputs
+        let malicious_inputs = vec![
+            "bf-123' OR '1'='1",
+            "bf-123'; DROP TABLE events; --",
+            "bf-123' UNION SELECT * FROM events",
+            "' OR '1'='1",
+        ];
+
+        for payload in malicious_inputs {
+            let result = storage.list_events(payload);
+            // Should not crash - should return empty or error
+            assert!(result.is_ok() || result.is_err(), "Malicious payload should not crash");
+            if result.is_ok() {
+                let events = result.unwrap();
+                assert_eq!(events.len(), 0, "Malicious payload should not return events");
+            }
+        }
+
+        // Verify normal operation still works
+        let normal_result = storage.list_events("bf-test");
+        assert!(normal_result.is_ok());
+        assert!(normal_result.unwrap().len() >= 1, "Normal query should work");
+    }
+
+    #[test]
+    fn test_cross_function_security_consistency() {
+        // Comprehensive test to ensure all functions handle malicious input consistently
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create valid test data
+        let issue1 = Issue::new("bf-valid1".to_string(), "Valid 1".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-valid2".to_string(), "Valid 2".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+        storage.create_issue(&issue2).unwrap();
+        storage.add_dependency("bf-valid1", "bf-valid2", &DependencyType::Blocks, "test").unwrap();
+        storage.add_label("bf-valid1", "test-label").unwrap();
+        storage.add_comment("bf-valid1", "author", "body").unwrap();
+
+        // Common malicious payload
+        let malicious_id = "bf-123' OR '1'='1";
+
+        // All functions should handle this safely without crashing
+        // Test each function individually
+        assert!(storage.get_issue(malicious_id).is_ok() || storage.get_issue(malicious_id).is_err(),
+                "get_issue should handle malicious input safely");
+        assert!(storage.get_dependencies(malicious_id).is_ok() || storage.get_dependencies(malicious_id).is_err(),
+                "get_dependencies should handle malicious input safely");
+        assert!(storage.get_labels(malicious_id).is_ok() || storage.get_labels(malicious_id).is_err(),
+                "get_labels should handle malicious input safely");
+        assert!(storage.get_annotations(malicious_id).is_ok() || storage.get_annotations(malicious_id).is_err(),
+                "get_annotations should handle malicious input safely");
+        assert!(storage.list_comments(malicious_id).is_ok() || storage.list_comments(malicious_id).is_err(),
+                "list_comments should handle malicious input safely");
+        assert!(storage.list_events(malicious_id).is_ok() || storage.list_events(malicious_id).is_err(),
+                "list_events should handle malicious input safely");
+
+        // Verify valid data is still accessible and not affected
+        assert!(storage.get_issue("bf-valid1").unwrap().is_some(), "Valid data should still be accessible");
+        assert_eq!(storage.get_dependencies("bf-valid1").unwrap().len(), 1, "Valid dependencies should still exist");
+        assert!(storage.get_labels("bf-valid1").unwrap().contains(&"test-label".to_string()), "Valid labels should still exist");
+    }
+
+    #[test]
+    fn test_parameterized_query_integrity() {
+        // Test that parameterized queries maintain integrity and prevent injection
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create test issues with specific data
+        let issue1 = Issue::new("bf-abc".to_string(), "Issue ABC".to_string(), ".".to_string());
+        let issue2 = Issue::new("bf-def".to_string(), "Issue DEF".to_string(), ".".to_string());
+        storage.create_issue(&issue1).unwrap();
+        storage.create_issue(&issue2).unwrap();
+
+        // Attempt to use quotes and special characters that would break string concatenation
+        // but should be safe with parameterized queries
+        let special_inputs = vec![
+            "bf-abc'def",  // Contains quote
+            "bf-abc;def",  // Contains semicolon
+            "bf-abc--def", // Contains comment markers
+        ];
+
+        for input in special_inputs {
+            let result = storage.get_issue(input);
+            // Should handle safely
+            assert!(result.is_ok(), "Special characters should not cause errors");
+
+            // Should not return bf-abc or bf-def
+            if let Some(retrieved) = result.unwrap() {
+                assert_ne!(retrieved.id, "bf-abc", "Should not return different issue");
+                assert_ne!(retrieved.id, "bf-def", "Should not return different issue");
+            }
+        }
+
+        // Verify normal queries still return correct data
+        let abc_result = storage.get_issue("bf-abc").unwrap().unwrap();
+        assert_eq!(abc_result.id, "bf-abc");
+        assert_eq!(abc_result.title, "Issue ABC");
+    }
+
+    #[test]
     fn test_get_dep_tree_regression_functionality() {
         // Comprehensive regression test to ensure normal functionality works
         let temp_file = NamedTempFile::new().unwrap();

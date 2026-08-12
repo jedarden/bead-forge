@@ -1247,12 +1247,21 @@ pub fn repair_stack(workspace_dir: &Path, opts: &RepairOptions) -> Result<Repair
 
     // ---- Post-verification: did the rebuild produce a sound workspace? ----
     let verify = check(workspace_dir)?;
-    // Preserved dirty beads legitimately show up as db-only (missing_in_jsonl); that
-    // is the expected unflushed state and must not count as a verification failure.
+    // Preserved dirty beads legitimately show up as db-only (missing_in_jsonl) and may
+    // have different hashes than their JSONL counterparts (they carry newer state that
+    // hasn't been flushed yet). Exclude them from verification failure checks.
+    let preserved_ids: std::collections::HashSet<String> =
+        dirty_snapshot.iter().map(|i| i.id.clone()).collect();
+    let hash_mismatch_excluding_preserved: Vec<_> = verify
+        .hash_mismatch
+        .into_iter()
+        .filter(|id| !preserved_ids.contains(id))
+        .collect();
+
     let verify_ok = verify.db_ok
         && verify.jsonl_ok
         && verify.missing_in_sqlite.is_empty()
-        && verify.hash_mismatch.is_empty();
+        && hash_mismatch_excluding_preserved.is_empty();
 
     if !verify_ok {
         // Roll back to the verified backup and raise the repeat-failure gate.
@@ -1262,7 +1271,7 @@ pub fn repair_stack(workspace_dir: &Path, opts: &RepairOptions) -> Result<Repair
             verify.db_ok,
             verify.jsonl_ok,
             verify.missing_in_sqlite.len(),
-            verify.hash_mismatch.len(),
+            hash_mismatch_excluding_preserved.len(),
             manifest.run_id
         );
         recovery::restore_run(&beads_dir, &manifest.run_id)?;

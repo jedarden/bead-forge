@@ -3,6 +3,7 @@
 //! This is the foundational ready command that lists all open (not closed) beads.
 //! Dependency filtering will be added in a subsequent bead.
 
+use crate::claim::get_ready_candidates;
 use crate::format::{get_formatter, OutputFormat};
 use crate::model::{Issue, IssueFilter, Status};
 use crate::storage::Storage;
@@ -34,17 +35,19 @@ pub fn run_ready(
     let db_path = beads_dir.join(&metadata.database);
     let storage = Storage::open(&db_path)?;
 
-    // Build filter to get all open (not closed) beads
-    let mut filter = IssueFilter::default();
-    filter.status = Some(Status::Open);
+    // Use get_ready_candidates which implements proper priority sorting (P0 > P1 > P2)
+    // and FIFO ordering within same priority
+    let scored_beads = storage.with_immediate_transaction(|tx| {
+        get_ready_candidates(tx, limit, None, None)
+    })?;
 
-    // --limit 0 means unlimited (None in filter)
-    if limit > 0 {
-        filter.limit = Some(limit);
+    // Convert ScoredBead to Issue for formatting compatibility
+    let mut issues = Vec::new();
+    for scored in scored_beads {
+        if let Some(issue) = storage.get_issue(&scored.id)? {
+            issues.push(issue);
+        }
     }
-
-    // Query for all open beads
-    let issues = storage.list_issues(&filter)?;
 
     // Use the common formatter pattern for consistency with other commands
     let output_format = OutputFormat::from_str(format).unwrap_or(OutputFormat::Text);

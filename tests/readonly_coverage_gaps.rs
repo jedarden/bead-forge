@@ -123,7 +123,7 @@ fn run_command(workspace: &Path, args: &[&str]) -> anyhow::Result<()> {
     full_args.push(workspace.to_str().unwrap());
 
     let cli = bead_forge::cli::Cli::parse_from(full_args.iter());
-    bead_forge::cli::run(cli)
+    Ok(bead_forge::cli::run(cli)?)
 }
 
 // =============================================================================

@@ -233,7 +233,7 @@ fn test_jsonl_export_dirty_only() {
     let dirty_count: i64 = storage
         .with_immediate_transaction(|tx| {
             tx.query_row("SELECT COUNT(*) FROM dirty_issues", [], |row| row.get(0))
-                .map_err(|e| anyhow::anyhow!(e))
+                .map_err(|e| e.into())
         })
         .unwrap();
     assert_eq!(dirty_count, 0);
