@@ -2611,9 +2611,64 @@ fn cmd_doctor(
             }
             println!("  Run 'bf doctor --reconcile' to backfill these rows in place");
         }
+
+        // Report graph-shape defects. Neither is repaired by --reconcile: breaking a
+        // cycle and reversing an edge are both semantic decisions. They are surfaced
+        // here because nothing else surfaces them -- a cycle parks every bead in it
+        // silently, and `bf ready` reports no reason for the absence.
+        if !result.dependency_cycles.is_empty() {
+            println!(
+                "⚠ Dependency cycles: {} (every bead in a cycle is permanently unclosable)",
+                result.dependency_cycles.len()
+            );
+            for cycle in result.dependency_cycles.iter().take(10) {
+                println!("    - {} -> {}", cycle.join(" -> "), cycle[0]);
+            }
+            if result.dependency_cycles.len() > 10 {
+                println!("    ... and {} more", result.dependency_cycles.len() - 10);
+            }
+            println!("  Break each with 'bf dep remove <blocked> <blocker>'");
+        }
+
+        if !result.inverted_edges.is_empty() {
+            println!(
+                "⚠ Possibly-inverted edges: {} (a verification bead is blocking an \
+                 implementation bead)",
+                result.inverted_edges.len()
+            );
+            for e in result.inverted_edges.iter().take(10) {
+                println!(
+                    "    - {} \"{}\"",
+                    e.blocked,
+                    truncate_title(&e.blocked_title)
+                );
+                println!(
+                    "        blocked by {} \"{}\"",
+                    e.blocker,
+                    truncate_title(&e.blocker_title)
+                );
+            }
+            if result.inverted_edges.len() > 10 {
+                println!("    ... and {} more", result.inverted_edges.len() - 10);
+            }
+            println!(
+                "  Heuristic — confirm before acting. Reverse with 'bf dep remove <blocked> \
+                 <blocker> && bf dep add <blocked> --blocks <blocker>'"
+            );
+        }
     }
 
     Ok(())
+}
+
+/// Shorten a bead title for single-line doctor output.
+fn truncate_title(title: &str) -> String {
+    const MAX: usize = 60;
+    if title.chars().count() <= MAX {
+        return title.to_string();
+    }
+    let head: String = title.chars().take(MAX - 1).collect();
+    format!("{}…", head.trim_end())
 }
 
 fn cmd_commit_check(beads_dir: &PathBuf) -> Result<()> {

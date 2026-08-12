@@ -48,6 +48,31 @@ pub struct DoctorResult {
     // Reads are now NULL-tolerant, and this check surfaces the rows for `bf doctor
     // --fix-schema` to repair in place.
     pub null_not_null: Vec<NullNotNullViolation>,
+    // Blocking-dependency cycles among non-terminal beads. Every bead in a cycle is
+    // permanently unclosable: each waits on the next, so none can ever reach a state
+    // where its blockers are done. Reported, never auto-fixed -- which edge to cut is
+    // a semantic decision only the author can make.
+    pub dependency_cycles: Vec<Vec<String>>,
+    // Edges where a verification-shaped bead blocks an implementation-shaped bead, i.e.
+    // the graph says "verify it before you build it". Heuristic (title-prefix based), so
+    // reported as a warning and never auto-fixed.
+    pub inverted_edges: Vec<InvertedEdge>,
+}
+
+/// A dependency edge that runs against the direction work has to happen in: a
+/// verification-shaped bead ("Verify X", "Run clippy") recorded as the *blocker* of an
+/// implementation-shaped bead ("Implement X", "Add Y").
+///
+/// Almost always an argument-order slip at `bf dep add` time -- the arguments read
+/// naturally in the wrong order, and nothing downstream rejects the result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvertedEdge {
+    /// The implementation-shaped bead that is (wrongly) waiting.
+    pub blocked: String,
+    pub blocked_title: String,
+    /// The verification-shaped bead that is (wrongly) blocking.
+    pub blocker: String,
+    pub blocker_title: String,
 }
 
 /// A NOT NULL column that contains NULL values in one or more rows.
@@ -195,6 +220,47 @@ pub fn check(workspace_dir: &Path) -> Result<DoctorResult> {
     }
     result.null_not_null = null_not_null;
 
+    // Check for blocking-dependency cycles among non-terminal beads. Unlike the checks
+    // above this one is not repairable by `--reconcile`: breaking a cycle means deciding
+    // which edge was wrong, and only the author knows that. Reported so it cannot sit
+    // unnoticed -- a cycle silently parks every bead in it, and `bf ready` gives no hint.
+    let dependency_cycles = check_dependency_cycles(&db_path)?;
+    if !dependency_cycles.is_empty() {
+        let detail = dependency_cycles
+            .iter()
+            .map(|c| format!("{} -> {}", c.join(" -> "), c[0]))
+            .collect::<Vec<_>>()
+            .join("; ");
+        issues.push(format!(
+            "{} dependency cycle(s) detected -- every bead in a cycle is permanently \
+             unclosable and invisible to `bf ready`. Break each with `bf dep remove \
+             <blocked> <blocker>`: {}",
+            dependency_cycles.len(),
+            detail
+        ));
+    }
+    result.dependency_cycles = dependency_cycles;
+
+    // Check for edges pointing against the direction of the work (a "Verify X" bead
+    // recorded as the blocker of an "Implement X" bead). Heuristic, so this is advisory:
+    // it flags the shape for a human to confirm rather than rewriting the graph.
+    let inverted_edges = check_inverted_edges(&db_path)?;
+    if !inverted_edges.is_empty() {
+        let detail = inverted_edges
+            .iter()
+            .map(|e| format!("{} blocked by {}", e.blocked, e.blocker))
+            .collect::<Vec<_>>()
+            .join(", ");
+        issues.push(format!(
+            "{} possibly-inverted dependency edge(s): a verification bead is blocking an \
+             implementation bead, so the work can never start. Reverse a confirmed one with \
+             `bf dep remove <blocked> <blocker> && bf dep add <blocked> --blocks <blocker>`: {}",
+            inverted_edges.len(),
+            detail
+        ));
+    }
+    result.inverted_edges = inverted_edges;
+
     result.db_ok = db_ok;
     result.jsonl_ok = jsonl_ok;
     result.issues = issues;
@@ -235,6 +301,222 @@ fn check_stale_blocked_statuses(db_path: &Path) -> Result<Vec<String>> {
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(ids)
+}
+
+/// Dependency types that actually gate scheduling. Kept in sync with the blocker
+/// subquery in `check_stale_blocked_statuses`.
+const BLOCKING_DEP_TYPES: &str = "'blocks', 'parent-child', 'conditional-blocks', 'waits-for'";
+
+/// Statuses that mean "this bead no longer blocks anything".
+const TERMINAL_STATUSES: &str = "'closed', 'tombstone', 'done', 'completed'";
+
+/// Adjacency list of the blocking graph: `blocked bead -> the beads it waits on`.
+type BlockingEdges = std::collections::BTreeMap<String, Vec<String>>;
+
+/// Bead id -> title, for every bead appearing in [`BlockingEdges`].
+type BeadTitles = std::collections::BTreeMap<String, String>;
+
+/// Load the blocking-dependency graph restricted to non-terminal beads.
+///
+/// Terminal beads are excluded on both ends: a closed blocker gates nothing, so an edge
+/// through one cannot deadlock live work and is just history.
+fn load_active_graph(db_path: &Path) -> Result<(BlockingEdges, BeadTitles)> {
+    use std::collections::BTreeMap;
+
+    let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
+
+    let sql = format!(
+        r#"
+        SELECT d.issue_id, d.depends_on_id, blocked.title, blocker.title
+        FROM dependencies d
+        INNER JOIN issues blocked ON blocked.id = d.issue_id
+        INNER JOIN issues blocker ON blocker.id = d.depends_on_id
+        WHERE d.type IN ({types})
+          AND blocked.deleted_at IS NULL
+          AND blocker.deleted_at IS NULL
+          AND blocked.status NOT IN ({terminal})
+          AND blocker.status NOT IN ({terminal})
+        ORDER BY d.issue_id, d.depends_on_id
+        "#,
+        types = BLOCKING_DEP_TYPES,
+        terminal = TERMINAL_STATUSES,
+    );
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let mut edges: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut titles: BTreeMap<String, String> = BTreeMap::new();
+    for (blocked, blocker, blocked_title, blocker_title) in rows {
+        titles.insert(blocked.clone(), blocked_title);
+        titles.insert(blocker.clone(), blocker_title);
+        edges.entry(blocked.clone()).or_default().push(blocker);
+        edges.entry(blocked).or_default();
+    }
+    Ok((edges, titles))
+}
+
+/// Detect blocking-dependency cycles among non-terminal beads.
+///
+/// A cycle is unrecoverable without human input: every bead in it waits on the next, so
+/// no member can ever satisfy its blockers, and `bf ready` will never surface any of
+/// them. Observed live in NEEDLE (a 5-node ring in the 16.x epic) where it silently
+/// parked five beads -- including, with some irony, the bead whose job was to fix
+/// `add_dependency`.
+///
+/// Each returned vector is one cycle, listed in traversal order and *not* repeating the
+/// entry node at the end.
+fn check_dependency_cycles(db_path: &Path) -> Result<Vec<Vec<String>>> {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let (edges, _) = load_active_graph(db_path)?;
+
+    // Iterative three-colour DFS. White = unvisited, Grey = on the current path,
+    // Black = fully explored. An edge into a Grey node closes a cycle.
+    #[derive(Clone, Copy, PartialEq)]
+    enum Colour {
+        White,
+        Grey,
+        Black,
+    }
+
+    let mut colour: BTreeMap<&str, Colour> =
+        edges.keys().map(|k| (k.as_str(), Colour::White)).collect();
+    let mut cycles: Vec<Vec<String>> = Vec::new();
+    let mut seen_cycles: BTreeSet<Vec<String>> = BTreeSet::new();
+
+    for root in edges.keys() {
+        if colour.get(root.as_str()) != Some(&Colour::White) {
+            continue;
+        }
+        // (node, index of next child to visit)
+        let mut stack: Vec<(&str, usize)> = vec![(root.as_str(), 0)];
+        let mut path: Vec<&str> = vec![root.as_str()];
+        colour.insert(root.as_str(), Colour::Grey);
+
+        while let Some((node, child_idx)) = stack.pop() {
+            let children = edges.get(node).map(|v| v.as_slice()).unwrap_or(&[]);
+            if child_idx < children.len() {
+                stack.push((node, child_idx + 1));
+                let next = children[child_idx].as_str();
+                match colour.get(next).copied().unwrap_or(Colour::White) {
+                    Colour::Grey => {
+                        // Found a back-edge: the cycle is the path from `next` onward.
+                        if let Some(pos) = path.iter().position(|n| *n == next) {
+                            let cycle: Vec<String> =
+                                path[pos..].iter().map(|s| s.to_string()).collect();
+                            // Canonicalise so the same ring found from different entry
+                            // points is reported once.
+                            let mut key = cycle.clone();
+                            key.sort();
+                            key.dedup();
+                            if seen_cycles.insert(key) {
+                                cycles.push(cycle);
+                            }
+                        }
+                    }
+                    Colour::White => {
+                        colour.insert(next, Colour::Grey);
+                        path.push(next);
+                        stack.push((next, 0));
+                    }
+                    Colour::Black => {}
+                }
+            } else {
+                colour.insert(node, Colour::Black);
+                if path.last() == Some(&node) {
+                    path.pop();
+                }
+            }
+        }
+    }
+
+    Ok(cycles)
+}
+
+/// True if a title reads as a verification step rather than a change to the code.
+fn is_verification_title(title: &str) -> bool {
+    let t = title.trim().to_ascii_lowercase();
+    const PREFIXES: &[&str] = &[
+        "verify ",
+        "validate ",
+        "confirm ",
+        "check that ",
+        "run clippy",
+        "run cargo",
+        "run the test",
+        "run full test",
+        "run all test",
+    ];
+    PREFIXES.iter().any(|p| t.starts_with(p))
+}
+
+/// True if a title reads as a change to the code rather than a check on it.
+fn is_implementation_title(title: &str) -> bool {
+    let t = title.trim().to_ascii_lowercase();
+    const PREFIXES: &[&str] = &[
+        "implement ",
+        "add ",
+        "create ",
+        "write ",
+        "apply ",
+        "fix ",
+        "wire ",
+        "export ",
+        "introduce ",
+        "build ",
+    ];
+    PREFIXES.iter().any(|p| t.starts_with(p))
+}
+
+/// Detect edges whose direction contradicts the order the work has to happen in.
+///
+/// This is a *heuristic* on title shape, so it is reported and never auto-fixed. It
+/// catches the argument-order slip at `bf dep add` time, which is otherwise invisible:
+/// the edge is structurally valid, so nothing rejects it, and the only symptom is an
+/// implementation bead that waits forever on its own verification.
+///
+/// Measured on NEEDLE 2026-08-12: 21 such edges, arising at a steady 4-6% of new beads
+/// across three months -- i.e. a recurring authoring error, not a one-off migration
+/// artifact, which is why it needs a standing check rather than a cleanup.
+fn check_inverted_edges(db_path: &Path) -> Result<Vec<InvertedEdge>> {
+    let (edges, titles) = load_active_graph(db_path)?;
+    let mut out = Vec::new();
+
+    for (blocked, blockers) in &edges {
+        let blocked_title = match titles.get(blocked) {
+            Some(t) => t,
+            None => continue,
+        };
+        if !is_implementation_title(blocked_title) {
+            continue;
+        }
+        for blocker in blockers {
+            let blocker_title = match titles.get(blocker) {
+                Some(t) => t,
+                None => continue,
+            };
+            if is_verification_title(blocker_title) {
+                out.push(InvertedEdge {
+                    blocked: blocked.clone(),
+                    blocked_title: blocked_title.clone(),
+                    blocker: blocker.clone(),
+                    blocker_title: blocker_title.clone(),
+                });
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Find beads whose `assignee` is the literal empty string rather than NULL (bf-29wxxl).
@@ -1434,6 +1716,172 @@ mod tests {
     use crate::jsonl::export_jsonl;
     use crate::model::{Issue, IssueType, Priority, Status};
     use tempfile::TempDir;
+
+    /// Build a workspace with the given beads and blocking edges.
+    /// `edges` are `(blocked, blocker)` pairs, matching `bf dep add <blocker> --blocks <blocked>`.
+    fn graph_fixture(beads: &[(&str, &str, Status)], edges: &[(&str, &str)]) -> (TempDir, PathBuf) {
+        use crate::model::DependencyType;
+
+        let temp_dir = TempDir::new().unwrap();
+        let beads_dir = temp_dir.path().join(".beads");
+        init_workspace(&beads_dir, "bf").unwrap();
+        let metadata = load_metadata(&beads_dir).unwrap();
+        let db_path = beads_dir.join(&metadata.database);
+
+        let storage = Storage::open(&db_path).unwrap();
+
+        // Create every bead Open first, wire the edges, and only then apply the target
+        // statuses. Two reasons: it mirrors reality (edges are authored while the work is
+        // live, and beads close later), and `add_dependency` currently fails outright when
+        // the blocked bead is already closed -- it sets status='blocked' without clearing
+        // closed_at and trips the status/closed_at CHECK constraint.
+        for (id, title, _) in beads {
+            let issue = Issue {
+                id: (*id).to_string(),
+                title: (*title).to_string(),
+                status: Status::Open,
+                priority: Priority::MEDIUM,
+                issue_type: IssueType::Task,
+                source_repo: Some(".".to_string()),
+                ..Default::default()
+            };
+            storage.create_issue(&issue).unwrap();
+        }
+        for (blocked, blocker) in edges {
+            storage
+                .add_dependency(blocked, blocker, &DependencyType::Blocks, "test-actor")
+                .unwrap();
+        }
+        // Apply terminal statuses directly: the status/closed_at pair has to move together
+        // to satisfy the CHECK constraint.
+        let conn = Connection::open(&db_path).unwrap();
+        for (id, _, status) in beads {
+            if status.is_terminal() {
+                conn.execute(
+                    "UPDATE issues SET status = ?1, closed_at = ?2 WHERE id = ?3",
+                    rusqlite::params![status.to_string(), chrono::Utc::now().to_rfc3339(), id],
+                )
+                .unwrap();
+            }
+        }
+        drop(conn);
+        (temp_dir, db_path)
+    }
+
+    #[test]
+    fn test_detects_dependency_cycle() {
+        let (_tmp, db) = graph_fixture(
+            &[
+                ("bf-a", "Add ring node one", Status::Open),
+                ("bf-b", "Add ring node two", Status::Open),
+                ("bf-c", "Add ring node three", Status::Open),
+            ],
+            // a <- b <- c <- a
+            &[("bf-b", "bf-a"), ("bf-c", "bf-b"), ("bf-a", "bf-c")],
+        );
+
+        let cycles = check_dependency_cycles(&db).unwrap();
+        assert_eq!(cycles.len(), 1, "expected exactly one cycle: {:?}", cycles);
+        let mut members = cycles[0].clone();
+        members.sort();
+        assert_eq!(members, vec!["bf-a", "bf-b", "bf-c"]);
+    }
+
+    #[test]
+    fn test_acyclic_graph_reports_no_cycle() {
+        let (_tmp, db) = graph_fixture(
+            &[
+                ("bf-a", "Add helper", Status::Open),
+                ("bf-b", "Add caller", Status::Open),
+                ("bf-c", "Verify behaviour", Status::Open),
+            ],
+            // a -> b -> c, a proper chain
+            &[("bf-b", "bf-a"), ("bf-c", "bf-b")],
+        );
+        assert!(check_dependency_cycles(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_cycle_through_closed_bead_is_not_reported() {
+        // A ring is only a deadlock if every member can still block. Once one member
+        // closes the ring is broken in practice, so it must not be reported.
+        let (_tmp, db) = graph_fixture(
+            &[
+                ("bf-a", "Add ring node one", Status::Open),
+                ("bf-b", "Add ring node two", Status::Closed),
+                ("bf-c", "Add ring node three", Status::Open),
+            ],
+            &[("bf-b", "bf-a"), ("bf-c", "bf-b"), ("bf-a", "bf-c")],
+        );
+        assert!(check_dependency_cycles(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_detects_inverted_edge() {
+        let (_tmp, db) = graph_fixture(
+            &[
+                ("bf-impl", "Implement widget parser", Status::Open),
+                ("bf-ver", "Verify widget parser output", Status::Open),
+            ],
+            // the implementation is (wrongly) waiting on its own verification
+            &[("bf-impl", "bf-ver")],
+        );
+
+        let inverted = check_inverted_edges(&db).unwrap();
+        assert_eq!(inverted.len(), 1, "got {:?}", inverted);
+        assert_eq!(inverted[0].blocked, "bf-impl");
+        assert_eq!(inverted[0].blocker, "bf-ver");
+    }
+
+    #[test]
+    fn test_correct_direction_is_not_flagged() {
+        let (_tmp, db) = graph_fixture(
+            &[
+                ("bf-impl", "Implement widget parser", Status::Open),
+                ("bf-ver", "Verify widget parser output", Status::Open),
+            ],
+            // verification waits on the implementation -- the correct direction
+            &[("bf-ver", "bf-impl")],
+        );
+        assert!(check_inverted_edges(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_inverted_edge_between_closed_beads_is_not_flagged() {
+        // Historical inversions on finished work are noise, not a defect to act on.
+        let (_tmp, db) = graph_fixture(
+            &[
+                ("bf-impl", "Implement widget parser", Status::Closed),
+                ("bf-ver", "Verify widget parser output", Status::Closed),
+            ],
+            &[("bf-impl", "bf-ver")],
+        );
+        assert!(check_inverted_edges(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_title_shape_classifiers() {
+        assert!(is_verification_title("Verify OTLP initialization and logs"));
+        assert!(is_verification_title("Run clippy and fix warnings"));
+        assert!(is_verification_title(
+            "validate needle-ci-builder image contents"
+        ));
+        assert!(!is_verification_title("Add expand_tilde unit tests"));
+        // "verification" as a noun mid-title must not trip the prefix match
+        assert!(!is_verification_title(
+            "Add logging verification and run test suite"
+        ));
+
+        assert!(is_implementation_title(
+            "Implement tilde expansion in config loader"
+        ));
+        assert!(is_implementation_title(
+            "Fix HOME isolation in in-process Worker tests"
+        ));
+        assert!(!is_implementation_title(
+            "Verify tests pass with isolated workspace_root"
+        ));
+    }
 
     #[test]
     fn test_check_empty_workspace() {
