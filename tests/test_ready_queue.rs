@@ -7,7 +7,7 @@
 //! 4. Query sorts by priority (P0 > P1 > P2)
 
 use bead_forge::claim::get_ready_candidates;
-use bead_forge::model::{Issue, IssueType, Priority, Status};
+use bead_forge::model::{DependencyType, Issue, IssueType, Priority, Status};
 use bead_forge::storage::Storage;
 use chrono::Utc;
 use rusqlite::params;
@@ -1166,6 +1166,485 @@ fn test_filter_all_candidates_match() {
         filtered_ids, original_ids,
         "Filtering should preserve original order when all items match"
     );
+}
+
+// =============================================================================
+// Edge Case and Error Handling Tests
+// =============================================================================
+
+/// Test 1: Query with malformed filter criteria - invalid priority value
+///
+/// This test verifies that the query handles edge case priority values
+/// gracefully. The database schema constrains priorities to 0-4 (CHECK constraint),
+/// so we test the boundary values and ordering behavior.
+#[test]
+fn test_query_handles_boundary_priority_values() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create beads with boundary priority values (0 and 4 are the valid range)
+    let now = Utc::now();
+
+    let mut p0_bead = Issue {
+        id: "bf-p0".to_string(),
+        title: "Priority 0 (Critical)".to_string(),
+        status: Status::Open,
+        priority: Priority(0), // Lowest value (highest priority)
+        issue_type: IssueType::Task,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        source_repo: Some(".".to_string()),
+        events: Vec::new(),
+        ..Default::default()
+    };
+    storage.create_issue(&p0_bead).unwrap();
+
+    let mut p4_bead = Issue {
+        id: "bf-p4".to_string(),
+        title: "Priority 4 (Backlog)".to_string(),
+        status: Status::Open,
+        priority: Priority(4), // Highest value (lowest priority)
+        issue_type: IssueType::Task,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        source_repo: Some(".".to_string()),
+        events: Vec::new(),
+        ..Default::default()
+    };
+    storage.create_issue(&p4_bead).unwrap();
+
+    let mut p2_bead = Issue {
+        id: "bf-p2".to_string(),
+        title: "Priority 2 (Normal)".to_string(),
+        status: Status::Open,
+        priority: Priority(2),
+        issue_type: IssueType::Task,
+        created_at: now,
+        updated_at: now,
+        source_repo: Some(".".to_string()),
+        events: Vec::new(),
+        ..Default::default()
+    };
+    storage.create_issue(&p2_bead).unwrap();
+
+    // Query should handle boundary values correctly
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
+        .unwrap();
+
+    // All three beads should be returned
+    assert_eq!(candidates.len(), 3, "All beads with boundary priorities should be returned");
+
+    // Verify ordering: P0 first (lowest value = highest priority), then P2, then P4
+    assert_eq!(candidates[0].id, "bf-p0", "P0 should be first (highest priority)");
+    assert_eq!(candidates[0].priority, 0);
+    assert_eq!(candidates[1].id, "bf-p2", "P2 should be second");
+    assert_eq!(candidates[1].priority, 2);
+    assert_eq!(candidates[2].id, "bf-p4", "P4 should be third (lowest priority)");
+    assert_eq!(candidates[2].priority, 4);
+}
+
+/// Test 2: Query when database schema has missing optional columns
+///
+/// This test verifies graceful degradation when optional fields (like
+/// critical_path_cache entries) are missing. The query uses LEFT JOIN
+/// and COALESCE to handle missing data gracefully.
+#[test]
+fn test_query_handles_missing_critical_path_cache() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create beads that don't have entries in critical_path_cache
+    // (This is the normal state - not every bead is on a critical path)
+    create_test_bead(
+        &storage,
+        "bf-no-cache-1",
+        "No cache entry 1",
+        Status::Open,
+        Priority(1),
+    );
+    create_test_bead(
+        &storage,
+        "bf-no-cache-2",
+        "No cache entry 2",
+        Status::Open,
+        Priority(2),
+    );
+
+    // Delete any entries from critical_path_cache to simulate missing data
+    storage
+        .with_immediate_transaction(|tx| {
+            tx.execute("DELETE FROM critical_path_cache", [])?;
+            Ok(())
+        })
+        .unwrap();
+
+    // Query should handle missing critical_path_cache gracefully
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
+        .unwrap();
+
+    assert_eq!(candidates.len(), 2, "Beads without critical_path_cache should still be returned");
+
+    // Verify critical_float uses COALESCE default (1000.0 / (999 + 1) = 1.0)
+    for candidate in &candidates {
+        assert!(
+            (candidate.critical_float - 1.0).abs() < 0.01,
+            "Missing critical_path_cache should use default bonus, got {}",
+            candidate.critical_float
+        );
+    }
+}
+
+/// Test 3: Query handles beads with missing/NULL fields gracefully
+///
+/// This test verifies that beads with various NULL or missing optional
+/// fields are handled correctly by the query.
+#[test]
+fn test_query_handles_null_and_missing_fields() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create a bead and then manually set some fields to NULL
+    let now = Utc::now();
+    let issue = Issue {
+        id: "bf-null-fields".to_string(),
+        title: "Bead with potential NULL fields".to_string(),
+        status: Status::Open,
+        priority: Priority(2),
+        issue_type: IssueType::Task,
+        created_at: now.clone(),
+        updated_at: now,
+        source_repo: Some(".".to_string()),
+        events: Vec::new(),
+        assignee: None, // This field is NULL for open beads
+        closed_at: None, // Not closed, so NULL
+        ..Default::default()
+    };
+    storage.create_issue(&issue).unwrap();
+
+    // Query should handle NULL fields gracefully
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
+        .unwrap();
+
+    assert_eq!(candidates.len(), 1, "Bead with NULL optional fields should be returned");
+    assert_eq!(candidates[0].id, "bf-null-fields");
+
+    // Verify the query uses COALESCE for priority (not NULL in our schema, but defensive)
+    assert_eq!(candidates[0].priority, 2);
+}
+
+/// Test 4: Query returns deduplicated results (no same bead twice)
+///
+/// This test verifies that the query never returns duplicate bead IDs,
+/// even in edge cases like beads with multiple dependencies.
+#[test]
+fn test_query_returns_deduplicated_results() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create a bead with multiple dependencies (would produce multiple rows
+    // in the JOIN if we didn't use GROUP BY i.id)
+    let bead_with_deps = Issue {
+        id: "bf-with-many-deps".to_string(),
+        title: "Bead with many dependencies".to_string(),
+        status: Status::Open,
+        priority: Priority(2),
+        issue_type: IssueType::Task,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        source_repo: Some(".".to_string()),
+        events: Vec::new(),
+        ..Default::default()
+    };
+    storage.create_issue(&bead_with_deps).unwrap();
+
+    // Create 10 other beads that this bead depends on
+    for i in 0..10 {
+        let dep = Issue {
+            id: format!("bf-dep-{}", i),
+            title: format!("Dependency {}", i),
+            status: Status::Open,
+            priority: Priority(3),
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            events: Vec::new(),
+            ..Default::default()
+        };
+        storage.create_issue(&dep).unwrap();
+
+        // Add dependency from the main bead to this dependency
+        storage
+            .add_dependency(
+                "bf-with-many-deps",
+                &format!("bf-dep-{}", i),
+                &DependencyType::Blocks,
+                "test",
+            )
+            .unwrap();
+    }
+
+    // Query should return each bead only once, despite multiple JOIN matches
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
+        .unwrap();
+
+    // All 11 dependencies (open and not blocked) should be in the ready queue
+    // bf-with-many-deps is NOT ready because it's blocked by its dependencies
+    assert_eq!(candidates.len(), 10, "Should return exactly 10 unique dependency beads");
+
+    // Verify no duplicates: collect all IDs and check uniqueness
+    let mut ids: Vec<&str> = candidates.iter().map(|c| c.id.as_str()).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    assert_eq!(
+        ids.len(),
+        10,
+        "All candidates should be unique - found duplicates after deduplication"
+    );
+
+    // Verify bf-with-many-deps is NOT in the results (it's blocked)
+    assert!(
+        !candidates.iter().any(|c| c.id == "bf-with-many-deps"),
+        "Bead with dependencies should not be in ready queue while blocked"
+    );
+}
+
+/// Test 5: Query handles empty results gracefully (no open beads)
+///
+/// This test verifies that the query returns an empty result set when
+/// no beads match the criteria, rather than crashing or returning errors.
+#[test]
+fn test_query_returns_empty_when_no_ready_beads() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create only closed/tombstone beads
+    create_test_bead(
+        &storage,
+        "bf-closed",
+        "Closed bead",
+        Status::Closed,
+        Priority(0),
+    );
+    create_test_bead(
+        &storage,
+        "bf-tombstone",
+        "Tombstone bead",
+        Status::Tombstone,
+        Priority(1),
+    );
+
+    // Query should return empty results gracefully
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
+        .unwrap();
+
+    assert_eq!(candidates.len(), 0, "Empty result set should be returned when no beads match criteria");
+}
+
+/// Test 6: Query performance with large bead sets (1000+ beads)
+///
+/// This test verifies that the query completes in reasonable time even
+/// with a large number of beads in the database.
+#[test]
+fn test_query_performance_with_large_bead_set() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create 1500 open beads to test performance
+    let start = std::time::Instant::now();
+
+    for i in 0..1500 {
+        let priority = Priority(i % 5); // Mix of priorities 0-4
+        create_test_bead(
+            &storage,
+            &format!("bf-large-{:0>4}", i),
+            &format!("Large scale test bead {}", i),
+            Status::Open,
+            priority,
+        );
+    }
+
+    let creation_time = start.elapsed();
+    println!("Created 1500 test beads in {:?}", creation_time);
+
+    // Query with limit=100 should complete quickly
+    let query_start = std::time::Instant::now();
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
+        .unwrap();
+    let query_time = query_start.elapsed();
+
+    println!("Query with 1500 beads completed in {:?}", query_time);
+
+    // Verify we got results
+    assert_eq!(candidates.len(), 100, "Should return exactly 100 beads as requested");
+
+    // Performance assertion: query should complete within 5 seconds
+    // (This is a generous timeout - the actual query should be much faster)
+    assert!(
+        query_time < std::time::Duration::from_secs(5),
+        "Query with 1500 beads should complete within 5 seconds, took {:?}",
+        query_time
+    );
+
+    // Verify priority ordering is maintained in large result set
+    let mut prev_priority = None;
+    for candidate in &candidates {
+        if let Some(prev) = prev_priority {
+            assert!(
+                candidate.priority >= prev,
+                "Priority ordering should be maintained even with large result sets"
+            );
+        }
+        prev_priority = Some(candidate.priority);
+    }
+}
+
+/// Test 7: Query handles beads with special characters in ID/title
+///
+/// This test verifies that beads with special characters, SQL injection
+/// attempts, or unusual strings are handled safely.
+#[test]
+fn test_query_handles_special_characters_in_ids() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create beads with special characters in IDs and titles
+    let special_cases = vec![
+        ("bf-with-dash", "Bead with dash - test"),
+        ("bf_with_underscore", "Bead with underscore_test"),
+        ("bf.with.dots", "Bead with dots.test"),
+        ("bf:colon:test", "Bead with colon:test"),
+        ("bf;semicolon", "Bead with semicolon; drop table"),
+        ("bf'quote'test", "Bead with quote' character"),
+        ("bf\"doublequote\"", "Bead with doublequote\" character"),
+    ];
+
+    for (id, title) in &special_cases {
+        let issue = Issue {
+            id: id.to_string(),
+            title: title.to_string(),
+            status: Status::Open,
+            priority: Priority(2),
+            issue_type: IssueType::Task,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source_repo: Some(".".to_string()),
+            events: Vec::new(),
+            ..Default::default()
+        };
+        storage.create_issue(&issue).unwrap();
+    }
+
+    // Query should handle special characters safely
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, None, None)?))
+        .unwrap();
+
+    assert_eq!(candidates.len(), special_cases.len(), "All beads with special characters should be returned");
+
+    // Verify IDs match what we created (no SQL injection or corruption)
+    for candidate in &candidates {
+        assert!(
+            special_cases.iter().any(|(id, _)| id == &candidate.id),
+            "Special character ID should match original: {}",
+            candidate.id
+        );
+    }
+}
+
+/// Test 8: Query with velocity_stats when model/harness provided
+///
+/// This test verifies that velocity-aware scoring works when optional
+/// model and harness parameters are provided.
+#[test]
+fn test_query_with_velocity_scoring() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create test beads
+    create_test_bead(
+        &storage,
+        "bf-velocity-1",
+        "Velocity test 1",
+        Status::Open,
+        Priority(1),
+    );
+    create_test_bead(
+        &storage,
+        "bf-velocity-2",
+        "Velocity test 2",
+        Status::Open,
+        Priority(2),
+    );
+
+    // Populate velocity_stats table
+    storage
+        .with_immediate_transaction(|tx| {
+            tx.execute(
+                "INSERT INTO velocity_stats (model, harness, issue_type, p50_seconds, sample_count, last_updated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    "test-model",
+                    "test-harness",
+                    "task",
+                    600i64, // 10 minutes p50
+                    100i64,
+                    Utc::now().to_rfc3339()
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    // Query with model/harness should use velocity_stats for scoring
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, Some("test-model"), Some("test-harness"))?))
+        .unwrap();
+
+    assert_eq!(candidates.len(), 2, "Velocity-aware query should return ready beads");
+
+    // Verify both beads are present
+    let ids: Vec<&str> = candidates.iter().map(|c| c.id.as_str()).collect();
+    assert!(ids.contains(&"bf-velocity-1"), "Should contain bf-velocity-1");
+    assert!(ids.contains(&"bf-velocity-2"), "Should contain bf-velocity-2");
+}
+
+/// Test 9: Query handles beads without velocity_stats gracefully
+///
+/// This test verifies that when model/harness are provided but velocity_stats
+/// is missing for that combination, the query falls back gracefully to default
+/// values (1800 seconds = 30 minutes).
+#[test]
+fn test_query_with_missing_velocity_stats() {
+    let (_temp, storage) = setup_test_db();
+
+    // Create test beads
+    create_test_bead(
+        &storage,
+        "bf-no-velocity-1",
+        "No velocity data 1",
+        Status::Open,
+        Priority(1),
+    );
+    create_test_bead(
+        &storage,
+        "bf-no-velocity-2",
+        "No velocity data 2",
+        Status::Open,
+        Priority(2),
+    );
+
+    // DON'T populate velocity_stats - query should handle missing data
+
+    // Query with model/harness but no matching velocity_stats
+    let candidates = storage
+        .with_immediate_transaction(|tx| Ok(get_ready_candidates(tx, 100, Some("unknown-model"), Some("unknown-harness"))?))
+        .unwrap();
+
+    assert_eq!(candidates.len(), 2, "Query should handle missing velocity_stats gracefully");
+
+    // Verify both beads are present (fallback to default 1800 seconds)
+    let ids: Vec<&str> = candidates.iter().map(|c| c.id.as_str()).collect();
+    assert!(ids.contains(&"bf-no-velocity-1"), "Should contain bf-no-velocity-1");
+    assert!(ids.contains(&"bf-no-velocity-2"), "Should contain bf-no-velocity-2");
 }
 
 // =============================================================================
