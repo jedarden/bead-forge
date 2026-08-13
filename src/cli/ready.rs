@@ -160,6 +160,12 @@ mod tests {
 
     #[test]
     fn test_resolve_dependencies_for_json_no_deps() {
+        use tempfile::NamedTempFile;
+
+        // Create a proper test database
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
         // Test with an issue that has no dependencies
         let issue = Issue {
             id: "bf-123".to_string(),
@@ -171,7 +177,7 @@ mod tests {
         };
 
         let json_line = r#"{"id":"bf-123","title":"Test bead","status":"open"}"#;
-        let result = resolve_dependencies_for_json(&storage_mock(), &issue, json_line);
+        let result = resolve_dependencies_for_json(&storage, &issue, json_line);
 
         // Result should not include dependencies field
         assert!(result.contains("id"));
@@ -180,7 +186,24 @@ mod tests {
 
     #[test]
     fn test_resolve_dependencies_for_json_with_deps() {
-        // Test with an issue that has dependencies
+        use tempfile::NamedTempFile;
+
+        // Create a proper test database
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage = Storage::open(temp_file.path()).unwrap();
+
+        // Create the blocker bead first
+        let blocker = Issue {
+            id: "bf-456".to_string(),
+            title: "Blocker bead".to_string(),
+            status: Status::Open,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ..Default::default()
+        };
+        storage.create_issue(&blocker).unwrap();
+
+        // Create an issue with a dependency
         let mut issue = Issue {
             id: "bf-123".to_string(),
             title: "Test bead".to_string(),
@@ -201,19 +224,10 @@ mod tests {
         });
 
         let json_line = r#"{"id":"bf-123","title":"Test bead","status":"open"}"#;
-        let result = resolve_dependencies_for_json(&storage_mock(), &issue, json_line);
+        let result = resolve_dependencies_for_json(&storage, &issue, json_line);
 
         // Result should include resolved dependencies
         assert!(result.contains("dependencies"));
         assert!(result.contains("bf-456"));
-    }
-
-    // Mock storage for testing
-    fn storage_mock() -> Storage {
-        // This is a placeholder - real tests would use a test database
-        // For now, this just satisfies the type signature
-        let temp_dir = std::env::temp_dir();
-        let db_path = temp_dir.join("test_beads.db");
-        Storage::open(&db_path).unwrap()
     }
 }

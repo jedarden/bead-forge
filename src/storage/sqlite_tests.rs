@@ -873,16 +873,18 @@ mod comprehensive_tests {
         let temp_file = NamedTempFile::new().unwrap();
         let storage = Storage::open(temp_file.path()).unwrap();
 
-        // Create a blocked issue and a closed blocker
-        let mut blocker = Issue::new("bf-closed-blocker".to_string(), "Closed blocker".to_string(), ".".to_string());
-        blocker.status = Status::Closed;
+        // Create a blocked issue and a blocker (initially open)
+        let blocker = Issue::new("bf-closed-blocker".to_string(), "Closed blocker".to_string(), ".".to_string());
         storage.create_issue(&blocker).unwrap();
 
         let issue = Issue::new("bf-ready-2".to_string(), "Ready with closed blocker".to_string(), ".".to_string());
         storage.create_issue(&issue).unwrap();
 
-        // Add dependency on closed blocker
+        // Add dependency on blocker
         storage.add_dependency("bf-ready-2", "bf-closed-blocker", &DependencyType::Blocks, "test-user").unwrap();
+
+        // Close the blocker properly (this sets closed_at)
+        storage.close_issue("bf-closed-blocker", "test close", "test-user").unwrap();
 
         // Issue should be ready since blocker is closed
         let ready = storage.get_ready_candidates().unwrap();
