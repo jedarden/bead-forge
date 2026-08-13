@@ -193,7 +193,7 @@ pub enum Commands {
     /// Update a bead
     ///
     /// Updates a single field on a bead. Exactly one of --title, --status,
-    /// or --priority must be provided. All other fields are preserved unchanged.
+    /// --priority, or --assignee must be provided. All other fields are preserved unchanged.
     Update {
         /// Bead ID
         id: String,
@@ -209,6 +209,10 @@ pub enum Commands {
         /// New priority
         #[arg(long)]
         priority: Option<i32>,
+
+        /// New assignee (use "" to clear)
+        #[arg(long)]
+        assignee: Option<String>,
 
         /// Output JSON
         #[arg(long)]
@@ -1247,6 +1251,7 @@ pub fn run(cli: Cli) -> Result<()> {
             title,
             status,
             priority,
+            assignee,
             json,
         } => cmd_update(
             &beads_dir,
@@ -1254,6 +1259,7 @@ pub fn run(cli: Cli) -> Result<()> {
             title,
             status,
             priority,
+            assignee,
             no_auto_flush,
             json,
         ),
@@ -1963,6 +1969,7 @@ fn cmd_update(
     title: Option<String>,
     status: Option<String>,
     priority: Option<i32>,
+    assignee: Option<String>,
     no_auto_flush: bool,
     json: bool,
 ) -> Result<()> {
@@ -1979,6 +1986,17 @@ fn cmd_update(
     // Parse status if provided
     let status_parsed = status.map(|s| Status::from_str(&s)).transpose().map_err(|e| anyhow!(e))?;
 
+    // Handle assignee: distinguish between "not provided" (None) and "explicitly cleared" (Some(""))
+    // We pass through whatever the user provided and let the update/storage layer handle normalization
+    let assignee_for_update = if assignee.is_some() {
+        // User provided --assignee flag (could be empty string to clear, or a name to set)
+        // Pass it through as-is; the storage layer will normalize empty/whitespace to NULL
+        assignee.as_deref()
+    } else {
+        // No --assignee flag provided
+        None
+    };
+
     // Use the update module which enforces single-field semantics
     crate::update::update(
         &storage,
@@ -1986,6 +2004,7 @@ fn cmd_update(
         title.as_deref(),
         status_parsed,
         priority.map(Priority),
+        assignee_for_update,
     )?;
 
     let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
@@ -3133,6 +3152,13 @@ fn cmd_comments(
             let metadata = load_metadata(beads_dir)?;
             let db_path = beads_dir.join(&metadata.database);
             let storage = Storage::open(&db_path)?;
+
+            // Check if bead exists first to provide a better error message
+            let bead_exists = storage.get_issue(&id)?.is_some();
+            if !bead_exists {
+                return Err(anyhow!("Bead not found: {}", id).into());
+            }
+
             let comment_text = text.join(" ");
             let comment_id = storage.add_comment(&id, "cli", &comment_text)?;
             autoflush_after_mutation(beads_dir, &config, no_auto_flush);
