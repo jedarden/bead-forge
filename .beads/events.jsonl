@@ -83560,3 +83560,14 @@
 {"bead":"bf-1a0efp","duration_ms":54355,"event":"complete","exit_code":0,"outcome":"success","strand":"explore","ts":"2026-08-13T19:25:31.050894610+00:00","worker":"roam-3"}
 {"bead":"bf-1a0efp","event":"claim","strand":"explore","ts":"2026-08-13T19:25:31.233374567+00:00","worker":"roam-3"}
 {"adapter":"codex-gpt-5.6-luna-xhigh","bead":"bf-1a0efp","event":"dispatch","model":"gpt-5.6-luna","strand":"explore","ts":"2026-08-13T19:25:31.365062303+00:00","worker":"roam-3"}
+{"bead":"bf-49v64c","duration_ms":84419,"event":"complete","exit_code":0,"outcome":"success","strand":"explore","ts":"2026-08-13T19:26:16.039963335+00:00","worker":"glmroam-3"}
+{"bead":"bf-49v64c","event":"claim","strand":"explore","ts":"2026-08-13T19:26:16.217664554+00:00","worker":"glmroam-3"}
+{"adapter":"claude-code-glm-4.7","bead":"bf-49v64c","event":"dispatch","model":"glm-4.7","strand":"explore","ts":"2026-08-13T19:26:16.343081249+00:00","worker":"glmroam-3"}
+{"bead":"bf-1a0efp","duration_ms":46906,"event":"complete","exit_code":0,"outcome":"success","strand":"explore","ts":"2026-08-13T19:26:18.277064733+00:00","worker":"roam-3"}
+{"bead":"bf-1a0efp","event":"claim","strand":"explore","ts":"2026-08-13T19:26:18.478780037+00:00","worker":"roam-3"}
+{"adapter":"codex-gpt-5.6-luna-xhigh","bead":"bf-1a0efp","event":"dispatch","model":"gpt-5.6-luna","strand":"explore","ts":"2026-08-13T19:26:18.616264168+00:00","worker":"roam-3"}
+{"bead":"bf-1a0efp","duration_ms":58061,"event":"complete","exit_code":0,"outcome":"success","strand":"explore","ts":"2026-08-13T19:27:16.682435246+00:00","worker":"roam-3"}
+{"bead":"bf-1a0efp","event":"claim","strand":"explore","ts":"2026-08-13T19:27:16.894823737+00:00","worker":"roam-3"}
+{"adapter":"codex-gpt-5.6-luna-xhigh","bead":"bf-1a0efp","event":"dispatch","model":"gpt-5.6-luna","strand":"explore","ts":"2026-08-13T19:27:17.045658017+00:00","worker":"roam-3"}
+{"bead":"bf-49v64c","duration_ms":105108,"event":"complete","exit_code":0,"outcome":"success","strand":"explore","ts":"2026-08-13T19:28:01.456658518+00:00","worker":"glmroam-3"}
+{"bead":"bf-1xedhb","event":"claim","strand":"explore","ts":"2026-08-13T19:28:01.712963170+00:00","worker":"glmroam-3"}
