@@ -2004,7 +2004,6 @@ fn cmd_update(
         title.as_deref(),
         status_parsed,
         priority.map(Priority),
-        assignee_for_update,
     )?;
 
     let warning = autoflush_after_mutation(beads_dir, &config, no_auto_flush);
