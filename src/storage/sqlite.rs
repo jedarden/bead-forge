@@ -43,6 +43,17 @@ pub struct DependencyDisplay {
     pub title: String,
 }
 
+/// Timeout event data for a bead.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TimeoutEventData {
+    /// Number of timeout events for this bead
+    pub timeout_count: i64,
+    /// Duration of the most recent timeout in seconds (if available)
+    pub last_timeout_duration_secs: Option<i64>,
+    /// Timestamp of the most recent timeout event
+    pub last_timeout_at: Option<DateTime<Utc>>,
+}
+
 pub struct Storage {
     /// The database connection. Made public for testing purposes.
     pub conn: Mutex<Connection>,
@@ -2291,6 +2302,99 @@ impl Storage {
         })
     }
 
+    /// Query timeout events for a specific bead.
+    ///
+    /// Returns timeout event data including count, last duration, and timestamp.
+    /// Returns zero count and None values if no timeout events exist.
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead ID to query timeout events for
+    ///
+    /// # Returns
+    /// TimeoutEventData struct with timeout information
+    pub fn get_timeout_events(&self, bead_id: &str) -> Result<TimeoutEventData> {
+        let conn = self.conn.lock().unwrap();
+
+        // Query timeout count and most recent timeout info in a single query
+        let mut stmt = conn.prepare_cached(
+            "SELECT
+                COUNT(*) as timeout_count,
+                e.timeout_duration_secs,
+                e.ts
+             FROM bead_events e
+             WHERE e.bead_id = ?1 AND e.timeout = 1
+             ORDER BY e.ts DESC
+             LIMIT 1"
+        )?;
+
+        let mut rows = stmt.query(params![bead_id])?;
+
+        if let Some(row) = rows.next()? {
+            let timeout_count: i64 = row.get(0)?;
+            let timeout_duration_secs: Option<i64> = row.get(1)?;
+            let ts_str: Option<String> = row.get(2)?;
+            let last_timeout_at = match ts_str {
+                Some(ts) if !ts.is_empty() => Some(parse_datetime(ts)?),
+                _ => None,
+            };
+
+            Ok(TimeoutEventData {
+                timeout_count,
+                last_timeout_duration_secs: timeout_duration_secs,
+                last_timeout_at,
+            })
+        } else {
+            // No timeout events found
+            Ok(TimeoutEventData {
+                timeout_count: 0,
+                last_timeout_duration_secs: None,
+                last_timeout_at: None,
+            })
+        }
+    }
+
+    /// Get timeout event count for a specific bead.
+    ///
+    /// Returns the number of timeout events for the given bead.
+    /// Returns 0 if no timeout events exist.
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead ID to get timeout count for
+    ///
+    /// # Returns
+    /// Number of timeout events for the bead
+    pub fn get_timeout_count(&self, bead_id: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM bead_events WHERE bead_id = ?1 AND timeout = 1",
+            params![bead_id],
+            |row| row.get(0),
+        )?;
+        Ok(count)
+    }
+
+    /// Get the most recent timeout duration for a specific bead.
+    ///
+    /// Returns the duration of the most recent timeout event in seconds.
+    /// Returns None if no timeout events exist or if the duration is not available.
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead ID to get last timeout duration for
+    ///
+    /// # Returns
+    /// Optional duration of the most recent timeout in seconds
+    pub fn get_last_timeout_duration(&self, bead_id: &str) -> Result<Option<i64>> {
+        let conn = self.conn.lock().unwrap();
+        let result: Option<i64> = conn.query_row(
+            "SELECT timeout_duration_secs FROM bead_events
+             WHERE bead_id = ?1 AND timeout = 1
+             ORDER BY ts DESC LIMIT 1",
+            params![bead_id],
+            |row| row.get(0),
+        )?;
+        Ok(result)
+    }
+
     // Annotation methods
     pub fn get_annotations(&self, issue_id: &str) -> Result<BTreeMap<String, String>> {
         self.load_annotations(issue_id)
@@ -2890,6 +2994,131 @@ impl Storage {
         }
         Ok(())
     }
+
+    /// Query timeout events for a specific bead.
+    ///
+    /// Returns timeout event information including count and last timeout duration.
+    /// Returns None if no timeout events exist for the bead.
+    ///
+    /// # Arguments
+    /// * `bead_id` - The bead ID to query timeout events for
+    ///
+    /// # Returns
+    /// * `Option<BeadTimeoutInfo>` - Some with timeout info if any timeout events exist, None otherwise
+    pub fn query_timeout_events(&self, bead_id: &str) -> Result<Option<BeadTimeoutInfo>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare_cached(
+            "SELECT
+                COUNT(*) as timeout_count,
+                MAX(timeout_duration_secs) as last_timeout_duration,
+                MAX(ts) as last_timeout_at
+             FROM bead_events
+             WHERE bead_id = ?1 AND timeout = 1"
+        )?;
+
+        let mut rows = stmt.query(params![bead_id])?;
+
+        if let Some(row) = rows.next()? {
+            let count: i64 = row.get(0)?;
+            if count == 0 {
+                return Ok(None);
+            }
+
+            let last_duration: Option<i64> = row.get(1)?;
+            let last_timeout_at: Option<String> = row.get(2)?;
+
+            Ok(Some(BeadTimeoutInfo {
+                bead_id: bead_id.to_string(),
+                timeout_count: count as usize,
+                last_timeout_duration_secs: last_duration.map(|d| d as u64),
+                last_timeout_at: match last_timeout_at {
+                    Some(ts) => Some(parse_required_datetime(Some(ts))?),
+                    None => None,
+                },
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Query timeout events for multiple beads at once.
+    ///
+    /// Returns a map of bead_id to timeout event information.
+    /// Only includes beads that have at least one timeout event.
+    ///
+    /// # Arguments
+    /// * `bead_ids` - Slice of bead IDs to query timeout events for
+    ///
+    /// # Returns
+    /// * `HashMap<String, BeadTimeoutInfo>` - Map of bead_id to timeout info (only for beads with timeouts)
+    pub fn query_timeout_events_batch(
+        &self,
+        bead_ids: &[String],
+    ) -> Result<std::collections::HashMap<String, BeadTimeoutInfo>> {
+        if bead_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let conn = self.conn.lock().unwrap();
+        let mut result = std::collections::HashMap::new();
+
+        // Build the IN clause with placeholders
+        let in_clause = bead_ids.iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let query = format!(
+            "SELECT
+                bead_id,
+                COUNT(*) as timeout_count,
+                MAX(timeout_duration_secs) as last_timeout_duration,
+                MAX(ts) as last_timeout_at
+             FROM bead_events
+             WHERE bead_id IN ({}) AND timeout = 1
+             GROUP BY bead_id",
+            in_clause
+        );
+
+        let mut stmt = conn.prepare(&query)?;
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            bead_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+        let mut rows = stmt.query(param_refs.as_slice())?;
+
+        while let Some(row) = rows.next()? {
+            let bead_id: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+            let last_duration: Option<i64> = row.get(2)?;
+            let last_timeout_at: Option<String> = row.get(3)?;
+
+            result.insert(bead_id.clone(), BeadTimeoutInfo {
+                bead_id,
+                timeout_count: count as usize,
+                last_timeout_duration_secs: last_duration.map(|d| d as u64),
+                last_timeout_at: match last_timeout_at {
+                    Some(ts) => Some(parse_required_datetime(Some(ts))?),
+                    None => None,
+                },
+            });
+        }
+
+        Ok(result)
+    }
+}
+
+/// Timeout event information for a specific bead.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BeadTimeoutInfo {
+    /// Bead ID
+    pub bead_id: String,
+    /// Number of timeout events for this bead
+    pub timeout_count: usize,
+    /// Last timeout duration in seconds (if available)
+    pub last_timeout_duration_secs: Option<u64>,
+    /// Last timeout timestamp
+    pub last_timeout_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
