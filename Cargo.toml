@@ -74,6 +74,11 @@ path = "tests/test_p0_label_add.rs"
 required-features = []
 
 [[test]]
+name = "test_create_with_different_types"
+path = "tests/test_create_with_different_types.rs"
+required-features = []
+
+[[test]]
 name = "cli_integration_tests"
 path = "tests/cli_integration_tests.rs"
 required-features = []
