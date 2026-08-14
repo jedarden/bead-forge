@@ -1602,6 +1602,9 @@ fn cmd_create(
     // Validate priority is in range 0-4
     validate_priority(priority).to_result().map_err(|e| anyhow!(e))?;
 
+    // Validate type is a standard type
+    crate::validation::validate_issue_type(type_trimmed).to_result().map_err(|e| anyhow!(e))?;
+
     let count = storage.count_issues()?;
     let prefix = get_default_prefix(&config);
 

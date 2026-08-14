@@ -227,6 +227,50 @@ pub fn normalize_assignee(assignee: Option<&str>) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+/// Validate an issue type field value.
+///
+/// Returns `ValidationResult::Valid` if the type is one of the standard types
+/// (task, epic, bug, story, spike, genesis), otherwise returns
+/// `ValidationResult::Invalid` with a descriptive message.
+///
+/// # Examples
+/// ```
+/// use bead_forge::validation::{validate_issue_type, ValidationResult};
+///
+/// // Valid types
+/// assert_eq!(validate_issue_type("task"), ValidationResult::Valid);
+/// assert_eq!(validate_issue_type("epic"), ValidationResult::Valid);
+/// assert_eq!(validate_issue_type("bug"), ValidationResult::Valid);
+/// assert_eq!(validate_issue_type("story"), ValidationResult::Valid);
+/// assert_eq!(validate_issue_type("spike"), ValidationResult::Valid);
+/// assert_eq!(validate_issue_type("genesis"), ValidationResult::Valid);
+///
+/// // Invalid types
+/// assert!(validate_issue_type("invalid").is_invalid());
+/// assert!(validate_issue_type("custom").is_invalid());
+/// ```
+///
+/// # Where this is used
+///
+/// `bf create` calls this to validate the `--type` flag before creating a bead.
+/// This prevents invalid type values from being stored in the database.
+pub fn validate_issue_type(type_str: &str) -> ValidationResult {
+    let normalized = type_str.trim().to_lowercase();
+
+    // Check against the list of valid types
+    let valid_types = ["task", "epic", "bug", "story", "spike", "genesis",
+                       "feature", "chore", "docs", "question"];
+
+    if valid_types.contains(&normalized.as_str()) {
+        ValidationResult::Valid
+    } else {
+        ValidationResult::Invalid(format!(
+            "Invalid type: '{}'. Valid types are: task, epic, bug, story, spike, genesis, feature, chore, docs, question",
+            type_str
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,5 +470,60 @@ mod tests {
         assert_eq!(normalize_assignee(Some("")), None);
         assert_eq!(normalize_assignee(Some("   ")), None);
         assert_eq!(normalize_assignee(Some("\t\t")), None);
+    }
+
+    // validate_issue_type tests
+
+    #[test]
+    fn test_validate_issue_type_valid_standard_types() {
+        assert_eq!(validate_issue_type("task"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("epic"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("bug"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("story"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("spike"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("genesis"), ValidationResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_issue_type_valid_additional_types() {
+        assert_eq!(validate_issue_type("feature"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("chore"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("docs"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("question"), ValidationResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_issue_type_case_insensitive() {
+        assert_eq!(validate_issue_type("TASK"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("Task"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("EpIC"), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("BuG"), ValidationResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_issue_type_whitespace_trimmed() {
+        assert_eq!(validate_issue_type("  task  "), ValidationResult::Valid);
+        assert_eq!(validate_issue_type("\tepic\t"), ValidationResult::Valid);
+    }
+
+    #[test]
+    fn test_validate_issue_type_invalid() {
+        let result = validate_issue_type("invalid");
+        assert!(result.is_invalid());
+        assert!(result.to_string().contains("Invalid type"));
+    }
+
+    #[test]
+    fn test_validate_issue_type_custom_rejected() {
+        let result = validate_issue_type("custom");
+        assert!(result.is_invalid());
+        assert!(result.to_string().contains("Invalid type"));
+    }
+
+    #[test]
+    fn test_validate_issue_type_empty_string() {
+        let result = validate_issue_type("");
+        assert!(result.is_invalid());
+        assert!(result.to_string().contains("Invalid type"));
     }
 }

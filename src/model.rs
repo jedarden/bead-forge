@@ -182,6 +182,9 @@ pub enum IssueType {
     Bug,
     Feature,
     Epic,
+    Story,
+    Spike,
+    Genesis,
     Chore,
     Docs,
     Question,
@@ -197,6 +200,9 @@ impl IssueType {
             Self::Bug => "bug",
             Self::Feature => "feature",
             Self::Epic => "epic",
+            Self::Story => "story",
+            Self::Spike => "spike",
+            Self::Genesis => "genesis",
             Self::Chore => "chore",
             Self::Docs => "docs",
             Self::Question => "question",
@@ -227,6 +233,9 @@ impl FromStr for IssueType {
             "bug" => Ok(Self::Bug),
             "feature" => Ok(Self::Feature),
             "epic" => Ok(Self::Epic),
+            "story" => Ok(Self::Story),
+            "spike" => Ok(Self::Spike),
+            "genesis" => Ok(Self::Genesis),
             "chore" => Ok(Self::Chore),
             "docs" => Ok(Self::Docs),
             "question" => Ok(Self::Question),
@@ -2109,6 +2118,84 @@ mod tests {
     }
 
     #[test]
+    fn test_story_type() {
+        // Test that Story is a standard type
+        let story_type = IssueType::Story;
+
+        assert!(!matches!(story_type, IssueType::Custom(_)),
+                "Story should be a standard type, not Custom");
+
+        assert!(story_type.is_standard(),
+                "Story should be recognized as a standard type");
+
+        // Story should serialize as "story"
+        let serialized = serde_json::to_string(&story_type).unwrap();
+        assert_eq!(serialized, "\"story\"", "Story should serialize as 'story'");
+
+        // "story" should deserialize back to Story variant
+        let deserialized: IssueType = serde_json::from_str("\"story\"").unwrap();
+        assert_eq!(deserialized, IssueType::Story,
+                   "Deserializing 'story' should give IssueType::Story");
+
+        // Story should not equal a Custom("story")
+        let custom_story = IssueType::Custom("story".to_string());
+        assert_ne!(story_type, custom_story,
+                   "Standard Story should not equal Custom(\"story\")");
+    }
+
+    #[test]
+    fn test_spike_type() {
+        // Test that Spike is a standard type
+        let spike_type = IssueType::Spike;
+
+        assert!(!matches!(spike_type, IssueType::Custom(_)),
+                "Spike should be a standard type, not Custom");
+
+        assert!(spike_type.is_standard(),
+                "Spike should be recognized as a standard type");
+
+        // Spike should serialize as "spike"
+        let serialized = serde_json::to_string(&spike_type).unwrap();
+        assert_eq!(serialized, "\"spike\"", "Spike should serialize as 'spike'");
+
+        // "spike" should deserialize back to Spike variant
+        let deserialized: IssueType = serde_json::from_str("\"spike\"").unwrap();
+        assert_eq!(deserialized, IssueType::Spike,
+                   "Deserializing 'spike' should give IssueType::Spike");
+
+        // Spike should not equal a Custom("spike")
+        let custom_spike = IssueType::Custom("spike".to_string());
+        assert_ne!(spike_type, custom_spike,
+                   "Standard Spike should not equal Custom(\"spike\")");
+    }
+
+    #[test]
+    fn test_genesis_type() {
+        // Test that Genesis is a standard type
+        let genesis_type = IssueType::Genesis;
+
+        assert!(!matches!(genesis_type, IssueType::Custom(_)),
+                "Genesis should be a standard type, not Custom");
+
+        assert!(genesis_type.is_standard(),
+                "Genesis should be recognized as a standard type");
+
+        // Genesis should serialize as "genesis"
+        let serialized = serde_json::to_string(&genesis_type).unwrap();
+        assert_eq!(serialized, "\"genesis\"", "Genesis should serialize as 'genesis'");
+
+        // "genesis" should deserialize back to Genesis variant
+        let deserialized: IssueType = serde_json::from_str("\"genesis\"").unwrap();
+        assert_eq!(deserialized, IssueType::Genesis,
+                   "Deserializing 'genesis' should give IssueType::Genesis");
+
+        // Genesis should not equal a Custom("genesis")
+        let custom_genesis = IssueType::Custom("genesis".to_string());
+        assert_ne!(genesis_type, custom_genesis,
+                   "Standard Genesis should not equal Custom(\"genesis\")");
+    }
+
+    #[test]
     fn test_issue_with_epic_type_not_invalid() {
         // Test that an Issue with Epic type is handled correctly
         let issue = Issue {
@@ -2149,6 +2236,9 @@ mod tests {
             IssueType::Bug,
             IssueType::Feature,
             IssueType::Epic,
+            IssueType::Story,
+            IssueType::Spike,
+            IssueType::Genesis,
             IssueType::Chore,
             IssueType::Docs,
             IssueType::Question,
@@ -2160,7 +2250,7 @@ mod tests {
         }
 
         // Custom type should not be standard
-        let custom_type = IssueType::Custom("spike".to_string());
+        let custom_type = IssueType::Custom("custom".to_string());
         assert!(!custom_type.is_standard(),
                 "Custom issue type should not be recognized as standard");
     }
