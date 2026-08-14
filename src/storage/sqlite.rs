@@ -159,12 +159,20 @@ impl Storage {
                     Err(e) => return Err(e.into()),
                     Ok(_) => {
                         let r = f(&conn);
+                        // Ensure COMMIT/ROLLBACK errors are propagated
                         match &r {
                             Ok(_) => {
-                                let _ = conn.execute_batch("COMMIT");
+                                conn.execute_batch("COMMIT").map_err(|e| {
+                                    // COMMIT failed - try to ROLLBACK for cleanup
+                                    let _ = conn.execute_batch("ROLLBACK");
+                                    BeadForgeError::database(format!("COMMIT failed: {}", e), e, None)
+                                })?;
                             }
                             Err(_) => {
-                                let _ = conn.execute_batch("ROLLBACK");
+                                // Function failed - ensure ROLLBACK succeeds
+                                conn.execute_batch("ROLLBACK").map_err(|e| {
+                                    BeadForgeError::database(format!("ROLLBACK failed: {}", e), e, None)
+                                })?;
                             }
                         }
                         Some(r)
@@ -175,7 +183,9 @@ impl Storage {
                 Some(r) => return r,
                 None => {
                     attempt += 1;
-                    std::thread::sleep(Duration::from_millis(RETRY_BASE_MS * attempt as u64));
+                    // Use true exponential backoff: 50ms, 100ms, 200ms, 400ms, 800ms
+                    let delay_ms = RETRY_BASE_MS * 2_u64.pow(attempt - 1);
+                    std::thread::sleep(Duration::from_millis(delay_ms));
                 }
             }
         }
