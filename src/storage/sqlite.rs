@@ -7,7 +7,6 @@ use crate::model::{
 };
 use crate::secrets::{SecretMatch, SecretScanner};
 use crate::storage::schema::{apply_schema, ensure_wal_mode};
-use anyhow::anyhow;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, Connection, Transaction};
 use std::collections::BTreeMap;
@@ -312,7 +311,6 @@ impl Storage {
             let safe_offset = offset.min(MAX_OFFSET);
             query.push_str(&format!(" OFFSET ?{}", param_idx));
             params.push(safe_offset.to_string());
-            param_idx += 1;
         }
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(&query)?;
@@ -858,7 +856,7 @@ impl Storage {
                 if let Some(new_status) = &changes.status {
                     if new_status.is_terminal() {
                         // Find all dependents that were blocked by this bead
-                        let mut dependents = tx.prepare(
+                        let dependents = tx.prepare(
                             "SELECT DISTINCT issue_id FROM dependencies
                              WHERE depends_on_id = ?1
                              AND type IN ('blocks', 'parent-child', 'conditional-blocks', 'waits-for')",
@@ -1949,7 +1947,7 @@ impl Storage {
         let conn = self.conn.lock().unwrap();
 
         // Build recursive CTE based on direction
-        let (anchor_join, recursive_join, id_col, dep_col) = match direction {
+        let (anchor_join, recursive_join, id_col, _dep_col) = match direction {
             "up" => {
                 // "up" means: find issues that depend on this one
                 // Anchor: issues that directly depend on root
@@ -2262,7 +2260,6 @@ impl Storage {
         if let Some(et) = event_type {
             sql.push_str(&format!(" AND event_type = ?{}", param_idx));
             params.push(Box::new(et.as_str().to_string()) as Box<dyn rusqlite::ToSql>);
-            param_idx += 1;
         }
         sql.push_str(" ORDER BY created_at ASC");
         if let Some(l) = limit {
@@ -2418,7 +2415,6 @@ impl Storage {
         if let Some(max) = priority_max {
             sql.push_str(&format!(" AND i.priority <= ?{}", param_idx));
             params.push(max.to_string());
-            param_idx += 1;
         }
         sql.push_str(" GROUP BY i.id");
         sql.push_str(" ORDER BY i.priority ASC, i.created_at ASC");

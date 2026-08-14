@@ -371,7 +371,6 @@ pub fn get_velocity_stats(
     if let Some(harness) = harness_filter {
         query.push_str(&format!(" AND harness = ?{}", param_idx));
         params.push(harness.to_string());
-        param_idx += 1;
     }
 
     query.push_str(" ORDER BY sample_count DESC");
