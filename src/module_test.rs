@@ -230,13 +230,13 @@ pub fn run_module_test(module: &str, timeout_secs: u64) -> Result<TestOutput, Te
     }
 
     // Try to get any partial output that was captured
-    let stdout = if stdout_handle.is_finished() {
+    let _stdout = if stdout_handle.is_finished() {
         stdout_handle.join().ok().and_then(|r| r.ok()).unwrap_or_default()
     } else {
         String::new()
     };
 
-    let stderr = if stderr_handle.is_finished() {
+    let _stderr = if stderr_handle.is_finished() {
         stderr_handle.join().ok().and_then(|r| r.ok()).unwrap_or_default()
     } else {
         String::new()

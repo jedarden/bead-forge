@@ -1762,7 +1762,7 @@ mod tests {
             .unwrap();
 
         // Build mitosis batch operations manually to test placeholder resolution
-        let mut ops = vec![
+        let ops = vec![
             // Create two children
             BatchOp::Create {
                 title: "Child 1".to_string(),

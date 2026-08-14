@@ -525,4 +525,243 @@ mod infrastructure_tests {
         assert_eq!(SeparatorChar::Plus.as_char(), '+');
         assert_eq!(SeparatorChar::Custom('x').as_char(), 'x');
     }
+
+    // ==================== Exact Equals Count Verification Tests ====================
+
+    #[test]
+    fn test_exact_equals_count_verification_positive_cases() {
+        // Test case 1: Standard 3-equal separator with content
+        let line1 = "=== Exit Code: 0 ===";
+        assert!(has_exact_equals_count(line1, '=', 3),
+               "Line with '=== content ===' should have exactly 3 equals at both ends");
+
+        // Test case 2: Standard 3-equal separator with different content
+        let line2 = "=== Signal: SIGTERM ===";
+        assert!(has_exact_equals_count(line2, '=', 3),
+               "Line with '=== content ===' should have exactly 3 equals at both ends");
+
+        // Test case 3: Single equal separator
+        let line3 = "= test =";
+        assert!(has_exact_equals_count(line3, '=', 1),
+               "Line with '= test =' should have exactly 1 equal at both ends");
+
+        // Test case 4: Five equal separator (common in headers)
+        let line4 = "===== Header =====";
+        assert!(has_exact_equals_count(line4, '=', 5),
+               "Line with '===== content =====' should have exactly 5 equals at both ends");
+
+        // Test case 5: Specification requirement: 80 equals (full-line separator)
+        let line5 = "=".repeat(80);
+        let start_count = line5.chars().take_while(|&c| c == '=').count();
+        let end_count = line5.chars().rev().take_while(|&c| c == '=').count();
+        assert_eq!(start_count, 80, "Full-line separator should have 80 equals at start");
+        assert_eq!(end_count, 80, "Full-line separator should have 80 equals at end");
+    }
+
+    #[test]
+    fn test_exact_equals_count_verification_negative_cases() {
+        // Negative case 1: Too many equals at start (4 instead of 3)
+        let line1 = "==== content ===";
+        assert!(!has_exact_equals_count(line1, '=', 3),
+               "Line with '==== content ===' should NOT validate with expected count of 3");
+
+        // Negative case 2: Too few equals at start (2 instead of 3)
+        let line2 = "== content ===";
+        assert!(!has_exact_equals_count(line2, '=', 3),
+               "Line with '== content ===' should NOT validate with expected count of 3");
+
+        // Negative case 3: Too many equals at end (4 instead of 3)
+        let line3 = "=== content ====";
+        assert!(!has_exact_equals_count(line3, '=', 3),
+               "Line with '=== content ====' should NOT validate with expected count of 3");
+
+        // Negative case 4: Too few equals at end (2 instead of 3)
+        let line4 = "=== content ==";
+        assert!(!has_exact_equals_count(line4, '=', 3),
+               "Line with '=== content ==' should NOT validate with expected count of 3");
+
+        // Negative case 5: Asymmetric separators (3 at start, 2 at end)
+        let line5 = "=== content ==";
+        assert!(!has_exact_equals_count(line5, '=', 3),
+               "Asymmetric line '=== content ==' should NOT validate");
+
+        // Negative case 6: Asymmetric separators (2 at start, 3 at end)
+        let line6 = "== content ===";
+        assert!(!has_exact_equals_count(line6, '=', 3),
+               "Asymmetric line '== content ===' should NOT validate");
+
+        // Negative case 7: Wrong expected count (5 instead of 3)
+        let line7 = "=== content ===";
+        assert!(!has_exact_equals_count(line7, '=', 5),
+               "Line with 3 equals should NOT validate with expected count of 5");
+
+        // Negative case 8: No equals at all
+        let line8 = "content only";
+        assert!(!has_exact_equals_count(line8, '=', 3),
+               "Line with no equals should NOT validate");
+
+        // Negative case 9: Empty line
+        let line9 = "";
+        assert!(!has_exact_equals_count(line9, '=', 3),
+               "Empty line should NOT validate");
+
+        // Negative case 10: Full-line separator with wrong count (79 instead of 80)
+        let line10 = "=".repeat(79);
+        assert!(!has_exact_equals_count(&line10, '=', 80),
+               "Line with 79 equals should NOT validate with expected count of 80");
+
+        // Negative case 11: Full-line separator with wrong count (81 instead of 80)
+        let line11 = "=".repeat(81);
+        assert!(!has_exact_equals_count(&line11, '=', 80),
+               "Line with 81 equals should NOT validate with expected count of 80");
+    }
+
+    #[test]
+    fn test_exact_equals_count_specification_validation() {
+        // Specification requirement: Detail view separators must be exactly 80 equals
+        let spec_width = 80;
+
+        // Positive: Exact specification match
+        let correct_line = "=".repeat(spec_width);
+        let equals_count = count_separator_chars(&correct_line, '=');
+        assert_eq!(equals_count, spec_width,
+                  "Specification requires exactly {} equals, found {}", spec_width, equals_count);
+
+        // Verify it's a pure separator line
+        assert!(is_separator_only_line(&correct_line, '='),
+               "Specification requires separator-only line (no other characters)");
+
+        // Negative: Below specification
+        let below_spec = "=".repeat(spec_width - 1);
+        let below_count = count_separator_chars(&below_spec, '=');
+        assert_ne!(below_count, spec_width,
+                  "Separator with {} equals does NOT meet specification of {}", below_count, spec_width);
+
+        // Negative: Above specification
+        let above_spec = "=".repeat(spec_width + 1);
+        let above_count = count_separator_chars(&above_spec, '=');
+        assert_ne!(above_count, spec_width,
+                  "Separator with {} equals does NOT meet specification of {}", above_count, spec_width);
+
+        // Validate with full positioning
+        let output = format!("Header\n{}\nContent", correct_line);
+        assert_eq!(validate_separator_format(&output, '=', spec_width, SeparatorPosition::FullLine),
+                   SeparatorValidation::Valid,
+                   "80-equal separator must validate as FullLine per specification");
+
+        // Validate that wrong count fails
+        let wrong_output = format!("Header\n{}\nContent", below_spec);
+        match validate_separator_format(&wrong_output, '=', spec_width, SeparatorPosition::FullLine) {
+            SeparatorValidation::InvalidCount { expected, found } => {
+                assert_eq!(expected, spec_width, "Expected count should be specification width");
+                assert_eq!(found, spec_width - 1, "Found count should be below specification");
+            }
+            _ => panic!("Should return InvalidCount for separator below specification"),
+        }
+    }
+
+    #[test]
+    fn test_exact_equals_count_with_content_variations() {
+        // Test various content patterns with exact equals count
+
+        // Pattern 1: Content with spaces
+        let line1 = "=== Exit Code: 0 ===";
+        assert_exact_separator_count(line1, '=', 3);
+
+        // Pattern 2: Content without spaces
+        let line2 = "===Exit Code: 0===";
+        assert_exact_separator_count(line2, '=', 3);
+
+        // Pattern 3: Multiple words
+        let line3 = "=== Signal: SIGTERM (15) ===";
+        assert_exact_separator_count(line3, '=', 3);
+
+        // Pattern 4: Content with numbers
+        let line4 = "=== Count: 12345 ===";
+        assert_exact_separator_count(line4, '=', 3);
+
+        // Pattern 5: Content with special characters
+        let line5 = "=== Status: [OPEN] (P0) ===";
+        assert_exact_separator_count(line5, '=', 3);
+
+        // Pattern 6: Content with equals signs in the middle
+        let line6 = "=== Formula: x=y+z ===";
+        let total_equals = count_separator_chars(line6, '=');
+        assert_eq!(total_equals, 7, "Should count ALL equals, including those in content (3+1+3)");
+        // But start and end should still be exactly 3
+        assert!(has_exact_equals_count(line6, '=', 3), "Start and end should have exactly 3 equals");
+    }
+
+    #[test]
+    fn test_exact_equals_count_edge_cases() {
+        // Edge case 1: Line that is ONLY equals (no content)
+        let line1 = "=========="; // 10 equals
+        assert!(has_exact_equals_count(line1, '=', 10),
+               "Pure equals line should validate with full count");
+        assert!(!has_exact_equals_count(line1, '=', 5),
+               "Pure equals line should NOT validate with partial count");
+
+        // Edge case 2: Single equals with no content
+        let line2 = "=";
+        assert!(has_exact_equals_count(line2, '=', 1),
+               "Single equals should validate with count of 1");
+
+        // Edge case 3: Very long separator (200 equals)
+        let line3 = "=".repeat(200);
+        assert!(has_exact_equals_count(&line3, '=', 200),
+               "Very long separator should validate with exact count");
+
+        // Edge case 4: Mixed content types
+        let line4 = "=== 123 ===";
+        assert!(has_exact_equals_count(line4, '=', 3),
+               "Mixed alphanumeric content should validate");
+
+        // Edge case 5: Unicode content with equals
+        let line5 = "=== Unicode: café ===";
+        assert!(has_exact_equals_count(line5, '=', 3),
+               "Unicode content should not affect equals counting");
+
+        // Edge case 6: Tabs and newlines in content (shouldn't happen in practice but test anyway)
+        let line6 = "=== tab\there ===";
+        assert!(has_exact_equals_count(line6, '=', 3),
+               "Tabs in content should not affect equals counting");
+    }
+
+    #[test]
+    fn test_exact_equals_count_multi_context_validation() {
+        // Test equals count verification across different formatting contexts
+
+        // Context 1: Exit code display
+        let exit_code_output = "=== Exit Code: 0 ===";
+        assert!(has_exact_equals_count(exit_code_output, '=', 3),
+               "Exit code display must use exactly 3 equals");
+        assert_eq!(extract_content_between(exit_code_output, '=', 3), " Exit Code: 0 ",
+                  "Should extract content correctly");
+
+        // Context 2: Signal display
+        let signal_output = "=== Signal: SIGTERM ===";
+        assert!(has_exact_equals_count(signal_output, '=', 3),
+               "Signal display must use exactly 3 equals");
+
+        // Context 3: Status headers
+        let status_header = "===== Status =====";
+        assert!(has_exact_equals_count(status_header, '=', 5),
+               "Status headers must use exactly 5 equals");
+
+        // Context 4: Full-line separator (specification: 80 equals)
+        let full_separator = "=".repeat(80);
+        assert!(is_separator_only_line(&full_separator, '='),
+               "Full-line separator must contain only equals");
+        assert_eq!(count_separator_chars(&full_separator, '='), 80,
+               "Full-line separator must have exactly 80 equals per specification");
+
+        // Context 5: Table detail view separator
+        let detail_output = format!("bf-test: Test Issue\n{}\nStatus:", full_separator);
+        if let Some(found_separator) = find_separator_line(&detail_output, '=') {
+            assert_eq!(count_separator_chars(&found_separator, '='), 80,
+                      "Detail view separator must meet specification of 80 equals");
+        } else {
+            panic!("Should find separator line in detail output");
+        }
+    }
 }

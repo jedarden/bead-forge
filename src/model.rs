@@ -1463,7 +1463,7 @@ mod tests {
 
     #[test]
     fn test_sync_equals_ignores_audit_timestamps_and_relation_order() {
-        let mut issue1 = Issue {
+        let issue1 = Issue {
             id: "bd-test".to_string(),
             title: "Test".to_string(),
             created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),

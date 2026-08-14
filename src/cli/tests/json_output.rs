@@ -80,7 +80,7 @@
 //! | `claim` | Object | Single object with bead_id field |
 //! | `create` | String | Bead ID only (plain text) |
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::sync::OnceLock;
 use tempfile::TempDir;
@@ -193,7 +193,7 @@ pub mod json_validation {
 
     /// Assert that JSONL output is valid (each line is valid JSON)
     pub fn assert_valid_jsonl(jsonl: &str) {
-        for (i, line) in jsonl.lines().enumerate() {
+        for (_i, line) in jsonl.lines().enumerate() {
             if !line.trim().is_empty() {
                 // parse_json already panics on error, so we just call it
                 parse_json(line);
@@ -300,7 +300,7 @@ pub mod json_validation {
 /// let bead_id = fixtures::create_bead_with_assignee("My bead", "alice");
 /// ```
 pub mod fixtures {
-    use std::process::Command;
+    
 
     // ============================================================
     // Test fixture data constants - ready-to-use for edge cases

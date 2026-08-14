@@ -8,10 +8,10 @@
 mod comprehensive_tests {
     use super::super::*;
     use crate::model::{
-        Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges,
+        Comment, DependencyType, Event, EventType, Issue, IssueChanges,
         IssueFilter, IssueType, Priority, Status,
     };
-    use chrono::{Duration, TimeZone, Utc};
+    use chrono::{Duration, Utc};
     use tempfile::NamedTempFile;
 
     // ============================================================================

@@ -9,9 +9,8 @@
 //! - JSON output format validation
 //! - Epic type preservation through label operations
 
-use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 /// Helper to run bf commands and capture output
@@ -31,7 +30,7 @@ fn bf_cmd(args: &[&str], dir: &Path) -> (String, String, bool) {
 }
 
 /// Helper to create a test workspace
-fn create_test_workspace(name: &str) -> tempfile::TempDir {
+fn create_test_workspace(_name: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let beads_dir = dir.path().join(".beads");
     fs::create_dir(&beads_dir).expect("Failed to create .beads dir");
@@ -312,7 +311,7 @@ mod epic_label_cli_tests {
             ],
             dir,
         );
-        let id1 = extract_id(&stdout);
+        let _id1 = extract_id(&stdout);
 
         let (stdout, _, _) = bf_cmd(
             &[
@@ -320,13 +319,13 @@ mod epic_label_cli_tests {
             ],
             dir,
         );
-        let id2 = extract_id(&stdout);
+        let _id2 = extract_id(&stdout);
 
         let (stdout, _, _) = bf_cmd(
             &["create", "--type", "epic", "--label", "unique", "Epic 3"],
             dir,
         );
-        let id3 = extract_id(&stdout);
+        let _id3 = extract_id(&stdout);
 
         // List all labels (no specific ID)
         let (stdout, stderr, success) = bf_cmd(&["label", "list"], dir);
@@ -423,7 +422,7 @@ mod epic_label_cli_tests {
         let dir = workspace.path();
 
         // Create epics
-        let (stdout, _, _) = bf_cmd(
+        let (_stdout, _, _) = bf_cmd(
             &[
                 "create",
                 "--type",
@@ -437,7 +436,7 @@ mod epic_label_cli_tests {
             dir,
         );
 
-        let (stdout, _, _) = bf_cmd(
+        let (_stdout, _, _) = bf_cmd(
             &[
                 "create",
                 "--type",
@@ -451,7 +450,7 @@ mod epic_label_cli_tests {
             dir,
         );
 
-        let (stdout, _, _) = bf_cmd(
+        let (_stdout, _, _) = bf_cmd(
             &[
                 "create",
                 "--type",

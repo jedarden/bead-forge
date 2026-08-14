@@ -9,18 +9,16 @@ use crate::commit_check::{format_scan_results, scan_staged_beads};
 use crate::config::{find_beads_dir, get_default_prefix, load_config, load_metadata, Config};
 use crate::critical_path::compute_epic_critical_path;
 use crate::format::{get_formatter, ClaimResultOutput, OutputFormat, StatsOutput};
-use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, ReadyCandidate, Status};
+use crate::model::{Issue, IssueChanges, IssueFilter, IssueType, Priority, Status};
 use crate::reopen::reopen_bead;
 use crate::robot_docs::RobotDocs;
 use crate::rotate::{find_bead_in_archives, list_all_with_archives, rotate, RotateOptions};
 use crate::storage::Storage;
-use crate::update;
 use crate::validation::{normalize_assignee, validate_priority};
 use anyhow::anyhow;
 use crate::Result;
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
-use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -1794,6 +1792,30 @@ fn cmd_list(
     Ok(())
 }
 
+/// Add timeout statistics to JSON output.
+///
+/// Splices timeout event data into `json_line`'s "timeout_stats" field.
+/// Only adds the field if timeout_count > 0.
+fn resolve_timeout_for_json(json_line: &str, timeout_data: &crate::storage::sqlite::TimeoutEventData) -> String {
+    let mut value: serde_json::Value = match serde_json::from_str(json_line) {
+        Ok(v) => v,
+        Err(_) => return json_line.to_string(),
+    };
+
+    if let Some(obj) = value.as_object_mut() {
+        if timeout_data.timeout_count > 0 {
+            let timeout_stats = serde_json::json!({
+                "timeout_count": timeout_data.timeout_count,
+                "last_timeout_duration_secs": timeout_data.last_timeout_duration_secs,
+                "last_timeout_at": timeout_data.last_timeout_at
+            });
+            obj.insert("timeout_stats".to_string(), timeout_stats);
+        }
+    }
+
+    serde_json::to_string(&value).unwrap_or_else(|_| json_line.to_string())
+}
+
 /// Resolve an issue's dependency *edges* (issue_id, depends_on_id, type) to
 /// the target bead's own {id, title, status, priority} plus dependency_type,
 /// and splice the result into `json_line`'s "dependencies" field in place of
@@ -1856,6 +1878,16 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
         Err(_) => Vec::new(),
     };
 
+    // Fetch timeout events (graceful degradation if query fails)
+    let timeout_data = match storage.get_timeout_events(id) {
+        Ok(data) => data,
+        Err(_) => crate::storage::sqlite::TimeoutEventData {
+            timeout_count: 0,
+            last_timeout_duration_secs: None,
+            last_timeout_at: None,
+        },
+    };
+
     match format {
         "json" => {
             // Serialize to JSON with dependencies and comments included
@@ -1863,6 +1895,7 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
             let formatter = get_formatter(OutputFormat::Json);
             let json_str = formatter.format_issue(&issue);
             let json_str = resolve_dependencies_for_json(&storage, &issue, &json_str);
+            let json_str = resolve_timeout_for_json(&json_str, &timeout_data);
             if envelope {
                 // Wrap in envelope with kind="show"
                 println!("{}", formatter.format_with_envelope("show", &json_str));
@@ -1926,6 +1959,16 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
                     }
                 }
             }
+            // Display timeout statistics
+            if timeout_data.timeout_count > 0 {
+                println!("Timeouts: {}", timeout_data.timeout_count);
+                if let Some(duration_secs) = timeout_data.last_timeout_duration_secs {
+                    println!("Last timeout duration: {} seconds", duration_secs);
+                }
+                if let Some(last_timeout_at) = &timeout_data.last_timeout_at {
+                    println!("Last timeout at: {}", last_timeout_at.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
+            }
         }
         _ => {
             // Use the text formatter for consistency
@@ -1960,6 +2003,16 @@ fn cmd_show(beads_dir: &PathBuf, id: &str, format: &str, envelope: bool) -> Resu
                     println!("  [{}] {}: {}", comment.id, comment.author, comment.body);
                 }
             }
+            // Display timeout statistics
+            if timeout_data.timeout_count > 0 {
+                println!("Timeouts: {}", timeout_data.timeout_count);
+                if let Some(duration_secs) = timeout_data.last_timeout_duration_secs {
+                    println!("Last timeout duration: {} seconds", duration_secs);
+                }
+                if let Some(last_timeout_at) = &timeout_data.last_timeout_at {
+                    println!("Last timeout at: {}", last_timeout_at.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
+            }
         }
     }
 
@@ -1991,7 +2044,8 @@ fn cmd_update(
 
     // Handle assignee: distinguish between "not provided" (None) and "explicitly cleared" (Some(""))
     // We pass through whatever the user provided and let the update/storage layer handle normalization
-    let assignee_for_update = if assignee.is_some() {
+    // TODO: pass assignee to update() once assignee updates are supported
+    let _assignee_for_update = if assignee.is_some() {
         // User provided --assignee flag (could be empty string to clear, or a name to set)
         // Pass it through as-is; the storage layer will normalize empty/whitespace to NULL
         assignee.as_deref()
@@ -2390,7 +2444,7 @@ fn cmd_doctor(
     runs: bool,
     restore: Option<String>,
 ) -> Result<()> {
-    let metadata = load_metadata(beads_dir)?;
+    let _metadata = load_metadata(beads_dir)?;
 
     if runs {
         // List verified pre-rebuild recovery runs (doctor safety stack, layer 3).
@@ -4012,8 +4066,8 @@ mod tests {
     pub mod list_ready_recent_json_tests;
     pub mod search_json_tests;
     pub mod show_json_tests;
-    pub use crate::config::init_workspace;
-    pub use crate::Storage;
+    
+    
 
     // Unit tests for multi-label argument parsing (bf-hjeu2s)
     use super::*;

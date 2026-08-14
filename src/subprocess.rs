@@ -287,7 +287,7 @@ pub fn execute_command_to_trace(
     let start_time = Utc::now().to_rfc3339();
 
     // Execute the command
-    let mut result = execute_command(command, args, config)?;
+    let result = execute_command(command, args, config)?;
 
     let end_time = Utc::now().to_rfc3339();
 
@@ -401,7 +401,7 @@ pub fn execute_command_streaming(
     let mut stderr_lines = Vec::new();
 
     // Read stdout line by line
-    if let Some(mut stdout) = child.stdout.take() {
+    if let Some(stdout) = child.stdout.take() {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             match line {
@@ -420,7 +420,7 @@ pub fn execute_command_streaming(
     }
 
     // Read stderr line by line
-    if let Some(mut stderr) = child.stderr.take() {
+    if let Some(stderr) = child.stderr.take() {
         let reader = BufReader::new(stderr);
         for line in reader.lines() {
             match line {

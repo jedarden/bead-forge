@@ -555,7 +555,7 @@ mod tests {
 
         // A, C, D, E are on the critical path through C-F (longer path)
         // B should have float since it's on the shorter A-B-D-E path
-        let critical: Vec<&str> = result
+        let _critical: Vec<&str> = result
             .beads
             .iter()
             .filter(|b| b.float == 0)

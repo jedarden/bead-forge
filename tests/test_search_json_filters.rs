@@ -369,8 +369,8 @@ fn test_search_json_text_query_with_filters() {
 
     // Create beads with specific text in titles
     let api_open = create_bead_with_params(&workspace, "API endpoint task", "task", 2, "open");
-    let api_closed = close_bead_returning_id(&workspace, "API bug fix", "task", 2);
-    let frontend_open = create_bead_with_params(&workspace, "Frontend feature", "task", 2, "open");
+    let _api_closed = close_bead_returning_id(&workspace, "API bug fix", "task", 2);
+    let _frontend_open = create_bead_with_params(&workspace, "Frontend feature", "task", 2, "open");
 
     // Search for "API" with status=open filter
     let (out, err, ok) = run_bf(
@@ -502,9 +502,9 @@ fn test_search_json_wildcard_text_with_filters() {
 
     // Create beads
     let task1 = create_bead_with_labels(&workspace, "urgent backend task", &["urgent", "backend"]);
-    let task2 =
+    let _task2 =
         create_bead_with_labels(&workspace, "urgent frontend task", &["urgent", "frontend"]);
-    let task3 = create_bead_with_labels(&workspace, "backend task", &["backend"]);
+    let _task3 = create_bead_with_labels(&workspace, "backend task", &["backend"]);
 
     // Search for "backend" with label=urgent
     let (out, err, ok) = run_bf(

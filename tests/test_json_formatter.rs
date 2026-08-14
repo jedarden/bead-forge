@@ -137,6 +137,7 @@ fn test_json_formatter_multiple_issues() {
             labels: vec![],
             dependencies: vec![],
             comments: vec![],
+            events: vec![],
             annotations: Default::default(),
         },
         Issue {
@@ -399,6 +400,7 @@ fn test_get_formatter() {
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 
@@ -540,6 +542,7 @@ fn test_format_with_envelope_multiple_issues() {
             labels: vec![],
             dependencies: vec![],
             comments: vec![],
+            events: vec![],
             annotations: Default::default(),
         },
         Issue {
@@ -668,6 +671,7 @@ fn test_format_with_envelope_and_warning() {
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 
@@ -741,6 +745,7 @@ fn test_json_formatter_assignee_and_labels_normalization() {
         labels: vec![],
         dependencies: vec![],
         comments: vec![],
+        events: vec![],
         annotations: Default::default(),
     };
 

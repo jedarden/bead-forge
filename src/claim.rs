@@ -680,7 +680,7 @@ mod tests {
 
     #[test]
     fn test_claim_basic() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Create an open bead
         let issue = Issue::new(
@@ -708,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_claim_no_candidates() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // No beads available
         let result = storage
@@ -720,7 +720,7 @@ mod tests {
 
     #[test]
     fn test_claim_reclaims_stale() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Create an in_progress bead with old updated_at
         let mut issue = Issue::new(
@@ -835,9 +835,7 @@ mod tests {
 
     #[test]
     fn test_critical_path_bonus_in_claim() {
-        use crate::storage::schema;
-
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Create a dependency chain: bf-critical (float=0) -> bf-blocked
         // And an independent bead: bf-independent (no critical path data)
@@ -933,7 +931,7 @@ mod tests {
 
     #[test]
     fn test_critical_path_zero_float_outranks_high_priority() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Create a zero-float bead with low priority (4=Backlog)
         let mut zero_float = Issue::new(
@@ -997,7 +995,7 @@ mod tests {
 
     #[test]
     fn test_get_ready_candidates_limit_zero_returns_all() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Create 15 open beads
         for i in 0..15 {
@@ -1024,7 +1022,7 @@ mod tests {
 
     #[test]
     fn test_get_ready_candidates_respects_limit() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Create 20 open beads
         for i in 0..20 {
@@ -1053,7 +1051,7 @@ mod tests {
     /// being done.
     #[test]
     fn test_completed_status_blocker_unblocks_dependent() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         let blocker = Issue::new(
             "bf-blocker".to_string(),
@@ -1126,7 +1124,7 @@ mod tests {
     /// MUST appear in the ready output, while the blocked ones must not.
     #[test]
     fn test_ready_includes_zero_dependency_open_beads_bf_1nprw() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Two standalone open beads with NO dependencies — the bug report's worry was
         // that these would disappear from ready output.
@@ -1241,7 +1239,7 @@ mod tests {
 
     #[test]
     fn test_priority_ordering_p0_before_p1() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // Create beads with different priorities
         let mut p1_bead = Issue::new(
@@ -1286,7 +1284,7 @@ mod tests {
 
     #[test]
     fn test_priority_ordering_same_priority_fifo() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         let base_time = Utc::now();
 
@@ -1331,7 +1329,7 @@ mod tests {
 
     #[test]
     fn test_priority_ordering_default_priority_is_p2() {
-        let (_temp, mut storage) = setup_test_db();
+        let (_temp, storage) = setup_test_db();
 
         // The schema has `priority INTEGER NOT NULL DEFAULT 2`, so all beads
         // will have a priority value. The COALESCE(i.priority, 999) in the ORDER BY

@@ -11,16 +11,14 @@
 //! - Limit functionality
 //! - Multiple filter combinations
 
-use std::process::Command;
 use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    bf_binary, bf_command, capture, fixtures, format_detection, json_validation, test_workspace,
+    bf_binary, bf_command, capture, fixtures, format_detection, json_validation,
 };
 
 // Import items made available in parent scope
-use super::*;
 
 /// Create an isolated test workspace
 fn create_isolated_workspace() -> TempDir {
@@ -154,7 +152,6 @@ fn create_bead_with_type_and_labels_and_priority(
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_structure_validity() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create test beads with searchable content
     let bead1_id = fixtures::create_bead("Search test bead one");
@@ -206,7 +203,6 @@ fn test_search_json_structure_validity() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_jsonl_format_structure() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create test beads
     let bead1_id = fixtures::create_bead("JSONL search test one");
@@ -260,7 +256,7 @@ fn test_search_json_jsonl_format_structure() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_empty_result() {
     let temp_dir = create_isolated_workspace();
-    let workspace = temp_dir.path();
+    let _workspace = temp_dir.path();
 
     // Ensure no matching beads exist by using a fresh workspace
     let output = capture::capture_stdout(
@@ -280,7 +276,7 @@ fn test_search_json_empty_result() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_empty_result_valid_format() {
     let temp_dir = create_isolated_workspace();
-    let workspace = temp_dir.path();
+    let _workspace = temp_dir.path();
 
     // Test that empty output is still valid (empty string is valid JSONL)
     let output = capture::capture_stdout(
@@ -343,7 +339,6 @@ fn test_search_json_empty_database() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_filter_excludes_all_beads() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create some test beads
     let bead1_id = fixtures::create_bead("Filter exclude test 1");
@@ -391,7 +386,6 @@ fn test_search_json_filter_excludes_all_beads() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_priority_filter_excludes_all() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create test beads with default priority (2)
     let bead1_id = fixtures::create_bead("Priority filter exclude 1");
@@ -431,7 +425,6 @@ fn test_search_json_priority_filter_excludes_all() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_label_filter_excludes_all() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads without the label we'll filter by
     let bead1_id = fixtures::create_bead_with_labels("Label exclude test 1", &["other"]);
@@ -463,7 +456,6 @@ fn test_search_json_label_filter_excludes_all() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_type_filter_excludes_all() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with type "task"
     let bead1_id = create_bead_with_type("Type exclude test 1", "task");
@@ -495,7 +487,6 @@ fn test_search_json_type_filter_excludes_all() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_assignee_filter_excludes_all() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with one assignee
     let bead1_id = fixtures::create_bead_with_assignee("Assignee exclude test 1", "alice");
@@ -527,7 +518,6 @@ fn test_search_json_assignee_filter_excludes_all() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_required_fields_types() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Search field types test");
 
@@ -583,7 +573,7 @@ fn test_search_json_required_fields_types() {
     );
 
     // labels must be an array
-    let labels = json_validation::get_array(&parsed, "labels");
+    let _labels = json_validation::get_array(&parsed, "labels");
     // Successful call proves it's an array
 
     fixtures::close_bead(&bead_id, "Search field types cleanup");
@@ -597,7 +587,6 @@ fn test_search_json_required_fields_types() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_in_title() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Unique search term in title");
 
@@ -625,7 +614,6 @@ fn test_search_json_query_in_title() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_in_description() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Description search test");
 
@@ -663,7 +651,6 @@ fn test_search_json_query_in_description() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_case_sensitive() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("CaseSensitiveSearchTerm");
 
@@ -710,7 +697,6 @@ fn test_search_json_query_case_sensitive() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_no_match() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Random bead content");
 
@@ -740,7 +726,6 @@ fn test_search_json_query_no_match() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_status_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead("Status filter test open");
     let bead2_id = fixtures::create_bead("Status filter test closed");
@@ -779,7 +764,6 @@ fn test_search_json_status_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_multiple_status_filters() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead("Multi status open");
     let bead2_id = fixtures::create_bead("Multi status in_progress");
@@ -835,7 +819,6 @@ fn test_search_json_multiple_status_filters() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_type_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with different types using --type flag in create
     let bead1_id = create_bead_with_type("Type filter bug", "bug");
@@ -873,7 +856,6 @@ fn test_search_json_type_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_assignee_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead_with_assignee("Assignee filter alice", "alice");
     let bead2_id = fixtures::create_bead_with_assignee("Assignee filter bob", "bob");
@@ -910,7 +892,6 @@ fn test_search_json_assignee_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_label_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead_with_labels("Label filter urgent", &["urgent", "bug"]);
     let bead2_id = fixtures::create_bead_with_labels("Label filter enhancement", &["enhancement"]);
@@ -947,7 +928,6 @@ fn test_search_json_label_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_priority_range_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead("Priority range 0");
     let bead2_id = fixtures::create_bead("Priority range 2");
@@ -1003,7 +983,6 @@ fn test_search_json_priority_range_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_priority_min_only() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead("Priority min 0");
     let bead2_id = fixtures::create_bead("Priority min 3");
@@ -1051,7 +1030,6 @@ fn test_search_json_priority_min_only() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_priority_max_only() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead("Priority max 1");
     let bead2_id = fixtures::create_bead("Priority max 4");
@@ -1103,7 +1081,6 @@ fn test_search_json_priority_max_only() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_limit() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create multiple beads
     let bead1 = fixtures::create_bead("Search limit 1");
@@ -1140,7 +1117,6 @@ fn test_search_json_limit() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_default_limit() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create multiple beads (more than default limit of 50)
     let mut bead_ids = Vec::new();
@@ -1182,7 +1158,6 @@ fn test_search_json_default_limit() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_special_characters_in_query() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let special_title = "Test \"quotes\" and 'apostrophes' & <symbols>";
     let bead_id = fixtures::create_bead(special_title);
@@ -1223,7 +1198,6 @@ fn test_search_json_special_characters_in_query() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_unicode_in_query() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let unicode_title = "🎉 Unicode test with 日本語 and café";
     let bead_id = fixtures::create_bead(unicode_title);
@@ -1252,7 +1226,6 @@ fn test_search_json_unicode_in_query() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_special_characters_in_result() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead(fixtures::SPECIAL_CHARACTERS_TITLE);
 
@@ -1298,7 +1271,6 @@ fn test_search_json_special_characters_in_result() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_combined_filters() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with different types using --type flag in create
     let bead1_id = create_bead_with_type_and_labels_and_priority(
@@ -1350,7 +1322,6 @@ fn test_search_json_combined_filters() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_with_filters() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead_with_labels("Query filter bug fix", &["bug"]);
     let bead2_id = fixtures::create_bead_with_labels("Query filter feature add", &["feature"]);
@@ -1391,7 +1362,6 @@ fn test_search_json_query_with_filters() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_whitespace_in_query() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Search   with    spaces");
 
@@ -1456,7 +1426,6 @@ fn test_search_json_whitespace_in_query() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_empty_query_with_filters() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1_id = fixtures::create_bead_with_labels("Empty query test", &["special"]);
     let bead2_id = fixtures::create_bead("Empty query other");
@@ -1488,7 +1457,6 @@ fn test_search_json_empty_query_with_filters() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_result_ordering() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with specific titles to test ordering
     let bead1_id = fixtures::create_bead("Order test A");
@@ -1534,7 +1502,6 @@ fn test_search_json_result_ordering() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_timestamp_fields_valid() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Timestamp validation test");
 
@@ -1603,7 +1570,6 @@ fn test_search_json_timestamp_fields_valid() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_timestamp_fields_present_all_results() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create multiple beads to test timestamp presence across all results
     let bead1_id = fixtures::create_bead("Timestamp presence test 1");
@@ -1660,7 +1626,6 @@ fn test_search_json_timestamp_fields_present_all_results() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_description_field_presence() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Description field test");
 
@@ -1706,7 +1671,6 @@ fn test_search_json_description_field_presence() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_description_with_content() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Description content test");
 
@@ -1753,7 +1717,6 @@ fn test_search_json_description_with_content() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_description_field_all_results() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create multiple beads - some with descriptions, some without
     let bead1_id = fixtures::create_bead("Desc all test 1");

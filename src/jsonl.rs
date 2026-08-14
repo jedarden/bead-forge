@@ -622,7 +622,7 @@ mod tests {
             issue("bf-3", "Third"),
         ];
         export_jsonl(&path, || Ok(all_beads.clone())).unwrap();
-        let before_export = std::fs::read_to_string(&path).unwrap();
+        let _before_export = std::fs::read_to_string(&path).unwrap();
 
         // Now, export only dirty beads using export_jsonl_dirty
         let dirty_beads = vec![issue("bf-2", "Second Modified")];
@@ -831,7 +831,7 @@ not json at all
         std::fs::write(&path, jsonl_content).unwrap();
 
         let mut valid_count = 0;
-        let result = import_jsonl(&path, |issue| {
+        let result = import_jsonl(&path, |_issue| {
             valid_count += 1;
             Ok(UpsertResult::New)
         });
@@ -1103,7 +1103,7 @@ not json at all
 {"id":"bf-003","title":"Third","status":"open","priority":2,"type":"task","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","source_repo":"test"}"#;
         std::fs::write(&path, jsonl_content).unwrap();
 
-        let result = import_jsonl(&path, |issue| Ok(UpsertResult::New));
+        let result = import_jsonl(&path, |_issue| Ok(UpsertResult::New));
 
         // Comment-like lines will cause parse errors - this is expected behavior
         assert!(
@@ -1469,7 +1469,7 @@ not json at all
         use std::fs;
 
         let tmp = tempfile::TempDir::new().unwrap();
-        let path = tmp.path().join("readonly.jsonl");
+        let _path = tmp.path().join("readonly.jsonl");
 
         // Create a parent directory with read-only permissions
         let parent_dir = tmp.path().join("readonly_dir");
@@ -1552,7 +1552,7 @@ not json at all
 {"id":"bf-002","title":"Truncated","status":"open""#; // Missing closing brace and other fields
         std::fs::write(&path, jsonl_content).unwrap();
 
-        let result = import_jsonl(&path, |issue| Ok(UpsertResult::New));
+        let result = import_jsonl(&path, |_issue| Ok(UpsertResult::New));
 
         // Should fail on truncated line
         assert!(result.is_err(), "import should fail on truncated JSON");
@@ -1981,13 +1981,13 @@ not json at all
             .unwrap();
 
         // Create initial JSONL with 3 beads
-        let mut initial_issues = vec![
+        let initial_issues = vec![
             issue("bf-1", "First"),
             issue("bf-2", "Second"),
             issue("bf-3", "Third"),
         ];
         export_jsonl_merge(&jsonl_path, &initial_issues, &[]).unwrap();
-        let before = std::fs::read_to_string(&jsonl_path).unwrap();
+        let _before = std::fs::read_to_string(&jsonl_path).unwrap();
 
         // In the database, create the same 3 beads and mark bf-2 as dirty
         for issue in &initial_issues {

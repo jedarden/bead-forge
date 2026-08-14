@@ -401,7 +401,7 @@ pub fn get_velocity_stats(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Issue, IssueType, Status};
+    use crate::model::{Issue, IssueType};
     use crate::storage::schema::apply_schema;
     use chrono::Datelike;
     use chrono::Timelike;

@@ -4,7 +4,6 @@
 //! including corruption detection and JSONL-based repair.
 
 use crate::config::{find_beads_dir, load_metadata};
-use crate::error::BeadForgeError;
 use crate::jsonl::stream_issues;
 use crate::model::Issue;
 use crate::recovery;
@@ -2175,7 +2174,7 @@ mod tests {
         init_workspace(&beads_dir, "bf").unwrap();
         let metadata = load_metadata(&beads_dir).unwrap();
         let db_path = beads_dir.join(&metadata.database);
-        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+        let _jsonl_path = beads_dir.join(&metadata.jsonl_export);
 
         // Create a test bead and flush to JSONL
         let storage = Storage::open(&db_path).unwrap();
@@ -2281,7 +2280,7 @@ mod tests {
         init_workspace(&beads_dir, "bf").unwrap();
         let metadata = load_metadata(&beads_dir).unwrap();
         let db_path = beads_dir.join(&metadata.database);
-        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+        let _jsonl_path = beads_dir.join(&metadata.jsonl_export);
 
         // Create initial database with a bead
         let storage = Storage::open(&db_path).unwrap();
@@ -2330,7 +2329,7 @@ mod tests {
         init_workspace(&beads_dir, "bf").unwrap();
         let metadata = load_metadata(&beads_dir).unwrap();
         let db_path = beads_dir.join(&metadata.database);
-        let jsonl_path = beads_dir.join(&metadata.jsonl_export);
+        let _jsonl_path = beads_dir.join(&metadata.jsonl_export);
 
         // Create initial database with two beads
         let storage = Storage::open(&db_path).unwrap();
@@ -2369,7 +2368,7 @@ mod tests {
         assert_eq!(unflushed_before, 1, "Should have 1 dirty bead");
 
         // Now run import (simulates pulling updated JSONL from git)
-        let import_result = crate::sync::import(workspace).unwrap();
+        let _import_result = crate::sync::import(workspace).unwrap();
 
         // After import, all dirty marks should be cleared (db is now in sync with JSONL)
         let unflushed_after = count_unflushed(&db_path).unwrap();

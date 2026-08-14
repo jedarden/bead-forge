@@ -310,7 +310,7 @@ fn cleanup_old_archives(
     let mut deleted = Vec::new();
     let num_to_delete = archives.len().saturating_sub(max_archives);
 
-    for (num, path) in archives.into_iter().take(num_to_delete) {
+    for (_num, path) in archives.into_iter().take(num_to_delete) {
         std::fs::remove_file(&path)?;
         deleted.push(path);
     }

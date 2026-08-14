@@ -2315,42 +2315,43 @@ impl Storage {
     pub fn get_timeout_events(&self, bead_id: &str) -> Result<TimeoutEventData> {
         let conn = self.conn.lock().unwrap();
 
-        // Query timeout count and most recent timeout info in a single query
-        let mut stmt = conn.prepare_cached(
-            "SELECT
-                COUNT(*) as timeout_count,
-                e.timeout_duration_secs,
-                e.ts
-             FROM bead_events e
-             WHERE e.bead_id = ?1 AND e.timeout = 1
-             ORDER BY e.ts DESC
-             LIMIT 1"
-        )?;
+        // Query timeout count
+        let timeout_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM bead_events WHERE bead_id = ?1 AND timeout = 1",
+            params![bead_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
 
-        let mut rows = stmt.query(params![bead_id])?;
-
-        if let Some(row) = rows.next()? {
-            let timeout_count: i64 = row.get(0)?;
-            let timeout_duration_secs: Option<i64> = row.get(1)?;
-            let ts_str: Option<String> = row.get(2)?;
-            let last_timeout_at = match ts_str {
-                Some(ts) if !ts.is_empty() => Some(parse_datetime(ts)?),
-                _ => None,
-            };
-
-            Ok(TimeoutEventData {
-                timeout_count,
-                last_timeout_duration_secs: timeout_duration_secs,
-                last_timeout_at,
-            })
+        // Query most recent timeout event details
+        let (last_timeout_duration_secs, last_timeout_at) = if timeout_count > 0 {
+            let result = conn.query_row(
+                "SELECT timeout_duration_secs, ts FROM bead_events
+                 WHERE bead_id = ?1 AND timeout = 1
+                 ORDER BY ts DESC LIMIT 1",
+                params![bead_id],
+                |row| {
+                    let duration_secs: Option<i64> = row.get(0)?;
+                    let ts_str: Option<String> = row.get(1)?;
+                    let last_timeout_at = match ts_str {
+                        Some(ts) if !ts.is_empty() => {
+                            // Parse the datetime string, handle errors gracefully
+                            parse_datetime(ts).ok()
+                        },
+                        _ => None,
+                    };
+                    Ok((duration_secs, last_timeout_at))
+                },
+            );
+            result.unwrap_or((None, None))
         } else {
-            // No timeout events found
-            Ok(TimeoutEventData {
-                timeout_count: 0,
-                last_timeout_duration_secs: None,
-                last_timeout_at: None,
-            })
-        }
+            (None, None)
+        };
+
+        Ok(TimeoutEventData {
+            timeout_count,
+            last_timeout_duration_secs,
+            last_timeout_at,
+        })
     }
 
     /// Get timeout event count for a specific bead.
@@ -3207,7 +3208,7 @@ fn parse_datetime(s: String) -> Result<DateTime<Utc>> {
 mod tests {
     use super::*;
     use crate::model::{Issue, IssueType, Priority, Status};
-    use chrono::Utc;
+    
     use tempfile::NamedTempFile;
 
     #[test]
@@ -3705,7 +3706,7 @@ mod tests {
         let storage = Storage::open(temp_file.path()).unwrap();
 
         // Create an issue
-        let mut issue = Issue::new("bf-label-1".to_string(), "Test labels".to_string(), ".".to_string());
+        let issue = Issue::new("bf-label-1".to_string(), "Test labels".to_string(), ".".to_string());
         storage.create_issue(&issue).unwrap();
 
         // Add label
@@ -3737,7 +3738,7 @@ mod tests {
         let storage = Storage::open(temp_file.path()).unwrap();
 
         // Create an issue
-        let mut issue = Issue::new("bf-comment-1".to_string(), "Test comments".to_string(), ".".to_string());
+        let issue = Issue::new("bf-comment-1".to_string(), "Test comments".to_string(), ".".to_string());
         storage.create_issue(&issue).unwrap();
 
         // Add comment

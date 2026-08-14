@@ -5,7 +5,7 @@
 
 use crate::claim::get_ready_candidates;
 use crate::format::{get_formatter, OutputFormat};
-use crate::model::{Issue, IssueFilter, Status};
+use crate::model::Issue;
 use crate::storage::Storage;
 use crate::Result;
 use std::path::Path;
@@ -154,9 +154,8 @@ fn resolve_dependencies_for_json(storage: &Storage, issue: &Issue, json_line: &s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Issue;
-    use chrono::{DateTime, Utc};
-    use std::path::PathBuf;
+    use crate::model::{Issue, Status};
+    use chrono::Utc;
 
     #[test]
     fn test_resolve_dependencies_for_json_no_deps() {

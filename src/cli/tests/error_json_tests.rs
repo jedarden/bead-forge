@@ -25,7 +25,7 @@ use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    bf_binary, bf_command, bf_command_with_workspace, capture, fixtures, format_detection,
+    bf_binary, bf_command, bf_command_with_workspace, capture, fixtures,
     json_validation, test_workspace,
 };
 
@@ -54,7 +54,7 @@ fn create_isolated_workspace() -> TempDir {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_malformed_bead_id() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test various malformed bead IDs
     let malformed_ids = vec![
@@ -120,7 +120,7 @@ fn test_show_json_malformed_bead_id() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_update_json_malformed_bead_id() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let malformed_ids = vec![
         "invalid-id".to_string(),
@@ -129,7 +129,7 @@ fn test_update_json_malformed_bead_id() {
     ];
 
     for malformed_id in malformed_ids {
-        let (stdout, stderr, success) = capture::capture_failed_command(
+        let (_stdout, stderr, success) = capture::capture_failed_command(
             &mut bf_command()
                 .arg("update")
                 .arg(&malformed_id)
@@ -154,7 +154,7 @@ fn test_update_json_malformed_bead_id() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_close_json_nonexistent_bead_id() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let (stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
@@ -176,9 +176,9 @@ fn test_close_json_nonexistent_bead_id() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_comment_json_nonexistent_bead_id() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("comment")
             .arg("bf-nonexistent-comment-123")
@@ -198,7 +198,7 @@ fn test_comment_json_nonexistent_bead_id() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_dep_add_json_invalid_blocker_id() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a valid bead to be blocked
     let blocked_id = fixtures::create_bead("Bead to be blocked");
@@ -206,7 +206,7 @@ fn test_dep_add_json_invalid_blocker_id() {
     // Try to add dependency with invalid blocker
     let invalid_blocker = "bf-nonexistent-blocker-999";
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("dep")
             .arg("add")
@@ -238,7 +238,7 @@ fn test_dep_add_json_invalid_blocker_id() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_dep_add_json_invalid_blocked_id() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a valid blocker bead
     let blocker_id = fixtures::create_bead("Valid blocker bead");
@@ -246,7 +246,7 @@ fn test_dep_add_json_invalid_blocked_id() {
     // Try to add dependency with invalid blocked bead
     let invalid_blocked = "bf-nonexistent-blocked-888";
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("dep")
             .arg("add")
@@ -279,7 +279,7 @@ fn test_dep_add_json_invalid_blocked_id() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_dep_add_json_circular_dependency() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create two beads
     let bead1_id = fixtures::create_bead("Bead 1 for circular dep");
@@ -289,7 +289,7 @@ fn test_dep_add_json_circular_dependency() {
     fixtures::add_dependency(&bead2_id, &bead1_id);
 
     // Try to add circular dependency: bead1 -> bead2
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("dep")
             .arg("add")
@@ -325,7 +325,7 @@ fn test_dep_add_json_circular_dependency() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_empty_query() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a test bead
     let bead_id = fixtures::create_bead("Test bead for empty query");
@@ -358,7 +358,7 @@ fn test_search_json_empty_query() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_with_only_special_chars() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Queries with only special characters (avoiding CLI flag conflicts)
     let special_queries = vec![
@@ -383,7 +383,7 @@ fn test_search_json_query_with_only_special_chars() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_with_unmatched_brackets() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a bead with brackets
     let bead_id = fixtures::create_bead("Bead with [brackets] and (parentheses)");
@@ -414,7 +414,7 @@ fn test_search_json_query_with_unmatched_brackets() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_invalid_status_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let invalid_statuses = vec![
         "invalid-status",
@@ -447,7 +447,7 @@ fn test_list_json_invalid_status_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_invalid_type_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let invalid_types = vec![
         "invalid-type",
@@ -479,7 +479,7 @@ fn test_list_json_invalid_type_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_invalid_priority_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let invalid_priorities = vec![
         "invalid", "abc", "5.5",  // decimal
@@ -489,7 +489,7 @@ fn test_list_json_invalid_priority_filter() {
     ];
 
     for invalid_priority in invalid_priorities {
-        let (stdout, stderr, success) = capture::capture_failed_command(
+        let (_stdout, stderr, success) = capture::capture_failed_command(
             &mut bf_command()
                 .arg("list")
                 .arg("--priority-min")
@@ -517,7 +517,7 @@ fn test_list_json_invalid_priority_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_invalid_limit_filter() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let invalid_limits = vec![
         "-1",   // negative
@@ -558,7 +558,7 @@ fn test_list_json_invalid_limit_filter() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_unicode_edge_cases() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a bead with unicode content
     let bead_id = fixtures::create_bead("Unicode bead 测试 🧪 试験");
@@ -599,7 +599,7 @@ fn test_search_json_unicode_edge_cases() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_injection_attempts() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a test bead
     let bead_id = fixtures::create_bead("Bead for injection tests");
@@ -651,7 +651,7 @@ fn test_search_json_injection_attempts() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_extremely_long_query() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a bead
     let bead_id = fixtures::create_bead("Bead for long query test");
@@ -667,7 +667,7 @@ fn test_search_json_extremely_long_query() {
         "test\r\n".repeat(200),      // Windows newlines
     ];
 
-    for (i, query) in long_queries.iter().enumerate() {
+    for (_i, query) in long_queries.iter().enumerate() {
         let output = capture::capture_stdout(
             bf_command()
                 .arg("search")
@@ -688,7 +688,7 @@ fn test_search_json_extremely_long_query() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_query_with_null_bytes_and_controls() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead for control char tests");
 
@@ -723,7 +723,7 @@ fn test_search_json_query_with_null_bytes_and_controls() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_malformed_command_syntax_invalid_flag_combinations() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test invalid flag combinations
     let invalid_combinations = vec![
@@ -809,7 +809,7 @@ fn test_malformed_command_syntax_invalid_flag_combinations() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_malformed_command_syntax_invalid_flags() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test invalid flag usage
     let invalid_flags = vec![
@@ -862,7 +862,7 @@ fn test_malformed_command_syntax_invalid_flags() {
     ];
 
     for scenario in invalid_flags {
-        let (stdout, stderr, success, description) = scenario();
+        let (_stdout, stderr, success, description) = scenario();
 
         // Should fail for invalid flags
         assert!(!success, "command should fail for: {}", description);
@@ -878,7 +878,7 @@ fn test_malformed_command_syntax_invalid_flags() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_malformed_command_syntax_invalid_subcommands() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test invalid subcommand usage
     let invalid_subcommands = vec![
@@ -914,7 +914,7 @@ fn test_malformed_command_syntax_invalid_subcommands() {
     ];
 
     for scenario in invalid_subcommands {
-        let (stdout, stderr, success, description) = scenario();
+        let (_stdout, stderr, success, description) = scenario();
 
         // Should fail for invalid subcommands
         assert!(!success, "command should fail for: {}", description);
@@ -930,7 +930,7 @@ fn test_malformed_command_syntax_invalid_subcommands() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_out_of_range_parameters_extended() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead for extended range tests");
 
@@ -1048,7 +1048,7 @@ fn test_out_of_range_parameters_extended() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_invalid_parameter_formats() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead for format tests");
 
@@ -1147,11 +1147,11 @@ fn test_invalid_parameter_formats() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_label_add_json_empty_label() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead for empty label test");
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("label")
             .arg("add")
@@ -1174,9 +1174,9 @@ fn test_label_add_json_empty_label() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_label_add_json_nonexistent_bead() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("label")
             .arg("add")
@@ -1193,11 +1193,11 @@ fn test_label_add_json_nonexistent_bead() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_label_remove_json_nonexistent_label() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead for label removal test");
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("label")
             .arg("remove")
@@ -1219,12 +1219,12 @@ fn test_label_remove_json_nonexistent_label() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_update_json_empty_assignee() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead for assignee test");
 
     // Try setting empty assignee (should clear assignee)
-    let output = capture::capture_stdout(
+    let _output = capture::capture_stdout(
         bf_command()
             .arg("update")
             .arg(&bead_id)
@@ -1252,7 +1252,7 @@ fn test_update_json_empty_assignee() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_update_json_invalid_email_format() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead for email test");
 
@@ -1267,7 +1267,7 @@ fn test_update_json_invalid_email_format() {
     ];
 
     for invalid_email in invalid_emails {
-        let output = capture::capture_stdout(
+        let _output = capture::capture_stdout(
             bf_command()
                 .arg("update")
                 .arg(&bead_id)
@@ -1300,9 +1300,9 @@ fn test_update_json_invalid_email_format() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_missing_required_argument() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command().arg("show").arg("--format").arg("json"), // Missing bead ID argument
     );
 
@@ -1317,9 +1317,9 @@ fn test_show_json_missing_required_argument() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_create_json_missing_title() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("create")
             .arg("--type")
@@ -1339,7 +1339,7 @@ fn test_create_json_missing_title() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_create_json_invalid_type() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test that invalid type values are handled without crashing
     // bead-forge accepts any type string (flexible schema)
@@ -1382,12 +1382,12 @@ fn test_create_json_invalid_type() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_create_json_invalid_priority() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let invalid_priorities = vec!["invalid", "abc", "5.5", "-1", "1000"];
 
     for invalid_priority in invalid_priorities {
-        let (stdout, stderr, success) = capture::capture_failed_command(
+        let (_stdout, stderr, success) = capture::capture_failed_command(
             &mut bf_command()
                 .arg("create")
                 .arg("--title")
@@ -1414,7 +1414,7 @@ fn test_create_json_invalid_priority() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_ready_json_invalid_time_period() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let invalid_periods = vec![
         "invalid", "xyz", "1x",  // wrong unit
@@ -1424,7 +1424,7 @@ fn test_ready_json_invalid_time_period() {
     ];
 
     for invalid_period in invalid_periods {
-        let (stdout, stderr, success) = capture::capture_failed_command(
+        let (_stdout, stderr, success) = capture::capture_failed_command(
             &mut bf_command()
                 .arg("ready")
                 .arg("--time-period")
@@ -1495,7 +1495,7 @@ fn test_command_json_corrupted_database() {
         .expect("Failed to corrupt database");
 
     // Try to list beads - should fail gracefully
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut Command::new(bf_binary())
             .arg("-w")
             .arg(&beads_dir)
@@ -1557,7 +1557,7 @@ fn test_command_json_missing_config() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_responses_dont_emit_partial_json() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a bead
     let bead_id = fixtures::create_bead("Test bead for error schema");
@@ -1609,7 +1609,7 @@ fn test_error_responses_dont_emit_partial_json() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_empty_result_maintains_schema() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test various empty result scenarios
     let bead_id = fixtures::create_bead("Bead for empty schema test");
@@ -1655,7 +1655,7 @@ fn test_empty_result_maintains_schema() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_json_output_field_consistency_on_errors() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create beads with various states
     let bead1_id = fixtures::create_bead("Bead 1 for consistency test");
@@ -1760,7 +1760,7 @@ fn test_claim_json_no_ready_beads() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_already_closed_bead() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead to close and show");
     fixtures::close_bead(&bead_id, "Close for show test");
@@ -1792,13 +1792,13 @@ fn test_show_json_already_closed_bead() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_update_json_closed_bead() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Bead to close and update");
     fixtures::close_bead(&bead_id, "Close for update test");
 
     // Try to update closed bead
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("update")
             .arg(&bead_id)
@@ -1834,7 +1834,7 @@ fn test_update_json_closed_bead() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_json_structure_is_valid() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test that error JSON follows the expected structure
     // When --format json is specified with an invalid command, the output should still be valid JSON
@@ -1880,7 +1880,7 @@ fn test_error_json_structure_is_valid() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_parse_errors_vs_runtime_errors() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Parse errors: invalid command-line arguments caught by clap
     let parse_error_cases = vec![
@@ -1955,7 +1955,7 @@ fn test_parse_errors_vs_runtime_errors() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_messages_properly_escaped_in_json() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test that error messages with special characters are properly escaped in JSON
     let bead_id = fixtures::create_bead("Bead for error escaping test");
@@ -2012,7 +2012,7 @@ fn test_error_messages_properly_escaped_in_json() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_json_content_and_field_types() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test that error JSON has correct content and field types
     let bead_id = fixtures::create_bead("Bead for error content test");
@@ -2057,7 +2057,7 @@ fn test_error_json_content_and_field_types() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_constraint_violation_errors() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test database constraint violations (foreign key, unique, etc.)
 
@@ -2095,7 +2095,7 @@ fn test_constraint_violation_errors() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_multiple_errors_formatting_consistency() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test that different error types produce consistently formatted output
 
@@ -2133,7 +2133,7 @@ fn test_multiple_errors_formatting_consistency() {
     ];
 
     for scenario in error_scenarios {
-        let (stdout, description) = scenario();
+        let (stdout, _description) = scenario();
 
         // All error scenarios should have stdout that is either empty or valid JSON
         let stdout_trimmed = stdout.trim();
@@ -2147,13 +2147,13 @@ fn test_multiple_errors_formatting_consistency() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_with_special_characters_in_stderr() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a bead with special characters
     let bead_id = fixtures::create_bead("Bead with \"quotes\" and 'apostrophes'");
 
     // Try to reference it with invalid operation that includes the special chars in error
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (stdout, stderr, _success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("comment")
             .arg("bf-nonexistent-with-special-chars")
@@ -2185,7 +2185,7 @@ fn test_error_with_special_characters_in_stderr() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_empty_results_with_multiple_filters() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create beads with specific properties
     let bead1_id = fixtures::create_bead_with_assignee("High priority bug", "user1@example.com");
@@ -2246,7 +2246,7 @@ fn test_list_json_empty_results_with_multiple_filters() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_empty_results_with_complex_queries() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create a bead with specific content
     let bead_id = fixtures::create_bead("Specific content bead");
@@ -2347,7 +2347,7 @@ fn test_ready_json_empty_results_with_specific_conditions() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_json_field_consistency_across_command_types() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test that different error types maintain consistent field presence
     let error_scenarios = vec![
@@ -2422,7 +2422,7 @@ fn test_error_json_field_consistency_across_command_types() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_response_with_null_and_missing_fields() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Test that error responses handle null and missing fields correctly
     let bead_id = fixtures::create_bead("Test bead for null fields");
@@ -2483,7 +2483,7 @@ fn test_error_response_with_null_and_missing_fields() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_with_path_traversal_attempts() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Path traversal test bead");
 
@@ -2524,7 +2524,7 @@ fn test_search_json_with_path_traversal_attempts() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_with_command_injection_attempts() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Command injection test bead");
 
@@ -2564,7 +2564,7 @@ fn test_search_json_with_command_injection_attempts() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_with_format_string_attempts() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Format string test bead");
 
@@ -2605,7 +2605,7 @@ fn test_search_json_with_format_string_attempts() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_with_all_filter_combinations_empty() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
+    let _workspace = test_workspace();
 
     // Create beads with known properties
     let bead1_id = fixtures::create_bead_with_assignee("Test bead 1", "user1@example.com");

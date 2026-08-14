@@ -891,8 +891,8 @@ mod list_show {
 #[cfg(test)]
 mod claim_stats {
     use super::*;
-    use crate::format::json::JsonFormatter;
-    use crate::format::Formatter;
+    
+    
     use crate::model::{Issue, IssueType, Priority, Status};
     use serde_json::json;
 

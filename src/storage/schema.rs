@@ -287,12 +287,39 @@ pub const fn bead_annotations_table() -> &'static str {
 )"#
 }
 
+/// Bead events table - bf-only table for worker events including timeout tracking
+/// Stores NEEDLE worker events with timeout detection and duration tracking
+pub const fn bead_events_table() -> &'static str {
+    r#"CREATE TABLE IF NOT EXISTS bead_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL DEFAULT 'complete',
+    ts DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    worker TEXT NOT NULL,
+    strand TEXT DEFAULT '',
+    adapter TEXT,
+    model TEXT,
+    exit_code INTEGER,
+    timeout INTEGER NOT NULL DEFAULT 0,
+    timeout_duration_secs INTEGER,
+    metadata TEXT DEFAULT '{}'
+)"#
+}
+
 /// Bead annotations table indexes
 pub const fn bead_annotations_indexes() -> &'static str {
     r#"CREATE INDEX IF NOT EXISTS idx_bead_annotations_key_value
     ON bead_annotations (key, value);
 CREATE INDEX IF NOT EXISTS idx_bead_annotations_bead_id
     ON bead_annotations (bead_id);"#
+}
+
+/// Bead events table indexes
+pub const fn bead_events_indexes() -> &'static str {
+    r#"CREATE INDEX IF NOT EXISTS idx_bead_events_bead_id ON bead_events(bead_id);
+CREATE INDEX IF NOT EXISTS idx_bead_events_ts ON bead_events(ts);
+CREATE INDEX IF NOT EXISTS idx_bead_events_timeout ON bead_events(bead_id, timeout) WHERE timeout = 1;
+CREATE INDEX IF NOT EXISTS idx_bead_events_worker ON bead_events(worker);"#
 }
 
 /// Labels table indexes
@@ -628,6 +655,28 @@ CREATE INDEX IF NOT EXISTS idx_bead_annotations_key_value
 CREATE INDEX IF NOT EXISTS idx_bead_annotations_bead_id
     ON bead_annotations (bead_id);
 
+-- Bead events table (bf-only table for worker events including timeout tracking)
+CREATE TABLE IF NOT EXISTS bead_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bead_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL DEFAULT 'complete',
+    ts DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    worker TEXT NOT NULL,
+    strand TEXT DEFAULT '',
+    adapter TEXT,
+    model TEXT,
+    exit_code INTEGER,
+    timeout INTEGER NOT NULL DEFAULT 0,
+    timeout_duration_secs INTEGER,
+    metadata TEXT DEFAULT '{}'
+);
+
+-- Bead events indexes
+CREATE INDEX IF NOT EXISTS idx_bead_events_bead_id ON bead_events(bead_id);
+CREATE INDEX IF NOT EXISTS idx_bead_events_ts ON bead_events(ts);
+CREATE INDEX IF NOT EXISTS idx_bead_events_timeout ON bead_events(bead_id, timeout) WHERE timeout = 1;
+CREATE INDEX IF NOT EXISTS idx_bead_events_worker ON bead_events(worker);
+
 -- Dirty issues table (tracks beads that need flushing to JSONL)
 CREATE TABLE IF NOT EXISTS dirty_issues (
     bead_id TEXT NOT NULL PRIMARY KEY,
@@ -831,7 +880,7 @@ pub const fn table_bead_annotations() -> &'static str {
     bead_annotations_table()
 }
 
-/// All table DDL strings - returns all 16 table definitions in dependency order
+/// All table DDL strings - returns all 17 table definitions in dependency order
 pub fn all_tables() -> Vec<&'static str> {
     vec![
         issues_table(),
@@ -847,6 +896,7 @@ pub fn all_tables() -> Vec<&'static str> {
         assignees_table(),
         issue_assignees_table(),
         bead_annotations_table(),
+        bead_events_table(),
         dirty_issues_table(),
         blocked_issues_cache_table(),
         critical_path_cache_table(),
@@ -869,6 +919,7 @@ pub fn all_indexes() -> Vec<&'static str> {
         assignees_indexes(),
         issue_assignees_indexes(),
         bead_annotations_indexes(),
+        bead_events_indexes(),
         dirty_issues_indexes(),
         blocked_issues_cache_indexes(),
         critical_path_cache_indexes(),
@@ -983,7 +1034,7 @@ mod tests {
     #[test]
     fn test_all_tables_count() {
         let tables = all_tables();
-        assert_eq!(tables.len(), 16, "Should have 16 table definitions");
+        assert_eq!(tables.len(), 17, "Should have 17 table definitions");
 
         // Verify critical tables are present
         assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS issues")));
@@ -991,6 +1042,7 @@ mod tests {
         assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS comments")));
         assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS events")));
         assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS bead_annotations")));
+        assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS bead_events")));
         assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS blocked_issues_cache")));
         assert!(tables.iter().any(|t| t.contains("CREATE TABLE IF NOT EXISTS critical_path_cache")));
     }
@@ -998,13 +1050,14 @@ mod tests {
     #[test]
     fn test_all_indexes_count() {
         let indexes = all_indexes();
-        assert_eq!(indexes.len(), 16, "Should have 16 index definition groups");
+        assert_eq!(indexes.len(), 17, "Should have 17 index definition groups");
 
         // Verify critical index groups are present
         assert!(indexes.iter().any(|i| i.contains("idx_issues_status")));
         assert!(indexes.iter().any(|i| i.contains("idx_dependencies_issue")));
         assert!(indexes.iter().any(|i| i.contains("idx_comments_issue")));
         assert!(indexes.iter().any(|i| i.contains("idx_events_issue")));
+        assert!(indexes.iter().any(|i| i.contains("idx_bead_events_bead_id")));
     }
 
     #[test]
@@ -1036,6 +1089,8 @@ mod tests {
 
         // Verify all tables were created
         let tables = all_tables();
+        assert_eq!(tables.len(), 17, "Should verify all 17 tables were created");
+
         for table_ddl in tables {
             let table_name = extract_table_name(table_ddl);
             let mut stmt = conn.prepare(&format!(
@@ -1091,7 +1146,7 @@ mod tests {
         // Verify SCHEMA_SQL contains all tables and indexes
         let schema = SCHEMA_SQL;
 
-        // Check for all 16 tables
+        // Check for all 17 tables
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS issues"));
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS dependencies"));
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS comments"));
@@ -1105,6 +1160,7 @@ mod tests {
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS assignees"));
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS issue_assignees"));
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS bead_annotations"));
+        assert!(schema.contains("CREATE TABLE IF NOT EXISTS bead_events"));
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS dirty_issues"));
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS blocked_issues_cache"));
         assert!(schema.contains("CREATE TABLE IF NOT EXISTS critical_path_cache"));
@@ -1114,6 +1170,7 @@ mod tests {
         assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_dependencies_issue"));
         assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_comments_issue"));
         assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_events_issue"));
+        assert!(schema.contains("CREATE INDEX IF NOT EXISTS idx_bead_events_bead_id"));
     }
 
     #[test]

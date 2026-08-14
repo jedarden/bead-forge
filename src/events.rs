@@ -604,7 +604,7 @@ mod tests {
         processor.record_completion_event("bf-124".to_string(), "alpha".to_string(), "auto".to_string(), 124).unwrap(); // timeout
         processor.record_completion_event("bf-127".to_string(), "alpha".to_string(), "auto".to_string(), 127).unwrap(); // command not found
 
-        let events = processor.read_events().unwrap();
+        let _events = processor.read_events().unwrap();
         let timeout_events = processor.get_timeout_events().unwrap();
 
         assert_eq!(timeout_events.len(), 1);

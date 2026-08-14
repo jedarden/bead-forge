@@ -185,7 +185,7 @@ fn test_negative_priority_rejected() {
     // This validates that the priority validation function correctly rejects
     // invalid priority values outside the valid range of 0-4
 
-    use bead_forge::validation::{validate_priority, ValidationResult};
+    use bead_forge::validation::validate_priority;
 
     // Test that negative priority is rejected
     let result = validate_priority(-1);

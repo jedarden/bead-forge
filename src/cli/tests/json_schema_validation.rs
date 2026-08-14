@@ -35,17 +35,14 @@
 //! }
 //! ```
 
-use std::process::Command;
 use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    bf_binary, bf_command, bf_command_with_workspace, capture, envelope, fixtures,
-    format_detection, json_validation, test_workspace,
+    bf_command, bf_command_with_workspace, capture, envelope, fixtures, json_validation,
 };
 
 // Import items made available in parent scope
-use super::*;
 
 /// Create an isolated test workspace
 fn create_isolated_workspace() -> TempDir {
@@ -246,7 +243,6 @@ fn validate_field_types(json: &serde_json::Value, context: &str) -> std::result:
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_schema_consistency_on_invalid_bead_id() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Test various invalid bead IDs
     let invalid_ids = vec![
@@ -257,7 +253,7 @@ fn test_show_json_schema_consistency_on_invalid_bead_id() {
     ];
 
     for invalid_id in invalid_ids {
-        let (stdout, stderr, success) = capture::capture_failed_command(
+        let (stdout, _stderr, success) = capture::capture_failed_command(
             &mut bf_command()
                 .arg("show")
                 .arg(invalid_id)
@@ -309,7 +305,6 @@ fn test_show_json_schema_consistency_on_invalid_bead_id() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_update_json_schema_consistency_on_errors() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let error_cases = vec![
         // Invalid bead ID
@@ -358,7 +353,6 @@ fn test_update_json_schema_consistency_on_errors() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_command_json_schema_consistency_various_errors() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Test schema consistency across different command error scenarios
     let error_scenarios = vec![
@@ -496,7 +490,7 @@ fn test_show_json_empty_workspace() {
     let empty_workspace = temp_dir.path();
 
     // Show on non-existent bead in empty workspace
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (stdout, _stderr, success) = capture::capture_failed_command(
         &mut bf_command_with_workspace(empty_workspace)
             .arg("show")
             .arg("bf-nonexistent-empty")
@@ -579,7 +573,6 @@ fn test_empty_results_with_filters_maintain_schema() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_all_required_fields_present() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead with all possible fields
     let bead_id = fixtures::create_bead_with_labels(
@@ -664,7 +657,6 @@ fn test_show_json_all_required_fields_present() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_all_items_conform_to_schema() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create multiple beads with different configurations
     let bead1 = fixtures::create_bead_with_labels("Bead 1", &["bug"]);
@@ -719,7 +711,6 @@ fn test_list_json_all_items_conform_to_schema() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_results_conform_to_schema() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create searchable beads
     let bead1 = fixtures::create_bead("Searchable bead with unique keyword");
@@ -753,7 +744,6 @@ fn test_search_json_results_conform_to_schema() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_ready_json_results_conform_to_schema() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create ready beads
     let bead1 = fixtures::create_bead("Ready bead 1");
@@ -785,7 +775,6 @@ fn test_ready_json_results_conform_to_schema() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_claim_json_schema_structure() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead to claim
     let bead_id = fixtures::create_bead("Bead to claim");
@@ -830,7 +819,6 @@ fn test_claim_json_schema_structure() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_create_json_envelope_schema() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead with JSON output
     let output = capture::capture_stdout(
@@ -846,7 +834,7 @@ fn test_create_json_envelope_schema() {
     );
 
     // Parse envelope
-    let parsed = json_validation::parse_json(&output);
+    let _parsed = json_validation::parse_json(&output);
 
     // Validate envelope structure
     let envelope = envelope::validate_envelope(&output, "create");
@@ -872,7 +860,6 @@ fn test_create_json_envelope_schema() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_structure_matches_expected() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Structure validation test");
 
@@ -908,7 +895,6 @@ fn test_show_json_structure_matches_expected() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_structure_matches_expected() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead1 = fixtures::create_bead("List structure test 1");
     let bead2 = fixtures::create_bead("List structure test 2");
@@ -944,7 +930,6 @@ fn test_list_json_structure_matches_expected() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_search_json_structure_matches_expected() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Search structure test");
 
@@ -991,7 +976,6 @@ fn test_search_json_structure_matches_expected() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_schema_maintained_with_special_characters() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create bead with special characters in all fields
     let special_title = "Test with \"quotes\", 'apostrophes', & symbols <>";
@@ -1043,7 +1027,6 @@ fn test_schema_maintained_with_special_characters() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_schema_maintained_with_unicode() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create bead with unicode content
     let unicode_title = "Unicode test: café, 日本語, 🎉 🔥";
@@ -1095,7 +1078,6 @@ fn test_schema_maintained_with_unicode() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_schema_with_very_long_values() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create bead with very long description
     let bead_id = fixtures::create_bead("Long values test");
@@ -1143,7 +1125,6 @@ fn test_schema_with_very_long_values() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_schema_with_minimal_fields() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create bead with only required fields
     let bead_id = fixtures::create_bead("Minimal bead");
@@ -1186,7 +1167,6 @@ fn test_schema_with_minimal_fields() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_same_bead_consistent_schema_across_commands() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead with all fields populated
     let bead_id =
@@ -1258,7 +1238,6 @@ fn test_same_bead_consistent_schema_across_commands() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_error_responses_consistent_schema() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Test that different error types produce consistently structured output
     // Test that different error types produce consistently structured output

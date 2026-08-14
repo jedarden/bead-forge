@@ -318,7 +318,7 @@ mod tests {
 
         assert!(success, "Create command should succeed. stderr: {}", stderr);
 
-        let bead_id = stdout.trim();
+        let _bead_id = stdout.trim();
 
         // Export to JSONL
         let export_output = Command::new(bf_binary())

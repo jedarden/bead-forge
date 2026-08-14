@@ -1,4 +1,4 @@
-use crate::format::{text::format_stats_text, ClaimResultOutput, Formatter, StatsOutput};
+use crate::format::{ClaimResultOutput, Formatter, StatsOutput};
 use crate::model::{Dependency, Issue};
 use crate::velocity::VelocityStats;
 
@@ -292,7 +292,7 @@ mod tests {
     fn test_format_issue_with_long_title_truncation() {
         let formatter = ToonFormatter;
         let long_title = "A".repeat(100);
-        let mut issue = create_test_issue("bf-trunc", &long_title);
+        let issue = create_test_issue("bf-trunc", &long_title);
 
         let result = formatter.format_issue(&issue);
 
@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn test_format_stats_compact() {
         let formatter = ToonFormatter;
-        let mut stats = StatsOutput::new(100, 50, 30, 20);
+        let stats = StatsOutput::new(100, 50, 30, 20);
 
         let result = formatter.format_stats(&stats);
 

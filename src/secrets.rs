@@ -313,7 +313,7 @@ impl SecretScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Issue, Priority, Status};
+    use crate::model::Issue;
     use chrono::Utc;
 
     #[test]

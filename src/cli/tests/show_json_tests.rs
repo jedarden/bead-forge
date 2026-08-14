@@ -7,16 +7,14 @@
 //! - Error case (non-existent bead)
 //! - Different bead types and statuses
 
-use std::process::Command;
 use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    bf_binary, bf_command, capture, fixtures, format_detection, json_validation, test_workspace,
+    bf_command, capture, fixtures, json_validation,
 };
 
 // Import items made available in parent scope
-use super::*;
 
 /// Create an isolated test workspace
 fn create_isolated_workspace() -> TempDir {
@@ -43,7 +41,6 @@ fn create_isolated_workspace() -> TempDir {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_structure_validity() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a test bead
     let bead_id = fixtures::create_bead("Structure test bead");
@@ -97,7 +94,6 @@ fn test_show_json_structure_validity() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_is_parseable() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Parseable test");
 
@@ -130,7 +126,6 @@ fn test_show_json_is_parseable() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_required_fields_types() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Field types test");
 
@@ -189,7 +184,7 @@ fn test_show_json_required_fields_types() {
     );
 
     // labels must be an array (get_array already validates this)
-    let labels = json_validation::get_array(bead, "labels");
+    let _labels = json_validation::get_array(bead, "labels");
     // Successful call to get_array proves it's an array
 
     fixtures::close_bead(&bead_id, "Field types test cleanup");
@@ -199,7 +194,6 @@ fn test_show_json_required_fields_types() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_all_optional_fields_present() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Optional fields test");
 
@@ -255,7 +249,6 @@ fn test_show_json_all_optional_fields_present() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_special_characters_in_title() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let special_title = "Test \"quotes\" and 'apostrophes' & <symbols> \\n\\t";
     let bead_id = fixtures::create_bead(special_title);
@@ -297,7 +290,6 @@ fn test_show_json_special_characters_in_title() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_special_characters_in_description() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Desc special chars");
 
@@ -351,7 +343,6 @@ fn test_show_json_special_characters_in_description() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_special_characters_in_assignee() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Assignee test");
 
@@ -397,7 +388,6 @@ fn test_show_json_special_characters_in_assignee() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_unicode_emoji_in_all_text_fields() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let unicode_title = "🎉 Unicode title with emoji 🚀";
     let unicode_desc = "Description: 你好 مرحبا היי 🌟";
@@ -444,7 +434,6 @@ fn test_show_json_unicode_emoji_in_all_text_fields() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_special_characters_in_labels() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead_with_labels(
         "Label test",
@@ -502,7 +491,6 @@ fn test_show_json_special_characters_in_labels() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_nonexistent_bead_errors() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let (stdout, stderr, success) = capture::capture_failed_command(
         bf_command()
@@ -538,7 +526,6 @@ fn test_show_json_nonexistent_bead_errors() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_with_closed_bead() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Close test");
     fixtures::close_bead(&bead_id, "Test close reason");
@@ -574,7 +561,6 @@ fn test_show_json_with_closed_bead() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_timestamps_are_valid_rfc3339() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Timestamp test");
 
@@ -622,7 +608,6 @@ fn test_show_json_timestamps_are_valid_rfc3339() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_empty_fields_serialize_correctly() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Empty fields");
 

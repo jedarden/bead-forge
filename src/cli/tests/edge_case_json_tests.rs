@@ -9,17 +9,14 @@
 //! - Beads with minimal required fields
 //! - Edge combinations (long descriptions with special characters)
 
-use std::process::Command;
 use tempfile::TempDir;
 
 // Import test infrastructure helpers from sibling module
 use super::json_output::{
-    bf_binary, bf_command, bf_command_with_workspace, capture, envelope, fixtures,
-    format_detection, json_validation, test_workspace,
+    bf_command, bf_command_with_workspace, capture, envelope, fixtures, json_validation,
 };
 
 // Import items made available in parent scope
-use super::*;
 
 /// Create an isolated test workspace
 fn create_isolated_workspace() -> TempDir {
@@ -46,7 +43,6 @@ fn create_isolated_workspace() -> TempDir {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_extremely_long_description() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead with an extremely long description
     let bead_id = fixtures::create_bead("Long description test");
@@ -54,7 +50,7 @@ fn test_show_json_extremely_long_description() {
     // Create a description that's very long (10KB+)
     let long_desc = "A".repeat(1024 * 10); // 10KB of 'A' characters
 
-    let output = capture::capture_stdout(
+    let _output = capture::capture_stdout(
         bf_command()
             .arg("update")
             .arg(&bead_id)
@@ -99,7 +95,6 @@ fn test_show_json_extremely_long_description() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_long_description_with_special_characters() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead with long description containing special characters
     let bead_id = fixtures::create_bead("Long special chars test");
@@ -109,7 +104,7 @@ fn test_show_json_long_description_with_special_characters() {
         .map(|i| format!("Line {} with \"quotes\", 'apostrophes', & symbols <>, \\backslashes\\, and unicode: 🎉 café\n", i))
         .collect();
 
-    let output = capture::capture_stdout(
+    let _output = capture::capture_stdout(
         bf_command()
             .arg("update")
             .arg(&bead_id)
@@ -164,7 +159,6 @@ fn test_show_json_long_description_with_special_characters() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_with_long_descriptions() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create multiple beads with varying description lengths
     let bead1_id = fixtures::create_bead("Short desc bead");
@@ -233,7 +227,6 @@ fn test_list_json_with_long_descriptions() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_unicode_in_all_fields() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Test comprehensive unicode in multiple fields
     let unicode_title = "🎉 Unicode title 日本語 مرحبا היי 🚀";
@@ -309,7 +302,6 @@ fn test_show_json_unicode_in_all_fields() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_with_unicode_labels() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with unicode labels
     let bead1_id =
@@ -364,7 +356,6 @@ fn test_list_json_with_unicode_labels() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_trailing_and_leading_whitespace() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Trailing/leading whitespace test");
 
@@ -422,7 +413,6 @@ fn test_show_json_trailing_and_leading_whitespace() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_newlines_and_tabs_preserved() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Whitespace test");
 
@@ -479,7 +469,6 @@ fn test_show_json_newlines_and_tabs_preserved() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_carriage_returns_and_mixed_line_endings() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Line ending test");
 
@@ -537,10 +526,9 @@ fn test_show_json_carriage_returns_and_mixed_line_endings() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_invalid_bead_id_error_format() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Try to show a non-existent bead
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("show")
             .arg("bf-nonexistent-12345")
@@ -570,10 +558,9 @@ fn test_show_json_invalid_bead_id_error_format() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_update_json_invalid_bead_id_error_format() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Try to update a non-existent bead
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("update")
             .arg("bf-nonexistent-67890")
@@ -635,10 +622,9 @@ fn test_claim_json_no_ready_beads_error_format() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_label_add_json_invalid_bead_id_error_format() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Try to add a label to a non-existent bead
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, stderr, success) = capture::capture_failed_command(
         &mut bf_command()
             .arg("label")
             .arg("add")
@@ -668,7 +654,7 @@ fn test_show_json_empty_workspace() {
     let empty_workspace = temp_dir.path();
 
     // Try to show a bead in empty workspace
-    let (stdout, stderr, success) = capture::capture_failed_command(
+    let (_stdout, _stderr, success) = capture::capture_failed_command(
         &mut bf_command_with_workspace(empty_workspace)
             .arg("show")
             .arg("bf-some-id")
@@ -854,7 +840,6 @@ fn test_ready_json_all_blocked_beads() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_create_json_minimal_fields() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create bead with absolute minimum required parameters
     let output = capture::capture_stdout(
@@ -947,7 +932,6 @@ fn test_create_json_minimal_fields() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_minimal_bead_structure() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead and then verify minimal required fields are present
     let bead_id = fixtures::create_bead("Minimal structure test");
@@ -1007,7 +991,6 @@ fn test_show_json_minimal_bead_structure() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_minimal_beads() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with minimal configuration
     let bead1_id = fixtures::create_bead("Minimal list bead 1");
@@ -1046,7 +1029,6 @@ fn test_list_json_minimal_beads() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_long_description_with_special_chars_and_unicode() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Test the worst case: very long description with special characters and unicode
     let bead_id = fixtures::create_bead("Worst case test");
@@ -1111,7 +1093,6 @@ fn test_show_json_long_description_with_special_chars_and_unicode() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_edge_case_title_combinations() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Test various edge case title combinations
     let edge_titles: Vec<String> = vec![
@@ -1165,7 +1146,6 @@ fn test_show_json_edge_case_title_combinations() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_list_json_mixed_content_types() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create beads with various combinations of special content
     let bead1_id = fixtures::create_bead_with_labels("Mixed content 1", &["bug", "urgent"]);
@@ -1237,7 +1217,6 @@ fn test_list_json_mixed_content_types() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_partial_unicode_sequence() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Partial unicode test");
 
@@ -1285,7 +1264,6 @@ fn test_show_json_partial_unicode_sequence() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_show_json_very_long_single_line() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     let bead_id = fixtures::create_bead("Very long single line test");
 
@@ -1334,7 +1312,6 @@ fn test_show_json_very_long_single_line() {
 #[ignore = "bf-3uk2w5: pre-existing shared-test-workspace isolation defect (order-dependent false failure), not a product bug"]
 fn test_json_output_consistency_across_commands() {
     let _ws = create_isolated_workspace();
-    let workspace = test_workspace();
 
     // Create a bead with complex content
     let bead_id = fixtures::create_bead("Consistency test");

@@ -34,7 +34,7 @@ pub fn close_bead(db_path: &Path, id: &str, reason: &str, actor: &str) -> Result
 mod tests {
     use super::*;
     use crate::model::{Issue, Status};
-    use chrono::{Duration, Utc};
+    use chrono::Utc;
     use std::path::PathBuf;
     use tempfile::TempDir;
 

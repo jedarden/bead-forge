@@ -255,7 +255,7 @@ fn min<T: Ord>(value: T, max: T) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+    
 
     #[test]
     fn test_format_empty_issues() {
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn test_title_truncation() {
         let formatter = TableFormatter::new();
-        let mut issue = Issue::new("bf-test".to_string(), "This is a very long title that should be truncated in the table view to maintain readability".to_string(), ".".to_string());
+        let issue = Issue::new("bf-test".to_string(), "This is a very long title that should be truncated in the table view to maintain readability".to_string(), ".".to_string());
 
         let result = formatter.format_issues(&[issue]);
 
@@ -344,6 +344,41 @@ mod tests {
 
         // Verify it's all equals signs (no other characters except newline)
         assert!(separator_line.chars().all(|c| c == '='), "Separator should contain only equals signs");
+    }
+
+    #[test]
+    fn test_separator_exact_equals_count_with_negative_cases() {
+        let formatter = TableFormatter::new();
+        let issue = Issue::new("bf-neg-test".to_string(), "Negative Test Issue".to_string(), ".".to_string());
+        let result = formatter.format_issue_detail(&issue);
+
+        let lines: Vec<&str> = result.lines().collect();
+        let separator_line = lines.get(1).expect("Should have a separator line");
+
+        // Positive case: exactly 80 equals signs (specification requirement)
+        let equals_count = separator_line.chars().filter(|&c| c == '=').count();
+        assert_eq!(equals_count, 80, "Separator must have exactly 80 equals signs per specification");
+
+        // Negative case: not 79 equals signs (below specification)
+        assert_ne!(equals_count, 79, "Separator should not have 79 equals signs");
+
+        // Negative case: not 81 equals signs (above specification)
+        assert_ne!(equals_count, 81, "Separator should not have 81 equals signs");
+
+        // Negative case: not any other incorrect count
+        assert_eq!(equals_count, 80, "Separator count must be exactly 80, not {}", equals_count);
+
+        // Validate that all characters are equals signs (no mixed characters)
+        let total_chars = separator_line.chars().count();
+        assert_eq!(equals_count, total_chars, "All {} characters must be equals signs", total_chars);
+
+        // Verify no other characters are present
+        assert!(separator_line.chars().all(|c| c == '='), "Separator must contain only '=' characters, no other characters allowed");
+
+        // Verify the line doesn't contain spaces or other separators
+        assert!(!separator_line.contains(' '), "Separator must not contain spaces");
+        assert!(!separator_line.contains('-'), "Separator must not contain dashes");
+        assert!(!separator_line.contains('+'), "Separator must not contain plus signs");
     }
 
     #[test]

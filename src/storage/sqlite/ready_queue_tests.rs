@@ -9,10 +9,9 @@
 mod ready_queue_filtering_tests {
     use super::super::*;
     use crate::model::{
-        Comment, Dependency, DependencyType, Event, EventType, Issue, IssueChanges,
-        IssueFilter, IssueType, Priority, Status,
+        DependencyType, Issue, Priority, Status,
     };
-    use chrono::{Duration, TimeZone, Utc};
+    use chrono::{Duration, Utc};
     use tempfile::NamedTempFile;
 
     // ============================================================================
@@ -358,7 +357,7 @@ mod ready_queue_filtering_tests {
         let storage = Storage::open(temp_file.path()).unwrap();
 
         // Create one open blocker and one closed blocker
-        let mut open_blocker = Issue::new("bf-open-blocker".to_string(), "Open blocker".to_string(), ".".to_string());
+        let open_blocker = Issue::new("bf-open-blocker".to_string(), "Open blocker".to_string(), ".".to_string());
         storage.create_issue(&open_blocker).unwrap();
 
         let mut closed_blocker = Issue::new("bf-closed-blocker".to_string(), "Closed blocker".to_string(), ".".to_string());

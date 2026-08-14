@@ -680,7 +680,7 @@ fn test_batch_literal_id_references() {
 /// When we reopen the database, the bead should not exist.
 #[test]
 fn test_crash_mid_transaction_rolls_back_on_reopen() {
-    use std::io::Write;
+    
     use std::process::Command;
 
     let temp_dir = TempDir::new().unwrap();

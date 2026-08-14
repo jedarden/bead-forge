@@ -281,9 +281,9 @@ mod epic_label_tests {
     fn test_list_all_labels_across_epics() {
         let (_dir, _beads_dir, storage) = create_test_workspace();
 
-        let epic1 = create_epic_with_labels(&storage, "Epic 1", &["common", "epic-1-only"]);
-        let epic2 = create_epic_with_labels(&storage, "Epic 2", &["common", "epic-2-only"]);
-        let epic3 = create_epic_with_labels(&storage, "Epic 3", &["common"]);
+        let _epic1 = create_epic_with_labels(&storage, "Epic 1", &["common", "epic-1-only"]);
+        let _epic2 = create_epic_with_labels(&storage, "Epic 2", &["common", "epic-2-only"]);
+        let _epic3 = create_epic_with_labels(&storage, "Epic 3", &["common"]);
 
         let all_labels = storage
             .list_all_labels()
