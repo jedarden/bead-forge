@@ -313,3 +313,9 @@ All `br` commands plus:
 - [Steve Yegge: Introducing Beads](https://steve-yegge.medium.com/introducing-beads-a-coding-agent-memory-system-637d7d92514a)
 - [NEEDLE mitosis migration guide](docs/needle-mitosis-migration.md)
 - [Thundering herd analysis](docs/research/thundering-herd-and-work-queue.md)
+
+---
+
+Part of [jedarden.com](https://jedarden.com)
+
+*This GitHub repo is a read-only mirror of git.ardenone.com/jedarden/bead-forge — issues and PRs are welcome here either way.*
